@@ -61,7 +61,29 @@ if (!$user) {
             </li>
 
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald" aria-expanded="true" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill-add" viewBox="0 0 16 16">
+                        <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.5-5v1h1a.5.5 0 0 1 0 1h-1v1a.5.5 0 0 1-1 0v-1h-1a.5.5 0 0 1 0-1h1v-1a.5.5 0 0 1 1 0m-2-6a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+                        <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
+                    </svg>
+                    <span style="font-size: 18px;">Recruitment & Onboarding Management</span>
+                </a>
+
+                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="Recruitment & Onboarding Module/job_management.php" class="sidebar-link">Job Management</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Recruitment & Onboarding Module/applicant_management.php" class="sidebar-link">Applicant Management</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Recruitment & Onboarding Module/onboarding.php" class="sidebar-link">Onboarding</a>
+                    </li>
+                </ul>
+            </li>
+
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#geraldd"
                     aria-expanded="true" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
                         viewBox="0 0 16 16" style="margin-bottom: 6px;">
@@ -70,21 +92,78 @@ if (!$user) {
                         <path
                             d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
                     </svg>
-                    <span style="font-size: 18px;">Doctor and Nurse Management</span>
+                    <span style="font-size: 18px;">Time & Attendance</span>
                 </a>
 
-                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <ul id="geraldd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/doctor.php" class="sidebar-link">Doctors</a>
+                        <a href="Time & Attendance Module/clock-in_clock-out.php" class="sidebar-link">Clock-In/Clock-Out</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/nurse.php" class="sidebar-link">Nurses</a>
+                        <a href="Time & Attendance Module/daily_attendance_records.php" class="sidebar-link">Daily Attendance Records</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Other Staff</a>
+                        <a href="Time & Attendance Module/shift_management.php" class="sidebar-link">Shift Management</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Time & Attendance Module/attendance_records.php" class="sidebar-link">Attendance Reports</a>
                     </li>
                 </ul>
             </li>
+
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#geralddd" aria-expanded="true" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-right" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0z"/>
+                        <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708z"/>
+                    </svg>
+                    <span style="font-size: 18px;">Leave Management</span>
+                </a>
+
+                <ul id="geralddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="Leave Management Module/leave_application.php" class="sidebar-link">Leave Application</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Leave Management Module/leave_approval.php" class="sidebar-link">Leave Approval</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Leave Management Module/leave_credit_management.php" class="sidebar-link">Leave Creadit Management</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Leave Management Module/leave_reports.php" class="sidebar-link">Leave Reports</a>
+                    </li>
+                </ul>
+            </li>
+
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#geraldddd" aria-expanded="true" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cash-stack" viewBox="0 0 16 16">
+                        <path d="M1 3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1zm7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4"/>
+                        <path d="M0 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm3 0a2 2 0 0 1-2 2v4a2 2 0 0 1 2 2h10a2 2 0 0 1 2-2V7a2 2 0 0 1-2-2z"/>
+                    </svg>
+                    <span style="font-size: 18px;">Payroll & Compensation Benifits</span>
+                </a>
+
+                <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="Payroll & Onboarding Module/salary_computation.php" class="sidebar-link">Salary Computation</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Payroll & Onboarding Module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Payroll & Onboarding Module/payslip_generation.php" class="sidebar-link">Payslip Generation</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Payroll & Onboarding Module/payroll_disbursement.php" class="sidebar-link">Payroll Disbursement</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="Payroll & Onboarding Module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
+                    </li>
+                </ul>
+            </li>
+
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -121,11 +200,9 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1>BASAHIN PO YUNG MGA COMMENT SA CODE PARA DI MALIGAW</h1> <br>
-                <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
-                <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
-                <H1>CHAT LANG PO KAY ROBERT</H1>
-                <H1>HI GUYSSSS</H1>
+                <h1>HR DASHBOARD
+                    HI GUYSSSS
+                </h1> 
             </div>
             <!-- END CODING HERE -->
         </div>
