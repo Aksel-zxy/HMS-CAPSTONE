@@ -1,0 +1,280 @@
+@media (max-width: 768px) {
+  .main-content {
+    padding: 15px;
+  }
+
+  .inventory-table, .inventory-table thead, .inventory-table tbody, .inventory-table th, .inventory-table td, .inventory-table tr {
+    display: block;
+  }
+
+  .inventory-table th {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  .inventory-table td {
+    position: relative;
+    padding-left: 50%;
+    border: none;
+    border-bottom: 1px solid #eee;
+  }
+
+  .inventory-table td:before {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 45%;
+    white-space: nowrap;
+    font-weight: bold;
+  }
+
+  .inventory-table td:nth-of-type(1):before { content: "No."; }
+  .inventory-table td:nth-of-type(2):before { content: "Sales ID"; }
+  .inventory-table td:nth-of-type(3):before { content: "Staff"; }
+  .inventory-table td:nth-of-type(4):before { content: "Customer"; }
+  .inventory-table td:nth-of-type(5):before { content: "Qty"; }
+  .inventory-table td:nth-of-type(6):before { content: "Price/Unit"; }
+  .inventory-table td:nth-of-type(7):before { content: "Date"; }
+  .inventory-table td:nth-of-type(8):before { content: "Total"; }
+  .inventory-table td:nth-of-type(9):before { content: "Payment"; }
+  .inventory-table td:nth-of-type(10):before { content: "Actions"; }
+}
+
+
+.modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  .modal-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    width: 400px;
+    position: relative;
+    box-shadow: 0 0 15px rgba(0,0,0,0.3);
+  }
+
+  .modal-content h3 {
+    margin-top: 0;
+    text-align: center;
+  }
+
+  .modal-content label {
+    display: block;
+    margin-top: 10px;
+  }
+
+  .modal-content input {
+    width: 100%;
+    padding: 6px;
+    margin-top: 5px;
+    box-sizing: border-box;
+  }
+
+  .modal-content button {
+    margin-top: 15px;
+    padding: 8px 16px;
+    width: 100%;
+    background: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+  }
+
+  .close-btn {
+    position: absolute;
+    top: 10px; right: 15px;
+    cursor: pointer;
+    font-size: 18px;
+  }
+
+body {
+  background-color: #f7f7f7;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  padding: 20px 40px;
+  background-color: #f4f6f9;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 20px;
+  font-size: 14px;
+  color: #555;
+}
+
+.dashboard-content h2 {
+  font-size: 28px;
+  color: #444;
+}
+
+
+/* css of medicine inventory*/
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f8fc;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+
+.main-content {
+  flex-grow: 1;
+  padding: 20px;
+}
+
+.add-btn {
+  background-color: #00bcd4;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  float: right;
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.edit-btn {
+  background-color: #4CAF50;
+  color: white;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delete-btn {
+  background-color: #f44336;
+  color: white;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* css of sales*/
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f5f8fc;
+}
+
+.container {
+  display: flex;
+  height: 100vh;
+}
+
+
+.main-content {
+  flex-grow: 1;
+  padding: 40px;
+  background-color: #f5f8fc;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.user-name {
+  font-weight: bold;
+}
+
+.dashboard-content {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 6px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.add-btn {
+  background-color: #00bcd4;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  float: right;
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background-color: white;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.inventory-table th {
+  background-color: #f8f8f8;
+}
+
+.edit-btn {
+  background-color: #4CAF50;
+  color: white;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 5px;
+}
+
+.delete-btn {
+  background-color: #f44336;
+  color: white;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
