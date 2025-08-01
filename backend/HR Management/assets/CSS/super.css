@@ -1,0 +1,151 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Nunito, sans-serif;
+    font-size: .875rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #6c757d;
+    text-align: left;
+}
+
+.menu-title{
+    padding: 10px 20px;
+    letter-spacing: .05em;
+    pointer-events: none;
+    cursor: default;
+    font-size: .6875rem;
+    text-transform: uppercase;
+    color: #6e768e;
+    font-weight: 600;
+}
+
+li {
+    list-style: none;
+}
+
+a {
+    text-decoration: none;
+}
+
+.main {
+    min-height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    background-color: #F5F6F7;
+}
+
+#sidebar {
+    max-width: 264px;
+    min-width: 264px;
+    transition: all 0.35s ease-in-out;
+    background-color: white;
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+#sidebar.collapsed {
+    margin-left: -264px;
+}
+
+.navbar {
+    padding: 1.15rem 1.5rem;
+}
+
+.sidebar-nav {
+    flex: 1 1 auto;
+}
+
+.sidebar-logo {
+    padding: 1.15rem 1.5rem;
+    text-align: center;
+    color: white;
+}
+
+.sidebar-logo a {
+    text-decoration: none;
+    color: white;
+    font-weight: 700;
+    font-size: 20px;
+}
+
+.sidebar-header {
+    color: white;
+    font-size: .75rem;
+    padding: 1.5rem 1.5rem .375rem;
+}
+
+a.sidebar-link {
+    padding: .625rem 1.625rem;
+    color: #6e768e;
+    position: relative;
+    transition: all 0.35s;
+    display: block;
+    font-size: 15px;
+    text-decoration: none;
+    font-family: "Cerebri Sans,sans-serif";
+    font-size: .95rem;
+}
+
+a.sidebar-link:hover {
+    color: #00acc1
+}
+
+.sidebar-link[data-bs-toggle="collapse"]::after {
+    border: solid;
+    border-width: 0 .075rem .075rem 0;
+    content: "";
+    display: inline-block;
+    padding: 2px;
+    position: absolute;
+    right: 1.5rem;
+    top: 1.4rem;
+    transform: rotate(-135deg);
+    transition: all .2s ease-out;
+}
+
+.sidebar-link[data-bs-toggle="collapse"].collapsed::after {
+    transform: rotate(45deg);
+    transition: all .2s ease-out;
+}
+
+/* ---------- TopBar ---------- */
+.topbar {
+    width: 100%;
+    height: 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px;
+    margin-bottom: 20px;
+}
+
+/* ---------- Toggle ---------- */
+.toggle {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2.5rem;
+    cursor: pointer;
+}
+
+.toggler-btn {
+    background-color: transparent;
+    cursor: pointer;
+    border: 0;
+}
+
+.container-fluid h1{
+    font-size: 1.25rem;
+    margin: 0;
+    color: #323a46;
+}
