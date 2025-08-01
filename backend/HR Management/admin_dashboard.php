@@ -125,6 +125,7 @@ if (!$user) {
                 <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
                 <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
                 <H1>CHAT LANG PO KAY ROBERT</H1>
+                <H1>HI GUYSSSS</H1>
             </div>
             <!-- END CODING HERE -->
         </div>
