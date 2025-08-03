@@ -70,18 +70,18 @@ if (!$user) {
                         <path
                             d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
                     </svg>
-                    <span style="font-size: 18px;">Doctor and Nurse Management</span>
+                    <span style="font-size: 18px;">Billing Management</span>
                 </a>
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/doctor.php" class="sidebar-link">Doctors</a>
+                        <a href="billing_records.php" class="sidebar-link">Billing Records</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/nurse.php" class="sidebar-link">Nurses</a>
+                        <a href="billing_items.php" class="sidebar-link">Billing Items</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Other Staff</a>
+                        <a href="expense_logs.php" class="sidebar-link">Expense Logs</a>
                     </li>
                 </ul>
             </li>
@@ -121,10 +121,8 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1>BASAHIN PO YUNG MGA COMMENT SA CODE PARA DI MALIGAW</h1> <br>
-                <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
-                <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
-                <H1>CHAT LANG PO KAY ROBERT</H1>
+                <h1>Billing </h1> <br>
+                
             </div>
             <!-- END CODING HERE -->
         </div>
