@@ -121,7 +121,7 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1>BASAHIN PO YUNG MGA COMMENT SA CODE PARA DI MALIGAW</h1> <br>
+                <h1>BASAHIN PO YUNG MGA COMMENT SDE PARA DI MALIGAW</h1> <br>
                 <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
                 <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
                 <H1>CHAT LANG PO KAY ROBERT</H1>
