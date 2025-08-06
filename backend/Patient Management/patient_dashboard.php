@@ -50,7 +50,7 @@ if (!$user) {
             <!----- Sidebar Navigation ----->
         
             <li class="sidebar-item">
-                <a href="admin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="patient_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
@@ -60,7 +60,7 @@ if (!$user) {
                 </a>
             </li>
 
-            <li class="sidebar-item">
+           <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
                     aria-expanded="true" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
@@ -70,18 +70,15 @@ if (!$user) {
                         <path
                             d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
                     </svg>
-                    <span style="font-size: 18px;">Doctor and Nurse Management</span>
+                    <span style="font-size: 18px;">Patient Lists</span>
                 </a>
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/doctor.php" class="sidebar-link">Doctors</a>
+                        <a href="../Patient Management/inpatient.php" class="sidebar-link">Inpatients</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/nurse.php" class="sidebar-link">Nurses</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Other Staff</a>
+                        <a href="../Patient Management/outpatient.php" class="sidebar-link">Outpatients</a>
                     </li>
                 </ul>
             </li>
