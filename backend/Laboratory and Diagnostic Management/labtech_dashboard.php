@@ -1,35 +1,25 @@
 <?php
 session_start();
 include '../../SQL/config.php';
-require_once '../Laboratory and Diagnostic Management/test_class.php';
-
-//log in 
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
     exit();
 }
-
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     echo "User ID is not set in session.";
     exit();
 }
-
 $query = "SELECT * FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
-
 if (!$user) {
     echo "No user found.";
     exit();
 }
-
-
 ?>
-
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -41,21 +31,16 @@ if (!$user) {
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
 </head>
-<style>
-    </style>
+
 <body>
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
-
             <div class="sidebar-logo mt-3">
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
-
             <div class="menu-title">Navigation</div>
-
             <!----- Sidebar Navigation ----->
-        
             <li class="sidebar-item">
                 <a href="admin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -66,7 +51,6 @@ if (!$user) {
                     <span style="font-size: 18px;">Dashboard</span>
                 </a>
             </li>
-
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#labtech"
                     aria-expanded="true" aria-controls="auth">
@@ -90,72 +74,66 @@ if (!$user) {
                     </li>
                 </ul>
             </li>
-
-<!-- Module 2: Sample Collection & Tracking -->
-<li class="sidebar-item">
-    <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#sample"
-        aria-expanded="true" aria-controls="auth">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-collection" viewBox="0 0 16 16">
-            <path d="M2.5 3.5a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1h-11zm2-2a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1h-7zM0 13a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 16 13V6a1.5 1.5 0 0 0-1.5-1.5h-13A1.5 1.5 0 0 0 0 6v7zm1.5.5A.5.5 0 0 1 1 13V6a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-13z"/>
-        </svg>
-        <span style="font-size: 18px;">Sample Collection & Tracking</span>
-    </a>
-    <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-        <li class="sidebar-item">
-            <a href="../Sample/collection_log.php" class="sidebar-link">Sample Process</a>
-        </li>
-        <li class="sidebar-item">
-            <a href="../Sample/sample_tracking.php" class="sidebar-link">Sample Processing Status</a>
-        </li>
-        <li class="sidebar-item">
-            <a href="../Sample/collection_team.php" class="sidebar-link">Audit Trail & Test Booking</a>
-        </li>
-    </ul>
-</li>
-
-<!-- Module 3: Report Generation & Delivery -->
-<li class="sidebar-item">
-    <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#report"
-        aria-expanded="true" aria-controls="auth">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-text" viewBox="0 0 16 16">
-            <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/>
-            <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z"/>
-        </svg>
-        <span style="font-size: 18px;">Report Generation & Delivery</span>
-    </a>
-    <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-        <li class="sidebar-item">
-            <a href="../Laboratory and Diagnostic Management/labtechm3.php/test_results.php" class="sidebar-link">Test Results</a>
-        </li>
-        <li class="sidebar-item">
-            <a href="../Laboratory and Diagnostic Management/labtechm3.php/result_items.php" class="sidebar-link">Result Deliveries</a>
-        </li>
-        <li class="sidebar-item">
-            <a href="../Laboratory and Diagnostic Management/labtechm3.php/report_deliveries.php" class="sidebar-link">Operation Equipment</a>
-        </li>
-    </ul>
-</li>
-
-<!-- Module 4: Equipment Maintenance -->
-<li class="sidebar-item">
-    <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#equipment"
-        aria-expanded="true" aria-controls="auth">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-tools" viewBox="0 0 16 16">
-            <path d="M1 0 0 1l2.2 3.081a1 1 0 0 0 .815.419h.07a1 1 0 0 1 .708.293l2.675 2.675-2.617 2.654A3.003 3.003 0 0 0 0 13a3 3 0 1 0 5.878-.851l2.654-2.617.968.968-.305.914a1 1 0 0 0 .242 1.023l3.27 3.27a.997.997 0 0 0 1.414 0l1.586-1.586a.997.997 0 0 0 0-1.414l-3.27-3.27a1 1 0 0 0-1.023-.242L10.5 9.5l-.96-.96 2.68-2.643A3.005 3.005 0 0 0 16 3c0-.269-.035-.53-.102-.777l-2.14 2.141L12 4l-.364-1.757L13.777.102a3 3 0 0 0-3.675 3.68L7.462 6.46 4.793 3.793a1 1 0 0 1-.293-.707v-.071a1 1 0 0 0-.419-.814L1 0Zm9.646 10.646a.5.5 0 0 1 .708 0l2.914 2.915a.5.5 0 0 1-.707.707l-2.915-2.914a.5.5 0 0 1 0-.708ZM3 11l.471.242.529.026.287.445.445.287.026.529L5 13l-.242.471-.026.529-.445.287-.287.445-.529.026L3 15l-.471-.242L2 14.732l-.287-.445L1.268 14l-.026-.529L1 13l.242-.471.026-.529.445-.287.287-.445.529-.026L3 11Z"/>
-        </svg>
-        <span style="font-size: 18px;">Equipment Maintenance</span>
-    </a>
-    <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-        <li class="sidebar-item">
-            <a href="../Equipment/equipment_list.php" class="sidebar-link">Laboratory Equipment </a>
-        </li>
-        <li class="sidebar-item">
-            <a href="../Equipment/maintenance_schedule.php" class="sidebar-link">Maintenance Schedule</a>
-        </li>
-    </ul>
-</li>
-</aside>
-<!----- End of Sidebar ----->
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#sample"
+                    aria-expanded="true" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-collection" viewBox="0 0 16 16">
+                        <path d="M2.5 3.5a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1h-11zm2-2a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1h-7zM0 13a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 16 13V6a1.5 1.5 0 0 0-1.5-1.5h-13A1.5 1.5 0 0 0 0 6v7zm1.5.5A.5.5 0 0 1 1 13V6a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5h-13z" />
+                    </svg>
+                    <span style="font-size: 18px;">Sample Collection & Tracking</span>
+                </a>
+                <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="../Sample/collection_log.php" class="sidebar-link">Sample Process</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="../Sample/sample_tracking.php" class="sidebar-link">Sample Processing Status</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="../Sample/collection_team.php" class="sidebar-link">Audit Trail & Test Booking</a>
+                    </li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#report"
+                    aria-expanded="true" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-file-earmark-text" viewBox="0 0 16 16">
+                        <path d="M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5zM5 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z" />
+                        <path d="M9.5 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.5L9.5 0zm0 1v2A1.5 1.5 0 0 0 11 4.5h2V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h5.5z" />
+                    </svg>
+                    <span style="font-size: 18px;">Report Generation & Delivery</span>
+                </a>
+                <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/test_results.php" class="sidebar-link">Test Results</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/result_items.php" class="sidebar-link">Result Deliveries</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/report_deliveries.php" class="sidebar-link">Operation Equipment</a>
+                    </li>
+                </ul>
+            </li>
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#equipment"
+                    aria-expanded="true" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-tools" viewBox="0 0 16 16">
+                        <path d="M1 0 0 1l2.2 3.081a1 1 0 0 0 .815.419h.07a1 1 0 0 1 .708.293l2.675 2.675-2.617 2.654A3.003 3.003 0 0 0 0 13a3 3 0 1 0 5.878-.851l2.654-2.617.968.968-.305.914a1 1 0 0 0 .242 1.023l3.27 3.27a.997.997 0 0 0 1.414 0l1.586-1.586a.997.997 0 0 0 0-1.414l-3.27-3.27a1 1 0 0 0-1.023-.242L10.5 9.5l-.96-.96 2.68-2.643A3.005 3.005 0 0 0 16 3c0-.269-.035-.53-.102-.777l-2.14 2.141L12 4l-.364-1.757L13.777.102a3 3 0 0 0-3.675 3.68L7.462 6.46 4.793 3.793a1 1 0 0 1-.293-.707v-.071a1 1 0 0 0-.419-.814L1 0Zm9.646 10.646a.5.5 0 0 1 .708 0l2.914 2.915a.5.5 0 0 1-.707.707l-2.915-2.914a.5.5 0 0 1 0-.708ZM3 11l.471.242.529.026.287.445.445.287.026.529L5 13l-.242.471-.026.529-.445.287-.287.445-.529.026L3 15l-.471-.242L2 14.732l-.287-.445L1.268 14l-.026-.529L1 13l.242-.471.026-.529.445-.287.287-.445.529-.026L3 11Z" />
+                    </svg>
+                    <span style="font-size: 18px;">Equipment Maintenance</span>
+                </a>
+                <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="../Equipment/equipment_list.php" class="sidebar-link">Laboratory Equipment </a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="../Equipment/maintenance_schedule.php" class="sidebar-link">Maintenance Schedule</a>
+                    </li>
+                </ul>
+            </li>
+        </aside>
+        <!----- End of Sidebar ----->
         <!----- Main Content ----->
         <div class="main">
             <div class="topbar">
@@ -189,22 +167,18 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-             
             <h1>wala pa here</h1>
-
- 
-        <!----- End of Main Content ----->
-   
-    <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    </script>
-    <script src="assets/Bootstrap/all.min.js"></script>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
+            <!----- End of Main Content ----->
+            <script>
+                const toggler = document.querySelector(".toggler-btn");
+                toggler.addEventListener("click", function() {
+                    document.querySelector("#sidebar").classList.toggle("collapsed");
+                });
+            </script>
+            <script src="assets/Bootstrap/all.min.js"></script>
+            <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+            <script src="assets/Bootstrap/fontawesome.min.js"></script>
+            <script src="assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
