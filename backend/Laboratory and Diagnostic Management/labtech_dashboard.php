@@ -42,7 +42,7 @@ if (!$user) {
             <div class="menu-title">Navigation</div>
             <!----- Sidebar Navigation ----->
             <li class="sidebar-item">
-                <a href="admin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
@@ -67,10 +67,10 @@ if (!$user) {
 
                 <ul id="labtech" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/test.php" class="sidebar-link">Doctor Referral</a>
+                        <a href="mod1/doctor_referral.php" class="sidebar-link">Doctor Referral</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm1.php/appointment.php" class="sidebar-link">Calendar & Appointment Slot</a>
+                        <a href="mod1/cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
                 </ul>
             </li>
