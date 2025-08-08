@@ -83,10 +83,10 @@ if (!$user) {
 
                 <ul id="labtech" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/test.php" class="sidebar-link">Test Available</a>
+                        <a href="../Laboratory and Diagnostic Management/test.php" class="sidebar-link">Doctor Referral</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm1.php/appointment.php" class="sidebar-link">Appointment</a>
+                        <a href="../Laboratory and Diagnostic Management/labtechm1.php/appointment.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
                 </ul>
             </li>
@@ -102,13 +102,13 @@ if (!$user) {
     </a>
     <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
         <li class="sidebar-item">
-            <a href="../Sample/collection_log.php" class="sidebar-link">Collection Log</a>
+            <a href="../Sample/collection_log.php" class="sidebar-link">Sample Process</a>
         </li>
         <li class="sidebar-item">
-            <a href="../Sample/sample_tracking.php" class="sidebar-link">Sample Tracking</a>
+            <a href="../Sample/sample_tracking.php" class="sidebar-link">Sample Processing Status</a>
         </li>
         <li class="sidebar-item">
-            <a href="../Sample/collection_team.php" class="sidebar-link">Collection Team</a>
+            <a href="../Sample/collection_team.php" class="sidebar-link">Audit Trail & Test Booking</a>
         </li>
     </ul>
 </li>
@@ -128,10 +128,10 @@ if (!$user) {
             <a href="../Laboratory and Diagnostic Management/labtechm3.php/test_results.php" class="sidebar-link">Test Results</a>
         </li>
         <li class="sidebar-item">
-            <a href="../Laboratory and Diagnostic Management/labtechm3.php/result_items.php" class="sidebar-link">Result Items</a>
+            <a href="../Laboratory and Diagnostic Management/labtechm3.php/result_items.php" class="sidebar-link">Result Deliveries</a>
         </li>
         <li class="sidebar-item">
-            <a href="../Laboratory and Diagnostic Management/labtechm3.php/report_deliveries.php" class="sidebar-link">Delivery Methods</a>
+            <a href="../Laboratory and Diagnostic Management/labtechm3.php/report_deliveries.php" class="sidebar-link">Operation Equipment</a>
         </li>
     </ul>
 </li>
@@ -147,13 +147,10 @@ if (!$user) {
     </a>
     <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
         <li class="sidebar-item">
-            <a href="../Equipment/equipment_list.php" class="sidebar-link">Equipment Inventory</a>
+            <a href="../Equipment/equipment_list.php" class="sidebar-link">Laboratory Equipment </a>
         </li>
         <li class="sidebar-item">
             <a href="../Equipment/maintenance_schedule.php" class="sidebar-link">Maintenance Schedule</a>
-        </li>
-        <li class="sidebar-item">
-            <a href="../Equipment/service_log.php" class="sidebar-link">Service Log</a>
         </li>
     </ul>
 </li>
