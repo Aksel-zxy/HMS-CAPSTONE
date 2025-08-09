@@ -1,6 +1,7 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
+require_once "oop/fetchdetails.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
     exit();
@@ -19,6 +20,8 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+$patient = new Patient($conn);
+$allPatients = $patient->getAllPatients();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -166,8 +169,55 @@ if (!$user) {
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
-            <h1>Doc REf</h1>
+            <!-- START CODING HERE -->  
+            <h2>Appointments</h2>
+
+            <table style="width:100%; border-collapse:collapse; font-family:sans-serif;">
+                <thead>
+                    <tr style="background:#f8f9fa; border-bottom:2px solid #ddd;">
+                        <th style="padding:8px;">No</th>
+                        <th style="padding:8px;">Patient Name</th>
+                        <th style="padding:8px;">Date &amp; Time</th>
+                        <th style="padding:8px;">Status</th>
+                        <th style="padding:8px;">Appointment Type</th>
+                        <th style="padding:8px;">Age</th>
+                        <th style="padding:8px;">Room</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $counter = 1;
+                    foreach ($allPatients as $p):
+                        // Replace placeholders with your real DB fields
+                        $name       = $p['fname'] . ' ' . $p['lname'];
+                        $dateTime   = "Jul 21, 2025 10:42 AM"; // from DB
+                        $status     = "Scheduled";             // from DB
+                        $type       = "Consultation";          // from DB
+                        $age        = 34;                      // from DB or calculation
+                        $room       = "Room 305";              // from DB
+                    ?>
+                        <tr style="border-bottom:1px solid #eee;">
+                            <td style="padding:8px;"><?php echo $counter++; ?></td>
+                            <td style="padding:8px;"><?php echo htmlspecialchars($name); ?></td>
+                            <td style="padding:8px;"><?php echo $dateTime; ?></td>
+                            <td style="padding:8px;">
+                                <?php if ($status === 'Scheduled'): ?>
+                                    <span style="background:#fff3cd; color:#856404; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                                <?php elseif ($status === 'Completed'): ?>
+                                    <span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                                <?php elseif ($status === 'Missed'): ?>
+                                    <span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                                <?php else: ?>
+                                    <?php echo $status; ?>
+                                <?php endif; ?>
+                            </td>
+                            <td style="padding:8px;"><?php echo $type; ?></td>
+                            <td style="padding:8px;"><?php echo $age; ?></td>
+                            <td style="padding:8px;"><?php echo $room; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
             <!----- End of Main Content ----->
             <script>
                 const toggler = document.querySelector(".toggler-btn");
