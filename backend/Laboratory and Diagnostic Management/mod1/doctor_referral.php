@@ -169,51 +169,47 @@ $allPatients = $patient->getAllPatients();
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->  
+            <!-- START CODING HERE -->
             <h2>Appointments</h2>
 
             <table style="width:100%; border-collapse:collapse; font-family:sans-serif;">
                 <thead>
                     <tr style="background:#f8f9fa; border-bottom:2px solid #ddd;">
-                        <th style="padding:8px;">No</th>
+                        <th style="padding:8px;">Patient ID</th>
                         <th style="padding:8px;">Patient Name</th>
-                        <th style="padding:8px;">Date &amp; Time</th>
+                        <th style="padding:8px;">Date | Time</th>
+                        <th style="padding:8px;">Test Name</th>
                         <th style="padding:8px;">Status</th>
-                        <th style="padding:8px;">Appointment Type</th>
-                        <th style="padding:8px;">Age</th>
-                        <th style="padding:8px;">Room</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php
-                    $counter = 1;
-                    foreach ($allPatients as $p):
-                        // Replace placeholders with your real DB fields
-                        $name       = $p['fname'] . ' ' . $p['lname'];
-                        $dateTime   = "Jul 21, 2025 10:42 AM"; // from DB
-                        $status     = "Scheduled";             // from DB
-                        $type       = "Consultation";          // from DB
-                        $age        = 34;                      // from DB or calculation
-                        $room       = "Room 305";              // from DB
-                    ?>
+                    <?php foreach ($allPatients as $p): ?>
+                        <?php
+                        // Get actual patient ID
+                        $counter = $p['patient_id'];
+
+                        // Build name
+                        $name     = $p['fname'] . ' ' . $p['lname'];
+                        $dateTime = $p['appointment_date']; // from DB
+                        $status   = $p['status'];             // from DB
+                        $type     = $p['purpose'];          // from DB
+                        ?>
                         <tr style="border-bottom:1px solid #eee;">
-                            <td style="padding:8px;"><?php echo $counter++; ?></td>
+                            <td style="padding:8px;"><?php echo htmlspecialchars($counter); ?></td>
                             <td style="padding:8px;"><?php echo htmlspecialchars($name); ?></td>
                             <td style="padding:8px;"><?php echo $dateTime; ?></td>
+                            <td style="padding:8px;"><?php echo $type; ?></td>
                             <td style="padding:8px;">
-                                <?php if ($status === 'Scheduled'): ?>
+                                <?php if ($status === 'Processing'): ?>
                                     <span style="background:#fff3cd; color:#856404; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
                                 <?php elseif ($status === 'Completed'): ?>
                                     <span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                                <?php elseif ($status === 'Missed'): ?>
+                                <?php elseif ($status === 'Cancelled'): ?>
                                     <span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
                                 <?php else: ?>
                                     <?php echo $status; ?>
                                 <?php endif; ?>
                             </td>
-                            <td style="padding:8px;"><?php echo $type; ?></td>
-                            <td style="padding:8px;"><?php echo $age; ?></td>
-                            <td style="padding:8px;"><?php echo $room; ?></td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
