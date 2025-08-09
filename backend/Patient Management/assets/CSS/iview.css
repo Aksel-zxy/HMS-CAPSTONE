@@ -1,0 +1,59 @@
+
+        /* ===== Global Body Styling ===== */
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* ===== Card Styling ===== */
+        .card {
+            border-radius: 12px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            padding: 20px;
+        }
+
+        .card h4 {
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            color: white;
+            padding: 15px;
+            border-radius: 8px 8px 0 0;
+            font-weight: 600;
+        }
+
+        /* ===== Patient Info Styling ===== */
+        .patient-info p {
+            font-size: 16px;
+            margin-bottom: 10px;
+            padding: 12px 15px;
+            border-left: 4px solid #007bff;
+            background: #f9faff;
+            border-radius: 6px;
+            transition: 0.3s ease;
+        }
+
+        .patient-info p strong {
+            color: #0056b3;
+            min-width: 140px;
+            display: inline-block;
+        }
+
+        .patient-info p:hover {
+            background: #eef5ff;
+            transform: translateX(4px);
+        }
+
+        /* ===== Back Button ===== */
+        .btn-secondary {
+            border-radius: 6px;
+            padding: 8px 20px;
+            font-weight: 500;
+        }
+
+        /* ===== Responsive Layout ===== */
+        @media (max-width: 768px) {
+            .patient-info p {
+                font-size: 14px;
+            }
+        }

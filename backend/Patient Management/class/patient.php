@@ -8,7 +8,7 @@ class Patient {
     }
 
     public function getAllPatients() {
-        $sql = "SELECT * FROM patientinfo";
+        $sql = "SELECT * FROM patientinfo where admission_type != 'Outpatient' ORDER BY patient_id DESC";
         $result = $this->conn->query($sql);
 
         if (!$result) {
@@ -26,8 +26,8 @@ class Patient {
     }
 
     public function insertPatient($data) {
-        $stmt = $this->conn->prepare(" INSERT INTO patientinfo (fname, mname, lname, address, age, dob, gender, civil_status, phone_number, email, admission_type, bed_number) VALUES (?, ?,?,?,?,?,?,?, ?,?,?,?)");
-        $stmt->bind_param("ssssissssssi",
+        $stmt = $this->conn->prepare(" INSERT INTO patientinfo (fname, mname, lname, address, age, dob, gender, civil_status, phone_number, email, admission_type, bed_number, attending_doctor) VALUES (?, ?,?,?,?,?,?,?, ?,?,?,?,?)");
+        $stmt->bind_param("ssssisssssssi",
         $data['fname'], $data['mname'], $data['lname'], $data['address'], $data['age'], $data['dob'], $data['gender'], $data['civil_status'], $data['phone_number'],
         $data['email'], $data['admission_type'], $data['bed_number'], $data['attending_doctor']);
 
@@ -41,7 +41,7 @@ class Patient {
      if (!$stmt){
         die("Prepare failed: " . $this->conn->error);
      }
-    $stmt->bind_param("ssssiisssssssi", 
+    $stmt->bind_param("ssssisssssssi", 
         $data['fname'], $data['mname'], $data['lname'], $data['address'], 
         $data['dob'], $data['age'], $data['gender'], $data['civil_status'], 
         $data['phone_number'], $data['email'], $data['admission_type'], $data['bed_number'], $data['attending_doctor'],

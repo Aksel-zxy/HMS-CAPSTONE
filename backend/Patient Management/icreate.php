@@ -1,37 +1,12 @@
 <?php
-include '../../SQL/config.php';
-require_once 'Patient.php';
 
-$patient = new Patient($conn);
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $data = [
-        'fname' => $_POST["fname"],
-        'mname' => $_POST["mname"],
-        'lname' => $_POST["lname"],
-        'address' => $_POST["address"],
-        'age' => $_POST["age"],
-        'dob' => $_POST["dob"],
-        'gender' => $_POST["gender"],
-        'civil_status' => $_POST["civil_status"],
-        'phone_number' => $_POST["phone_number"],
-        'email' => $_POST["email"],
-        'admission_type' => $_POST["admission_type"],
-        'bed_number' => $_POST["bed_number"],
-        'attending_doctor' => $_POST["attending_doctor"] ?? '', // Fallback if not set
-    ];
-
-    if ($patient->insertPatient($data)) {
-        header("Location: ../Patient Management/inpatient.php?success=1");
-        exit();
-    } else {
-        $error = "Failed to add patient.";
-    }
-}
+require_once 'class/Patient.php';
+require_once 'class/create.php';
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>HMS | Patient Management</title>
@@ -40,149 +15,185 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="assets/CSS/super.css">
     <link rel="stylesheet" href="assets/CSS/icreate.css">
 </head>
+
 <body>
 
-<!-- Modal -->
-    <div class="modal fade" id="addPatientModal" tabindex="-1" aria-labelledby="addPatientModalLabel" aria-hidden="true">
+    <!-- Modal -->
+    <div class="modal fade" id="addPatientModal" tabindex="-1" aria-labelledby="addPatientModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
-               <form method="post" action="">
+                <form method="post" action="">
                     <div class="modal-body">
                         <?php if (isset($error)): ?>
-                            <div class="alert alert-danger"><?php echo $error; ?></div>
+                        <div class="alert alert-danger"><?php echo $error; ?></div>
                         <?php endif; ?>
 
-                        <!-- FORM FIELDS -->
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">First Name</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" name="fname" required minlength="2">
+                        <div class="step" id="step1">
+                            <!-- FORM FIELDS -->
+                            <div class="text-center mb-3">
+                                <h5>Patient Information</h5>
+                            </div>
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">First Name</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" name="fname" required minlength="2">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Middle Name</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" name="mname">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Last Name</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" name="lname" required minlength="2">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Address</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" name="address">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Date of Birth</label>
+                                <div class="col-sm-9">
+                                    <input type="date" class="form-control" id="dob" name="dob">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Age</label>
+                                <div class="col-sm-9">
+                                    <input type="number" class="form-control" id="age" name="age" readonly>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Gender</label>
+                                <div class="col-sm-9">
+                                    <select class="form-select" name="gender" required>
+                                        <option value="">-- Select Gender --</option>
+                                        <option value="Male">Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Civil Status</label>
+                                <div class="col-sm-9">
+                                    <select class="form-select" name="civil_status" required>
+                                        <option value="">-- Select Civil Status --</option>
+                                        <option value="Single">Single</option>
+                                        <option value="Married">Married</option>
+                                        <option value="Divorced">Divorced</option>
+                                        <option value="Widowed">Widowed</option>
+                                        <option value="Separated">Separated</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Phone Number</label>
+                                <div class="col-sm-9">
+                                    <input type="tel" class="form-control" name="phone_number" required maxlength="11">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Email</label>
+                                <div class="col-sm-9">
+                                    <input type="email" class="form-control" name="email">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Admission Type</label>
+                                <div class="col-sm-9">
+                                    <select class="form-select" name="admission_type" required>
+                                        <option value="">-- Select Admission Type --</option>
+                                        <option value="Emergency">Emergency</option>
+                                        <option value="Planned">Planned</option>
+                                        <option value="Elective">Elective</option>
+                                        <option value="Day Case">Day Case</option>
+                                        <option value="Maternity">Maternity</option>
+                                        <option value="Outpatient">Outpatient</option>
+                                        <option value="Observation">Observation</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Bed Number</label>
+                                <div class="col-sm-9">
+                                    <input type="number" class="form-control" name="bed_number">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Attending Doctor</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" name="attending_doctor">
+                                </div>
                             </div>
                         </div>
 
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Middle Name</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" name="mname">
+                        <div class="row mb-3 d-none" id="step2">
+                            <div class="text-center mb-3">
+                                <h5>Previous Medical History</h5>
+                            </div>
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Condition Name</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" name="codition_name" default="N/A">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Diagnosis Date</label>
+                                <div class="col-sm-9">
+                                    <input type="date" class="form-control" name="diagnosis_date" default="N/A">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <label class="col-sm-3 col-form-label">Notes</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" name="note" default="N/A">
+                                </div>
                             </div>
                         </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Last Name</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" name="lname" required minlength="2">
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Address</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" name="address">
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Date of Birth</label>
-                            <div class="col-sm-9">
-                                <input type="date" class="form-control" id="dob" name="dob">
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Age</label>
-                            <div class="col-sm-9">
-                                <input type="number" class="form-control" id="age" name="age" readonly>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Gender</label>
-                            <div class="col-sm-9">
-                                <select class="form-select" name="gender" required>
-                                    <option value="">-- Select Gender --</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Civil Status</label>
-                            <div class="col-sm-9">
-                                <select class="form-select" name="civil_status" required>
-                                    <option value="">-- Select Civil Status --</option>
-                                    <option value="Single">Single</option>
-                                    <option value="Married">Married</option>
-                                    <option value="Divorced">Divorced</option>
-                                    <option value="Widowed">Widowed</option>
-                                    <option value="Separated">Separated</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Phone Number</label>
-                            <div class="col-sm-9">
-                                <input type="tel" class="form-control" name="phone_number" required maxlength="11">
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Email</label>
-                            <div class="col-sm-9">
-                                <input type="email" class="form-control" name="email">
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Admission Type</label>
-                            <div class="col-sm-9">
-                                <select class="form-select" name="admission_type" required>
-                                    <option value="">-- Select Admission Type --</option>
-                                    <option value="Emergency">Emergency</option>
-                                    <option value="Planned">Planned</option>
-                                    <option value="Elective">Elective</option>
-                                    <option value="Day Case">Day Case</option>
-                                    <option value="Maternity">Maternity</option>
-                                    <option value="Outpatient">Outpatient</option>
-                                    <option value="Observation">Observation</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Bed Number</label>
-                            <div class="col-sm-9">
-                                <input type="number" class="form-control" name="bed_number">
-                            </div>
-                        </div>
-
-                        <div class="row mb-3">
-                            <label class="col-sm-3 col-form-label">Attending Doctor</label>
-                            <div class="col-sm-9">
-                                <input type="text" class="form-control" name="attending_doctor">
-                            </div>
-                        </div>
-
                     </div>
 
+
+
                     <div class="modal-footer">
-                        <button type="submit" class="btn btn-success">Submit</button>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" id="prevBtn" class="btn btn-secondary d-none">Back</button>
+                        <button type="button" id="nextBtn" class="btn btn-primary">Next</button>
+                        <button type="submit" id="submitBtn" class="btn btn-success d-none">Submit</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-<!-- JS Scripts -->
-<script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-<script src="assets/Bootstrap/jq.js"></script>
-<script src="assets/Bootstrap/fontawesome.min.js"></script>
-<script src="assets/Bootstrap/all.min.js"></script>
 
-<script>
+    <!-- JS Scripts -->
+    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="assets/Bootstrap/jq.js"></script>
+    <script src="assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="assets/Bootstrap/all.min.js"></script>
+
+    <script>
     // Auto-calculate age when DOB is changed
-    document.getElementById("dob").addEventListener("change", function () {
+    document.getElementById("dob").addEventListener("change", function() {
         const dob = new Date(this.value);
         const today = new Date();
         if (!isNaN(dob.getTime())) {
@@ -196,7 +207,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             document.getElementById("age").value = "";
         }
     });
-</script>
+
+    let step = 1;
+
+    document.getElementById("nextBtn").addEventListener("click", function() {
+        document.getElementById("step1").classList.add("d-none");
+        document.getElementById("step2").classList.remove("d-none");
+        document.getElementById("nextBtn").classList.add("d-none");
+        document.getElementById("prevBtn").classList.remove("d-none");
+        document.getElementById("submitBtn").classList.remove("d-none");
+    });
+
+    document.getElementById("prevBtn").addEventListener("click", function() {
+        document.getElementById("step2").classList.add("d-none");
+        document.getElementById("step1").classList.remove("d-none");
+        document.getElementById("prevBtn").classList.add("d-none");
+        document.getElementById("submitBtn").classList.add("d-none");
+        document.getElementById("nextBtn").classList.remove("d-none");
+    });
+    </script>
 
 </body>
+
 </html>
