@@ -1,7 +1,6 @@
-<?php
+ <?php
 include '../../SQL/config.php';
-require_once 'classincludes/billing_records_class.php';
-require_once 'classincludes/billing_summary_class.php';
+require_once 'classincludes/billing_summary_class.php'; // <-- Correct path if classincludes is in current directory
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
@@ -123,44 +122,28 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1>Billing Records</h1> <br>
+                <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem;">Summary of Fees</h1>
 
                 <div class="row">
                     <div class="col-md-12">
-                        <table class="table table-bordered">
-                            <thead>
+                        <table class="table table-bordered table-hover" style="border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(44,62,80,0.08); background:#f8f6f0;">
+                            <thead style="background-color:#f3f1eb;">
                                 <tr>
-                                    <th>Billing ID</th>
-                                    <th>Patient ID</th>
-                                    <th>Billing Date</th>
-                                    <th>Total Amount</th>
-                                    <th>Insurance Covered</th>
-                                    <th>Out of Pocket</th>
-                                    <th>Status</th>
-                                    <th>Payment Method</th>
-                                    <th>Transaction ID</th>
-                                    <th>Action</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Particulars</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Actual Charges</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">VAT</th>
+                                    <th class="text-center" colspan="3" style="font-size:1.1rem;">Amount of Discount</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Out of Pocket</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Status</th>
+                                </tr>
+                                <tr>
+                                    <th class="text-center" style="font-size:1.05rem;">SC/ PWD</th>
+                                    <th class="text-center" style="font-size:1.05rem;">Insurance</th>
+                                    <th class="text-center" style="font-size:1.05rem;">Benefit</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php
-                                $billing = new billing_records($conn);
-                                $records = $billing->getAllBillingRecords();
-                                while ($row = $records->fetch_assoc()) {
-                                    echo "<tr style='vertical-align: middle;'>";
-                                    echo "<td>" . $row['billing_id'] . "</td>";
-                                    echo "<td>" . $row['patient_id'] . "</td>";
-                                    echo "<td>" . $row['billing_date'] . "</td>";
-                                    echo "<td>₱" . number_format($row['total_amount'], 2) . "</td>";
-                                    echo "<td>₱" . number_format($row['insurance_covered'], 2) . "</td>";
-                                    echo "<td>₱" . number_format(($row['total_amount'] - $row['insurance_covered']), 2) . "</td>";
-                                    echo "<td><span class='badge " . ($row['status'] == 'Paid' ? 'bg-success' : 'bg-warning text-dark') . "'>" . (!empty($row['status']) ? $row['status'] : 'Pending') . "</span></td>";
-                                    echo "<td>" . $row['payment_method'] . "</td>";
-                                    echo "<td>" . $row['transaction_id'] . "</td>";
-                                    echo "<td><a href='billing_summary.php?billing_id=" . $row['billing_id'] . "&patient_id=" . $row['patient_id'] . "' class='btn btn-primary btn-sm'>Generate</a></td>";
-                                    echo "</tr>";
-                                }
-                                ?>
+                                
                             </tbody>
                         </table>
                     </div>
