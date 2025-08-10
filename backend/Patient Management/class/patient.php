@@ -26,25 +26,25 @@ class Patient {
     }
 
     public function insertPatient($data) {
-        $stmt = $this->conn->prepare(" INSERT INTO patientinfo (fname, mname, lname, address, age, dob, gender, civil_status, phone_number, email, admission_type, bed_number, attending_doctor) VALUES (?, ?,?,?,?,?,?,?, ?,?,?,?,?)");
+        $stmt = $this->conn->prepare(" INSERT INTO patientinfo (fname, mname, lname, address, age, dob, gender, civil_status, phone_number, email, admission_type,  attending_doctor) VALUES ( ?,?,?,?,?,?,?, ?,?,?,?,?)");
         $stmt->bind_param("ssssisssssssi",
         $data['fname'], $data['mname'], $data['lname'], $data['address'], $data['age'], $data['dob'], $data['gender'], $data['civil_status'], $data['phone_number'],
-        $data['email'], $data['admission_type'], $data['bed_number'], $data['attending_doctor']);
+        $data['email'], $data['admission_type'], $data['attending_doctor']);
 
         return $stmt->execute();
     }
 
     public function updatePatient($patient_id, $data) {
     $stmt = $this->conn->prepare(" UPDATE patientinfo SET fname=?, mname=?, lname=?, address=?, dob=?, age=?, gender=?, civil_status=?,
-     phone_number=?, email=?, admission_type=?, bed_number=?, attending_doctor=? WHERE patient_id=?");
+     phone_number=?, email=?, admission_type=?, attending_doctor=? WHERE patient_id=?");
 
      if (!$stmt){
         die("Prepare failed: " . $this->conn->error);
      }
-    $stmt->bind_param("ssssisssssssi", 
+    $stmt->bind_param("ssssissssssii", 
         $data['fname'], $data['mname'], $data['lname'], $data['address'], 
         $data['dob'], $data['age'], $data['gender'], $data['civil_status'], 
-        $data['phone_number'], $data['email'], $data['admission_type'], $data['bed_number'], $data['attending_doctor'],
+        $data['phone_number'], $data['email'], $data['admission_type'], $data['attending_doctor'],
         $patient_id
     );
 
@@ -55,8 +55,21 @@ class Patient {
         return true;
     }
 
+public function getPatientOrFail($patient_id) {
+        if (empty($patient_id)) {
+            throw new Exception("Patient ID is missing.");
+        }
 
+        $patient = $this->getPatientById($patient_id);
 
+        if (!$patient) {
+            throw new Exception("Patient not found.");
+        }
+
+        return $patient;
+    }
+
+    
 }
 
 ?>

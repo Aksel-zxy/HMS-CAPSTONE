@@ -4,16 +4,13 @@ require_once 'class/patient.php';
 
 $patientObj = new Patient($conn);
 
-if (!isset($_GET['patient_id'])) {
-    echo "Patient ID is missing.";
-    exit;
-}
+try {
+    $patient_id = $_GET['patient_id'] ?? null;
+    $patient = $patientObj->getPatientOrFail($patient_id);
 
-$patient_id = $_GET['patient_id'];
-$patient = $patientObj->getPatientById($patient_id);
-
-if (!$patient){
-    echo "Patient not found.";
+    
+} catch (Exception $e) {
+    echo $e->getMessage();
     exit;
 }
 ?>
@@ -48,8 +45,25 @@ if (!$patient){
                 <p><strong>Contact Number:</strong> <?= htmlspecialchars($patient['phone_number']) ?></p>
                 <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
                 <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
-                <p><strong>Bed Number:</strong> <?= htmlspecialchars($patient['bed_number']) ?></p>
 
+                <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['attending_doctor']) ?></p>
+                <?php
+                // Fetch admission date and condition name from another table, e.g., 'admissions'
+                $admission = null;
+                if ($patient_id) {
+                    $stmt = $conn->prepare("SELECT  condition_name, diagnosis_date, notes FROM p_previous_medical_history WHERE patient_id = ?");
+                    $stmt->bind_param("i", $patient_id);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
+                    $admission = $result->fetch_assoc();
+                    $stmt->close();
+                }
+                ?>
+
+
+                <p><strong>Condition Name:</strong> <?= htmlspecialchars($admission['condition_name'] ?? 'N/A') ?></p>
+                <p><strong>Diagnosis Date:</strong> <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
+                <p><strong>Notes: </strong><?= htmlspecialchars($admission['notes'] ?? 'N/A')?></p>
                 <a href="inpatient.php" class="btn btn-secondary">Back</a>
             </div>
         </div>

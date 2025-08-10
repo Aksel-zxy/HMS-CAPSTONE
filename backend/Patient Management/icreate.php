@@ -131,12 +131,7 @@ require_once 'class/create.php';
                                 </div>
                             </div>
 
-                            <div class="row mb-3">
-                                <label class="col-sm-3 col-form-label">Bed Number</label>
-                                <div class="col-sm-9">
-                                    <input type="number" class="form-control" name="bed_number">
-                                </div>
-                            </div>
+
 
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Attending Doctor</label>
@@ -153,7 +148,7 @@ require_once 'class/create.php';
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Condition Name</label>
                                 <div class="col-sm-9">
-                                    <input type="text" class="form-control" name="codition_name" default="N/A">
+                                    <input type="text" class="form-control" name="condition_name" default="N/A">
                                 </div>
                             </div>
 

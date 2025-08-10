@@ -69,6 +69,7 @@ if (!$user) {
                 </a>
             </li>
 
+
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse"
                     data-bs-target="#gerald" aria-expanded="true" aria-controls="auth">
@@ -90,6 +91,53 @@ if (!$user) {
                         <a href="../Patient Management/outpatient.php" class="sidebar-link">Outpatients</a>
                     </li>
                 </ul>
+            </li>
+
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
+                    aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="fa-regular fa-calendar" viewBox="0 0 16 16">
+
+                        <path d=" M216 64C229.3 64 240 74.7 240 88L240 128L400 128L400 88C400 74.7 410.7 64 424 64C437.3
+                        64 448 74.7 448 88L448 128L480 128C515.3 128 544 156.7 544 192L544 480C544 515.3 515.3 544 480
+                        544L160 544C124.7 544 96 515.3 96 480L96 192C96 156.7 124.7 128 160 128L192 128L192 88C192 74.7
+                        202.7 64 216 64zM216 176L160 176C151.2 176 144 183.2 144 192L144 240L496 240L496 192C496 183.2
+                        488.8 176 480 176L216 176zM144 288L144 480C144 488.8 151.2 496 160 496L480 496C488.8 496 496
+                        488.8 496 480L496 288L144 288z" />
+                    </svg>
+                    <span style="font-size: 18px;">Appointment</span>
+                </a>
+            </li>
+
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
+                    aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="fa-solid fa-clock-rotate-left" viewBox="0 0 16 16">
+
+                        <path
+                            d="M320 128C426 128 512 214 512 320C512 426 426 512 320 512C254.8 512 197.1 479.5 162.4 429.7C152.3 415.2 132.3 411.7 117.8 421.8C103.3 431.9 99.8 451.9 109.9 466.4C156.1 532.6 233 576 320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C234.3 64 158.5 106.1 112 170.7L112 144C112 126.3 97.7 112 80 112C62.3 112 48 126.3 48 144L48 256C48 273.7 62.3 288 80 288L104.6 288C105.1 288 105.6 288 106.1 288L192.1 288C209.8 288 224.1 273.7 224.1 256C224.1 238.3 209.8 224 192.1 224L153.8 224C186.9 166.6 249 128 320 128zM344 216C344 202.7 333.3 192 320 192C306.7 192 296 202.7 296 216L296 320C296 326.4 298.5 332.5 303 337L375 409C384.4 418.4 399.6 418.4 408.9 409C418.2 399.6 418.3 384.4 408.9 375.1L343.9 310.1L343.9 216z" />
+                    </svg>
+                    <span style="font-size: 18px;">Treatment History</span>
+                </a>
+            </li>
+
+            <li class="sidebar-item">
+                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
+                    aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="fa-regular fa-folder-closed" viewBox="0 0 16 16">
+
+                        <path d=" M512 464L128 464C119.2 464 112 456.8 112 448L112 304L528 304L528 448C528 456.8 520.8
+                        464 512 464zM528 256L112 256L112 160C112 151.2 119.2 144 128 144L266.7 144C270.2 144 273.5 145.1
+                        276.3 147.2L314.7 176C328.5 186.4 345.4 192 362.7 192L512 192C520.8 192 528 199.2 528 208L528
+                        256zM128 512L512 512C547.3 512 576 483.3 576 448L576 208C576 172.7 547.3 144 512 144L362.7
+                        144C355.8 144 349 141.8 343.5 137.6L305.1 108.8C294 100.5 280.5 96 266.7 96L128 96C92.7 96 64
+                        124.7 64 160L64 448C64 483.3 92.7 512 128 512z" />
+                    </svg>
+                    <span style="font-size: 18px;">Summary</span>
+                </a>
             </li>
 
 
@@ -159,7 +207,7 @@ if (!$user) {
                                 <th>Gender</th>
                                 <th>Civil Status</th>
                                 <th>Admission Type</th>
-                                <th>Bed Number</th>
+                                <!--<th>Bed Number</th>-->
                                 <th>Attending Doctor</th>
                                 <th colspan="2">Action</th>
                             </tr>
@@ -180,7 +228,7 @@ if (!$user) {
                             <td>$row[gender]</td>
                             <td>$row[civil_status]</td>
                             <td>$row[admission_type]</td>
-                            <td>$row[bed_number]</td>
+                         
                             <td>$row[attending_doctor]</td>
                             <td>
                                 <a class='btn btn-info btn-sm' href='../Patient Management/iview.php?patient_id=$row[patient_id]'>View</a>

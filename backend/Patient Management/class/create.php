@@ -1,6 +1,6 @@
 <?php
 include '../../SQL/config.php';
-require_once 'Patient.php';
+require_once 'patient.php';
 
 $patient = new Patient($conn);
 
@@ -17,7 +17,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         'phone_number' => $_POST["phone_number"],
         'email' => $_POST["email"],
         'admission_type' => $_POST["admission_type"],
-        'bed_number' => $_POST["bed_number"],
         'attending_doctor' => $_POST["attending_doctor"] ?? '',
     ];
 
@@ -40,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param(
             "isss",
             $patient_id,
-            $_POST['codition_name'],
+            $_POST['condition_name'],
             $_POST['diagnosis_dae'],
             $_POST['notes']
         );

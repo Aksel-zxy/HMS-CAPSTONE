@@ -1,61 +1,62 @@
-.container{
-    max-width: 1440px;
-    height: 80vh;
-    overflow-y: auto;
-    width: 100%;
-    background: #fff;
-    box-shadow: 2px 5px 10px rgba(0, 0, 0, 0.5);
-    justify-content: center;
+/* Removed .container styles */
+
+h1 {
+  padding: 2rem 0;
+  font-size: 2.5rem;
+  text-align: center;
+  color: #000;
+  margin-bottom: 2rem;
 }
 
-.container h1{
-    padding: 2rem 1rem;
-    font-size: 2.5rem;
-    text-align: center;
-    color: #000;
-}
-.tbl{
-    width: 100%;
-    border-collapse: collapse;
-    
-}
-.tbl thead{
-    background: #ccc;
-    color: #000;
-}
-.tbl thead tr th{
-    font-size: 0.9rem;
-    padding: 0.5rem;
-    letter-spacing: 0;
-    vertical-align: center;
-    border: 1px solid #aab7b8;
-    text-align: center;
-}
-.tbl tbody tr td{
-    font-size: 0.9rem;
-    letter-spacing: 0;
-    font-weight: normal;
-    text-align: center;
-    border: 1px solid #aab7b8;
-    padding: 0.5rem;
-    color: #000;
-}
-.tbl tr:nth-child(even){
-    background: #ccc;
-}
-.tbl tr:hover td{
-    background: #839192;
-    color: #000;
-    transition: all 0.3s ease-in;
-    cursor: pointer;
-}
-.tbl button{
-    display: inline-block;
-    border: none;
-    margin: 0 auto;
-    padding: 0.4rem;
-    border-radius: 1px;
-    outline: none;
-    cursor: pointer;
+.tbl {
+  width: 100%;
+  margin: 0 auto 2rem auto;
+  border-collapse: collapse;
 }
 
+.tbl thead {
+  background: #ccc;
+  font-size: 1rem;
+  padding: 0.75rem 0.5rem;
+  color: #000;
+}
+
+.tbl thead tr th {
+  font-size: 1rem;
+  padding: 1rem;
+  letter-spacing: 0;
+  vertical-align: middle;
+  border: 1px solid #aab7b8;
+  text-align: center;
+}
+
+.tbl tbody tr td {
+  font-size: 1rem;
+  letter-spacing: 0;
+  font-weight: normal;
+  text-align: center;
+  border: 1px solid #aab7b8;
+  padding: 1rem;
+  color: #000;
+}
+.tbl tr td a {
+  color: #000;
+  text-decoration: none;
+  width: 100%;
+}
+.tbl tr:hover td {
+  background: #839192;
+  color: #000;
+  transition: all 0.3s ease-in;
+  cursor: pointer;
+}
+
+.tbl button {
+  display: inline-block;
+  border: none;
+  margin: 0 auto;
+  padding: 0.6rem 1.2rem;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
