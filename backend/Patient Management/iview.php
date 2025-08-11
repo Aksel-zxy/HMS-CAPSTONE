@@ -1,19 +1,28 @@
 <?php
 include '../../SQL/config.php';
 require_once 'class/patient.php';
+require_once 'class/caller.php';
 
 $patientObj = new Patient($conn);
+$callerObj = new Caller($conn); // create Caller instance
 
 try {
     $patient_id = $_GET['patient_id'] ?? null;
     $patient = $patientObj->getPatientOrFail($patient_id);
 
-    
+    //  Fetch admission/EMR details
+    try {
+        $admission = $callerObj->callHistory($patient_id);
+    } catch (Exception $e) {
+        $admission = null; // No admission found
+    }
+
 } catch (Exception $e) {
     echo $e->getMessage();
     exit;
 }
 ?>
+
 
 
 <!DOCTYPE html>
@@ -36,7 +45,7 @@ try {
             <div class="card-body">
 
                 <p><strong>Name:</strong>
-                    <?=  htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?></p>
+                    <?=  htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . '  ' . $patient['lname']) ?></p>
                 <p><strong>Address:</strong> <?= htmlspecialchars($patient['address']) ?></p>
                 <p><strong>Date of Birth:</strong> <?= htmlspecialchars($patient['dob']) ?></p>
                 <p><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
@@ -45,22 +54,7 @@ try {
                 <p><strong>Contact Number:</strong> <?= htmlspecialchars($patient['phone_number']) ?></p>
                 <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
                 <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
-
                 <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['attending_doctor']) ?></p>
-                <?php
-                // Fetch admission date and condition name from another table, e.g., 'admissions'
-                $admission = null;
-                if ($patient_id) {
-                    $stmt = $conn->prepare("SELECT  condition_name, diagnosis_date, notes FROM p_previous_medical_history WHERE patient_id = ?");
-                    $stmt->bind_param("i", $patient_id);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    $admission = $result->fetch_assoc();
-                    $stmt->close();
-                }
-                ?>
-
-
                 <p><strong>Condition Name:</strong> <?= htmlspecialchars($admission['condition_name'] ?? 'N/A') ?></p>
                 <p><strong>Diagnosis Date:</strong> <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
                 <p><strong>Notes: </strong><?= htmlspecialchars($admission['notes'] ?? 'N/A')?></p>

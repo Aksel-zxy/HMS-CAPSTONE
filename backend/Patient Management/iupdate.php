@@ -180,7 +180,7 @@ if ($medical_history) {
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Attending Doctor</label>
                             <div class="col-sm-6">
-                                <input type="number" class="form-control" name="bed_number"
+                                <input type="number" class="form-control" name="attending_doctor"
                                     value="<?= $patient['attending_doctor']; ?>" readonly>
                             </div>
                         </div>
