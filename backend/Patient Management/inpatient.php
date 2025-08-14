@@ -1,4 +1,6 @@
 <?php
+session_start();
+
 include '../../SQL/config.php';
 require_once 'class/patient.php';
 
@@ -6,7 +8,7 @@ $patientObj = new Patient($conn);
 $patients = $patientObj->getAllPatients();
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: login.php');
     exit();
 }
 
@@ -15,19 +17,15 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     exit();
 }
 
+
 $query = "SELECT * FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -128,7 +126,6 @@ if (!$user) {
                     aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-regular fa-folder-closed" viewBox="0 0 16 16">
-
                         <path d=" M512 464L128 464C119.2 464 112 456.8 112 448L112 304L528 304L528 448C528 456.8 520.8
                         464 512 464zM528 256L112 256L112 160C112 151.2 119.2 144 128 144L266.7 144C270.2 144 273.5 145.1
                         276.3 147.2L314.7 176C328.5 186.4 345.4 192 362.7 192L512 192C520.8 192 528 199.2 528 208L528
@@ -156,12 +153,13 @@ if (!$user) {
                         </svg>
                     </button>
                 </div>
+
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
                         <span class="username ml-1 me-2"><?php echo $user['fname']; ?>
                             <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton"
-                            data-bs-toggle="dropdown" aria-expanded="false">
+                            data-bs-toggle="dropdown" aria-expanded="true">
                             <i class="bi bi-person-circle"></i>
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton"
@@ -177,7 +175,6 @@ if (!$user) {
                                 </a>
                             </li>
                         </ul>
-
                     </div>
                 </div>
             </div>
@@ -228,8 +225,7 @@ if (!$user) {
                             <td>$row[gender]</td>
                             <td>$row[civil_status]</td>
                             <td>$row[admission_type]</td>
-                         
-                            <td>$row[attending_doctor]</td>
+                            <td>$row[doctor_name]</td>
                             <td>
                                 <a class='btn btn-info btn-sm' href='../Patient Management/iview.php?patient_id=$row[patient_id]'>View</a>
                             </td>
@@ -258,10 +254,6 @@ if (!$user) {
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="assets/Bootstrap/fontawesome.min.js"></script>
     <script src="assets/Bootstrap/jq.js"></script>
-
-
-
-
 </body>
 
 </html>

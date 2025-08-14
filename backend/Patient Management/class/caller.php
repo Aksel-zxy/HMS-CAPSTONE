@@ -22,7 +22,7 @@ public function callEmr($patient_id) {
 
 
 public function callHistory($patient_id) {
-    $stmt = $this->conn->prepare("SELECT * FROM p_previous_medical_history WHERE patient_id = ?");
+    $stmt = $this->conn->prepare("SELECT * FROM p_previous_medical_records WHERE patient_id = ?");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -44,7 +44,13 @@ public function callBeddings ($patient_id) {
         throw new Exception("No beddings found for patient ID: " . $patient_id);
     }
 }
-
+public function getAllDoctors() {
+    $sql = "SELECT employee_id, first_name, last_name 
+            FROM hr_employees 
+            WHERE profession = 'Doctor'";
+    $result = $this->conn->query($sql);
+    return $result;
 }
 
+}
 ?>
