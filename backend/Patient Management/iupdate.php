@@ -1,25 +1,26 @@
 <?php
 require_once 'class/update.php';
 require_once 'class/patient.php';
+require_once 'class/caller.php';    
 
+$callerObj = new Caller($conn); // create Caller instance
+$doctors = $callerObj->getAllDoctors(); // Fetch all doctors
 
-
-// Create patient object
 $patientObj = new Patient($conn);
 
-// Fetch main patient data
+
 $patient = $patientObj->getPatientById($patient_id);
 
-// Fetch medical history from p_previous_medical_history
+
 $sql = "SELECT condition_name, diagnosis_date, notes 
-        FROM p_previous_medical_history 
+        FROM p_previous_medical_records
         WHERE patient_id = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $medical_history = $stmt->get_result()->fetch_assoc();
 
-// Merge into $patient array so HTML works
+
 if ($medical_history) {
     $patient = array_merge($patient, $medical_history);
 } else {
@@ -180,10 +181,21 @@ if ($medical_history) {
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Attending Doctor</label>
                             <div class="col-sm-6">
-                                <input type="number" class="form-control" name="attending_doctor"
-                                    value="<?= $patient['attending_doctor']; ?>" readonly>
+                                <select class="form-select" name="attending_doctor" required>
+                                    <option value="">-- Select Available Doctor --</option>
+                                    <?php
+            $doctors = $callerObj->getAllDoctors(); // returns array or mysqli result
+            foreach ($doctors as $doc) {
+                $selected = ($patient['attending_doctor'] == $doc['employee_id']) ? 'selected' : '';
+                echo "<option value='{$doc['employee_id']}' {$selected}>" .
+                     htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) .
+                     "</option>";
+            }
+            ?>
+                                </select>
                             </div>
                         </div>
+
 
                     </div>
                     <div class="row mb-3 d-none" id="step2">

@@ -1,5 +1,9 @@
 <?php
 include '../../SQL/config.php';
+require_once 'class/patient.php';
+
+$patientObj = new Patient($conn);
+$patients = $patientObj->getOutPatients();
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
@@ -22,6 +26,7 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -64,6 +69,7 @@ if (!$user) {
                 </a>
             </li>
 
+
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse"
                     data-bs-target="#gerald" aria-expanded="true" aria-controls="auth">
@@ -86,6 +92,7 @@ if (!$user) {
                     </li>
                 </ul>
             </li>
+
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
                     aria-controls="auth">
@@ -121,7 +128,6 @@ if (!$user) {
                     aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-regular fa-folder-closed" viewBox="0 0 16 16">
-
                         <path d=" M512 464L128 464C119.2 464 112 456.8 112 448L112 304L528 304L528 448C528 456.8 520.8
                         464 512 464zM528 256L112 256L112 160C112 151.2 119.2 144 128 144L266.7 144C270.2 144 273.5 145.1
                         276.3 147.2L314.7 176C328.5 186.4 345.4 192 362.7 192L512 192C520.8 192 528 199.2 528 208L528
@@ -132,6 +138,8 @@ if (!$user) {
                     <span style="font-size: 18px;">Summary</span>
                 </a>
             </li>
+
+
 
         </aside>
         <!----- End of Sidebar ----->
@@ -147,12 +155,13 @@ if (!$user) {
                         </svg>
                     </button>
                 </div>
+
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
                         <span class="username ml-1 me-2"><?php echo $user['fname']; ?>
                             <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton"
-                            data-bs-toggle="dropdown" aria-expanded="false">
+                            data-bs-toggle="dropdown" aria-expanded="true">
                             <i class="bi bi-person-circle"></i>
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton"
@@ -168,7 +177,6 @@ if (!$user) {
                                 </a>
                             </li>
                         </ul>
-
                     </div>
                 </div>
             </div>
@@ -176,8 +184,16 @@ if (!$user) {
             <div class="container">
                 <div class="tbl_container">
                     <h1>Lists of Outpatients</h1>
-                    <a class="btn btn-primary" href="../Patient Management/ocreate.php" role="button"> Add New
-                        Patient</a>
+                    <!-- Button to trigger modal -->
+                    <div class="d-flex justify-content-end mt-4">
+                        <button type="button" class="btn btn-primary" id="Boton" data-bs-toggle="modal"
+                            data-bs-target="#addPatientModal">
+                            Add New Patient
+                        </button>
+                    </div>
+
+                    <?php include 'icreate.php'; // This includes the modal code ?>
+
                     <br>
                     <table class="tbl">
                         <thead>
@@ -189,29 +205,18 @@ if (!$user) {
                                 <th>Address</th>
                                 <th>Gender</th>
                                 <th>Civil Status</th>
-                                <!--<th>Admission Type</th>-->
-                                <th>Bed Number</th>
+                                <th>Admission Type</th>
+                                <!--<th>Bed Number</th>-->
+                                <th>Attending Doctor</th>
                                 <th colspan="2">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php
                        
-                        // Check Connection
-                        if ($conn->connect_error) {
-                            die("Connection Failed: " . $conn->connect_error);
-                        }
-
-                        // read all row from database table
-                        $sql = "SELECT * FROM patientinfo WHERE admission_type = 'Outpatient' ORDER BY patient_id DESC";
-                        $result = $conn->query($sql); 
-
-                        if (!$result) {
-                            die("Invalid query: " . $conn->error);
-                        }
 
                         //read data of each row
-                        while($row = $result->fetch_assoc()) {
+                        while($row = $patients->fetch_assoc()) {
                             echo "
                             <tr>
                             <td>$row[patient_id]</td>
@@ -222,12 +227,12 @@ if (!$user) {
                             <td>$row[gender]</td>
                             <td>$row[civil_status]</td>
                             <td>$row[admission_type]</td>
-                           
+                            <td>$row[doctor_name]</td>
                             <td>
-                                <a class='btn btn-info btn-sm' href='../Patient Management/oview.php?patient_id=$row[patient_id]'>View</a>
+                                <a class='btn btn-info btn-sm' href='../Patient Management/iview.php?patient_id=$row[patient_id]'>View</a>
                             </td>
                             <td>
-                            <a class='btn btn-primary btn-sm' href='../Patient Management/oupdate.php?patient_id=$row[patient_id]'>Edit</a>
+                            <a class='btn btn-primary btn-sm' href='../Patient Management/iupdate.php?patient_id=$row[patient_id]'>Edit</a>
                             </td>
                         </tr>
                             ";

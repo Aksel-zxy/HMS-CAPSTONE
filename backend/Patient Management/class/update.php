@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (!empty($_POST['condition_name']) || !empty($_POST['diagnosis_date']) || !empty($_POST['notes'])) {
             try {
                 $stmt = $conn->prepare("
-                    UPDATE p_previous_medical_history 
+                    UPDATE p_previous_medical_records 
                     SET condition_name = ?, diagnosis_date = ?, notes = ? 
                     WHERE patient_id = ?
                 ");
@@ -56,17 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if (!$stmt->execute()) {
                     throw new Exception("Medical history update failed: " . $stmt->error);
                 }
-
-                // Log to PHP error log
-                error_log("Updated p_previous_medical_history for patient_id={$patient_id} | Data: " . json_encode($_POST));
-
-                // Log to browser console
-                echo "<script>console.log('p_previous_medical_history updated', " . json_encode([
-                    'patient_id'     => $patient_id,
-                    'condition_name' => $_POST['condition_name'],
-                    'diagnosis_date' => $_POST['diagnosis_date'],
-                    'notes'          => $_POST['notes']
-                ]) . ");</script>";
+                $stmt->close();
 
             } catch (Exception $mhErr) {
                 error_log($mhErr->getMessage());

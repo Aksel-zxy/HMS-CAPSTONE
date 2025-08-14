@@ -8,7 +8,13 @@ class Patient {
     }
 
     public function getAllPatients() {
-        $sql = "SELECT * FROM patientinfo where admission_type != 'Outpatient' ORDER BY patient_id DESC";
+        $sql = "SELECT p.patient_id, p.fname, p.mname, p.lname, p.address, p.gender, 
+                   p.civil_status, p.admission_type, 
+                   CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
+            FROM patientinfo p
+            LEFT JOIN hr_employees e 
+                   ON p.attending_doctor = e.employee_id
+            WHERE p.admission_type != 'Outpatient'";
         $result = $this->conn->query($sql);
 
         if (!$result) {
@@ -19,7 +25,15 @@ class Patient {
     }
 
     public function getPatientById($id) {
-        $stmt = $this->conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
+        $stmt = $this->conn->prepare("
+        SELECT p.*, 
+               CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
+        FROM patientinfo p
+        LEFT JOIN hr_employees e
+               ON p.attending_doctor = e.employee_id
+        WHERE p.patient_id = ?
+        LIMIT 1
+    ");
         $stmt->bind_param("i", $id);
         $stmt->execute();
         return $stmt->get_result()->fetch_assoc();
@@ -27,11 +41,16 @@ class Patient {
 
     public function insertPatient($data) {
         $stmt = $this->conn->prepare(" INSERT INTO patientinfo (fname, mname, lname, address, age, dob, gender, civil_status, phone_number, email, admission_type,  attending_doctor) VALUES ( ?,?,?,?,?,?,?, ?,?,?,?,?)");
-        $stmt->bind_param("ssssisssssssi",
+        $stmt->bind_param("ssssissssssi",
         $data['fname'], $data['mname'], $data['lname'], $data['address'], $data['age'], $data['dob'], $data['gender'], $data['civil_status'], $data['phone_number'],
         $data['email'], $data['admission_type'], $data['attending_doctor']);
 
-        return $stmt->execute();
+       if (!$stmt->execute()) {
+        throw new Exception("Insert failed: " . $stmt->error);
+    }
+
+    // ✅ Return the actual inserted patient ID
+    return $this->conn->insert_id;
     }
 
     public function updatePatient($patient_id, $data) {
@@ -68,7 +87,22 @@ public function getPatientOrFail($patient_id) {
 
         return $patient;
     }
+ public function getOutPatients() {
+        $sql = "SELECT p.patient_id, p.fname, p.mname, p.lname, p.address, p.gender, 
+                   p.civil_status, p.admission_type, 
+                   CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
+            FROM patientinfo p
+            LEFT JOIN hr_employees e 
+                   ON p.attending_doctor = e.employee_id
+            WHERE p.admission_type = 'Outpatient'";
+        $result = $this->conn->query($sql);
 
+        if (!$result) {
+            die("Invalid query: " . $this->conn->error);
+        }
+
+        return $result;
+    }
     
 }
 

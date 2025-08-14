@@ -4,10 +4,12 @@ require_once 'class/patient.php';
 require_once 'class/caller.php';
 
 $patientObj = new Patient($conn);
+
 $callerObj = new Caller($conn); // create Caller instance
 
 try {
     $patient_id = $_GET['patient_id'] ?? null;
+  
     $patient = $patientObj->getPatientOrFail($patient_id);
 
     //  Fetch admission/EMR details
@@ -41,7 +43,7 @@ try {
 <body>
     <div class="container mt-4">
         <div class="card shadow">
-            <h4 class="mb-0">View Inpatient Details</h4>
+            <h4 class="mb-0">View Patient Details</h4>
             <div class="card-body">
 
                 <p><strong>Name:</strong>
@@ -54,7 +56,7 @@ try {
                 <p><strong>Contact Number:</strong> <?= htmlspecialchars($patient['phone_number']) ?></p>
                 <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
                 <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
-                <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['attending_doctor']) ?></p>
+                <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['doctor_name']) ?></p>
                 <p><strong>Condition Name:</strong> <?= htmlspecialchars($admission['condition_name'] ?? 'N/A') ?></p>
                 <p><strong>Diagnosis Date:</strong> <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
                 <p><strong>Notes: </strong><?= htmlspecialchars($admission['notes'] ?? 'N/A')?></p>

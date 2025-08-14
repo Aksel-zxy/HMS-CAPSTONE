@@ -1,22 +1,23 @@
 <?php
-include '../../SQL/config.php';
+include '../../../SQL/config.php';
 require_once 'patient.php';
 
 $patient = new Patient($conn);
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Collect form data
     $data = [
-        'fname' => $_POST["fname"],
-        'mname' => $_POST["mname"],
-        'lname' => $_POST["lname"],
-        'address' => $_POST["address"],
-        'age' => $_POST["age"],
-        'dob' => $_POST["dob"],
-        'gender' => $_POST["gender"],
-        'civil_status' => $_POST["civil_status"],
-        'phone_number' => $_POST["phone_number"],
-        'email' => $_POST["email"],
-        'admission_type' => $_POST["admission_type"],
+        'fname' => $_POST["fname"] ?? '',
+        'mname' => $_POST["mname"] ?? '',
+        'lname' => $_POST["lname"] ?? '',
+        'address' => $_POST["address"] ?? '',
+        'age' => $_POST["age"] ?? '',
+        'dob' => $_POST["dob"] ?? '',
+        'gender' => $_POST["gender"] ?? '',
+        'civil_status' => $_POST["civil_status"] ?? '',
+        'phone_number' => $_POST["phone_number"] ?? '',
+        'email' => $_POST["email"] ?? '',
+        'admission_type' => $_POST["admission_type"] ?? '',
         'attending_doctor' => $_POST["attending_doctor"] ?? '',
     ];
 
@@ -24,35 +25,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $conn->begin_transaction();
 
     try {
-        // Insert patient and get new ID
         $patient_id = $patient->insertPatient($data);
-
         if (!$patient_id) {
             throw new Exception("Failed to insert patient");
         }
 
-        // Insert into medical_records table
         $stmt = $conn->prepare("
-            INSERT INTO  p_previous_medical_history (patient_id, condition_name, diagnosis_date, notes)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO p_previous_medical_records (patient_id, condition_name, diagnosis_date, notes)
+            VALUES (?, ?, ?, ?)
         ");
-        $stmt->bind_param(
-            "isss",
-            $patient_id,
-            $_POST['condition_name'],
-            $_POST['diagnosis_dae'],
-            $_POST['notes']
-        );
+       $condition_name = $_POST['condition_name'] ?? '';
+$diagnosis_date = $_POST['diagnosis_date'] ?? '';
+$notes = $_POST['notes'] ?? '';
+
+$stmt->bind_param(
+    "isss",
+    $patient_id,
+    $condition_name,
+    $diagnosis_date,
+    $notes
+);
+
         $stmt->execute();
 
-        // Commit transaction
         $conn->commit();
 
-        header("Location: ../Patient Management/inpatient.php?success=1");
+        // Redirect before any output
+        header("Location: ../inpatient.php?success=1");
         exit();
+
     } catch (Exception $e) {
-        $conn->rollback();
-        $error = "Failed to add patient and medical record: " . $e->getMessage();
+        $conn->rollback();  
+        // Log instead of echo (to prevent header issues)
+        error_log("Patient creation failed: " . $e->getMessage());
+        header("Location: ../inpatient.php?error=1");
+        exit();
     }
 }
 ?>
