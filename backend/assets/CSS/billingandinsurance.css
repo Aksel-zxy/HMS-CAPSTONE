@@ -1,0 +1,144 @@
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f7f9fa;
+    margin: 0;
+    padding: 0;
+}
+.container {
+    max-width: 1100px;
+    margin: 40px auto;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    padding: 32px 40px 40px 40px;
+}
+h2 {
+    margin-top: 0;
+    color: #2d3e50;
+    letter-spacing: 1px;
+}
+.form-card {
+    background: #f4f8fb;
+    border-radius: 8px;
+    padding: 24px 28px 18px 28px;
+    margin-bottom: 32px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    max-width: 500px;
+}
+.form-card label {
+    display: block;
+    margin-bottom: 8px;
+    color: #34495e;
+    font-weight: 500;
+}
+.form-card input[type="number"],
+.form-card input[type="text"],
+.form-card textarea {
+    width: 100%;
+    padding: 8px 10px;
+    margin-bottom: 16px;
+    border: 1px solid #cfd8dc;
+    border-radius: 4px;
+    font-size: 15px;
+    background: #fff;
+    transition: border 0.2s;
+}
+.form-card input:focus,
+.form-card textarea:focus {
+    border: 1.5px solid #1976d2;
+    outline: none;
+}
+.form-card button {
+    background: #1976d2;
+    color: #fff;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.form-card button:hover {
+    background: #125ea7;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+th, td {
+    border: none;
+    padding: 12px 10px;
+    text-align: left;
+}
+th {
+    background: #1976d2;
+    color: #fff;
+    font-weight: 600;
+    font-size: 15px;
+}
+tr:nth-child(even) {
+    background: #f4f8fb;
+}
+tr:hover {
+    background: #e3f0fc;
+}
+.status-pending {
+    color: #ff9800;
+    font-weight: 600;
+}
+.status-approved {
+    color: #43a047;
+    font-weight: 600;
+}
+.status-declined {
+    color: #e53935;
+    font-weight: 600;
+}
+.actions a {
+    margin-right: 10px;
+    text-decoration: none;
+    color: #1976d2;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+.actions a:hover {
+    color: #125ea7;
+    text-decoration: underline;
+}
+.actions em {
+    color: #888;
+}
+@media (max-width: 900px) {
+    .container { padding: 10px; }
+    .form-card { padding: 12px; }
+    th, td { font-size: 13px; }
+}
+@media (max-width: 600px) {
+    .container { padding: 2px; }
+    .form-card { padding: 6px; }
+    table, thead, tbody, th, td, tr { display: block; }
+    th { position: absolute; left: -9999px; }
+    tr { margin-bottom: 15px; }
+    td { border: none; position: relative; padding-left: 50%; }
+    td:before {
+        position: absolute;
+        left: 10px;
+        width: 45%;
+        white-space: nowrap;
+        font-weight: bold;
+        color: #1976d2;
+    }
+    td:nth-of-type(1):before { content: "ID"; }
+    td:nth-of-type(2):before { content: "Patient ID"; }
+    td:nth-of-type(3):before { content: "Billing ID"; }
+    td:nth-of-type(4):before { content: "Insurance Type"; }
+    td:nth-of-type(5):before { content: "Coverage Covered"; }
+    td:nth-of-type(6):before { content: "Notes"; }
+    td:nth-of-type(7):before { content: "Status"; }
+    td:nth-of-type(8):before { content: "Actions"; }
+}
