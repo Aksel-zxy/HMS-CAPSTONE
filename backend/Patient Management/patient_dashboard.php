@@ -34,6 +34,7 @@ if (!$user) {
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
+    <link rel="stylesheet" href="assets/CSS/dashboard.css">
 </head>
 
 <body>
@@ -171,17 +172,57 @@ if (!$user) {
                     </div>
                 </div>
             </div>
+
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1>BASAHIN PO YUNG MGA COMMENT SA CODE PARA DI MALIGAW</h1> <br>
-                <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
-                <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
-                <H1>CHAT LANG PO KAY ROBERT</H1>
+                <div class="container text-black allign-items-center rounded welcome">
+                    <span class="username ml-4 me-4 fs-4 justify-content-end">Hello, <?php echo $user['fname']; ?>
+                        <?php echo $user['lname']; ?>! Here's today's Hospital overview</span>
+                </div>
+                <div class="container-fluid mt-4">
+                    <div class="row justify-content-center">
+                        <div class="col-md-3 mb-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Total Patients</h5>
+                                    <p class="card-text">150</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Today's appointment</h5>
+                                    <p class="card-text">80</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Prescriptions</h5>
+                                    <p class="card-text">70</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Hospital Admissions</h5>
+                                    <p class="card-text">70</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
     </div>
+
     <script>
     const toggler = document.querySelector(".toggler-btn");
     toggler.addEventListener("click", function() {
