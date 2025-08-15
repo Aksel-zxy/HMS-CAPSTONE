@@ -183,72 +183,75 @@ $allPatients = $patient->getAllPatients();
                         <th style="padding:8px;">Action</th> <!-- Added -->
                     </tr>
                 </thead>
-                <tbody>
-                    <?php foreach ($allPatients as $p): ?>
-                        <?php
-                        // Get actual patient ID
-                        $counter = $p['patient_id'];
+               <tbody>
+    <?php foreach ($allPatients as $p): ?>
+        <?php
+        // Get actual patient ID
+        $counter = $p['patient_id'];
 
-                        // Build name
-                        $name     = $p['fname'] . ' ' . $p['lname'];
-                        $dateTime = $p['appointment_date'];
-                        $type     = $p['notes'];
+        // Build name
+        $name     = $p['fname'] . ' ' . $p['lname'];
+        $dateTime = $p['appointment_date'];
+        $type     = $p['notes'];
 
-                        // Default status from p_appointments
-                        $status = $p['status'];
+        // Default status from p_appointments
+        $status = $p['status'];
 
-                        // Check if dl_schedule has a record for this patient
-                        $schedQuery = $conn->prepare("
-                            SELECT status 
-                            FROM dl_schedule 
-                            WHERE patientID = ?
-                            LIMIT 1
-                        ");
-                        $schedQuery->bind_param("i", $counter);
-                        $schedQuery->execute();
-                        $schedResult = $schedQuery->get_result();
-                        if ($schedRow = $schedResult->fetch_assoc()) {
-                            $status = $schedRow['status']; // Override with dl_schedule status
-                        }
-                        $schedQuery->close();
-                        ?>
-                        <tr style="border-bottom:1px solid #eee;">
-                            <td style="padding:8px;"><?php echo htmlspecialchars($counter); ?></td>
-                            <td style="padding:8px;"><?php echo htmlspecialchars($name); ?></td>
-                            <td style="padding:8px;"><?php echo $dateTime; ?></td>
-                            <td style="padding:8px;"><?php echo $type; ?></td>
-                            <td style="padding:8px;">
-                                <?php if ($status === 'Scheduled'): ?>
-                                    <span style="background:#fff3cd; color:#856404; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                                <?php elseif ($status === 'Completed'): ?>
-                                    <span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                                <?php elseif ($status === 'Cancelled'): ?>
-                                    <span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                                <?php elseif ($status === 'Processing'): ?>
-                                    <span style="background:#cce5ff; color:#004085; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                                <?php else: ?>
-                                    <?php echo $status; ?>
-                                <?php endif; ?>
+        // Check if dl_schedule has a record for this patient
+        $schedQuery = $conn->prepare("
+            SELECT status 
+            FROM dl_schedule 
+            WHERE patientID = ?
+            LIMIT 1
+        ");
+        $schedQuery->bind_param("i", $counter);
+        $schedQuery->execute();
+        $schedResult = $schedQuery->get_result();
+        if ($schedRow = $schedResult->fetch_assoc()) {
+            $status = $schedRow['status']; // Override with dl_schedule status
+        }
+        $schedQuery->close();
 
-                            </td>
-                            <td>
-                                <?php if ($status !== 'Processing' && $status !== 'Completed'): ?>
-                                    <button
-                                        class="btn btn-primary btn-sm addScheduleBtn"
-                                        data-id="<?= $p['patient_id'] ?>"
-                                        data-name="<?= htmlspecialchars($name) ?>"
-                                        data-date="<?= $dateTime ?>"
-                                        data-test="<?= htmlspecialchars($type) ?>"
-                                        data-status="<?= $status ?>"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#addScheduleModal">
-                                        Lab Scheduling (+)
-                                    </button>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
+        // Skip if status is Processing
+        if ($status === 'Processing') {
+            continue;
+        }
+        ?>
+        <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:8px;"><?php echo htmlspecialchars($counter); ?></td>
+            <td style="padding:8px;"><?php echo htmlspecialchars($name); ?></td>
+            <td style="padding:8px;"><?php echo $dateTime; ?></td>
+            <td style="padding:8px;"><?php echo $type; ?></td>
+            <td style="padding:8px;">
+                <?php if ($status === 'Scheduled'): ?>
+                    <span style="background:#fff3cd; color:#856404; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                <?php elseif ($status === 'Completed'): ?>
+                    <span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                <?php elseif ($status === 'Cancelled'): ?>
+                    <span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                <?php else: ?>
+                    <?php echo $status; ?>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if ($status !== 'Completed'): ?>
+                    <button
+                        class="btn btn-primary btn-sm addScheduleBtn"
+                        data-id="<?= $p['patient_id'] ?>"
+                        data-name="<?= htmlspecialchars($name) ?>"
+                        data-date="<?= $dateTime ?>"
+                        data-test="<?= htmlspecialchars($type) ?>"
+                        data-status="<?= $status ?>"
+                        data-bs-toggle="modal"
+                        data-bs-target="#addScheduleModal">
+                        Lab Scheduling (+)
+                    </button>
+                <?php endif; ?>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+</tbody>
+
             </table>
             <!-- MODAL AREA HERE -->
             <div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true">
