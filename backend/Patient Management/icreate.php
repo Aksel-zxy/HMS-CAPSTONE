@@ -140,16 +140,16 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                                     <select class="form-select" name="attending_doctor" required>
                                         <option value="">-- Attending Doctor --</option>
                                         <?php
-            if ($doctors && $doctors->num_rows > 0) {
-                while ($doc = $doctors->fetch_assoc()) {
-                    echo "<option value='{$doc['employee_id']}'>" .
-                          htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) .
-                         "</option>";
-                }
-            } else {
-                echo "<option value=''>No doctors available</option>";
-            }
-            ?>
+                                        if ($doctors && $doctors->num_rows > 0) {
+                                            while ($doc = $doctors->fetch_assoc()) {
+                                                echo "<option value='{$doc['employee_id']}'>" .
+                                                    htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) .
+                                                    "</option>";
+                                            }
+                                        } else {
+                                            echo "<option value=''>No doctors available</option>";
+                                        }
+                                        ?>
                                     </select>
                                 </div>
                             </div>

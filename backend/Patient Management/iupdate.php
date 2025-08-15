@@ -184,14 +184,14 @@ if ($medical_history) {
                                 <select class="form-select" name="attending_doctor" required>
                                     <option value="">-- Select Available Doctor --</option>
                                     <?php
-            $doctors = $callerObj->getAllDoctors(); // returns array or mysqli result
-            foreach ($doctors as $doc) {
-                $selected = ($patient['attending_doctor'] == $doc['employee_id']) ? 'selected' : '';
-                echo "<option value='{$doc['employee_id']}' {$selected}>" .
-                     htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) .
-                     "</option>";
-            }
-            ?>
+                                    $doctors = $callerObj->getAllDoctors(); // returns array or mysqli result
+                                    foreach ($doctors as $doc) {
+                                        $selected = ($patient['attending_doctor'] == $doc['employee_id']) ? 'selected' : '';
+                                        echo "<option value='{$doc['employee_id']}' {$selected}>" .
+                                            htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) .
+                                            "</option>";
+                                    }
+                                    ?>
                                 </select>
                             </div>
                         </div>
