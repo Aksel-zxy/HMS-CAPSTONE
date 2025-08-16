@@ -1,6 +1,19 @@
- <?php
+<?php
 include '../../SQL/config.php';
-require_once 'classincludes/billing_summary_class.php'; // <-- Correct path if classincludes is in current directory
+require_once 'classincludes/billing_summary_class.php';
+
+// Add this class for dl_services
+class DLServices {
+    private $conn;
+    public function __construct($conn) {
+        $this->conn = $conn;
+    }
+    public function getAllServices() {
+        $query = "SELECT * FROM dl_services";
+        $result = $this->conn->query($query);
+        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    }
+}
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
@@ -23,8 +36,11 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
-?>
 
+// Fetch all services
+$dlServices = new DLServices($conn);
+$services = $dlServices->getAllServices();
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -129,7 +145,7 @@ if (!$user) {
                         <table class="table table-bordered table-hover" style="border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(44,62,80,0.08); background:#f8f6f0;">
                             <thead style="background-color:#f3f1eb;">
                                 <tr>
-                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Particulars</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Service Name</th>
                                     <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Actual Charges</th>
                                     <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">VAT</th>
                                     <th class="text-center" colspan="3" style="font-size:1.1rem;">Amount of Discount</th>
@@ -137,13 +153,31 @@ if (!$user) {
                                     <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Status</th>
                                 </tr>
                                 <tr>
-                                    <th class="text-center" style="font-size:1.05rem;">SC/ PWD</th>
+                                    <th class="text-center" style="font-size:1.05rem;">SC/PWD</th>
                                     <th class="text-center" style="font-size:1.05rem;">Insurance</th>
                                     <th class="text-center" style="font-size:1.05rem;">Benefit</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                
+                                <?php if (!empty($services)): ?>
+                                    <?php foreach ($services as $service): ?>
+                                        <tr>
+                                            <td class="text-center align-middle"><?= htmlspecialchars($service['serviceName']) ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['price']) ? htmlspecialchars($service['price']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['actual_charges']) ? htmlspecialchars($service['actual_charges']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['vat']) ? htmlspecialchars($service['vat']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['sc_pwd_discount']) ? htmlspecialchars($service['sc_pwd_discount']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['insurance_discount']) ? htmlspecialchars($service['insurance_discount']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['benefit_discount']) ? htmlspecialchars($service['benefit_discount']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['out_of_pocket']) ? htmlspecialchars($service['out_of_pocket']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['status']) ? htmlspecialchars($service['status']) : '-' ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="9" class="text-center">No services found.</td>
+                                    </tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
