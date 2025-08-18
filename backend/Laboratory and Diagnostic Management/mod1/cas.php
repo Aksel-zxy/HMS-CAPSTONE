@@ -192,67 +192,69 @@ if (!$user) {
             </div>
             <!----- End of Main Content ----->
             <script>
-                const toggler = document.querySelector(".toggler-btn");
-                toggler.addEventListener("click", function() {
-                    document.querySelector("#sidebar").classList.toggle("collapsed");
-                });
-                document.addEventListener('DOMContentLoaded', function() {
-                    let calendarEl = document.getElementById('scheduleCalendar');
+document.addEventListener('DOMContentLoaded', function () {
+  const calendarEl = document.getElementById('scheduleCalendar');
 
-                    // Create floating div for hover info
-                    let hoverBox = document.createElement('div');
-                    hoverBox.id = 'hoverBox';
-                    hoverBox.style.position = 'absolute';
-                    hoverBox.style.background = '#fff';
-                    hoverBox.style.border = '1px solid #ccc';
-                    hoverBox.style.padding = '10px';
-                    hoverBox.style.borderRadius = '5px';
-                    hoverBox.style.boxShadow = '0px 2px 6px rgba(0,0,0,0.2)';
-                    hoverBox.style.display = 'none';
-                    hoverBox.style.zIndex = '1000';
-                    document.body.appendChild(hoverBox);
+  const hoverBox = document.createElement('div');
+  Object.assign(hoverBox.style, {
+    position: 'absolute',
+    background: '#fff',
+    border: '1px solid #ccc',
+    padding: '10px',
+    borderRadius: '6px',
+    boxShadow: '0 2px 6px rgba(0,0,0,.2)',
+    display: 'none',
+    zIndex: '1000'
+  });
+  document.body.appendChild(hoverBox);
 
-                    let calendar = new FullCalendar.Calendar(calendarEl, {
-                        initialView: 'dayGridMonth',
-                        events: 'oop/docref.php?action=schedules',
-                        eventColor: '#007bff',
-                        eventTextColor: '#fff',
+  function toYMD(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
 
-                        dayCellDidMount: function(info) {
-                            info.el.addEventListener('mouseenter', function(e) {
-                                let date = info.date.toISOString().split('T')[0];
+  function placeHover(e) {
+    hoverBox.style.left = (e.clientX + 12 + window.scrollX) + 'px';
+    hoverBox.style.top  = (e.clientY + 12 + window.scrollY) + 'px';
+  }
 
-                                fetch(`oop/docref.php?action=slots&date=${date}`)
-                                    .then(res => res.json())
-                                    .then(data => {
-                                        let content = `<strong>${date}</strong><br>`;
-                                        if (data.length > 0) {
-                                            data.forEach(slot => {
-                                                content += `${slot.time} (${slot.remaining} left)<br>`;
-                                            });
-                                        } else {
-                                            content += 'No available slots';
-                                        }
-                                        hoverBox.innerHTML = content;
-                                        hoverBox.style.display = 'block';
-                                        hoverBox.style.left = (e.pageX + 10) + 'px';
-                                        hoverBox.style.top = (e.pageY + 10) + 'px';
-                                    });
-                            });
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    timeZone: 'local',
+    events: 'oop/docref.php?action=schedules',
+    eventColor: '#007bff',
+    eventTextColor: '#fff',
 
-                            info.el.addEventListener('mousemove', function(e) {
-                                hoverBox.style.left = (e.pageX + 10) + 'px';
-                                hoverBox.style.top = (e.pageY + 10) + 'px';
-                            });
+    dayCellDidMount: function (info) {
+      const dateStr = toYMD(info.date);
 
-                            info.el.addEventListener('mouseleave', function() {
-                                hoverBox.style.display = 'none';
-                            });
-                        }
-                    });
+      info.el.addEventListener('mouseenter', function (e) {
+        fetch(`oop/docref.php?action=dayDetails&date=${encodeURIComponent(dateStr)}`)
+          .then(r => r.json())
+          .then(data => {
+            let html = `<strong>${dateStr}</strong><br>`;
+            if (Array.isArray(data) && data.length) {
+              data.forEach(d => {
+                html += `${d.patient} — ${d.service} — ${d.time}<br>`;
+              });
+            } else {
+              html += 'No appointments';
+            }
+            hoverBox.innerHTML = html;
+            hoverBox.style.display = 'block';
+            placeHover(e);
+          });
+      });
 
-                    calendar.render();
-                });
+      info.el.addEventListener('mousemove', placeHover);
+      info.el.addEventListener('mouseleave', () => { hoverBox.style.display = 'none'; });
+    }
+  });
+
+  calendar.render();
+});
             </script>
             <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
             <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
