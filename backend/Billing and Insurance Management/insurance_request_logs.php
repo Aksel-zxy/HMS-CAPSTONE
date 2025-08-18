@@ -1,30 +1,22 @@
 <?php
+session_start();
 include '../../SQL/config.php';
-require_once 'classincludes/billing_records_class.php';
-require_once 'classincludes/billing_summary_class.php';
+require_once 'classincludes/insurance_requestlogs_class.php';
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: login.php');
     exit();
 }
 
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
+$logs = new InsuranceRequestLogs($conn);
+$requests = $logs->getAllRequests();
 
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
+$success_message = '';
+if (isset($_GET['success']) && $_GET['success'] == 1) {
+    $success_message = "Insurance request submitted successfully.";
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -36,6 +28,7 @@ if (!$user) {
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
+    <link rel="stylesheet" type="text/css" href="../assets/CSS/billingandinsurance.css">
 </head>
 
 <body>
@@ -121,67 +114,45 @@ if (!$user) {
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem; color:#2c3e50;">Billing Records</h1>
-
-                <div class="row">
-                    <div class="col-md-12">
-                        <link rel="stylesheet" href="assets/CSS/billingandinsurance.css">
-                        <table class="table minimal-table">
-                            <thead>
-                                <tr>
-                                    <th>Billing ID</th>
-                                    <th>Patient ID</th>
-                                    <th>Billing Date</th>
-                                    <th>Total Amount</th>
-                                    <th>Insurance Covered</th>
-                                    <th>Out of Pocket</th>
-                                    <th>Status</th>
-                                    <th>Payment Method</th>
-                                    <th>Transaction ID</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $billing = new billing_records($conn);
-                                $records = $billing->getAllBillingRecords();
-                                while ($row = $records->fetch_assoc()) {
-                                    echo "<tr>";
-                                    echo "<td>" . $row['billing_id'] . "</td>";
-                                    echo "<td>" . $row['patient_id'] . "</td>";
-                                    echo "<td>" . $row['billing_date'] . "</td>";
-                                    echo "<td>₱" . number_format($row['total_amount'], 2) . "</td>";
-                                    echo "<td>₱" . number_format($row['insurance_covered'], 2) . "</td>";
-                                    echo "<td>₱" . number_format(($row['total_amount'] - $row['insurance_covered']), 2) . "</td>";
-                                    $badgeClass = ($row['status'] == 'Paid') ? 'minimal-badge bg-success' : 'minimal-badge bg-warning text-dark';
-                                    echo "<td><span class='" . $badgeClass . "'>" . (!empty($row['status']) ? $row['status'] : 'Pending') . "</span></td>";
-                                    echo "<td>" . $row['payment_method'] . "</td>";
-                                    echo "<td>" . $row['transaction_id'] . "</td>";
-                                    echo "<td><a href='billing_summary.php?billing_id=" . $row['billing_id'] . "&patient_id=" . $row['patient_id'] . "' class='minimal-btn'>Generate</a></td>";
-                                    echo "</tr>";
-                                }
-                                ?>
-                            </tbody>
-                        </table>
-                    </div>
-                
+<div class="center-wrapper">
+    <div class="container" style="max-width: 1000px;">
+        <h2>Insurance Request Logs</h2>
+        <?php if (!empty($success_message)): ?>
+            <div class="alert-success">
+                <?= htmlspecialchars($success_message) ?>
             </div>
-            <!-- END CODING HERE -->
+        <?php endif; ?>
+        <div style="text-align:center;margin-bottom:18px;">
+            <a href="insurance_request.php">Back to Request Form</a>
         </div>
-        <!----- End of Main Content ----->
+        <div class="request-table hospital-billing-table"  >
+            <h3>Submitted Insurance Requests</h3>
+            <?php if (!empty($requests)): ?>
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Patient ID</th>
+                    <th>Billing ID</th>
+                    <th>Insurance Type</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                </tr>
+                <?php foreach ($requests as $req): ?>
+                <tr>
+                    <td><?= htmlspecialchars($req['request_id']) ?></td>
+                    <td><?= htmlspecialchars($req['patient_id']) ?></td>
+                    <td><?= htmlspecialchars($req['billing_id']) ?></td>
+                    <td><?= htmlspecialchars($req['insurance_type']) ?></td>
+                    <td><?= htmlspecialchars($req['notes']) ?></td>
+                    <td><?= ucfirst(htmlspecialchars($req['status'])) ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </table>
+            <?php else: ?>
+                <div style="margin-top:16px;text-align:center;">No insurance requests found.</div>
+            <?php endif; ?>
+        </div>
     </div>
-    <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    </script>
-    <script src="assets/Bootstrap/all.min.js"></script>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
+</div>
 </body>
-
 </html>

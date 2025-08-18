@@ -1,7 +1,19 @@
 <?php
 include '../../SQL/config.php';
-require_once 'classincludes/billing_records_class.php';
 require_once 'classincludes/billing_summary_class.php';
+
+// Add this class for dl_services
+class DLServices {
+    private $conn;
+    public function __construct($conn) {
+        $this->conn = $conn;
+    }
+    public function getAllServices() {
+        $query = "SELECT * FROM dl_services";
+        $result = $this->conn->query($query);
+        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    }
+}
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
@@ -24,8 +36,11 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
-?>
 
+// Fetch all services
+$dlServices = new DLServices($conn);
+$services = $dlServices->getAllServices();
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -123,46 +138,46 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem; color:#2c3e50;">Billing Records</h1>
+                <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem;">Summary of Fees</h1>
 
                 <div class="row">
                     <div class="col-md-12">
-                        <link rel="stylesheet" href="assets/CSS/billingandinsurance.css">
-                        <table class="table minimal-table">
-                            <thead>
+                        <table class="table table-bordered table-hover" style="border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(44,62,80,0.08); background:#f8f6f0;">
+                            <thead style="background-color:#f3f1eb;">
                                 <tr>
-                                    <th>Billing ID</th>
-                                    <th>Patient ID</th>
-                                    <th>Billing Date</th>
-                                    <th>Total Amount</th>
-                                    <th>Insurance Covered</th>
-                                    <th>Out of Pocket</th>
-                                    <th>Status</th>
-                                    <th>Payment Method</th>
-                                    <th>Transaction ID</th>
-                                    <th>Action</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Service Name</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Actual Charges</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">VAT</th>
+                                    <th class="text-center" colspan="3" style="font-size:1.1rem;">Amount of Discount</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Out of Pocket</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Status</th>
+                                </tr>
+                                <tr>
+                                    <th class="text-center" style="font-size:1.05rem;">SC/PWD</th>
+                                    <th class="text-center" style="font-size:1.05rem;">Insurance</th>
+                                    <th class="text-center" style="font-size:1.05rem;">Benefit</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php
-                                $billing = new billing_records($conn);
-                                $records = $billing->getAllBillingRecords();
-                                while ($row = $records->fetch_assoc()) {
-                                    echo "<tr>";
-                                    echo "<td>" . $row['billing_id'] . "</td>";
-                                    echo "<td>" . $row['patient_id'] . "</td>";
-                                    echo "<td>" . $row['billing_date'] . "</td>";
-                                    echo "<td>₱" . number_format($row['total_amount'], 2) . "</td>";
-                                    echo "<td>₱" . number_format($row['insurance_covered'], 2) . "</td>";
-                                    echo "<td>₱" . number_format(($row['total_amount'] - $row['insurance_covered']), 2) . "</td>";
-                                    $badgeClass = ($row['status'] == 'Paid') ? 'minimal-badge bg-success' : 'minimal-badge bg-warning text-dark';
-                                    echo "<td><span class='" . $badgeClass . "'>" . (!empty($row['status']) ? $row['status'] : 'Pending') . "</span></td>";
-                                    echo "<td>" . $row['payment_method'] . "</td>";
-                                    echo "<td>" . $row['transaction_id'] . "</td>";
-                                    echo "<td><a href='billing_summary.php?billing_id=" . $row['billing_id'] . "&patient_id=" . $row['patient_id'] . "' class='minimal-btn'>Generate</a></td>";
-                                    echo "</tr>";
-                                }
-                                ?>
+                                <?php if (!empty($services)): ?>
+                                    <?php foreach ($services as $service): ?>
+                                        <tr>
+                                            <td class="text-center align-middle"><?= htmlspecialchars($service['serviceName']) ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['price']) ? htmlspecialchars($service['price']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['actual_charges']) ? htmlspecialchars($service['actual_charges']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['vat']) ? htmlspecialchars($service['vat']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['sc_pwd_discount']) ? htmlspecialchars($service['sc_pwd_discount']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['insurance_discount']) ? htmlspecialchars($service['insurance_discount']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['benefit_discount']) ? htmlspecialchars($service['benefit_discount']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['out_of_pocket']) ? htmlspecialchars($service['out_of_pocket']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['status']) ? htmlspecialchars($service['status']) : '-' ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="9" class="text-center">No services found.</td>
+                                    </tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>
