@@ -1,37 +1,48 @@
 <?php
-require_once __DIR__ . '../../../../../SQL/config.php';
+require_once __DIR__ . '../../../../../SQL/config.php'; //
 
 class Calendar {
     private $conn;
-    public function __construct($conn){ $this->conn = $conn; }
-
-    public function getSchedules() {
-        $sql = "
-            SELECT 
-              s.patientID,
-              p.fname, p.lname,
-              s.serviceName,
-              s.scheduleDate,
-              s.scheduleTime
-            FROM dl_schedule s
-            JOIN patientinfo p ON p.patient_id = s.patientID
-            WHERE COALESCE(s.status,'') <> 'Processing'
-        ";
-        $res = $this->conn->query($sql);
-
-        $events = [];
-        while ($row = $res->fetch_assoc()) {
-            $date = $row['scheduleDate'];
-            $time = $row['scheduleTime'];
-            $pretty = date('g:i A', strtotime($time));
-            $events[] = [
-                'title' => "{$row['fname']} {$row['lname']} — {$row['serviceName']} — {$pretty}",
-                'start' => "{$date}T{$time}",
-                'allDay' => false
-            ];
-        }
-        return $events;
+    public function __construct($conn){ 
+        $this->conn = $conn; 
     }
+
+  public function getSchedules() {
+    $sql = "
+        SELECT 
+          s.patientID,
+          p.fname, p.lname,
+          s.serviceName,
+          s.scheduleDate,
+          s.scheduleTime,
+          COALESCE(s.status, '') as status
+        FROM dl_schedule s
+        JOIN patientinfo p ON p.patient_id = s.patientID
+        WHERE s.status = 'Processing'
+    ";
+    $res = $this->conn->query($sql);
+
+    $events = [];
+    while ($row = $res->fetch_assoc()) {
+        $date  = $row['scheduleDate'];
+        $time  = $row['scheduleTime'];
+        $start = "{$date}T{$time}";
+
+        $pretty = date('g:i A', strtotime($time));
+
+        $events[] = [
+            "title"   => "{$row['fname']} {$row['lname']} — {$row['serviceName']} — {$pretty}",
+            "start"   => $start,
+            "allDay"  => false,
+            "patient" => "{$row['fname']} {$row['lname']}",
+            "service" => $row['serviceName'],
+            "time"    => $pretty,
+            "status"  => $row['status']
+        ];
+    }
+    return $events;
+}
+
 
     // Get all patients scheduled for a given date
     public function getDayDetails($date) {
@@ -62,7 +73,7 @@ class Calendar {
 
 $calendar = new Calendar($conn);
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 $action = $_GET['action'] ?? 'schedules';
 
 if ($action === 'schedules') {
