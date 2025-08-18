@@ -49,7 +49,8 @@ try {
                 <p><strong>Name:</strong>
                     <?=  htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . '  ' . $patient['lname']) ?></p>
                 <p><strong>Address:</strong> <?= htmlspecialchars($patient['address']) ?></p>
-                <p><strong>Date of Birth:</strong> <?= htmlspecialchars($patient['dob']) ?></p>
+                <p><strong>Date of Birth:</strong>
+                    <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob']))) ?></p>
                 <p><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
                 <p><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?></p>
                 <p><strong>Civil Status:</strong> <?= htmlspecialchars($patient['civil_status']) ?></p>
