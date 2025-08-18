@@ -9,9 +9,9 @@ class InsuranceRequest {
     }
 
     // Create a new insurance request
-    public function create($patient_id, $billing_id, $insurance_type, $coverage_covered, $notes) {
-        $stmt = $this->conn->prepare("INSERT INTO insurance_request (patient_id, billing_id, insurance_type, coverage_covered, notes, status) VALUES (?, ?, ?, ?, ?, 'pending')");
-        $stmt->bind_param("iisss", $patient_id, $billing_id, $insurance_type, $coverage_covered, $notes);
+    public function create($patient_id, $billing_id, $insurance_type, $notes) {
+        $stmt = $this->conn->prepare("INSERT INTO insurance_request (patient_id, billing_id, insurance_type, notes, status) VALUES (?, ?, ?, ?, 'pending')");
+        $stmt->bind_param("iiss", $patient_id, $billing_id, $insurance_type, $notes);
         return $stmt->execute();
     }
 

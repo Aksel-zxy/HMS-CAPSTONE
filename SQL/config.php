@@ -3,7 +3,7 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 // 1800 for 30mins
-$inactive = 1000;
+$inactive = 1800;
 
 if (isset($_SESSION['timeout'])) {
     $session_life = time() - $_SESSION['timeout'];

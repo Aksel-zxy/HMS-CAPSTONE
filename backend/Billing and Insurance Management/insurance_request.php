@@ -47,11 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_request'])) {
             $_POST['patient_id'],
             $_POST['billing_id'],
             $_POST['insurance_type'],
-            $_POST['coverage_covered'],
             $_POST['notes']
         );
-        $success_message = "Insurance request submitted successfully.";
-        $show_requests = true;
+        // Redirect to logs page after successful submission
+        header("Location: insurance_request_logs.php?success=1");
+        exit();
     } else {
         $error_message = "Patient ID does not exist. Please enter a valid Patient ID.";
     }
@@ -83,40 +83,44 @@ if ($show_requests) {
 <html>
 <head>
     <title>Insurance Requests</title>
-    <link rel="stylesheet" href="../assets/CSS/billingandinsurance.css">
+    <link rel="stylesheet" type="text/css" href="../assets/CSS/billingandinsurance.css">
 </head>
 <body>
-<div class="container">
-    <h2>Insurance Request Form</h2>
-    <div class="form-card">
-        <?php if (!empty($success_message)): ?>
-            <div style="background:#e8f5e9;color:#388e3c;padding:10px 16px;border-radius:4px;margin-bottom:16px;">
-                <?= htmlspecialchars($success_message) ?>
-            </div>
-        <?php endif; ?>
-        <?php if (!empty($error_message)): ?>
-            <div style="background:#ffebee;color:#c62828;padding:10px 16px;border-radius:4px;margin-bottom:16px;">
-                <?= htmlspecialchars($error_message) ?>
-            </div>
-        <?php endif; ?>
-        <form method="post">
-            <label for="patient_id">Patient ID:</label>
-            <input type="number" name="patient_id" id="patient_id" required>
+<div class="center-wrapper">
+    <div class="container">
+        <h2>Insurance Requests Form</h2>
+        <div class="form-card">
+            <?php if (!empty($success_message)): ?>
+                <div class="alert-success">
+                    <?= htmlspecialchars($success_message) ?>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($error_message)): ?>
+                <div class="alert-error">
+                    <?= htmlspecialchars($error_message) ?>
+                </div>
+            <?php endif; ?>
+            <form method="post">
+                <label for="patient_id">Patient ID:</label>
+                <input type="number" name="patient_id" id="patient_id" required>
 
-            <label for="billing_id">Billing ID:</label>
-            <input type="number" name="billing_id" id="billing_id" required>
+                <label for="billing_id">Billing ID:</label>
+                <input type="number" name="billing_id" id="billing_id" required>
 
-            <label for="insurance_type">Insurance Type:</label>
-            <input type="text" name="insurance_type" id="insurance_type" required>
+                <label for="insurance_type">Insurance Type:</label>
+                <input type="text" name="insurance_type" id="insurance_type" required>
 
-            <label for="coverage_covered">Coverage Covered:</label>
-            <input type="text" name="coverage_covered" id="coverage_covered" required>
+                <label for="notes">Notes:</label>
+                <textarea name="notes" id="notes" rows="2"></textarea>
 
-            <label for="notes">Notes:</label>
-            <textarea name="notes" id="notes" rows="2"></textarea>
-
-            <button type="submit" name="create_request">Submit Request</button>
-        </form>
+                <button type="submit" name="create_request">Submit Request</button>
+            </form>
+        </div>
+        <!-- Remove logs table from here -->
+        <!-- Optionally, add a link to logs page -->
+        <div style="text-align:center;">
+            <a href="insurance_request_logs.php">View Insurance Request Logs</a>
+        </div>
     </div>
 </div>
 </body>

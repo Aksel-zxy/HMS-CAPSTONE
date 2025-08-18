@@ -3,19 +3,38 @@ body {
     background: #f7f9fa;
     margin: 0;
     padding: 0;
+    min-height: 100vh;
+    /* Remove flex/grid from body */
+}
+.center-wrapper {
+    width: 100vw;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .container {
-    max-width: 1100px;
-    margin: 40px auto;
     background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-    padding: 32px 40px 40px 40px;
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    padding: 40px 32px 32px 32px;
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+    /* Center vertically and horizontally */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 h2 {
     margin-top: 0;
     color: #2d3e50;
     letter-spacing: 1px;
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 28px;
 }
 .form-card {
     background: #f4f8fb;
@@ -23,13 +42,13 @@ h2 {
     padding: 24px 28px 18px 28px;
     margin-bottom: 32px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-    max-width: 500px;
 }
 .form-card label {
     display: block;
     margin-bottom: 8px;
     color: #34495e;
     font-weight: 500;
+    font-size: 15px;
 }
 .form-card input[type="number"],
 .form-card input[type="text"],
@@ -58,87 +77,189 @@ h2 {
     font-weight: 500;
     cursor: pointer;
     transition: background 0.2s;
+    width: 100%;
+    margin-top: 8px;
 }
 .form-card button:hover {
     background: #125ea7;
 }
-table {
-    border-collapse: collapse;
+.alert-success {
+    background: #e8f5e9;
+    color: #388e3c;
+    padding: 10px 16px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    font-size: 15px;
+    text-align: center;
+}
+.alert-error {
+    background: #ffebee;
+    color: #c62828;
+    padding: 10px 16px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    font-size: 15px;
+    text-align: center;
+}
+.request-table {
+    margin-top: 32px;
+    background: #f4f8fb;
+    border-radius: 10px;
+    padding: 24px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.request-table h3 {
+    margin-top: 0;
+    margin-bottom: 18px;
+    color: #1976d2;
+    font-size: 1.2rem;
+    font-weight: 600;
+    text-align: center;
+}
+.request-table table {
     width: 100%;
+    border-collapse: collapse;
     background: #fff;
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
-th, td {
+.request-table th, .request-table td {
     border: none;
-    padding: 12px 10px;
+    padding: 10px 8px;
     text-align: left;
+    font-size: 14px;
 }
-th {
+.request-table th {
     background: #1976d2;
     color: #fff;
     font-weight: 600;
-    font-size: 15px;
 }
-tr:nth-child(even) {
+.request-table tr:nth-child(even) {
     background: #f4f8fb;
 }
-tr:hover {
+.request-table tr:hover {
     background: #e3f0fc;
 }
-.status-pending {
-    color: #ff9800;
-    font-weight: 600;
-}
-.status-approved {
-    color: #43a047;
-    font-weight: 600;
-}
-.status-declined {
-    color: #e53935;
-    font-weight: 600;
-}
-.actions a {
-    margin-right: 10px;
+.request-table a {
     text-decoration: none;
-    color: #1976d2;
     font-weight: 500;
-    transition: color 0.2s;
 }
-.actions a:hover {
-    color: #125ea7;
-    text-decoration: underline;
+.request-table a[style*="green"] { color: #43a047 !important; }
+.request-table a[style*="red"] { color: #e53935 !important; }
+.request-table span[style*="gray"] { color: #888 !important; }
+.hospital-billing-table {
+    background: #f8fafc;
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(33, 150, 243, 0.08);
+    padding: 28px 12px 24px 12px;
+    margin-top: 36px;
+
 }
-.actions em {
-    color: #888;
+.hospital-billing-table h3 {
+    color: #1976d2;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 18px;
+    text-align: left;
+    letter-spacing: 1px;
+}
+.hospital-billing-table table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 8px rgba(33, 150, 243, 0.07);
+}
+.hospital-billing-table th, .hospital-billing-table td {
+    padding: 14px 12px;
+    font-size: 15px;
+    border-bottom: 1px solid #e3eaf1;
+}
+.hospital-billing-table th {
+    background: linear-gradient(90deg, #1976d2 80%, #42a5f5 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    border-bottom: 2px solid #1565c0;
+    letter-spacing: 0.5px;
+}
+.hospital-billing-table tr:nth-child(even) td {
+    background: #f4f8fb;
+}
+.hospital-billing-table tr:hover td {
+    background: #e3f0fc;
+    transition: background 0.2s;
+}
+.hospital-billing-table td {
+    color: #2d3e50;
+    vertical-align: middle;
+}
+.hospital-billing-table td:last-child {
+    text-align: center;
+}
+.hospital-billing-table a {
+    font-weight: 600;
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+}
+.hospital-billing-table a[style*="green"] {
+    background: #e8f5e9;
+    color: #388e3c !important;
+}
+.hospital-billing-table a[style*="red"] {
+    background: #ffebee;
+    color: #c62828 !important;
+}
+.hospital-billing-table span[style*="gray"] {
+    color: #888 !important;
+    font-style: italic;
 }
 @media (max-width: 900px) {
     .container { padding: 10px; }
     .form-card { padding: 12px; }
     th, td { font-size: 13px; }
 }
-@media (max-width: 600px) {
-    .container { padding: 2px; }
-    .form-card { padding: 6px; }
-    table, thead, tbody, th, td, tr { display: block; }
-    th { position: absolute; left: -9999px; }
-    tr { margin-bottom: 15px; }
-    td { border: none; position: relative; padding-left: 50%; }
-    td:before {
+@media (max-width: 700px) {
+    .hospital-billing-table table, .hospital-billing-table thead, .hospital-billing-table tbody, .hospital-billing-table th, .hospital-billing-table td, .hospital-billing-table tr {
+        display: block;
+    }
+    .hospital-billing-table th {
         position: absolute;
-        left: 10px;
+        left: -9999px;
+    }
+    .hospital-billing-table tr {
+        margin-bottom: 18px;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(33, 150, 243, 0.07);
+        background: #fff;
+    }
+    .hospital-billing-table td {
+        border: none;
+        position: relative;
+        padding-left: 52%;
+        min-height: 38px;
+        font-size: 15px;
+    }
+    .hospital-billing-table td:before {
+        position: absolute;
+        left: 12px;
         width: 45%;
         white-space: nowrap;
         font-weight: bold;
         color: #1976d2;
+        font-size: 14px;
     }
-    td:nth-of-type(1):before { content: "ID"; }
-    td:nth-of-type(2):before { content: "Patient ID"; }
-    td:nth-of-type(3):before { content: "Billing ID"; }
-    td:nth-of-type(4):before { content: "Insurance Type"; }
-    td:nth-of-type(5):before { content: "Coverage Covered"; }
-    td:nth-of-type(6):before { content: "Notes"; }
-    td:nth-of-type(7):before { content: "Status"; }
-    td:nth-of-type(8):before { content: "Actions"; }
+    .hospital-billing-table td:nth-of-type(1):before { content: "ID"; }
+    .hospital-billing-table td:nth-of-type(2):before { content: "Patient ID"; }
+    .hospital-billing-table td:nth-of-type(3):before { content: "Billing ID"; }
+    .hospital-billing-table td:nth-of-type(4):before { content: "Insurance Type"; }
+    .hospital-billing-table td:nth-of-type(5):before { content: "Notes"; }
+    .hospital-billing-table td:nth-of-type(6):before { content: "Status"; }
+    .hospital-billing-table td:nth-of-type(7):before { content: "Action"; }
 }
+
