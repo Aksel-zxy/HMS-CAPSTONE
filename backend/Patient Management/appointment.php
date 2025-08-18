@@ -3,6 +3,13 @@ session_start();
 
 include '../../SQL/config.php';
 require_once 'class/patient.php';
+require_once 'class/caller.php';
+
+$appointmentObj = new caller($conn);
+$appointments = $appointmentObj->getAllAppointments();
+
+$getDoctors = new Caller($conn);
+$doctors = $getDoctors->getDoctors();
 
 $patientObj = new Patient($conn);
 $patients = $patientObj->getAllPatients();
@@ -194,16 +201,45 @@ $user = $result->fetch_assoc();
                         </div>
 
                         <!-- Modal Form -->
-                        <form action="save_appointment.php" method="POST">
+                        <form action="class/pcreate.php" method="POST">
                             <div class="modal-body">
 
                                 <!-- Patient ID -->
                                 <div class="mb-3">
-                                    <label for="patient_id" class="form-label">Patient ID</label>
-                                    <input type="number" class="form-control" id="patient_id" name="patient_id"
+                                    <label for="patient_search" class="form-label">Patient</label>
+                                    <input class="form-control" list="patientsList" id="patient_search"
+                                        name="patient_search" placeholder="Search patient..." autocomplete="off"
                                         required>
+                                    <datalist id="patientsList">
+                                        <?php
+                                        if ($patients && $patients->num_rows > 0) {
+                                            while ($patient = $patients->fetch_assoc()) {
+                                                $displayName = "{$patient['fname']} {$patient['mname']} {$patient['lname']}";
+                                                echo "<option value=\"{$displayName}\" data-id=\"{$patient['patient_id']}\"></option>";
+                                            }
+                                        }
+                                        ?>
+                                    </datalist>
+                                    <input type="hidden" id="patient_id" name="patient_id">
                                 </div>
 
+                                <!-- Purpose -->
+                                <div class="mb-3">
+                                    <label for="doctor" class="form-label">Doctor</label>
+                                    <select class="form-select" id="doctor" name="doctor" required>
+                                        <option value="">-- Select Doctor --</option>
+                                        <?php 
+                                        if ($doctors && $doctors->num_rows > 0) {
+                                            while ($doctor = $doctors->fetch_assoc()) {
+                                                $doctorName = "{$doctor['first_name']} {$doctor['last_name']}";
+                                                echo "<option value=\"{$doctor['employee_id']}\">{$doctorName} - {$doctor['specialization']}</option>";
+                                            }
+                                        } else {
+                                            echo "<option value=\"\">No doctors available</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
                                 <!-- Appointment Date & Time -->
                                 <div class="mb-3">
                                     <label for="appointment_date" class="form-label">Appointment Date & Time</label>
@@ -219,6 +255,11 @@ $user = $result->fetch_assoc();
                                         <option value="labor">Labor</option>
                                         <option value="checkup">Check-up</option>
                                         <option value="consultation">Consultation</option>
+                                        <option value="cardiology">Cardiology</option>
+                                        <option value="laboratory">laboratory</option>
+                                        <option value="ob-gyne">ob-gyne</option>
+                                        <option value="pediatric">pediatric</option>
+                                        <option value="physichiatric">physichiatric</option>
                                     </select>
                                 </div>
 
@@ -251,81 +292,77 @@ $user = $result->fetch_assoc();
             </div>
 
 
-            <div class="container mt-4">
-                <h2 class="mb-4">Employee Weekly Schedule</h2>
 
-                <!-- Button to trigger modal -->
+
+            <div class="container mt-4">
+                <h2 class="mb-4">All Appointments</h2>
+
                 <div class="container mt-4 mb-4 justify-content-end d-flex">
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal"
                         data-bs-target="#appointmentModal">
                         Add Appointment
                     </button>
                 </div>
-                <!-- Week Start Info -->
-                <p><strong>Week Start:</strong> 2025-08-18</p>
-
-                <!-- Weekly Schedule Table -->
-                <table class="table table-bordered text-center align-middle">
-                    <thead class="table-dark">
+                <!-- Appointment Table -->
+                <table class="table table-hover align-middle overflow-x-auto">
+                    <thead class="text-center">
                         <tr>
-                            <th>Day</th>
-                            <th>Start Time</th>
-                            <th>End Time</th>
-                            <th>Status</th>
+                            <th class="text-center">Appointment ID</th>
+                            <th class="text-center">Patient </th>
+                            <th class="text-center">Attending Doctor</th>
+                            <th class="text-center">Date & Time</th>
+                            <th class="text-center">Purpose</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Notes</th>
+                            <th class="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td>Monday</td>
-                            <td>08:00 AM</td>
-                            <td>04:00 PM</td>
-                            <td class="text-success">On Duty</td>
-                        </tr>
-                        <tr>
-                            <td>Tuesday</td>
-                            <td>08:00 AM</td>
-                            <td>04:00 PM</td>
-                            <td class="text-success">On Duty</td>
-                        </tr>
-                        <tr>
-                            <td>Wednesday</td>
-                            <td>08:00 AM</td>
-                            <td>04:00 PM</td>
-                            <td class="text-warning">Half Day</td>
-                        </tr>
-                        <tr>
-                            <td>Thursday</td>
-                            <td>--</td>
-                            <td>--</td>
-                            <td class="text-danger">Off</td>
-                        </tr>
-                        <tr>
-                            <td>Friday</td>
-                            <td>08:00 AM</td>
-                            <td>04:00 PM</td>
-                            <td class="text-success">On Duty</td>
-                        </tr>
-                        <tr>
-                            <td>Saturday</td>
-                            <td>09:00 AM</td>
-                            <td>01:00 PM</td>
-                            <td class="text-info">Training</td>
-                        </tr>
-                        <tr>
-                            <td>Sunday</td>
-                            <td>--</td>
-                            <td>--</td>
-                            <td class="text-danger">Off</td>
-                        </tr>
+                        <?php 
+                        if ($appointments && $appointments->num_rows > 0) {
+                            while ($row = $appointments->fetch_assoc()) {
+                                echo "<tr>
+                                    <td class='text-center'>{$row['appointment_id']}</td>
+                                    <td class='text-center'>{$row['patient_name']}</td>
+                                    <td class='text-center'>{$row['doctor_name']}</td>
+                                    <td class='text-center'>{$row['appointment_date']}</td>
+                                    <td class='text-center'>{$row['purpose']}</td>
+                                    <td class='text-center'>{$row['status']}</td>
+                                    <td class='text-center'>{$row['notes']}</td>
+                                    <td class='text-center'>
+                                        <a class='btn btn-primary btn-sm' href='edit_appointment.php?appointment_id={$row['appointment_id']}'>Edit</a>
+                                       
+                                    </td>
+                                </tr>";
+                            }
+                        } else {
+                            echo "<tr><td colspan='7' class='text-center'>No appointments found.</td></tr>";
+                        }
+                        ?>
+
                     </tbody>
                 </table>
             </div>
 
-            <!-- END CODING HERE -->
         </div>
-        <!----- End of Main Content ----->
+
+        <!-- END CODING HERE -->
+    </div>
+    <!----- End of Main Content ----->
     </div>
     <script>
+    document.getElementById('patient_search').addEventListener('input', function() {
+        var input = this.value;
+        var options = document.getElementById('patientsList').options;
+        var patientId = '';
+        for (var i = 0; i < options.length; i++) {
+            if (options[i].value === input) {
+                patientId = options[i].getAttribute('data-id');
+                break;
+            }
+        }
+        document.getElementById('patient_id').value = patientId;
+    });
     const toggler = document.querySelector(".toggler-btn");
     toggler.addEventListener("click", function() {
         document.querySelector("#sidebar").classList.toggle("collapsed");

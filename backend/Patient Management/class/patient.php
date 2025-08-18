@@ -104,6 +104,25 @@ public function getPatientOrFail($patient_id) {
         return $result;
     }
     
+        public function insertAppointment($data) {
+        $stmt = $this->conn->prepare("
+            INSERT INTO p_appointments (patient_id, appointment_date, purpose, notes)
+            VALUES (?, ?, ?, ?)
+        ");
+        $stmt->bind_param(
+            "isss",
+            $data['patient_id'],
+            $data['appointment_date'],
+            $data['purpose'],
+            $data['notes']
+        );
+        if ($stmt->execute()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
 }
 
 ?>
