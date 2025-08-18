@@ -191,71 +191,7 @@ if (!$user) {
                 </div>
             </div>
             <!----- End of Main Content ----->
-            <script>
-document.addEventListener('DOMContentLoaded', function () {
-  const calendarEl = document.getElementById('scheduleCalendar');
-
-  const hoverBox = document.createElement('div');
-  Object.assign(hoverBox.style, {
-    position: 'absolute',
-    background: '#fff',
-    border: '1px solid #ccc',
-    padding: '10px',
-    borderRadius: '6px',
-    boxShadow: '0 2px 6px rgba(0,0,0,.2)',
-    display: 'none',
-    zIndex: '1000'
-  });
-  document.body.appendChild(hoverBox);
-
-  function toYMD(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-
-  function placeHover(e) {
-    hoverBox.style.left = (e.clientX + 12 + window.scrollX) + 'px';
-    hoverBox.style.top  = (e.clientY + 12 + window.scrollY) + 'px';
-  }
-
-  const calendar = new FullCalendar.Calendar(calendarEl, {
-    initialView: 'dayGridMonth',
-    timeZone: 'local',
-    events: 'oop/docref.php?action=schedules',
-    eventColor: '#007bff',
-    eventTextColor: '#fff',
-
-    dayCellDidMount: function (info) {
-      const dateStr = toYMD(info.date);
-
-      info.el.addEventListener('mouseenter', function (e) {
-        fetch(`oop/docref.php?action=dayDetails&date=${encodeURIComponent(dateStr)}`)
-          .then(r => r.json())
-          .then(data => {
-            let html = `<strong>${dateStr}</strong><br>`;
-            if (Array.isArray(data) && data.length) {
-              data.forEach(d => {
-                html += `${d.patient} — ${d.service} — ${d.time}<br>`;
-              });
-            } else {
-              html += 'No appointments';
-            }
-            hoverBox.innerHTML = html;
-            hoverBox.style.display = 'block';
-            placeHover(e);
-          });
-      });
-
-      info.el.addEventListener('mousemove', placeHover);
-      info.el.addEventListener('mouseleave', () => { hoverBox.style.display = 'none'; });
-    }
-  });
-
-  calendar.render();
-});
-            </script>
+            <script src="../assets/javascript/calendar.js"></script>
             <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
             <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
             <script src="../assets/Bootstrap/all.min.js"></script>
