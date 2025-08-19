@@ -1,6 +1,7 @@
 <?php
 include '../../SQL/config.php';
-require_once 'classincludes/billing_records_class.php'; // <-- Correct path if classincludes is in current directory
+require_once 'classincludes/billing_records_class.php';
+require_once 'classincludes/billing_summary_class.php';
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
@@ -122,11 +123,12 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1>Billing Records</h1> <br>
+                <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem; color:#2c3e50;">Billing Records</h1>
 
                 <div class="row">
                     <div class="col-md-12">
-                        <table class="table table-bordered">
+                        <link rel="stylesheet" href="assets/CSS/billingandinsurance.css">
+                        <table class="table minimal-table">
                             <thead>
                                 <tr>
                                     <th>Billing ID</th>
@@ -138,6 +140,7 @@ if (!$user) {
                                     <th>Status</th>
                                     <th>Payment Method</th>
                                     <th>Transaction ID</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -149,13 +152,14 @@ if (!$user) {
                                     echo "<td>" . $row['billing_id'] . "</td>";
                                     echo "<td>" . $row['patient_id'] . "</td>";
                                     echo "<td>" . $row['billing_date'] . "</td>";
-                                    echo "<td>" . $row['total_amount'] . "</td>";
-                                    echo "<td>" . $row['insurance_covered'] . "</td>";
-                                    // Calculate out of pocket dynamically
-                                    echo "<td>" . ($row['total_amount'] - $row['insurance_covered']) . "</td>";
-                                    echo "<td>" . (!empty($row['status']) ? $row['status'] : 'Pending') . "</td>";
+                                    echo "<td>₱" . number_format($row['total_amount'], 2) . "</td>";
+                                    echo "<td>₱" . number_format($row['insurance_covered'], 2) . "</td>";
+                                    echo "<td>₱" . number_format(($row['total_amount'] - $row['insurance_covered']), 2) . "</td>";
+                                    $badgeClass = ($row['status'] == 'Paid') ? 'minimal-badge bg-success' : 'minimal-badge bg-warning text-dark';
+                                    echo "<td><span class='" . $badgeClass . "'>" . (!empty($row['status']) ? $row['status'] : 'Pending') . "</span></td>";
                                     echo "<td>" . $row['payment_method'] . "</td>";
                                     echo "<td>" . $row['transaction_id'] . "</td>";
+                                    echo "<td><a href='billing_summary.php?billing_id=" . $row['billing_id'] . "&patient_id=" . $row['patient_id'] . "' class='minimal-btn'>Generate</a></td>";
                                     echo "</tr>";
                                 }
                                 ?>

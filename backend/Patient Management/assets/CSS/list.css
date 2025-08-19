@@ -1,61 +1,86 @@
-.container{
-    max-width: 1440px;
-    height: 80vh;
-    overflow-y: auto;
-    width: 100%;
-    background: #fff;
-    box-shadow: 2px 5px 10px rgba(0, 0, 0, 0.5);
-    justify-content: center;
+h1 {
+  padding: 2rem 0;
+  font-size: 2.5rem;
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 2rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, #e0eafc 0%, #cfdef3 100%);
+  border-radius: 8px;
 }
 
-.container h1{
-    padding: 2rem 1rem;
-    font-size: 2.5rem;
-    text-align: center;
-    color: #000;
-}
-.tbl{
-    width: 100%;
-    border-collapse: collapse;
-    
-}
-.tbl thead{
-    background: #ccc;
-    color: #000;
-}
-.tbl thead tr th{
-    font-size: 0.9rem;
-    padding: 0.5rem;
-    letter-spacing: 0;
-    vertical-align: center;
-    border: 1px solid #aab7b8;
-    text-align: center;
-}
-.tbl tbody tr td{
-    font-size: 0.9rem;
-    letter-spacing: 0;
-    font-weight: normal;
-    text-align: center;
-    border: 1px solid #aab7b8;
-    padding: 0.5rem;
-    color: #000;
-}
-.tbl tr:nth-child(even){
-    background: #ccc;
-}
-.tbl tr:hover td{
-    background: #839192;
-    color: #000;
-    transition: all 0.3s ease-in;
-    cursor: pointer;
-}
-.tbl button{
-    display: inline-block;
-    border: none;
-    margin: 0 auto;
-    padding: 0.4rem;
-    border-radius: 1px;
-    outline: none;
-    cursor: pointer;
+.tbl {
+  width: 95%;
+  margin: 0 auto 2rem auto;
+  border-collapse: collapse;
+  box-shadow: 0 4px 24px rgba(44, 62, 80, 0.08);
+  background: #f8f9fa;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
+.tbl thead {
+  background: linear-gradient(90deg, #b2bec3 0%, #dfe6e9 100%);
+  font-size: 1rem;
+  color: #2c3e50;
+}
+
+.tbl thead tr th {
+  font-size: 1.1rem;
+  padding: 1.2rem;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+  border: none;
+  text-align: center;
+  font-weight: 600;
+}
+
+.tbl tbody tr {
+  transition: background 0.3s, color 0.3s;
+}
+
+.tbl tbody tr td {
+  font-size: 1rem;
+  letter-spacing: 0;
+  font-weight: 400;
+  text-align: center;
+  border-top: 1px solid #dfe6e9;
+  padding: 1.1rem;
+  color: #2c3e50;
+  background: #fff;
+}
+
+.tbl tr td a {
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.tbl tr td a:hover {
+  color: black;
+}
+
+.tbl tr:hover td {
+  background: #dff9fb;
+  color: #2d3436;
+  cursor: pointer;
+}
+
+.tbl button {
+  display: inline-block;
+  border: none;
+  margin: 0 auto;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(90deg, #00b894 0%, #0984e3 100%);
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(44, 62, 80, 0.08);
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.tbl button:hover {
+  background: linear-gradient(90deg, #0984e3 0%, #00b894 100%);
+  box-shadow: 0 4px 16px rgba(44, 62, 80, 0.12);
+}

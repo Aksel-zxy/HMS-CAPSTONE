@@ -1,7 +1,9 @@
 <?php
+require_once 'class/patient.php';
+require_once 'class/caller.php';
 
-require_once 'class/Patient.php';
-require_once 'class/create.php';
+$callerObj = new Caller($conn); // create Caller instance
+$doctors = $callerObj->getAllDoctors(); // Fetch all doctors
 ?>
 
 <!DOCTYPE html>
@@ -13,7 +15,7 @@ require_once 'class/create.php';
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="assets/CSS/icreate.css">
+    <!-- <link rel="stylesheet" href="assets/CSS/icreate.css"> -->
 </head>
 
 <body>
@@ -23,7 +25,7 @@ require_once 'class/create.php';
         aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
-                <form method="post" action="">
+                <form action="class/create.php" method="POST">
                     <div class="modal-body">
                         <?php if (isset($error)): ?>
                         <div class="alert alert-danger"><?php echo $error; ?></div>
@@ -131,19 +133,27 @@ require_once 'class/create.php';
                                 </div>
                             </div>
 
-                            <div class="row mb-3">
-                                <label class="col-sm-3 col-form-label">Bed Number</label>
-                                <div class="col-sm-9">
-                                    <input type="number" class="form-control" name="bed_number">
-                                </div>
-                            </div>
 
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Attending Doctor</label>
                                 <div class="col-sm-9">
-                                    <input type="text" class="form-control" name="attending_doctor">
+                                    <select class="form-select" name="attending_doctor" required>
+                                        <option value="">-- Attending Doctor --</option>
+                                        <?php
+                                        if ($doctors && $doctors->num_rows > 0) {
+                                            while ($doc = $doctors->fetch_assoc()) {
+                                                echo "<option value='{$doc['employee_id']}'>" .
+                                                    htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) .
+                                                    "</option>";
+                                            }
+                                        } else {
+                                            echo "<option value=''>No doctors available</option>";
+                                        }
+                                        ?>
+                                    </select>
                                 </div>
                             </div>
+
                         </div>
 
                         <div class="row mb-3 d-none" id="step2">
@@ -153,7 +163,7 @@ require_once 'class/create.php';
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Condition Name</label>
                                 <div class="col-sm-9">
-                                    <input type="text" class="form-control" name="codition_name" default="N/A">
+                                    <input type="text" class="form-control" name="condition_name" default="N/A">
                                 </div>
                             </div>
 
@@ -185,11 +195,7 @@ require_once 'class/create.php';
         </div>
     </div>
 
-    <!-- JS Scripts -->
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/all.min.js"></script>
+
 
     <script>
     // Auto-calculate age when DOB is changed

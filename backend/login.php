@@ -170,7 +170,7 @@ $login->authenticate();
             <p class="subtext">Enter your username and password to access your panel.</p>
 
             <?php if ($login->getError()): ?>
-                <div class="alert alert-danger"><?= $login->getError() ?></div>
+            <div class="alert alert-danger"><?= $login->getError() ?></div>
             <?php endif; ?>
 
             <form method="POST" action="">

@@ -160,7 +160,7 @@ $allPatients = $patient->getAllPatients();
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -170,7 +170,7 @@ $allPatients = $patient->getAllPatients();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <h2>Appointments</h2>
+            <h2>Doctor Referral</h2>
 
             <table style="width:100%; border-collapse:collapse; font-family:sans-serif;">
                 <thead>
@@ -180,45 +180,190 @@ $allPatients = $patient->getAllPatients();
                         <th style="padding:8px;">Date | Time</th>
                         <th style="padding:8px;">Test Name</th>
                         <th style="padding:8px;">Status</th>
+                        <th style="padding:8px;">Action</th> <!-- Added -->
                     </tr>
                 </thead>
-                <tbody>
-                    <?php foreach ($allPatients as $p): ?>
-                        <?php
-                        // Get actual patient ID
-                        $counter = $p['patient_id'];
+               <tbody>
+    <?php foreach ($allPatients as $p): ?>
+        <?php
+        // Get actual patient ID
+        $counter = $p['patient_id'];
 
-                        // Build name
-                        $name     = $p['fname'] . ' ' . $p['lname'];
-                        $dateTime = $p['appointment_date']; // from DB
-                        $status   = $p['status'];             // from DB
-                        $type     = $p['purpose'];          // from DB
-                        ?>
-                        <tr style="border-bottom:1px solid #eee;">
-                            <td style="padding:8px;"><?php echo htmlspecialchars($counter); ?></td>
-                            <td style="padding:8px;"><?php echo htmlspecialchars($name); ?></td>
-                            <td style="padding:8px;"><?php echo $dateTime; ?></td>
-                            <td style="padding:8px;"><?php echo $type; ?></td>
-                            <td style="padding:8px;">
-                                <?php if ($status === 'Processing'): ?>
-                                    <span style="background:#fff3cd; color:#856404; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                                <?php elseif ($status === 'Completed'): ?>
-                                    <span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                                <?php elseif ($status === 'Cancelled'): ?>
-                                    <span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                                <?php else: ?>
-                                    <?php echo $status; ?>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
+        // Build name
+        $name     = $p['fname'] . ' ' . $p['lname'];
+        $dateTime = $p['appointment_date'];
+        $type     = $p['notes'];
+
+        // Default status from p_appointments
+        $status = $p['status'];
+
+        // Check if dl_schedule has a record for this patient
+        $schedQuery = $conn->prepare("
+            SELECT status 
+            FROM dl_schedule 
+            WHERE patientID = ?
+            LIMIT 1
+        ");
+        $schedQuery->bind_param("i", $counter);
+        $schedQuery->execute();
+        $schedResult = $schedQuery->get_result();
+        if ($schedRow = $schedResult->fetch_assoc()) {
+            $status = $schedRow['status']; // Override with dl_schedule status
+        }
+        $schedQuery->close();
+
+        // Skip if status is Processing
+        if ($status === 'Processing') {
+            continue;
+        }
+        ?>
+        <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:8px;"><?php echo htmlspecialchars($counter); ?></td>
+            <td style="padding:8px;"><?php echo htmlspecialchars($name); ?></td>
+            <td style="padding:8px;"><?php echo $dateTime; ?></td>
+            <td style="padding:8px;"><?php echo $type; ?></td>
+            <td style="padding:8px;">
+                <?php if ($status === 'Scheduled'): ?>
+                    <span style="background:#fff3cd; color:#856404; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                <?php elseif ($status === 'Completed'): ?>
+                    <span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                <?php elseif ($status === 'Cancelled'): ?>
+                    <span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                <?php else: ?>
+                    <?php echo $status; ?>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if ($status !== 'Completed'): ?>
+                    <button
+                        class="btn btn-primary btn-sm addScheduleBtn"
+                        data-id="<?= $p['patient_id'] ?>"
+                        data-name="<?= htmlspecialchars($name) ?>"
+                        data-date="<?= $dateTime ?>"
+                        data-test="<?= htmlspecialchars($type) ?>"
+                        data-status="<?= $status ?>"
+                        data-bs-toggle="modal"
+                        data-bs-target="#addScheduleModal">
+                        Lab Scheduling (+)
+                    </button>
+                <?php endif; ?>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+</tbody>
+
             </table>
+            <!-- MODAL AREA HERE -->
+            <div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+
+                        <div class="modal-header">
+                            <h5 class="modal-title">Add Schedule</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+
+                        <div class="modal-body">
+                            <form id="scheduleForm" method="POST" action="oop/fetchdetails.php">
+                                <input type="hidden" name="patient_id" id="modalPatientId">
+
+                                <div class="mb-3">
+                                    <label class="form-label">Patient Name</label>
+                                    <input type="text" class="form-control" id="modalPatientName" name="patient_name" readonly>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Test Name</label>
+                                    <select class="form-select" name="service_id" id="modalTestNameSelect" required>
+                                        <option value="" id="modalTestNamePlaceholder" disabled selected>-- Select Test --</option>
+                                        <?php
+                                        // Example: Fetch laboratory services from DB
+                                        $servicesQuery = $conn->query("
+                                            SELECT serviceID, serviceName
+                                            FROM dl_services
+                                        ");
+                                        while ($srv = $servicesQuery->fetch_assoc()):
+                                        ?>
+                                            <option value="<?= $srv['serviceID'] ?>">
+                                                <?= htmlspecialchars($srv['serviceName']) ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+
+
+                                <div class="mb-3">
+                                    <label class="form-label">Assign Laboratorist</label>
+                                    <select class="form-select" name="laboratorist_id" required>
+                                        <option value="">-- Select Laboratorist --</option>
+                                        <?php
+                                        // Fetch laboratorists from DB
+                                        $labQuery = $conn->query("
+                                            SELECT employee_id, first_name, last_name 
+                                            FROM hr_employees 
+                                            WHERE profession = 'Laboratorist' 
+                                            ORDER BY first_name
+                                        ");
+                                        while ($lab = $labQuery->fetch_assoc()):
+                                        ?>
+                                            <option value="<?= $lab['employee_id'] ?>">
+                                                <?= htmlspecialchars($lab['first_name'] . ' ' . $lab['last_name']) ?>
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+
+
+                                <div class="mb-3">
+                                    <label class="form-label">Schedule Date & Time</label>
+                                    <input type="datetime-local" class="form-control" name="schedule_datetime" required>
+                                </div>
+
+                                <button type="submit" class="btn btn-success">Save Schedule</button>
+                            </form>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
             <!----- End of Main Content ----->
             <script>
-                const toggler = document.querySelector(".toggler-btn");
-                toggler.addEventListener("click", function() {
+                // Sidebar toggle
+                document.querySelector(".toggler-btn")?.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
+                });
+
+                // Add Schedule button click
+                document.querySelectorAll(".addScheduleBtn").forEach(button => {
+                    button.addEventListener("click", function() {
+                        // Fill patient details
+                        document.getElementById("modalPatientId").value = this.dataset.id || "";
+                        document.getElementById("modalPatientName").value = this.dataset.name || "";
+
+                        // Get test name
+                        let testName = (this.dataset.test && this.dataset.test.trim() !== "") ?
+                            `-- ${this.dataset.test} --` :
+                            "-- Select Test --";
+
+                        // Update placeholder option
+                        let placeholderOption = document.getElementById("modalTestNamePlaceholder");
+                        placeholderOption.textContent = testName;
+                        placeholderOption.value = "";
+                        placeholderOption.disabled = true;
+                        placeholderOption.selected = true;
+
+                        // Force browser to re-render selection
+                        let selectElement = placeholderOption.parentElement;
+                        selectElement.selectedIndex = 0;
+
+                        // Pre-fill date/time if available
+                        let dateTimeInput = document.querySelector("input[name='schedule_datetime']");
+                        if (this.dataset.date) {
+                            dateTimeInput.value = this.dataset.date.replace(" ", "T");
+                        } else {
+                            dateTimeInput.value = "";
+                        }
+                    });
                 });
             </script>
             <script src="../assets/Bootstrap/all.min.js"></script>
