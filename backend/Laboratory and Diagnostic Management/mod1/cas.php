@@ -191,69 +191,7 @@ if (!$user) {
                 </div>
             </div>
             <!----- End of Main Content ----->
-            <script>
-                const toggler = document.querySelector(".toggler-btn");
-                toggler.addEventListener("click", function() {
-                    document.querySelector("#sidebar").classList.toggle("collapsed");
-                });
-                document.addEventListener('DOMContentLoaded', function() {
-                    let calendarEl = document.getElementById('scheduleCalendar');
-
-                    // Create floating div for hover info
-                    let hoverBox = document.createElement('div');
-                    hoverBox.id = 'hoverBox';
-                    hoverBox.style.position = 'absolute';
-                    hoverBox.style.background = '#fff';
-                    hoverBox.style.border = '1px solid #ccc';
-                    hoverBox.style.padding = '10px';
-                    hoverBox.style.borderRadius = '5px';
-                    hoverBox.style.boxShadow = '0px 2px 6px rgba(0,0,0,0.2)';
-                    hoverBox.style.display = 'none';
-                    hoverBox.style.zIndex = '1000';
-                    document.body.appendChild(hoverBox);
-
-                    let calendar = new FullCalendar.Calendar(calendarEl, {
-                        initialView: 'dayGridMonth',
-                        events: 'oop/docref.php?action=schedules',
-                        eventColor: '#007bff',
-                        eventTextColor: '#fff',
-
-                        dayCellDidMount: function(info) {
-                            info.el.addEventListener('mouseenter', function(e) {
-                                let date = info.date.toISOString().split('T')[0];
-
-                                fetch(`oop/docref.php?action=slots&date=${date}`)
-                                    .then(res => res.json())
-                                    .then(data => {
-                                        let content = `<strong>${date}</strong><br>`;
-                                        if (data.length > 0) {
-                                            data.forEach(slot => {
-                                                content += `${slot.time} (${slot.remaining} left)<br>`;
-                                            });
-                                        } else {
-                                            content += 'No available slots';
-                                        }
-                                        hoverBox.innerHTML = content;
-                                        hoverBox.style.display = 'block';
-                                        hoverBox.style.left = (e.pageX + 10) + 'px';
-                                        hoverBox.style.top = (e.pageY + 10) + 'px';
-                                    });
-                            });
-
-                            info.el.addEventListener('mousemove', function(e) {
-                                hoverBox.style.left = (e.pageX + 10) + 'px';
-                                hoverBox.style.top = (e.pageY + 10) + 'px';
-                            });
-
-                            info.el.addEventListener('mouseleave', function() {
-                                hoverBox.style.display = 'none';
-                            });
-                        }
-                    });
-
-                    calendar.render();
-                });
-            </script>
+            <script src="../assets/javascript/calendar.js"></script>
             <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
             <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
             <script src="../assets/Bootstrap/all.min.js"></script>

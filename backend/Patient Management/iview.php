@@ -49,7 +49,8 @@ try {
                 <p><strong>Name:</strong>
                     <?=  htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . '  ' . $patient['lname']) ?></p>
                 <p><strong>Address:</strong> <?= htmlspecialchars($patient['address']) ?></p>
-                <p><strong>Date of Birth:</strong> <?= htmlspecialchars($patient['dob']) ?></p>
+                <p><strong>Date of Birth:</strong>
+                    <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob']))) ?></p>
                 <p><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
                 <p><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?></p>
                 <p><strong>Civil Status:</strong> <?= htmlspecialchars($patient['civil_status']) ?></p>
@@ -57,6 +58,7 @@ try {
                 <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
                 <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
                 <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['doctor_name']) ?></p>
+                <p class="text-center"><strong> -- Previous Medical History -- </strong></p>
                 <p><strong>Condition Name:</strong> <?= htmlspecialchars($admission['condition_name'] ?? 'N/A') ?></p>
                 <p><strong>Diagnosis Date:</strong> <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
                 <p><strong>Notes: </strong><?= htmlspecialchars($admission['notes'] ?? 'N/A')?></p>
@@ -64,34 +66,13 @@ try {
             </div>
         </div>
     </div>
-    <script>
-    const toggler = document.querySelector(".toggler-btn");
-    toggler.addEventListener("click", function() {
-        document.querySelector("#sidebar").classList.toggle("collapsed");
-    });
-    </script>
+
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="assets/Bootstrap/fontawesome.min.js"></script>
     <script src="assets/Bootstrap/jq.js"></script>
 
-    <script>
-    document.getElementById("dob").addEventListener("change", function() {
-        const dob = new Date(this.value);
-        const today = new Date();
 
-        if (!isNaN(dob.getTime())) {
-            let age = today.getFullYear() - dob.getFullYear();
-            const m = today.getMonth() - dob.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-                age--;
-            }
-            document.getElementById("age").value = age;
-        } else {
-            document.getElementById("age").value = "";
-        }
-    });
-    </script>
 </body>
 
 </html>

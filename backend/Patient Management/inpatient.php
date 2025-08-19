@@ -92,8 +92,8 @@ $user = $result->fetch_assoc();
             </li>
 
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
-                    aria-controls="auth">
+                <a href="appointment.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-regular fa-calendar" viewBox="0 0 16 16">
 
@@ -206,7 +206,7 @@ $user = $result->fetch_assoc();
                                 <th>Admission Type</th>
                                 <!--<th>Bed Number</th>-->
                                 <th>Attending Doctor</th>
-                                <th colspan="2">Action</th>
+                                <th colspan="3">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -230,7 +230,10 @@ $user = $result->fetch_assoc();
                                 <a class='btn btn-info btn-sm' href='../Patient Management/iview.php?patient_id=$row[patient_id]'>View</a>
                             </td>
                             <td>
-                            <a class='btn btn-primary btn-sm' href='../Patient Management/iupdate.php?patient_id=$row[patient_id]'>Edit</a>
+                            <a class='btn btn-info btn-sm' href='../Patient Management/iupdate.php?patient_id=$row[patient_id]'>Edit</a>
+                            </td>
+                            <td>
+                            <a class='btn btn-info btn-sm' href='../Patient Management/iupdate.php?patient_id=$row[patient_id]'>Admit</a>
                             </td>
                         </tr>
                             ";

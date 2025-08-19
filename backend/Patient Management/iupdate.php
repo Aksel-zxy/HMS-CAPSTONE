@@ -49,7 +49,7 @@ if ($medical_history) {
 <body>
     <div class="container">
         <div class="card shadow">
-            <div class="card-header bg-primary txt-white">
+            <div class="card-header  txt-white text-center">
                 <h4 class="mb-0">Edit Details</h4>
             </div>
             <div class="card-body">
