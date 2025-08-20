@@ -1,7 +1,10 @@
 <?php
+// Start session and include configuration at the very top
+session_start();
 include '../../SQL/config.php';
+
+// Include the class files
 require_once 'classincludes/billing_records_class.php';
-require_once 'classincludes/billing_summary_class.php';
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
@@ -24,6 +27,28 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+// Instantiate the billing_records class
+$billing = new billing_records($conn);
+
+// Process any patients without billing records
+if (isset($_GET['process_patients']) && $_GET['process_patients'] == 'true') {
+    $processed = $billing->processAllPatientsWithoutBilling();
+    if ($processed > 0) {
+        $message = "Successfully created billing records for $processed patients.";
+        $message_type = "success";
+    } else {
+        $message = "Billing Record is Up to Date. No new patients found.";
+        $message_type = "info";
+    }
+}
+
+// Check if there are patients without billing records
+$patientsWithoutBilling = $billing->getPatientsWithoutBillingRecords();
+$patientsWithoutBillingCount = $patientsWithoutBilling ? $patientsWithoutBilling->num_rows : 0;
+
+// Get all billing records
+$records = $billing->getAllBillingRecords();
 ?>
 
 <!DOCTYPE html>
@@ -36,6 +61,92 @@ if (!$user) {
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
+    <style>
+        .minimal-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.9em;
+            border-radius: 5px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .minimal-table thead tr {
+            background-color: #2c3e50;
+            color: #ffffff;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        .minimal-table th,
+        .minimal-table td {
+            padding: 12px 15px;
+        }
+        
+        .minimal-table tbody tr {
+            border-bottom: 1px solid #dddddd;
+        }
+        
+        .minimal-table tbody tr:nth-of-type(even) {
+            background-color: #f3f3f3;
+        }
+        
+        .minimal-table tbody tr:last-of-type {
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .minimal-badge {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .minimal-btn {
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: #2c3e50;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            transition: background-color 0.3s;
+        }
+        
+        .minimal-btn:hover {
+            background-color: #1a252f;
+            color: white;
+        }
+        
+        .alert-box {
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+        
+        .alert-success {
+            color: #3c763d;
+            background-color: #dff0d8;
+            border-color: #d6e9c6;
+        }
+        
+        .alert-info {
+            color: #31708f;
+            background-color: #d9edf7;
+            border-color: #bce8f1;
+        }
+        
+        .alert-warning {
+            color: #8a6d3b;
+            background-color: #fcf8e3;
+            border-color: #faebcc;
+        }
+        
+        .action-buttons {
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
 
 <body>
@@ -86,6 +197,17 @@ if (!$user) {
                         <a href="expense_logs.php" class="sidebar-link">Expense Logs</a>
                     </li>
                 </ul>
+
+                 <li class="sidebar-item">
+                <a href="insurance_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
+                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
+                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                    </svg>
+                    <span style="font-size: 18px;">Insurance Request</span>
+                </a>
+            </li>
             </li>
         </aside>
         <!----- End of Sidebar ----->
@@ -124,49 +246,92 @@ if (!$user) {
             <!-- START CODING HERE -->
             <div class="container-fluid">
                 <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem; color:#2c3e50;">Billing Records</h1>
+                
+                <?php
+                // Display messages if any
+                if (isset($message)) {
+                    $alert_class = $message_type == 'success' ? 'alert-success' : ($message_type == 'info' ? 'alert-info' : 'alert-warning');
+                    echo "<div class='alert-box $alert_class'>$message</div>";
+                }
+                
+                // Check if there are patients without billing records
+                if ($patientsWithoutBillingCount > 0) {
+                    echo '<div class="alert alert-warning">';
+                    echo 'There are ' . $patientsWithoutBillingCount . ' patients without billing records. ';
+                    echo '<a href="billing_records.php?process_patients=true" class="alert-link">Click here to generate billing IDs for them</a>.';
+                    echo '</div>';
+                }
+                ?>
+                
+                <div class="action-buttons">
+                    <a href="billing_records.php?process_patients=true" class="minimal-btn">Check for New Patients</a>
+                </div>
 
                 <div class="row">
                     <div class="col-md-12">
-                        <link rel="stylesheet" href="assets/CSS/billingandinsurance.css">
-                        <table class="table minimal-table">
-                            <thead>
-                                <tr>
-                                    <th>Billing ID</th>
-                                    <th>Patient ID</th>
-                                    <th>Billing Date</th>
-                                    <th>Total Amount</th>
-                                    <th>Insurance Covered</th>
-                                    <th>Out of Pocket</th>
-                                    <th>Status</th>
-                                    <th>Payment Method</th>
-                                    <th>Transaction ID</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $billing = new billing_records($conn);
-                                $records = $billing->getAllBillingRecords();
-                                while ($row = $records->fetch_assoc()) {
-                                    echo "<tr>";
-                                    echo "<td>" . $row['billing_id'] . "</td>";
-                                    echo "<td>" . $row['patient_id'] . "</td>";
-                                    echo "<td>" . $row['billing_date'] . "</td>";
-                                    echo "<td>₱" . number_format($row['total_amount'], 2) . "</td>";
-                                    echo "<td>₱" . number_format($row['insurance_covered'], 2) . "</td>";
-                                    echo "<td>₱" . number_format(($row['total_amount'] - $row['insurance_covered']), 2) . "</td>";
-                                    $badgeClass = ($row['status'] == 'Paid') ? 'minimal-badge bg-success' : 'minimal-badge bg-warning text-dark';
-                                    echo "<td><span class='" . $badgeClass . "'>" . (!empty($row['status']) ? $row['status'] : 'Pending') . "</span></td>";
-                                    echo "<td>" . $row['payment_method'] . "</td>";
-                                    echo "<td>" . $row['transaction_id'] . "</td>";
-                                    echo "<td><a href='billing_summary.php?billing_id=" . $row['billing_id'] . "&patient_id=" . $row['patient_id'] . "' class='minimal-btn'>Generate</a></td>";
-                                    echo "</tr>";
-                                }
-                                ?>
-                            </tbody>
-                        </table>
+                        <div class="table-responsive">
+                            <table class="table minimal-table">
+                                <thead>
+                                    <tr>
+                                        <th>Billing ID</th>
+                                        <th>Patient ID</th>
+                                        <th>Patient Name</th>
+                                        <th>Billing Date</th>
+                                        <th>Total Amount</th>
+                                        <th>Insurance Covered</th>
+                                        <th>Out of Pocket</th>
+                                        <th>Status</th>
+                                        <th>Payment Method</th>
+                                        <th>Transaction ID</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    if ($records && $records->num_rows > 0) {
+                                        while ($row = $records->fetch_assoc()) {
+                                            echo "<tr>";
+                                            echo "<td>" . (isset($row['billing_id']) ? $row['billing_id'] : 'N/A') . "</td>";
+                                            echo "<td>" . (isset($row['patient_id']) ? $row['patient_id'] : 'N/A') . "</td>";
+                                            echo "<td>" . (isset($row['fname']) ? $row['fname'] . ' ' . $row['lname'] : 'N/A') . "</td>";
+                                            echo "<td>" . (isset($row['billing_date']) ? $row['billing_date'] : 'N/A') . "</td>";
+                                            echo "<td>₱" . (isset($row['total_amount']) ? number_format($row['total_amount'], 2) : '0.00') . "</td>";
+                                            echo "<td>₱" . (isset($row['insurance_covered']) ? number_format($row['insurance_covered'], 2) : '0.00') . "</td>";
+                                            $out_of_pocket = (isset($row['total_amount']) && isset($row['insurance_covered'])) ? 
+                                                ($row['total_amount'] - $row['insurance_covered']) : 0;
+                                            echo "<td>₱" . number_format($out_of_pocket, 2) . "</td>";
+                                            
+                                            $badgeClass = 'minimal-badge ';
+                                            $status = isset($row['status']) ? $row['status'] : 'pending';
+                                            switch($status) {
+                                                case 'Paid':
+                                                    $badgeClass .= 'bg-success';
+                                                    break;
+                                                case 'pending':
+                                                    $badgeClass .= 'bg-warning text-dark';
+                                                    break;
+                                                case 'Partially Paid':
+                                                    $badgeClass .= 'bg-info';
+                                                    break;
+                                                default:
+                                                    $badgeClass .= 'bg-secondary';
+                                            }
+                                            
+                                            echo "<td><span class='" . $badgeClass . "'>" . $status . "</span></td>";
+                                            echo "<td>" . (isset($row['payment_method']) ? $row['payment_method'] : 'N/A') . "</td>";
+                                            echo "<td>" . (isset($row['transaction_id']) ? $row['transaction_id'] : 'N/A') . "</td>";
+                                            echo "<td><a href='billing_summary.php?billing_id=" . (isset($row['billing_id']) ? $row['billing_id'] : '') . "&patient_id=" . (isset($row['patient_id']) ? $row['patient_id'] : '') . "' class='minimal-btn'>Generate</a></td>";
+                                            echo "</tr>";
+                                        }
+                                    } else {
+                                        echo "<tr><td colspan='11' class='text-center'>No billing records found</td></tr>";
+                                    }
+                                    ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                
+                </div>
             </div>
             <!-- END CODING HERE -->
         </div>

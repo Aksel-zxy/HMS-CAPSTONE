@@ -1,27 +1,43 @@
 <?php
 include '../../SQL/config.php';
 
-if (!isset($_SESSION['doctor']) || $_SESSION['doctor'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
+class DoctorDashboard {
+    public $conn;
+    public $user;
+
+    public function __construct($conn) {
+        $this->conn = $conn;
+        $this->authenticate();
+        $this->fetchUser();
+    }
+
+    private function authenticate() {
+        if (!isset($_SESSION['doctor']) || $_SESSION['doctor'] !== true) {
+            header('Location: login.php');
+            exit();
+        }
+        if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+            echo "User ID is not set in session.";
+            exit();
+        }
+    }
+
+    private function fetchUser() {
+        $query = "SELECT * FROM users WHERE user_id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("i", $_SESSION['user_id']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $this->user = $result->fetch_assoc();
+        if (!$this->user) {
+            echo "No user found.";
+            exit();
+        }
+    }
 }
 
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
+$dashboard = new DoctorDashboard($conn);
+$user = $dashboard->user;
 ?>
 
 <!DOCTYPE html>
@@ -70,18 +86,24 @@ if (!$user) {
                         <path
                             d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
                     </svg>
-                    <span style="font-size: 18px;">Doctor and Nurse Management</span>
+                    <span style="font-size: 18px;">Scheduling Shifts and Duties</span>
                 </a>
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/doctor.php" class="sidebar-link">Doctors</a>
+                        <a href="doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/nurse.php" class="sidebar-link">Nurses</a>
+                        <a href="nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Other Staff</a>
+                        <a href="../Employee/admin.php" class="sidebar-link">Doctor Duty</a>
+                    </li>
+                       <li class="sidebar-item">
+                        <a href="../Employee/admin.php" class="sidebar-link">Nurse Duty</a>
+                    </li>
+                       <li class="sidebar-item">
+                        <a href="schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -143,3 +165,10 @@ if (!$user) {
 </body>
 
 </html>
+
+
+
+
+
+
+
