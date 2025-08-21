@@ -70,29 +70,33 @@ document.addEventListener("DOMContentLoaded", function () {
     initialView: "dayGridMonth",
     timeZone: "local",
     events: "oop/docref.php?action=schedules",
-    eventColor: "#007bff",
-    eventTextColor: "#fff",
 
     headerToolbar: {
       left: "prev,next today",
       center: "title",
       right: "dayGridMonth,timeGridWeek,timeGridDay",
     },
-
-    allDaySlot: false,
-
-    slotLabelFormat: {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
+    buttonText: {
+      today: "Today",
+      month: "Month",
+      week: "Week",
+      day: "Day",
     },
 
-    // 🚀 key settings for stacking
+    allDaySlot: false,
     eventOverlap: false,
     slotEventOverlap: false,
-    eventMaxStack: 10,  // allow multiple stacked vertically
+
+    allDaySlot: false,
+    eventOverlap: false,
+    slotEventOverlap: false,
 
     eventContent: function (arg) {
+      // ✅ Show details in week/day view, but not in month
+      if (arg.view.type === "dayGridMonth") {
+        return { html: "" }; // hide text in month view
+      }
+
       let patient = arg.event.extendedProps.patient || "";
       let service = arg.event.extendedProps.service || "";
 
@@ -106,22 +110,36 @@ document.addEventListener("DOMContentLoaded", function () {
       };
     },
 
-    // ✅ Ensure vertical stacking in Week/Day
-    eventDidMount: function (info) {
-      if (
-        info.view.type === "timeGridWeek" ||
-        info.view.type === "timeGridDay"
-      ) {
-        info.el.style.position = "relative";
-        info.el.style.width = "100%";   // full width instead of side-by-side
-        info.el.style.marginTop = "2px"; // gap between stacked patients
-      }
-    },
-
-    // Month hover tooltip
+    // ✅ Month cell coloring
     dayCellDidMount: function (info) {
+      if (calendar.view.type !== "dayGridMonth") return;
+
       const dateStr = toYMD(info.date);
 
+      fetch(
+        `oop/docref.php?action=dayDetails&date=${encodeURIComponent(dateStr)}`
+      )
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data) && data.length) {
+            // ✅ Filter out completed & cancelled (case-insensitive)
+            const activeAppointments = data.filter(
+              (d) =>
+                d.status &&
+                !["completed", "cancelled"].includes(d.status.toLowerCase())
+            );
+
+            if (activeAppointments.length > 0) {
+              info.el.style.backgroundColor = "lightgreen"; // has active
+            } else {
+              info.el.style.backgroundColor = ""; // only completed/cancelled → no color
+            }
+          } else {
+            info.el.style.backgroundColor = "";
+          }
+        });
+
+      // Hover tooltip
       info.el.addEventListener("mouseenter", function (e) {
         if (calendar.view.type !== "dayGridMonth") return;
 
@@ -132,11 +150,22 @@ document.addEventListener("DOMContentLoaded", function () {
           .then((data) => {
             let html = `<strong>${dateStr}</strong><br>`;
             if (Array.isArray(data) && data.length) {
-              data.forEach((d) => {
-                html += `${d.patient} — ${d.service} — ${formatTime(
-                  d.time
-                )}<br>`;
-              });
+              // ✅ Only show non-completed & non-cancelled
+              const activeAppointments = data.filter(
+                (d) =>
+                  d.status &&
+                  !["completed", "cancelled"].includes(d.status.toLowerCase())
+              );
+
+              if (activeAppointments.length > 0) {
+                activeAppointments.forEach((d) => {
+                  html += `${d.patient} — ${d.service} — ${formatTime(
+                    d.time
+                  )}<br>`;
+                });
+              } else {
+                html += "No active appointments";
+              }
             } else {
               html += "No appointments";
             }
@@ -152,7 +181,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     },
 
-    // Show modal on click in Week/Day
+    // ✅ Modal for week/day view
     dateClick: function (info) {
       if (
         calendar.view.type === "timeGridWeek" ||
@@ -188,6 +217,5 @@ document.addEventListener("DOMContentLoaded", function () {
     },
   });
 
-  
   calendar.render();
 });

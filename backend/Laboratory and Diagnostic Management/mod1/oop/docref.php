@@ -1,60 +1,65 @@
 <?php
 require_once __DIR__ . '../../../../../SQL/config.php'; //
 
-class Calendar {
+class Calendar
+{
     private $conn;
-    public function __construct($conn){ 
-        $this->conn = $conn; 
+    public function __construct($conn)
+    {
+        $this->conn = $conn;
     }
 
-  public function getSchedules() {
-    $sql = "
-        SELECT 
-          s.patientID,
-          p.fname, p.lname,
-          s.serviceName,
-          s.scheduleDate,
-          s.scheduleTime,
-          COALESCE(s.status, '') as status
-        FROM dl_schedule s
-        JOIN patientinfo p ON p.patient_id = s.patientID
-        WHERE s.status = 'Processing'
-    ";
-    $res = $this->conn->query($sql);
+    // ✅ Only fetch Processing schedules for the calendar
+    public function getSchedules()
+    {
+        $sql = "
+            SELECT 
+              s.patientID,
+              p.fname, p.lname,
+              s.serviceName,
+              s.scheduleDate,
+              s.scheduleTime,
+              COALESCE(s.status, '') as status
+            FROM dl_schedule s
+            JOIN patientinfo p ON p.patient_id = s.patientID
+            WHERE s.status = 'Processing'
+        ";
+        $res = $this->conn->query($sql);
 
-    $events = [];
-    while ($row = $res->fetch_assoc()) {
-        $date  = $row['scheduleDate'];
-        $time  = $row['scheduleTime'];
-        $start = "{$date}T{$time}";
+        $events = [];
+        while ($row = $res->fetch_assoc()) {
+            $date  = $row['scheduleDate'];
+            $time  = $row['scheduleTime'];
+            $start = "{$date}T{$time}";
 
-        $pretty = date('g:i A', strtotime($time));
+            $pretty = date('g:i A', strtotime($time));
 
-        $events[] = [
-            "title"   => "{$row['fname']} {$row['lname']} — {$row['serviceName']} — {$pretty}",
-            "start"   => $start,
-            "allDay"  => false,
-            "patient" => "{$row['fname']} {$row['lname']}",
-            "service" => $row['serviceName'],
-            "time"    => $pretty,
-            "status"  => $row['status']
-        ];
+            $events[] = [
+                "title"   => "{$row['fname']} {$row['lname']} — {$row['serviceName']} — {$pretty}",
+                "start"   => $start,
+                "allDay"  => false,
+                "patient" => "{$row['fname']} {$row['lname']}",
+                "service" => $row['serviceName'],
+                "time"    => $pretty,
+                "status"  => $row['status']
+            ];
+        }
+        return $events;
     }
-    return $events;
-}
 
-
-    // Get all patients scheduled for a given date
-    public function getDayDetails($date) {
+    // ✅ Exclude "Completed" schedules from tooltip/day details
+    public function getDayDetails($date)
+    {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return [];
 
         $stmt = $this->conn->prepare("
-            SELECT p.fname, p.lname, s.serviceName, s.scheduleTime
-            FROM dl_schedule s
-            JOIN patientinfo p ON p.patient_id = s.patientID
-            WHERE s.scheduleDate = ?
-            ORDER BY s.scheduleTime
-        ");
+        SELECT p.fname, p.lname, s.serviceName, s.scheduleTime, s.status
+        FROM dl_schedule s
+        JOIN patientinfo p ON p.patient_id = s.patientID
+        WHERE s.scheduleDate = ?
+          AND s.status NOT IN ('Completed', 'Cancelled')
+        ORDER BY s.scheduleTime
+    ");
         $stmt->bind_param('s', $date);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -64,7 +69,8 @@ class Calendar {
             $details[] = [
                 'patient' => $row['fname'] . " " . $row['lname'],
                 'service' => $row['serviceName'],
-                'time'    => date('g:i A', strtotime($row['scheduleTime']))
+                'time'    => date('g:i A', strtotime($row['scheduleTime'])),
+                'status'  => $row['status']
             ];
         }
         return $details;
