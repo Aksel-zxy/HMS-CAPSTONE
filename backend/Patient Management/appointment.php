@@ -232,6 +232,7 @@ $user = $result->fetch_assoc();
                                         if ($doctors && $doctors->num_rows > 0) {
                                             while ($doctor = $doctors->fetch_assoc()) {
                                                 $doctorName = "{$doctor['first_name']} {$doctor['last_name']}";
+                                                // The value is employee_id
                                                 echo "<option value=\"{$doctor['employee_id']}\">{$doctorName} - {$doctor['specialization']}</option>";
                                             }
                                         } else {

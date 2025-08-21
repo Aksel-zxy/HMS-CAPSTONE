@@ -106,12 +106,13 @@ public function getPatientOrFail($patient_id) {
     
         public function insertAppointment($data) {
         $stmt = $this->conn->prepare("
-            INSERT INTO p_appointments (patient_id, appointment_date, purpose, notes)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO p_appointments (patient_id, doctor_id, appointment_date, purpose, notes)
+            VALUES (?, ?, ?, ?, ?)
         ");
         $stmt->bind_param(
-            "isss",
+            "iisss",
             $data['patient_id'],
+            $data['doctor_id'],
             $data['appointment_date'],
             $data['purpose'],
             $data['notes']

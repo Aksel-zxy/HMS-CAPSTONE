@@ -54,14 +54,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit();
 }
 
+// Convert shift times to natural format (e.g., 08:00 AM)
+$shift_start_natural = date("g:i A", strtotime($shift['shift_start']));
+$shift_end_natural   = date("g:i A", strtotime($shift['shift_end']));
+$appointmentTime_natural = date("g:i A", strtotime($appointmentTime));
+
 if ($appointmentTime < $shift['shift_start'] || $appointmentTime > $shift['shift_end']) {
     echo "<script>
-            alert('Doctor available only between {$shift['shift_start']} and {$shift['shift_end']}');
+            alert('Doctor available only between {$shift_start_natural} and {$shift_end_natural}. You selected {$appointmentTime_natural}.');
             window.history.back();
           </script>";
     exit();
 }
-
 
     // --- 2. Validate no conflicting appointment ---
     $sql = "SELECT * FROM p_appointments 
