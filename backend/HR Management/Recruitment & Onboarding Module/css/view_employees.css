@@ -1,0 +1,430 @@
+/* ---------- Loader ---------- */
+#loading-screen {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    background: #F5F6F7;
+    top: 0;
+    left: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loader {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+
+.loader div {
+    width: 18px;
+    height: 18px;
+    background: #0096c7;
+    border-radius: 50%;
+    animation: bounce 0.6s infinite alternate;
+}
+
+.loader div:nth-child(1) { animation-delay: 0s; }
+.loader div:nth-child(2) { animation-delay: 0.1s; }
+.loader div:nth-child(3) { animation-delay: 0.2s; }
+.loader div:nth-child(4) { animation-delay: 0.3s; }
+.loader div:nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes bounce {
+    to {
+        transform: translateY(-8px);
+        opacity: 0.6;
+    }
+}
+
+/* ---------- Container & Card Layout ---------- */
+.employee-container {
+    max-width: 1000px;
+    margin: 30px auto;
+    background-color: white;
+}
+
+.employee-card {
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-shadow: 0 8px 10px rgba(0, 0, 0, 1);
+}
+
+.employee-card-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.employee-flex {
+    display: flex;
+    gap: 50px;
+    margin-bottom: 30px;
+}
+
+/* ---------- TopBar ---------- */
+.link-bar {
+    align-items: center;
+    padding: 0 10px;
+    margin-top: 30px;
+    margin-left: 50px;
+}
+
+.link-bar a:hover svg {
+  color: #0096c7;
+  transform: scale(1.3);
+  transition: 0.2s ease-in-out;
+}
+
+/* ---------- Heading ---------- */  
+.heading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px 0;
+}
+
+.heading h4 {
+    font-weight: bold;
+    font-size: 35px;
+    color: black;
+}
+
+/* ---------- Employee Heading ---------- */  
+.employee-header {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 24px;         
+    align-items: center; 
+    margin-bottom: 32px;
+    margin-top: 16px;
+    margin-left: 32px;
+    margin-right: 32px;
+}
+
+/* ---------- Photo ---------- */  
+.employee-photo-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;     
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.employee-photo-section:hover {
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.8);
+}
+
+.employee-photo {
+    width: 150px;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 8px; 
+}
+
+/* ---------- Status ---------- */  
+.status-badge {
+    padding: 5px 10px;  
+    border-radius: 5px;
+    font-weight: bold;
+    display: inline-block;
+    margin-bottom: 16px;
+}
+
+.status-active {
+    background-color: green;
+    color: white;
+}
+.status-inactive {
+    background-color: grey;
+    color: white;
+}
+.status-resigned {
+    background-color: red;
+    color: white;
+}
+
+/* ---------- Buttons ---------- */  
+.employee-photo-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;  
+    gap: 12px;             
+}
+
+.employee-photo-buttons a {
+    display: block;       
+    width: 200px;          
+    text-align: center;     
+    padding: 5px 0;        
+    background: #0047ab;
+    color: white;
+    border-radius: 5px;
+    text-decoration: none;
+}
+
+.employee-photo-buttons a:hover {
+    background: #0096c7;
+    text-decoration: underline;
+}
+
+/* ---------- Personal Info Card ---------- */  
+.personal-info-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px 24px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px; 
+}
+
+/* ---------- Employee Table Styling ---------- */
+.employee-info-section {
+    display: flex;
+    gap: 24px;       
+}
+
+.card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px 24px; 
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card:hover {
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.8);
+}
+
+.card-heading {
+    font-size: 19px;   
+    font-weight: bold;
+    margin-bottom: 13px;
+    color: #0047ab;
+    border-bottom: 2px solid #0047ab;
+    padding-bottom: 8px; 
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;         
+}
+
+.full-width {
+    width: 100%;
+}
+
+.two-column-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;        
+    margin-left: 40px;
+    margin-right: 40px;
+    margin-bottom: 30px;
+}
+
+.column {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;          
+}
+
+/* ---------- Responsive ---------- */  
+@media (max-width: 768px) {
+    .employee-header {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .two-column-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---------- Pop-Up Form ---------- */
+.popup-form {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    justify-content: center;
+    align-items: center;
+    overflow-y: auto;
+}
+
+.form-container {
+    background-color: #F5F6F7;
+    color: black;
+    padding: 20px;
+    width: 600px; 
+    position: relative;
+    overflow-y: auto;
+    max-height: 95vh;
+}
+
+.form-container input, 
+.form-container select,
+.form-container textarea {
+    width: 100%;
+    padding: 8px;
+    margin: 10px 0;
+    min-width: 0;
+    font-size: 13px;
+}
+
+label{
+    display: block;
+    font-size: 15px;
+    text-align: left;
+    font-weight: bold;
+}
+
+.form-container button {
+    padding: 10px;
+    background-color: #0047ab;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 20px;
+    width: 100%;
+    border-radius: 5px;
+}
+
+.form-container button:hover {
+    background-color: #0096c7;
+    transition: background-color 0.3s;
+    font-weight: bold;
+}
+
+.close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background-color: darkred;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    border-radius: 100px;
+}
+
+.close-btn:hover {
+    background-color: red;
+    transform: scale(1.3);
+    transition: 0.2s ease-in-out;
+}
+
+/* ---- Documents table ---- */
+.info-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border: 1px solid grey;      
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  font-size: 14px;
+}
+
+.info-table tr + tr td {
+  border-top: 1px solid grey;   /* slate-100 */
+}
+
+.info-table td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+
+.info-table td:first-child {
+  font-weight: 600;
+  color: #111827;                  /* gray-900 */
+  width: 320px;                    /* label column */
+}
+
+.info-table td:nth-child(2) {
+  width: 14px;
+  text-align: center;
+  color: #94a3b8;                  /* slate-400 */
+}
+
+.info-table a {
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.info-table a:hover {
+  text-decoration: underline;
+}
+
+/* Row hover */
+.info-table tr:hover td {
+  background: #fafafa;
+}
+
+/* ---- Status badges ---- */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.badge-ok {
+  color: #065f46;                  /* emerald-800 */
+  background: #ecfdf5;             /* emerald-50 */
+  border-color: #a7f3d0;           /* emerald-200 */
+}
+
+.badge-missing {
+  color: #991b1b;                  /* red-800 */
+  background: #fef2f2;             /* red-50 */
+  border-color: #fecaca;           /* red-200 */
+}
+
+/* Optional: turn the View link into a subtle button */
+.link-btn {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;             /* slate-50 */
+}
+
+.link-btn:hover {
+  background: #eef2f7;
+}
+
+/* ---- Responsive tweaks ---- */
+@media (max-width: 640px) {
+  .info-table td {
+    padding: 10px 12px;
+  }
+  .info-table td:first-child {
+    width: 55%;
+  }
+  .info-table td:nth-child(2) {
+    width: 10px;
+  }
+}
+
