@@ -4,6 +4,10 @@ include '../../SQL/config.php';
 require_once 'classincludes/insurance_request_class.php';
 require_once 'classincludes/billing_summary_class.php';
 
+$InsuranceRequest = new InsuranceRequest($conn);
+$patient = $InsuranceRequest->insurance();
+
+
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
     exit();
@@ -35,28 +39,34 @@ $success_message = '';
 $error_message = '';
 
 // Handle form submission for new request
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_request'])) {
-    // Validate patient_id exists
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST' &&
+    isset($_POST['create_request'], $_POST['patient_id'], $_POST['insurance_number'], $_POST['insurance_type'])
+) {
+    // All required POST fields are set
     $patient_id = $_POST['patient_id'];
+    $insurance_number = $_POST['insurance_number'];
+    $insurance_type = $_POST['insurance_type'];
+    $notes = $_POST['notes'] ?? ''; // notes is optional
+
+    // Validate patient_id exists
     $check_stmt = $conn->prepare("SELECT patient_id FROM patientinfo WHERE patient_id = ?");
     $check_stmt->bind_param("i", $patient_id);
     $check_stmt->execute();
     $check_stmt->store_result();
+
     if ($check_stmt->num_rows > 0) {
-        $insuranceRequest->create(
-            $_POST['patient_id'],
-            $_POST['billing_id'],
-            $_POST['insurance_type'],
-            $_POST['notes']
-        );
-        // Redirect to logs page after successful submission
+        $insuranceRequest->create($patient_id, $insurance_number, $insurance_type, $notes);
+
         header("Location: insurance_request_logs.php?success=1");
         exit();
     } else {
         $error_message = "Patient ID does not exist. Please enter a valid Patient ID.";
     }
+
     $check_stmt->close();
 }
+
 
 // Handle status update
 if (isset($_GET['action'], $_GET['id']) && in_array($_GET['action'], ['approve', 'decline'])) {
@@ -156,11 +166,27 @@ if ($show_requests) {
                 <h2>Insurance Requests Form</h2>
                 <div class="form-card">
                     <form method="post">
-                        <label for="patient_id">Name:</label>
-                        <input type="number" name="patient_id" id="patient_id" required>
+                        <div class="col-sm-9">
+                                    <select class="form-select" name="patient_id" required>
+                                        <option value="">-- Patient--</option>
+                                       <?php
+                                        if (!empty($patient)) {
+                                            foreach ($patient as $row) {
+                                                $fullName = htmlspecialchars($row['full_name']);
+                                                echo "<option value='{$row['patient_id']}'>$fullName</option>";
+                                            }
+                                        } else {
+                                            echo "<option value=''>No patient available</option>";
+                                        }
+
+                                        ?>
+
+                                    </select>
+                                </div>
+                                    
                         
-                        <label for="billing_id">Insurance Number:</label>
-                        <input type="number" name="billing_id" id="billing_id" required>
+                        <label for="insurance_number">Insurance Number:</label>
+                        <input type="number" name="insurance_number" id="insurance_number" required>        
                         
                         <label for="insurance_type">Insurance Type:</label>
                         <select name="insurance_type" id="insurance_type" required>
