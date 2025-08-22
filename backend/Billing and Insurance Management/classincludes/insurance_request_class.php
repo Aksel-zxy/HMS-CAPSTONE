@@ -9,11 +9,20 @@ class InsuranceRequest {
     }
 
     // Create a new insurance request
-    public function create($patient_id, $billing_id, $insurance_type, $notes) {
-        $stmt = $this->conn->prepare("INSERT INTO insurance_request (patient_id, billing_id, insurance_type, notes, status) VALUES (?, ?, ?, ?, 'pending')");
-        $stmt->bind_param("iiss", $patient_id, $billing_id, $insurance_type, $notes);
-        return $stmt->execute();
+   public function create($patient_id, $insurance_number, $insurance_type, $notes) {
+    $stmt = $this->conn->prepare("
+        INSERT INTO insurance_request (patient_id, insurance_number, insurance_type, notes)
+        VALUES (?, ?, ?, ?)
+    ");
+
+    if (!$stmt) {
+        // Optional: Debug SQL error
+        die("Prepare failed: " . $this->conn->error);
     }
+
+    $stmt->bind_param("iiss", $patient_id, $insurance_number, $insurance_type, $notes);
+    return $stmt->execute();
+}
 
     // Get all insurance requests
     public function getAll() {
@@ -38,4 +47,14 @@ class InsuranceRequest {
         $stmt->bind_param("si", $status, $request_id);
         return $stmt->execute();
     }
+    //for summoning the patients
+   public function insurance() {
+    $stmt = $this->conn->prepare("SELECT 
+       patient_id, fname, mname, lname, CONCAT(fname, ' ', IFNULL(mname, ''), ' ', lname) AS full_name from patientinfo");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+    
 }
