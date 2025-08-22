@@ -1,7 +1,8 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
-require_once "oop/fetchdetails.php";
+require_once "oop2/upd_stats.php";
+require_once "../mod1/oop/fetchdetails.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
     exit();
@@ -90,7 +91,7 @@ $allPatients = $patient->getAllPatients();
                         <a href="../Sample/collection_log.php" class="sidebar-link">Sample Process</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod2/sps.php" class="sidebar-link">Sample Processing Status</a>
+                        <a href="../Sample/sample_tracking.php" class="sidebar-link">Sample Processing Status</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Sample/collection_team.php" class="sidebar-link">Audit Trail & Test Booking</a>
@@ -170,160 +171,123 @@ $allPatients = $patient->getAllPatients();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <h2>Doctor Referral</h2>
+            <h2>Sample Processing Status</h2>
 
             <table style="width:100%; border-collapse:collapse; font-family:sans-serif;">
-                <thead>
-                    <tr style="background:#f8f9fa; border-bottom:2px solid #ddd;">
-                        <th style="padding:8px;">Patient ID</th>
-                        <th style="padding:8px;">Patient Name</th>
-                        <th style="padding:8px;">Date | Time</th>
-                        <th style="padding:8px;">Test Name</th>
-                        <th style="padding:8px;">Status</th>
-                        <th style="padding:8px;">Action</th> <!-- Added -->
-                    </tr>
-                </thead>
-               <tbody>
-    <?php foreach ($allPatients as $p): ?>
-        <?php
-        // Get actual patient ID
+    <thead>
+        <tr style="background:#f8f9fa; border-bottom:2px solid #ddd;">
+            <th style="padding:8px;">Patient ID</th>
+            <th style="padding:8px;">Patient Name</th>
+            <th style="padding:8px;">Date | Time</th>
+            <th style="padding:8px;">Test Name</th>
+            <th style="padding:8px;">Status</th>
+            <th style="padding:8px;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+    <?php foreach ($allPatients as $p):
         $counter = $p['patient_id'];
-
-        // Build name
         $name     = $p['fname'] . ' ' . $p['lname'];
         $dateTime = $p['appointment_date'];
         $type     = $p['notes'];
-
-        // Default status from p_appointments
         $status = $p['status'];
 
-        // Check if dl_schedule has a record for this patient
-        $schedQuery = $conn->prepare("
-            SELECT status 
-            FROM dl_schedule 
-            WHERE patientID = ?
-            LIMIT 1
-        ");
+        // Override status if exists in dl_schedule
+        $schedQuery = $conn->prepare("SELECT status FROM dl_schedule WHERE patientID = ? LIMIT 1");
         $schedQuery->bind_param("i", $counter);
         $schedQuery->execute();
         $schedResult = $schedQuery->get_result();
         if ($schedRow = $schedResult->fetch_assoc()) {
-            $status = $schedRow['status']; // Override with dl_schedule status
+            $status = $schedRow['status'];
         }
         $schedQuery->close();
 
-        // Skip if status is Processing
-        if ($status === 'Processing') {
-            continue;
-        }
-        ?>
+        // Skip "Scheduled" status
+        if ($status === 'Scheduled') continue;
+    ?>
         <tr style="border-bottom:1px solid #eee;">
-            <td style="padding:8px;"><?php echo htmlspecialchars($counter); ?></td>
-            <td style="padding:8px;"><?php echo htmlspecialchars($name); ?></td>
-            <td style="padding:8px;"><?php echo $dateTime; ?></td>
-            <td style="padding:8px;"><?php echo $type; ?></td>
+            <td style="padding:8px;"><?= htmlspecialchars($counter) ?></td>
+            <td style="padding:8px;"><?= htmlspecialchars($name) ?></td>
+            <td style="padding:8px;"><?= htmlspecialchars($dateTime) ?></td>
+            <td style="padding:8px;"><?= htmlspecialchars($type) ?></td>
             <td style="padding:8px;">
-                <?php if ($status === 'Scheduled'): ?>
-                    <span style="background:#fff3cd; color:#856404; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
-                <?php elseif ($status === 'Completed'): ?>
-                    <span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                <?php if ($status === 'Completed'): ?>
+                    <span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:12px;"><?= htmlspecialchars($status) ?></span>
                 <?php elseif ($status === 'Cancelled'): ?>
-                    <span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;"><?php echo $status; ?></span>
+                    <span style="background:#f8d7da; color:#721c24; padding:3px 8px; border-radius:12px;"><?= htmlspecialchars($status) ?></span>
+                <?php elseif ($status === 'Processing'): ?>
+                    <span style="background:#cce5ff; color:#004085; padding:3px 8px; border-radius:12px; font-weight:bold;">
+                        <?= htmlspecialchars($status) ?>
+                    </span>
                 <?php else: ?>
-                    <?php echo $status; ?>
+                    <?= htmlspecialchars($status) ?>
                 <?php endif; ?>
             </td>
-            <td>
+            <td style="padding:8px;">
                 <?php if ($status !== 'Completed'): ?>
                     <button
-                        class="btn btn-primary btn-sm addScheduleBtn"
+                        class="btn btn-warning btn-sm editScheduleBtn"
                         data-id="<?= $p['patient_id'] ?>"
-                        data-name="<?= htmlspecialchars($name) ?>"
-                        data-date="<?= $dateTime ?>"
-                        data-test="<?= htmlspecialchars($type) ?>"
-                        data-status="<?= $status ?>"
+                        data-date="<?= date('Y-m-d\TH:i', strtotime($dateTime)) ?>"
+                        data-status="<?= htmlspecialchars($status) ?>"
                         data-bs-toggle="modal"
-                        data-bs-target="#addScheduleModal">
-                        Lab Scheduling (+)
+                        data-bs-target="#editScheduleModal">
+                        Edit
                     </button>
+
+                    <form method="POST" action="oop2/upd_stats.php" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this schedule?');">
+                        <input type="hidden" name="patient_id" value="<?= $counter ?>">
+                        <button type="submit" name="delete_schedule" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                <?php else: ?>
+                    <span style="color:gray;">No Actions</span>
                 <?php endif; ?>
             </td>
         </tr>
     <?php endforeach; ?>
 </tbody>
+</table>
 
-            </table>
+
             <!-- MODAL AREA HERE -->
-            <div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true">
+            <!-- MODAL AREA -->
+            <div class="modal fade" id="editScheduleModal" tabindex="-1" aria-labelledby="editScheduleModalLabel" aria-hidden="true">
                 <div class="modal-dialog">
-                    <div class="modal-content">
-
-                        <div class="modal-header">
-                            <h5 class="modal-title">Add Schedule</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-
-                        <div class="modal-body">
-                            <form id="scheduleForm" method="POST" action="oop/fetchdetails.php">
+                    <form method="POST" action="oop2/upd_stats.php">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="editScheduleModalLabel">Update Schedule</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
                                 <input type="hidden" name="patient_id" id="modalPatientId">
 
                                 <div class="mb-3">
-                                    <label class="form-label">Patient Name</label>
-                                    <input type="text" class="form-control" id="modalPatientName" name="patient_name" readonly>
+                                    <label for="modalScheduleDate" class="form-label">Schedule Date</label>
+                                    <input type="date" class="form-control" id="modalScheduleDate" name="schedule_date" required>
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">Test Name</label>
-                                    <select class="form-select" name="service_id" id="modalTestNameSelect" required>
-                                        <option value="" id="modalTestNamePlaceholder" disabled selected>-- Select Test --</option>
-                                        <?php
-                                        // Example: Fetch laboratory services from DB
-                                        $servicesQuery = $conn->query("
-                                            SELECT serviceID, serviceName
-                                            FROM dl_services
-                                        ");
-                                        while ($srv = $servicesQuery->fetch_assoc()):
-                                        ?>
-                                            <option value="<?= $srv['serviceID'] ?>">
-                                                <?= htmlspecialchars($srv['serviceName']) ?>
-                                            </option>
-                                        <?php endwhile; ?>
+                                    <label for="modalScheduleTime" class="form-label">Schedule Time</label>
+                                    <input type="time" class="form-control" id="modalScheduleTime" name="schedule_time" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="modalStatus" class="form-label">Status</label>
+                                    <select class="form-select" id="modalStatus" name="status" required>
+                                        <option value="Scheduled">Scheduled</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                        <option value="Processing">Processing</option>
                                     </select>
                                 </div>
-
-
-                                <div class="mb-3">
-                                    <label class="form-label">Assign Laboratorist</label>
-                                    <select class="form-select" name="laboratorist_id" required>
-                                        <option value="">-- Select Laboratorist --</option>
-                                        <?php
-                                        // Fetch laboratorists from DB
-                                        $labQuery = $conn->query("
-                                            SELECT employee_id, first_name, last_name 
-                                            FROM hr_employees 
-                                            WHERE profession = 'Laboratorist' 
-                                            ORDER BY first_name
-                                        ");
-                                        while ($lab = $labQuery->fetch_assoc()):
-                                        ?>
-                                            <option value="<?= $lab['employee_id'] ?>">
-                                                <?= htmlspecialchars($lab['first_name'] . ' ' . $lab['last_name']) ?>
-                                            </option>
-                                        <?php endwhile; ?>
-                                    </select>
-                                </div>
-
-
-                                <div class="mb-3">
-                                    <label class="form-label">Schedule Date & Time</label>
-                                    <input type="datetime-local" class="form-control" name="schedule_datetime" required>
-                                </div>
-
-                                <button type="submit" class="btn btn-success">Save Schedule</button>
-                            </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" name="update_schedule" class="btn btn-primary">Update</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            </div>
                         </div>
-
-                    </div>
+                    </form>
                 </div>
             </div>
             <!----- End of Main Content ----->
@@ -333,36 +297,19 @@ $allPatients = $patient->getAllPatients();
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
 
-                // Add Schedule button click
-                document.querySelectorAll(".addScheduleBtn").forEach(button => {
-                    button.addEventListener("click", function() {
-                        // Fill patient details
-                        document.getElementById("modalPatientId").value = this.dataset.id || "";
-                        document.getElementById("modalPatientName").value = this.dataset.name || "";
+                document.querySelectorAll('.editScheduleBtn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        const patientId = button.getAttribute('data-id');
+                        const dateTime = button.getAttribute('data-date'); // expects format: 'YYYY-MM-DDTHH:mm'
+                        const status = button.getAttribute('data-status');
 
-                        // Get test name
-                        let testName = (this.dataset.test && this.dataset.test.trim() !== "") ?
-                            `-- ${this.dataset.test} --` :
-                            "-- Select Test --";
+                        // Split date and time from datetime string
+                        const [date, time] = dateTime.split('T');
 
-                        // Update placeholder option
-                        let placeholderOption = document.getElementById("modalTestNamePlaceholder");
-                        placeholderOption.textContent = testName;
-                        placeholderOption.value = "";
-                        placeholderOption.disabled = true;
-                        placeholderOption.selected = true;
-
-                        // Force browser to re-render selection
-                        let selectElement = placeholderOption.parentElement;
-                        selectElement.selectedIndex = 0;
-
-                        // Pre-fill date/time if available
-                        let dateTimeInput = document.querySelector("input[name='schedule_datetime']");
-                        if (this.dataset.date) {
-                            dateTimeInput.value = this.dataset.date.replace(" ", "T");
-                        } else {
-                            dateTimeInput.value = "";
-                        }
+                        document.getElementById('modalPatientId').value = patientId;
+                        document.getElementById('modalScheduleDate').value = date;
+                        document.getElementById('modalScheduleTime').value = time;
+                        document.getElementById('modalStatus').value = status;
                     });
                 });
             </script>

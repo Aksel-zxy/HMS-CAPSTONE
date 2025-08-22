@@ -2,7 +2,7 @@
 session_start();
 include '../../../SQL/config.php';
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: login.php');
     exit();
 }
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
@@ -87,7 +87,7 @@ if (!$user) {
                         <a href="../Sample/collection_log.php" class="sidebar-link">Sample Process</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Sample/sample_tracking.php" class="sidebar-link">Sample Processing Status</a>
+                        <a href="../mod2/sps.php" class="sidebar-link">Sample Processing Status</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Sample/collection_team.php" class="sidebar-link">Audit Trail & Test Booking</a>

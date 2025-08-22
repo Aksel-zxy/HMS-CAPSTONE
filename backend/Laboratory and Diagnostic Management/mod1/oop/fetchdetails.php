@@ -3,9 +3,9 @@ require_once __DIR__ . '../../../../../SQL/config.php';
 
 class Patient
 {
-    private $conn;
-    private $appointmentsTable = "p_appointments";
-    private $patientTable = "patientinfo";
+    public $conn;
+    public $appointmentsTable = "p_appointments";
+    public $patientTable = "patientinfo";
 
     public function __construct($db)
     {
