@@ -89,7 +89,21 @@ class Schedule {
     }
 }
 
-
+function getLatestSchedule($conn, $patient_id) {
+    $stmt = $conn->prepare("
+        SELECT status, cancel_reason, scheduleDate, scheduleTime
+        FROM dl_schedule
+        WHERE patientID = ?
+        ORDER BY scheduleID DESC
+        LIMIT 1
+    ");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+    return $row ?: null; // return null if no record
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $schedule = new Schedule($conn);
 

@@ -168,13 +168,24 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
 
-            <div style="display:flex; gap:20px;">
-                <div id="scheduleCalendar" style="flex:2;"></div>
-                <div style="flex:1;">
-                    <h4>Available Slots</h4>
-                    <ul id="availableSlots"></ul>
+            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+
+                <div style="display:flex; gap:15px;">
+                    <!-- Calendar -->
+                    <div id="scheduleCalendar" style="flex:2; background:#fff; border-radius:8px; padding:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                    </div>
+
+                    <!-- Available Slots -->
+                    <div style="flex:1; background:#fff; border-radius:8px; padding:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+                        <h4 style="margin-bottom:12px; color:#0d6efd; font-family:Arial, sans-serif;">Available Slots</h4>
+                        <ul id="availableSlots" style="list-style:none; padding:0; margin:0; font-family:Arial, sans-serif; font-size:14px;">
+                            <!-- Slots will be injected here -->
+                        </ul>
+                    </div>
                 </div>
+
             </div>
+
 
             <!-- MODAL AREA PO -->
             <div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
@@ -192,6 +203,12 @@ if (!$user) {
             </div>
             <!----- End of Main Content ----->
             <script src="../assets/javascript/calendar.js"></script>
+            <script>
+                // Sidebar toggle
+                document.querySelector(".toggler-btn")?.addEventListener("click", function() {
+                    document.querySelector("#sidebar").classList.toggle("collapsed");
+                });
+            </script>
             <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
             <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
             <script src="../assets/Bootstrap/all.min.js"></script>
