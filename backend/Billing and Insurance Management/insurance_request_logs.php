@@ -143,7 +143,7 @@ if (isset($_GET['success']) && $_GET['success'] == 1) {
                             <i class="bi bi-person-circle"></i>
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                            <li><span>Welcome <strong style="color: #007bff;"><?php echo $_SESSION['user']['lname'] ?? 'User'; ?></strong>!</span></li>
+                            <li><span>Welcome <strong style="color: #060c13ff;"><?php echo $_SESSION['user']['lname'] ?? 'User'; ?></strong>!</span></li>
                             <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
                         </ul>
                     </div>

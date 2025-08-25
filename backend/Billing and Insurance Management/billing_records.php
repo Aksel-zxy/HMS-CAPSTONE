@@ -60,7 +60,7 @@ $records = $billing->getAllBillingRecords();
     <title>HMS | Billing and Insurance Management</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="../assets/CSS/billingandinsurance.css">
+    <link rel="stylesheet" href="../assets/CSS/billingrecord.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
    
 </head>
