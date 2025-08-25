@@ -1,8 +1,13 @@
 <?php
-define("BASE_URL", "/hms-capstone/");
+// Prevent redeclaration
+if (!defined("BASE_URL")) {
+    define("BASE_URL", "/hms-capstone/");
+}
+
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+
 // 1800 for 30mins
 $inactive = 1800;
 
@@ -12,11 +17,10 @@ if (isset($_SESSION['timeout'])) {
         session_unset();
         session_destroy();
         echo "<script>
-        alert('You have been logged out due to inactivity.');
-        window.location.href = '" . BASE_URL . "backend/logout.php';
-      </script>";
-exit();
-
+            alert('You have been logged out due to inactivity.');
+            window.location.href = '" . BASE_URL . "backend/logout.php';
+        </script>";
+        exit();
     }
 }
 
@@ -27,10 +31,9 @@ $username = "root";
 $password = "";
 $dbname = "hmscapstone";
 
+// DB connection
 $conn = new mysqli($servername, $username, $password, $dbname);
-
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
-} 
-
+}
 ?>
