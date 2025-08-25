@@ -54,6 +54,9 @@ $patients = $patientObj->getAllPatients();
     <h2>Edit Appointment</h2>
     <form method="POST" action="class/edits_a.php">
 
+        <!-- Hidden Appointment ID -->
+        <input type="hidden" name="appointment_id" value="<?php echo $appointment_id; ?>">
+
         <!-- Patient -->
         <div class="mb-3">
             <label for="patient_id" class="form-label">Patient</label>

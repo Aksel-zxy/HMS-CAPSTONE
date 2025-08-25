@@ -84,3 +84,65 @@ h1 {
   background: linear-gradient(90deg, #0984e3 0%, #00b894 100%);
   box-shadow: 0 4px 16px rgba(44, 62, 80, 0.12);
 }
+
+/* Responsive styles */
+@media (max-width: 900px) {
+  h1 {
+    font-size: 2rem;
+    padding: 1.5rem 0;
+  }
+  .tbl {
+    width: 100%;
+  }
+  .tbl thead tr th,
+  .tbl tbody tr td {
+    padding: 0.8rem;
+    font-size: 0.95rem;
+  }
+  .tbl button {
+    font-size: 0.95rem;
+    padding: 0.5rem 1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  h1 {
+    font-size: 1.5rem;
+    padding: 1rem 0;
+    margin-bottom: 1rem;
+  }
+  .tbl {
+    width: 100%;
+    box-shadow: none;
+    border-radius: 0;
+    font-size: 0.9rem;
+    overflow-x: auto;
+    display: block;
+  }
+  .tbl thead {
+    font-size: 0.9rem;
+  }
+  .tbl thead tr th,
+  .tbl tbody tr td {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+  .tbl button {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+  }
+  /* Make table scrollable horizontally */
+  .tbl {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Optional: Hide less important columns on very small screens */
+@media (max-width: 480px) {
+  .tbl thead tr th:nth-child(n + 4),
+  .tbl tbody tr td:nth-child(n + 4) {
+    display: none;
+  }
+}

@@ -5,6 +5,8 @@ include '../../../SQL/config.php';
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $appointment_id   = $_POST['appointment_id']; // <-- Missing before
     $patient_id = $_POST['patient_id'];
     $doctor_id = $_POST['doctor'];
     $appointment_date = $_POST['appointment_date'];
