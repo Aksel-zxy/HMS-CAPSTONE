@@ -2,21 +2,36 @@
 include '../../SQL/config.php';
 require_once 'classincludes/billing_summary_class.php';
 
-// Add this class for dl_services
-class DLServices {
+// ✅ Fix duplicate session warning
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// ======================
+// CLASS FOR DL RESULTS
+// ======================
+class DLResults {
     private $conn;
     public function __construct($conn) {
         $this->conn = $conn;
     }
-    public function getAllServices() {
-        $query = "SELECT * FROM dl_services";
-        $result = $this->conn->query($query);
+
+    // Fetch results by patientID
+    public function getResultsByPatient($patientID) {
+        $query = "SELECT * FROM dl_results WHERE patientID = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("i", $patientID);
+        $stmt->execute();
+        $result = $stmt->get_result();
         return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
     }
 }
 
+// ======================
+// SESSION VALIDATION
+// ======================
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: login.php');
     exit();
 }
 
@@ -25,6 +40,9 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     exit();
 }
 
+// ======================
+// FETCH LOGGED IN USER
+// ======================
 $query = "SELECT * FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
@@ -37,9 +55,16 @@ if (!$user) {
     exit();
 }
 
-// Fetch all services
-$dlServices = new DLServices($conn);
-$services = $dlServices->getAllServices();
+// ======================
+// GET PATIENT ID
+// ======================
+$patientID = $_GET['patientID'] ?? ($_SESSION['patientID'] ?? null);
+
+$dlResults = new DLResults($conn);
+$results = [];
+if ($patientID) {
+    $results = $dlResults->getResultsByPatient($patientID);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

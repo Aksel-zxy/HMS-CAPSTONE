@@ -269,14 +269,7 @@ h2::after {
     font-size: 15px;
     border-bottom: 1px solid #e3eaf1;
 }
-.hospital-billing-table th {
-    background: linear-gradient(90deg, #1976d2 80%, #42a5f5 100%);
-    color: #fff;
-    font-weight: 700;
-    font-size: 16px;
-    border-bottom: 2px solid #1565c0;
-    letter-spacing: 0.5px;
-}
+
 .hospital-billing-table tr:nth-child(even) td {
     background: #f4f8fb;
 }

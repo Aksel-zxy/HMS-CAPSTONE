@@ -22,6 +22,6 @@ class BillingSummary {
         $stmt->bind_param("isssss", $patient_id, $particulars, $actual_charges, $vat, $amount_of_discount, $out_of_pocket);
         return $stmt->execute();
     }
+    
 
-    // ADD BILLING RECEIPT BUTTON 
 }

@@ -45,7 +45,7 @@
 .alert-info {
     background: #e3f2fd;
     color: #1565c0;
-    border-left: 4px solid #1565c0;
+
 }
 
 .alert-warning {
@@ -72,6 +72,16 @@
     color: #ffffff;
 }
 
+.billing-records-table thead th {
+    
+    background: linear-gradient(90deg, #1976d2 80%, #42a5f5 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    border-bottom: 2px solid #1565c0;
+    letter-spacing: 0.5px;
+
+}
 .billing-records-table thead tr {
     border-bottom: none;
 }
