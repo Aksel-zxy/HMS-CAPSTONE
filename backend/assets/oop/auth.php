@@ -116,6 +116,9 @@ class Login
                 case 'Doctor':
                     header("Location: Doctor and Nurse Management/user_panel/user_doctor.php");
                     break;
+                case 'Pharmacist':
+                    header("Location: Pharmacy Management/user_panel/user_pharmacist.php");
+                    break;
                 case 'Nurse':
                     header("Location: Doctor and Nurse Management/user_panel/user_nurse.php");
                     break;
