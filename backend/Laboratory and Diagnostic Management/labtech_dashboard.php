@@ -84,13 +84,13 @@ if (!$user) {
                 </a>
                 <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Sample/collection_log.php" class="sidebar-link">Sample Process</a>
+                        <a href="mod2/test_process.php" class="sidebar-link">Sample Process</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="mod2/sps.php" class="sidebar-link">Sample Processing Status</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Sample/collection_team.php" class="sidebar-link">Audit Trail & Test Booking</a>
+                        <a href="mod2/audit.php" class="sidebar-link">Audit Trail</a>
                     </li>
                 </ul>
             </li>

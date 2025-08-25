@@ -1,6 +1,8 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
+require_once "oop2/upd_stats.php";
+require_once "../mod1/oop/fetchdetails.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -19,6 +21,8 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+$patient = new Patient($conn);
+$allPatients = $patient->getAllPatients();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,10 +71,10 @@ if (!$user) {
 
                 <ul id="labtech" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="doctor_referral.php" class="sidebar-link">Doctor Referral</a>
+                        <a href="../mod1/doctor_referral.php" class="sidebar-link">Doctor Referral</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
+                        <a href="../mod1/cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
                 </ul>
             </li>
@@ -84,13 +88,13 @@ if (!$user) {
                 </a>
                 <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../mod2/test_process.php" class="sidebar-link">Sample Process</a>
+                        <a href="test_process.php" class="sidebar-link">Sample Process</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod2/sps.php" class="sidebar-link">Sample Processing Status</a>
+                        <a href="sps.php" class="sidebar-link">Sample Processing Status</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod2/audit.php" class="sidebar-link">Audit Trail</a>
+                        <a href="audit.php" class="sidebar-link">Audit Trail</a>
                     </li>
                 </ul>
             </li>
@@ -168,49 +172,14 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
 
-            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
 
-                <div style="display:flex; gap:15px;">
-                    <!-- Calendar -->
-                    <div id="scheduleCalendar" style="flex:2; background:#fff; border-radius:8px; padding:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    </div>
-
-                    <!-- Available Slots -->
-                    <div style="flex:1; background:#fff; border-radius:8px; padding:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                        <h4 style="margin-bottom:12px; color:#0d6efd; font-family:Arial, sans-serif;">Available Slots</h4>
-                        <ul id="availableSlots" style="list-style:none; padding:0; margin:0; font-family:Arial, sans-serif; font-size:14px;">
-                            <!-- Slots will be injected here -->
-                        </ul>
-                    </div>
-                </div>
-
-            </div>
-
-
-            <!-- MODAL AREA PO -->
-            <div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="dayModalLabel">Available Slots</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body" id="dayModalBody">
-                            <!-- Filled by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-            </div>
             <!----- End of Main Content ----->
-            <script src="../assets/javascript/calendar.js"></script>
             <script>
                 // Sidebar toggle
                 document.querySelector(".toggler-btn")?.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
             </script>
-            <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
-            <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
             <script src="../assets/Bootstrap/fontawesome.min.js"></script>

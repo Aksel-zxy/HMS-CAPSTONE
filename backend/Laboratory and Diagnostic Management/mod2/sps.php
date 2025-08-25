@@ -71,10 +71,10 @@ $allPatients = $patient->getAllPatients();
 
                 <ul id="labtech" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="doctor_referral.php" class="sidebar-link">Doctor Referral</a>
+                        <a href="../mod1/doctor_referral.php" class="sidebar-link">Doctor Referral</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
+                        <a href="../mod1/cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
                 </ul>
             </li>
@@ -88,13 +88,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Sample/collection_log.php" class="sidebar-link">Sample Process</a>
+                        <a href="test_process.php" class="sidebar-link">Sample Process</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Sample/sample_tracking.php" class="sidebar-link">Sample Processing Status</a>
+                        <a href="sps.php" class="sidebar-link">Sample Processing Status</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Sample/collection_team.php" class="sidebar-link">Audit Trail & Test Booking</a>
+                        <a href="audit.php" class="sidebar-link">Audit Trail</a>
                     </li>
                 </ul>
             </li>
