@@ -35,73 +35,120 @@ class Login
 
     private function loginUser($username, $password)
     {
-        $stmt = $this->conn->prepare("SELECT * FROM users WHERE username = ?");
+        // 1️⃣ Check hr_employees table
+        $stmt = $this->conn->prepare("SELECT * FROM hr_employees WHERE username = ?");
         $stmt->bind_param("s", $username);
         $stmt->execute();
         $result = $stmt->get_result();
+        $employee = $result->fetch_assoc();
 
-        if ($result && $result->num_rows == 1) {
-            $user = $result->fetch_assoc();
-        
-            // Ensure the password is correct (note: use password_verify for hashed passwords)
-            if ($password === $user['password']) {
-                $_SESSION['user_id'] = $user['user_id'];  // Setting user ID
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                
-                // Debugging session right after setting
-                echo '<pre>';
-                print_r($_SESSION);  // See if the session is properly populated
-                echo '</pre>';
-                
-                // Set session variables based on the role
-                switch ($user['role']) {
-                    case '0': // Superadmin
-                        $_SESSION['superadmin'] = true;
-                        break;
-                    case '1': // HR Admin
-                        $_SESSION['hr'] = true;
-                        break;
-                    case '2': // Doctor
-                        $_SESSION['doctor'] = true;
-                        break;
-                    case '3': // Patient Management
-                        $_SESSION['patient'] = true;
-                        break;
-                    case '4': // Billing and Insurance
-                        $_SESSION['billing'] = true;
-                        break;
-                    case '5': // Pharmacy Management
-                        $_SESSION['pharmacy'] = true;
-                        break;
-                    case '6': // Lab Tech
-                        $_SESSION['labtech'] = true;
-                        break;
-                    case '7': // Inventory Management
-                        $_SESSION['inventory'] = true;
-                        break;
-                    case '8': // Report and Analytics
-                        $_SESSION['report'] = true;
-                        break;
-                    default:
-                        $this->error = "Invalid role.";
-                        return;
-                }
-        
-                // Debugging session again before redirect
-                echo '<pre>';
-                print_r($_SESSION);  // Check if session variables are properly set
-                echo '</pre>';
-                
-                $this->redirectBasedOnRole($user['role']);
-            } else {
-                $this->error = "Incorrect password.";
+        if ($employee) {
+            $this->processEmployeeLogin($employee, $password);
+            return;
+        }
+
+        // 2️⃣ Check patient_user table
+        $stmt = $this->conn->prepare("SELECT * FROM patient_user WHERE username = ?");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $patient = $result->fetch_assoc();
+
+        if ($patient) {
+            $this->processPatientLogin($patient, $password);
+            return;
+        }
+
+        $this->error = "User not found.";
+    }
+
+    private function processUserLogin($user, $password)
+    {
+        if ($password === $user['password']) { // use password_verify if hashed
+            $_SESSION['user_id'] = $user['user_id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['role'] = $user['role'];
+
+            switch ($user['role']) {
+                case '0':
+                    $_SESSION['superadmin'] = true;
+                    break;
+                case '1':
+                    $_SESSION['hr'] = true;
+                    break;
+                case '2':
+                    $_SESSION['doctor'] = true;
+                    break;
+                case '3':
+                    $_SESSION['patient'] = true;
+                    break;
+                case '4':
+                    $_SESSION['billing'] = true;
+                    break;
+                case '5':
+                    $_SESSION['pharmacy'] = true;
+                    break;
+                case '6':
+                    $_SESSION['labtech'] = true;
+                    break;
+                case '7':
+                    $_SESSION['inventory'] = true;
+                    break;
+                case '8':
+                    $_SESSION['report'] = true;
+                    break;
             }
+
+            $this->redirectBasedOnRole($user['role']);
         } else {
-            $this->error = "User not found.";
+            $this->error = "Incorrect password.";
         }
     }
 
+    private function processEmployeeLogin($employee, $password)
+    {
+        if ($password === $employee['password']) {
+            $_SESSION['employee_id'] = $employee['employee_id'];
+            $_SESSION['username'] = $employee['username'];
+            $_SESSION['profession'] = $employee['profession'];
+
+            switch ($employee['profession']) {
+                case 'Doctor':
+                    header("Location: Doctor and Nurse Management/user_panel/user_doctor.php");
+                    break;
+                case 'Nurse':
+                    header("Location: Doctor and Nurse Management/user_panel/user_nurse.php");
+                    break;
+                case 'Accountant':
+                    header("Location: Billing and Insurance Management/user_panel/user_accountant.php");
+                    break;
+                case 'Laboratorist':
+                    header("Location: Laboratory and Diagnostic Management/user_panel/user_lab.php");
+                    break;
+                default:
+                    $this->error = "Unknown profession.";
+                    return;
+            }
+            exit;
+        } else {
+            $this->error = "Incorrect password.";
+        }
+    }
+
+    private function processPatientLogin($patient, $password)
+    {
+        if ($password === $patient['password']) {
+            $_SESSION['user_id'] = $patient['user_id'];
+            $_SESSION['username'] = $patient['username'];
+            $_SESSION['profession'] = 'patient';
+
+            // Redirect patient to their dashboard
+            header("Location: Patient Management/user_panel/user_patient.php");
+            exit();
+        } else {
+            $this->error = "Incorrect password.";
+        }
+    }
     private function redirectBasedOnRole($role)
     {
         switch ($role) {

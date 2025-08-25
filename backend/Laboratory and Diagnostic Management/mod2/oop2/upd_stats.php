@@ -35,7 +35,7 @@ class PatientSchedule
         return $data;
     }
 
-    // ✅ Update by scheduleID
+    // Update by scheduleID (and insert dl_results on Completed)
     public function updateSchedule($scheduleID, $new_status = null, $scheduleDate = null, $scheduleTime = null, $cancelReason = null)
     {
         if (empty($scheduleID)) {
@@ -47,31 +47,29 @@ class PatientSchedule
         $params = [];
         $types  = "";
 
-        if ($new_status !== null && $new_status !== "") {
+        if (!empty($new_status)) {
             $fields[] = "status = ?";
             $params[] = $new_status;
             $types   .= "s";
         }
 
-        if ($scheduleDate !== null && $scheduleDate !== "") {
+        if (!empty($scheduleDate)) {
             $fields[] = "scheduleDate = ?";
             $params[] = $scheduleDate;
             $types   .= "s";
         }
 
-        if ($scheduleTime !== null && $scheduleTime !== "") {
+        if (!empty($scheduleTime)) {
             $fields[] = "scheduleTime = ?";
             $params[] = $scheduleTime;
             $types   .= "s";
         }
 
-        // ✅ handle cancel reason if status = Cancelled
         if ($new_status === "Cancelled") {
             $fields[] = "cancel_reason = ?";
             $params[] = $cancelReason ?? "No reason provided";
             $types   .= "s";
         } else {
-            // Clear cancel_reason if not cancelled
             $fields[] = "cancel_reason = NULL";
         }
 
@@ -90,11 +88,45 @@ class PatientSchedule
         $success = $stmt->execute();
         $stmt->close();
 
+        // ✅ If update succeeded and status is Completed, insert into dl_results (only if not exists)
+        if ($success && $new_status === "Completed") {
+            $check = $this->conn->prepare("SELECT resultID FROM dl_results WHERE scheduleID = ?");
+            $check->bind_param("i", $scheduleID);
+            $check->execute();
+            $check->store_result();
+
+            if ($check->num_rows == 0) {
+                $check->close();
+
+                // fetch patientID from schedule safely
+                $s = $this->conn->prepare("SELECT patientID FROM dl_schedule WHERE scheduleID = ? LIMIT 1");
+                $s->bind_param("i", $scheduleID);
+                $s->execute();
+                $patientID = null;
+                $s->bind_result($patientID);
+                if ($s->fetch() && !empty($patientID)) {
+                    $s->close();
+
+                    $insert = $this->conn->prepare("INSERT INTO dl_results (scheduleID, patientID, resultDate, status, result, remarks) 
+                                                    VALUES (?, ?, NOW(), 'Processing', NULL, 'Pending results')");
+                    $insert->bind_param("ii", $scheduleID, $patientID);
+                    $insert->execute();
+                    $insert->close();
+                } else {
+                    $s->close();
+                    error_log("❌ Failed to fetch patientID for scheduleID={$scheduleID}");
+                }
+            } else {
+                $check->close();
+            }
+        }
+
         return $success;
     }
-}
+} // ✅ end class
 
-// ✅ POST Handling
+
+// ----------------- POST Handling -----------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $patientSchedule = new PatientSchedule($conn);
 
@@ -114,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (isset($_POST['delete_schedule'])) {
-        $schedule_id   = (int) $_POST['scheduleID']; // ✅ fixed
+        $schedule_id   = (int) $_POST['scheduleID'];
         $cancel_reason = !empty($_POST['cancel_reason']) ? $_POST['cancel_reason'] : "No reason provided";
 
         $stmt = $conn->prepare("UPDATE dl_schedule SET status = 'Cancelled', cancel_reason = ? WHERE scheduleID = ?");
