@@ -194,54 +194,54 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container">
-                <div class="tbl_container">
-                    <h1>Lists of Outpatients</h1>
-                    <!-- Button to trigger modal -->
-                    <div class="d-flex justify-content-end mt-4">
-                        <button type="button" class="btn btn-primary" id="Boton" data-bs-toggle="modal"
-                            data-bs-target="#addPatientModal">
-                            Add New Patient
-                        </button>
-                    </div>
+            <div class="container mt-4">
 
-                    <?php include 'icreate.php'; // This includes the modal code ?>
+                <h2>Lists of Outpatients</h2>
+                <!-- Button to trigger modal -->
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="button" class="btn btn-primary" id="Boton" data-bs-toggle="modal"
+                        data-bs-target="#addPatientModal">
+                        Add New Patient
+                    </button>
+                </div>
 
-                    <br>
-                    <table class="tbl">
-                        <thead>
-                            <tr>
-                                <th>Patient Id</th>
-                                <th>First Name</th>
-                                <th>Middle Name</th>
-                                <th>Last Name</th>
-                                <th>Address</th>
-                                <th>Gender</th>
-                                <th>Civil Status</th>
-                                <th>Admission Type</th>
-                                <!--<th>Bed Number</th>-->
-                                <th>Attending Doctor</th>
-                                <th colspan="2">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php
+                <?php include 'icreate.php'; // This includes the modal code ?>
+
+                <br>
+                <table class="table table-hover align-middle overflow-x-auto">
+                    <thead style="font-size: 1rem;" class="text-center">
+                        <tr class="text-center">
+                            <th class="text-center">Patient Id</th>
+                            <th class="text-center">First Name</th>
+                            <th class="text-center">Middle Name</th>
+                            <th class="text-center">Last Name</th>
+                            <th class="text-center">Address</th>
+                            <th class="text-center">Gender</th>
+                            <th class="text-center">Civil Status</th>
+                            <th class="text-center">Admission Type</th>
+                            <!--<th>Bed Number</th>-->
+                            <th class="text-center">Attending Doctor</th>
+                            <th class="text-center" colspan="2">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
                        
 
                         //read data of each row
                         while($row = $patients->fetch_assoc()) {
                             echo "
-                            <tr>
-                            <td>$row[patient_id]</td>
-                            <td>$row[fname]</td>
-                            <td>$row[mname]</td>
-                            <td>$row[lname]</td>
-                            <td>$row[address]</td>
-                            <td>$row[gender]</td>
-                            <td>$row[civil_status]</td>
-                            <td>$row[admission_type]</td>
-                            <td>$row[doctor_name]</td>
-                            <td>
+                            <tr class='text-center'>
+                            <td class='text-center'>$row[patient_id]</td>
+                            <td class='text-center'>$row[fname]</td>
+                            <td class='text-center'>$row[mname]</td>
+                            <td class='text-center'>$row[lname]</td>
+                            <td class='text-center'>$row[address]</td>
+                            <td class='text-center'>$row[gender]</td>
+                            <td class='text-center'>$row[civil_status]</td>
+                            <td class='text-center'>$row[admission_type]</td>
+                            <td class='text-center'>$row[doctor_name]</td>
+                            <td class='text-center'>
                                 <a class='btn btn-info btn-sm' href='../Patient Management/iview.php?patient_id=$row[patient_id]'>View</a>
                             </td>
                             <td>
@@ -251,9 +251,9 @@ if (!$user) {
                             ";
                         }
                         ?>
-                        </tbody>
-                    </table>
-                </div>
+                    </tbody>
+                </table>
+
             </div>
             <!-- END CODING HERE -->
         </div>
