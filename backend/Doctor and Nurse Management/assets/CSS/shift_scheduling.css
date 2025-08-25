@@ -1,0 +1,38 @@
+/* Modal overlay background */
+.shift-modal {
+    display: block;
+    background: rgba(0,0,0,0.5);
+}
+
+/* Table header for shift modal */
+.shift-table-header {
+    background: #007bff;
+    color: #fff;
+}
+
+/* Table border radius and overflow */
+.shift-table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* Card header for doctor/nurse shift list */
+.doctor-shift-header,
+.nurse-shift-header {
+    background: #007bff;
+    color: #fff;
+}
+
+/* Table for doctor/nurse shift list */
+.doctor-shift-table,
+.nurse-shift-table {
+    /* Add any custom styling if needed */
+}
+.container-fluid{
+      margin-left: 20px;
+  padding: 15px;
+  width: 97%;
+  height: auto;
+  background-color: white;
+  border-radius: 30px;
+}
