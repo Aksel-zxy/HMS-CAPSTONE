@@ -247,38 +247,36 @@ if ($medical_history) {
             <script src="assets/Bootstrap/jq.js"></script>
 
             <script>
-            document.getElementById("dob").addEventListener("change", function() {
-                const dob = new Date(this.value);
-                const today = new Date();
+            function toggleStep(step) {
+                if (step === 1) {
+                    // Step 1 visible
+                    document.getElementById("step1").classList.remove("d-none");
+                    document.getElementById("step2").classList.add("d-none");
 
-                if (!isNaN(dob.getTime())) {
-                    let age = today.getFullYear() - dob.getFullYear();
-                    const m = today.getMonth() - dob.getMonth();
-                    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
-                        age--;
-                    }
-                    document.getElementById("age").value = age;
+                    // Enable required only for step 1 fields
+                    document.querySelectorAll("#step1 [required]").forEach(el => el.setAttribute("required", "true"));
+                    document.querySelectorAll("#step2 [required]").forEach(el => el.removeAttribute("required"));
+
+                    document.getElementById("nextBtn").classList.remove("d-none");
+                    document.getElementById("prevBtn").classList.add("d-none");
+                    document.getElementById("submitBtn").classList.add("d-none");
                 } else {
-                    document.getElementById("age").value = "";
+                    // Step 2 visible
+                    document.getElementById("step1").classList.add("d-none");
+                    document.getElementById("step2").classList.remove("d-none");
+
+                    // Enable required only for step 2 fields
+                    document.querySelectorAll("#step2 [required]").forEach(el => el.setAttribute("required", "true"));
+                    document.querySelectorAll("#step1 [required]").forEach(el => el.removeAttribute("required"));
+
+                    document.getElementById("nextBtn").classList.add("d-none");
+                    document.getElementById("prevBtn").classList.remove("d-none");
+                    document.getElementById("submitBtn").classList.remove("d-none");
                 }
-            });
-            let step = 1;
+            }
 
-            document.getElementById("nextBtn").addEventListener("click", function() {
-                document.getElementById("step1").classList.add("d-none");
-                document.getElementById("step2").classList.remove("d-none");
-                document.getElementById("nextBtn").classList.add("d-none");
-                document.getElementById("prevBtn").classList.remove("d-none");
-                document.getElementById("submitBtn").classList.remove("d-none");
-            });
-
-            document.getElementById("prevBtn").addEventListener("click", function() {
-                document.getElementById("step2").classList.add("d-none");
-                document.getElementById("step1").classList.remove("d-none");
-                document.getElementById("prevBtn").classList.add("d-none");
-                document.getElementById("submitBtn").classList.add("d-none");
-                document.getElementById("nextBtn").classList.remove("d-none");
-            });
+            document.getElementById("nextBtn").addEventListener("click", () => toggleStep(2));
+            document.getElementById("prevBtn").addEventListener("click", () => toggleStep(1));
             </script>
 </body>
 
