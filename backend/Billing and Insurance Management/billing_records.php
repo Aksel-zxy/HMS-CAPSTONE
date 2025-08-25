@@ -60,93 +60,9 @@ $records = $billing->getAllBillingRecords();
     <title>HMS | Billing and Insurance Management</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/CSS/billingandinsurance.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-    <style>
-        .minimal-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            font-size: 0.9em;
-            border-radius: 5px;
-            overflow: hidden;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
-        }
-        
-        .minimal-table thead tr {
-            background-color: #2c3e50;
-            color: #ffffff;
-            text-align: left;
-            font-weight: bold;
-        }
-        
-        .minimal-table th,
-        .minimal-table td {
-            padding: 12px 15px;
-        }
-        
-        .minimal-table tbody tr {
-            border-bottom: 1px solid #dddddd;
-        }
-        
-        .minimal-table tbody tr:nth-of-type(even) {
-            background-color: #f3f3f3;
-        }
-        
-        .minimal-table tbody tr:last-of-type {
-            border-bottom: 2px solid #2c3e50;
-        }
-        
-        .minimal-badge {
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 0.8em;
-            font-weight: bold;
-        }
-        
-        .minimal-btn {
-            display: inline-block;
-            padding: 5px 10px;
-            background-color: #2c3e50;
-            color: white;
-            text-decoration: none;
-            border-radius: 3px;
-            transition: background-color 0.3s;
-        }
-        
-        .minimal-btn:hover {
-            background-color: #1a252f;
-            color: white;
-        }
-        
-        .alert-box {
-            padding: 15px;
-            margin-bottom: 20px;
-            border: 1px solid transparent;
-            border-radius: 4px;
-        }
-        
-        .alert-success {
-            color: #3c763d;
-            background-color: #dff0d8;
-            border-color: #d6e9c6;
-        }
-        
-        .alert-info {
-            color: #31708f;
-            background-color: #d9edf7;
-            border-color: #bce8f1;
-        }
-        
-        .alert-warning {
-            color: #8a6d3b;
-            background-color: #fcf8e3;
-            border-color: #faebcc;
-        }
-        
-        .action-buttons {
-            margin-bottom: 20px;
-        }
-    </style>
+   
 </head>
 
 <body>
@@ -270,7 +186,7 @@ $records = $billing->getAllBillingRecords();
                 <div class="row">
                     <div class="col-md-12">
                         <div class="table-responsive">
-                            <table class="table minimal-table">
+                            <table class="table billing-records-table">
                                 <thead>
                                     <tr>
                                         <th>Billing ID</th>
@@ -296,11 +212,17 @@ $records = $billing->getAllBillingRecords();
                                             echo "<td>" . (isset($row['fname']) ? $row['fname'] . ' ' . $row['lname'] : 'N/A') . "</td>";
                                             echo "<td>" . (isset($row['billing_date']) ? $row['billing_date'] : 'N/A') . "</td>";
                                             echo "<td>₱" . (isset($row['total_amount']) ? number_format($row['total_amount'], 2) : '0.00') . "</td>";
-                                            echo "<td>₱" . (isset($row['insurance_covered']) ? number_format($row['insurance_covered'], 2) : '0.00') . "</td>";
-                                            $out_of_pocket = (isset($row['total_amount']) && isset($row['insurance_covered'])) ? 
-                                                ($row['total_amount'] - $row['insurance_covered']) : 0;
+                                            
+                                            // Insurance covered amount (from insurance_request table)
+                                            $insurance_covered = isset($row['insurance_covered_amount']) ? $row['insurance_covered_amount'] : 0;
+                                            echo "<td>₱" . number_format($insurance_covered, 2) . "</td>";
+                                            
+                                            // Out of pocket calculation
+                                            $total_amount = isset($row['total_amount']) ? $row['total_amount'] : 0;
+                                            $out_of_pocket = max(0, $total_amount - $insurance_covered);
                                             echo "<td>₱" . number_format($out_of_pocket, 2) . "</td>";
                                             
+                                            // Billing status
                                             $badgeClass = 'minimal-badge ';
                                             $status = isset($row['status']) ? $row['status'] : 'pending';
                                             switch($status) {
@@ -320,7 +242,7 @@ $records = $billing->getAllBillingRecords();
                                             echo "<td><span class='" . $badgeClass . "'>" . $status . "</span></td>";
                                             echo "<td>" . (isset($row['payment_method']) ? $row['payment_method'] : 'N/A') . "</td>";
                                             echo "<td>" . (isset($row['transaction_id']) ? $row['transaction_id'] : 'N/A') . "</td>";
-                                            echo "<td><a href='billing_summary.php?billing_id=" . (isset($row['billing_id']) ? $row['billing_id'] : '') . "&patient_id=" . (isset($row['patient_id']) ? $row['patient_id'] : '') . "' class='minimal-btn'>Generate</a></td>";
+                                            echo "<td><a href='billing_summary.php?billing_id=" . (isset($row['billing_id']) ? $row['billing_id'] : '') . "&patient_id=" . (isset($row['patient_id']) ? $row['patient_id'] : '') . "' class='minimal-btn'>Generate Receipt</a></td>";
                                             echo "</tr>";
                                         }
                                     } else {

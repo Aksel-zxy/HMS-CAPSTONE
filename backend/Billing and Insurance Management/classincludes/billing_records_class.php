@@ -9,9 +9,18 @@ class billing_records {
     
     public function getAllBillingRecords() {
         $query = "
-            SELECT br.*, p.fname, p.lname 
+            SELECT 
+                br.*, 
+                p.fname, 
+                p.lname,
+                COALESCE(ir.insurance_covered, 0) as insurance_covered_amount
             FROM billing_records br 
             LEFT JOIN patientinfo p ON br.patient_id = p.patient_id
+            LEFT JOIN (
+                SELECT patient_id, insurance_covered
+                FROM insurance_request 
+                WHERE status = 'Approved'
+            ) ir ON br.patient_id = ir.patient_id
             ORDER BY br.billing_id DESC
         ";
         
@@ -64,6 +73,31 @@ class billing_records {
         return false;
     }
 
+    // Get insurance coverage for a patient
+    public function getInsuranceCoverage($patient_id) {
+        $query = "SELECT insurance_covered FROM insurance_request WHERE patient_id = ? AND status = 'Approved'";
+        $stmt = $this->conn->prepare($query);
+        
+        if (!$stmt) {
+            return 0.00;
+        }
+        
+        $stmt->bind_param("i", $patient_id);
+        
+        if (!$stmt->execute()) {
+            return 0.00;
+        }
+        
+        $result = $stmt->get_result();
+        
+        if ($result && $result->num_rows > 0) {
+            $row = $result->fetch_assoc();
+            return $row['insurance_covered'];
+        }
+        
+        return 0.00;
+    }
+
     // Create initial billing record for a new patient
     public function createInitialBillingRecord($patient_id) {
         // Check if record already exists
@@ -74,11 +108,13 @@ class billing_records {
         // Generate billing ID
         $billing_id = $this->getNextBillingId();
         
+        // Get insurance coverage if available
+        $insurance_covered = $this->getInsuranceCoverage($patient_id);
+        
         // Set default values for a new patient
         $billing_date = date('Y-m-d H:i:s');
         $total_amount = 0.00;
-        $insurance_covered = 0.00;
-        $out_of_pocket = 0.00;
+        $out_of_pocket = max(0, $total_amount - $insurance_covered);
         $status = 'pending';
         $payment_method = 'Not Set';
         $transaction_id = 'N/A';
