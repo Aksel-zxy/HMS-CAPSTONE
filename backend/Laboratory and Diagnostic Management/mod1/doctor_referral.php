@@ -3,7 +3,7 @@ session_start();
 include '../../../SQL/config.php';
 require_once "oop/fetchdetails.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
 }
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {

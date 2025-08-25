@@ -1,4 +1,5 @@
 <?php
+define("BASE_URL", "/hms-capstone/");
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
@@ -11,10 +12,11 @@ if (isset($_SESSION['timeout'])) {
         session_unset();
         session_destroy();
         echo "<script>
-                alert('You have been logged out due to inactivity.');
-                window.location.href = '../logout.php';
-              </script>";
-        exit();
+        alert('You have been logged out due to inactivity.');
+        window.location.href = '" . BASE_URL . "backend/logout.php';
+      </script>";
+exit();
+
     }
 }
 
