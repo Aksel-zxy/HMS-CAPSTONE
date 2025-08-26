@@ -1,6 +1,7 @@
 <?php
 include '../../../SQL/config.php';
 
+// Add user authentication and fetching
 class DoctorDashboard {
     public $conn;
     public $user;
@@ -39,93 +40,110 @@ class DoctorDashboard {
 $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
 
-// Fetch all appointments
-$appointments = [];
-$sql = "SELECT appointment_id, patient_id, appointment_date, purpose, status, notes, doctor_id FROM p_appointments ORDER BY appointment_date DESC";
-$result = $conn->query($sql);
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $appointments[] = $row;
-    }
+// Fetch doctors and nurses for filter dropdowns
+$doctor_options = [];
+$nurse_options = [];
+$dept_options = [];
+
+$doctor_result = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession='Doctor'");
+while ($row = $doctor_result->fetch_assoc()) {
+    $doctor_options[] = $row;
+}
+$nurse_result = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession='Nurse'");
+while ($row = $nurse_result->fetch_assoc()) {
+    $nurse_options[] = $row;
+}
+$dept_result = $conn->query("SELECT DISTINCT department FROM hr_employees WHERE department IS NOT NULL AND department != ''");
+while ($row = $dept_result->fetch_assoc()) {
+    $dept_options[] = $row['department'];
 }
 
-// Get selected appointment_id from GET
-$appointment_id = $_GET['appointment_id'] ?? '';
+// Filters
+$doctor_id = $_GET['doctor_id'] ?? '';
+$nurse_id = $_GET['nurse_id'] ?? '';
+$role = $_GET['role'] ?? '';
+$department = $_GET['department'] ?? '';
+$status = $_GET['status'] ?? '';
+$view = $_GET['view'] ?? 'week'; // 'week' or 'day'
 
-// Fetch doctor_id from appointment for duty assignment
-$selected_doctor_id = '';
-if ($appointment_id) {
-    $stmt = $conn->prepare("SELECT doctor_id FROM p_appointments WHERE appointment_id = ?");
-    $stmt->bind_param("i", $appointment_id);
-    $stmt->execute();
-    $stmt->bind_result($selected_doctor_id);
-    $stmt->fetch();
-    $stmt->close();
+// Build query with filters
+$query = "SELECT s.schedule_id, s.employee_id, s.week_start, 
+                 s.mon_start, s.mon_end, s.mon_status,
+                 s.tue_start, s.tue_end, s.tue_status,
+                 s.wed_start, s.wed_end, s.wed_status,
+                 s.thu_start, s.thu_end, s.thu_status,
+                 s.fri_start, s.fri_end, s.fri_status,
+                 s.sat_start, s.sat_end, s.sat_status,
+                 s.sun_start, s.sun_end, s.sun_status,
+                 e.first_name, e.last_name, e.role, e.profession, e.department
+          FROM shift_scheduling s
+          JOIN hr_employees e ON s.employee_id = e.employee_id
+          WHERE 1=1";
+
+if ($doctor_id !== '') {
+    $query .= " AND e.employee_id = '" . $conn->real_escape_string($doctor_id) . "' AND e.profession = 'Doctor'";
+}
+if ($nurse_id !== '') {
+    $query .= " AND e.employee_id = '" . $conn->real_escape_string($nurse_id) . "' AND e.profession = 'Nurse'";
+}
+if ($role !== '') {
+    $query .= " AND e.role = '" . $conn->real_escape_string($role) . "'";
+}
+if ($department !== '') {
+    $query .= " AND e.department = '" . $conn->real_escape_string($department) . "'";
+}
+if ($status !== '') {
+    $query .= " AND (
+        s.mon_status = '" . $conn->real_escape_string($status) . "' OR
+        s.tue_status = '" . $conn->real_escape_string($status) . "' OR
+        s.wed_status = '" . $conn->real_escape_string($status) . "' OR
+        s.thu_status = '" . $conn->real_escape_string($status) . "' OR
+        s.fri_status = '" . $conn->real_escape_string($status) . "' OR
+        s.sat_status = '" . $conn->real_escape_string($status) . "' OR
+        s.sun_status = '" . $conn->real_escape_string($status) . "'
+    )";
 }
 
-// Fetch beds for dropdown
-$beds = [];
-$bed_res = $conn->query("SELECT bed_id, bed_number, ward, room_number, bed_type, status, notes FROM p_beds");
-if ($bed_res && $bed_res->num_rows > 0) {
-    while ($row = $bed_res->fetch_assoc()) {
-        $beds[] = $row;
-    }
-}
+$result = $conn->query($query);
 
-// Fetch nurses for dropdown (profession = 'Nurse')
-$nurses = [];
-$nurse_res = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse' AND status = 'active'");
-if ($nurse_res && $nurse_res->num_rows > 0) {
-    while ($row = $nurse_res->fetch_assoc()) {
-        $nurses[] = $row;
-    }
-}
+$events = [];
+$days = [
+    'Monday'    => ['col_start' => 'mon_start', 'col_end' => 'mon_end', 'col_status' => 'mon_status', 'date' => '2025-08-18'],
+    'Tuesday'   => ['col_start' => 'tue_start', 'col_end' => 'tue_end', 'col_status' => 'tue_status', 'date' => '2025-08-19'],
+    'Wednesday' => ['col_start' => 'wed_start', 'col_end' => 'wed_end', 'col_status' => 'wed_status', 'date' => '2025-08-20'],
+    'Thursday'  => ['col_start' => 'thu_start', 'col_end' => 'thu_end', 'col_status' => 'thu_status', 'date' => '2025-08-21'],
+    'Friday'    => ['col_start' => 'fri_start', 'col_end' => 'fri_end', 'col_status' => 'fri_status', 'date' => '2025-08-22'],
+    'Saturday'  => ['col_start' => 'sat_start', 'col_end' => 'sat_end', 'col_status' => 'sat_status', 'date' => '2025-08-23'],
+    'Sunday'    => ['col_start' => 'sun_start', 'col_end' => 'sun_end', 'col_status' => 'sun_status', 'date' => '2025-08-24'],
+];
 
-// Handle duty assignment form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
-    $appointment_id = $_POST['appointment_id'];
-    $doctor_id = $selected_doctor_id;
-    $bed_id = !empty($_POST['bed_id']) ? $_POST['bed_id'] : null;
-    $nurse_assistant = !empty($_POST['nurse_assistant']) ? $_POST['nurse_assistant'] : null;
-    $procedure = $_POST['procedure'];
-    $equipment = !empty($_POST['equipment']) ? $_POST['equipment'] : null;
-    $tools = !empty($_POST['tools']) ? $_POST['tools'] : null;
-    $notes = $_POST['notes'];
-    $status = "Pending"; // Always insert as Pending
-
-    $stmt = $conn->prepare("INSERT INTO duty_assignments (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-    $stmt->bind_param(
-        "iiissssss",
-        $appointment_id,
-        $doctor_id,
-        $bed_id,
-        $nurse_assistant,
-        $procedure,
-        $equipment,
-        $tools,
-        $notes,
-        $status
-    );
-
-    if ($stmt->execute()) {
-        header("Location: doctor_duty.php?success=1");
-        exit;
-    } else {
-        echo "<div class='alert alert-danger'>Error: " . $stmt->error . "</div>";
-    }
-}
-
-// Fetch all duty assignments for "My Duties" table
-$duties = [];
-$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at FROM duty_assignments ORDER BY created_at DESC");
-if ($duty_res && $duty_res->num_rows > 0) {
-    while ($row = $duty_res->fetch_assoc()) {
-        $duties[] = $row;
+// When building events, only set 'title' to staff name
+while ($row = $result->fetch_assoc()) {
+    $full_name = $row['first_name'] . ' ' . $row['last_name'];
+    foreach ($days as $day => $info) {
+        $start = $row[$info['col_start']];
+        $end = $row[$info['col_end']];
+        $status = $row[$info['col_status']];
+        if ($start && $end && $status) {
+            $events[] = [
+                'title' => $full_name,
+                'start' => $info['date'] . "T" . $start,
+                'end'   => $info['date'] . "T" . $end,
+                'groupId' => $row['department'],
+                'extendedProps' => [
+                    'department' => $row['department'],
+                    'role' => $row['role'],
+                    'profession' => $row['profession'],
+                    'status' => $status,
+                    'staff' => $full_name,
+                    'start' => $info['date'] . "T" . $start,
+                    'end' => $info['date'] . "T" . $end
+                ]
+            ];
+        }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -135,40 +153,12 @@ if ($duty_res && $duty_res->num_rows > 0) {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="../assets/CSS/duty_assignment.css">
-    <link rel="stylesheet" href="../assets/CSS/schedule_editing.css">
-    <style>
-        /* Extra modal styling for the assignment form */
-        .duty-modal {
-            background: rgba(0,0,0,0.25);
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .duty-modal .form-container {
-            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-            border-radius: 16px;
-            max-width: 500px;
-            width: 100%;
-        }
-        .close-modal-btn {
-            float: right;
-            font-size: 1.5rem;
-            color: #888;
-            background: none;
-            border: none;
-            margin-top: -10px;
-        }
-        .close-modal-btn:hover {
-            color: #333;
-        }
-    </style>
+    <link rel="stylesheet" href="../assets/CSS/schedule_calendar.css">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 </head>
 <body>
-    <div class="d-flex">
+     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
 
@@ -180,10 +170,10 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
             <!----- Sidebar Navigation ----->
         
-            <li class="sidebar-item">
+           <li class="sidebar-item">
                 <a href="../doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
+                    <svg x..mlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
                         <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
@@ -200,16 +190,16 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -262,7 +252,7 @@ if ($duty_res && $duty_res->num_rows > 0) {
                         <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
-                        <a href="doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                        <a href="../Employee/admin.php" class="sidebar-link">Doctor Duty</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -309,11 +299,9 @@ if ($duty_res && $duty_res->num_rows > 0) {
             </li>
 
         </aside>
-
-        
-
         <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+
+        <!----- Main Content -----> 
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -327,183 +315,153 @@ if ($duty_res && $duty_res->num_rows > 0) {
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
-                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 200px; padding: 10px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background-color: #fff; color: #333;">
-                            <li style="margin-bottom: 8px; font-size: 14px; color: #555;">
+                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                            <li>
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../../logout.php">
                                     Logout
                                 </a>
                             </li>
                         </ul>
-
                     </div>
                 </div>
             </div>
             <!-- START CODING HERE -->
-           <div class="container">
-                <h2 class="mt-4 mb-3">Appointments</h2>
-                <table class="appointments-table table table-bordered table-hover">
-                    <thead class="table-primary">
-                        <tr>
-                            <th>Appointment ID</th>
-                            <th>Patient ID</th>
-                            <th>Date</th>
-                            <th>Purpose</th>
-                            <th>Status</th>
-                            <th>Notes</th>
-                            <th>Doctor ID</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($appointments)): ?>
-                            <?php foreach ($appointments as $appt): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($appt['appointment_id']); ?></td>
-                                    <td><?= htmlspecialchars($appt['patient_id']); ?></td>
-                                    <td><?= htmlspecialchars($appt['appointment_date']); ?></td>
-                                    <td><?= htmlspecialchars($appt['purpose']); ?></td>
-                                    <td><?= htmlspecialchars($appt['status']); ?></td>
-                                    <td><?= htmlspecialchars($appt['notes']); ?></td>
-                                    <td><?= htmlspecialchars($appt['doctor_id']); ?></td>
-                                    <td>
-                                        <a href="doctor_duty.php?appointment_id=<?= $appt['appointment_id']; ?>" class="assign-btn btn btn-primary btn-sm">Assign Duty</a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="8">No appointments found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-                <!-- Modal-like form for duty assignment -->
-                <?php if ($appointment_id): ?>
-                <div class="duty-modal" id="dutyModal">
-                    <div class="form-container">
-                        <button class="close-modal-btn" onclick="window.location.href='doctor_duty.php'">&times;</button>
-                        <h2 class="mb-3 text-center">Assign Duty</h2>
-                        <form action="" method="POST">
-                            <input type="hidden" name="appointment_id" value="<?= htmlspecialchars($appointment_id) ?>">
-                            <!-- Remove doctor_id hidden field, it's now fetched from appointment -->
-
-                            <div class="mb-3">
-                                <label class="form-label">Bed</label>
-                                <select name="bed_id" class="form-select">
-                                    <option value="">-- Select Bed --</option>
-                                    <?php foreach($beds as $row): ?>
-                                        <option value="<?= $row['bed_id'] ?>">
-                                            <?= htmlspecialchars($row['bed_number']) ?> (<?= htmlspecialchars($row['ward']) ?>, Room <?= htmlspecialchars($row['room_number']) ?>, <?= htmlspecialchars($row['bed_type']) ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Nurse Assistant</label>
-                                <select name="nurse_assistant" class="form-select">
-                                    <option value="">-- Select Nurse --</option>
-                                    <?php foreach($nurses as $row): ?>
-                                        <option value="<?= $row['employee_id'] ?>">
-                                            <?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Procedure</label>
-                                <input type="text" name="procedure" class="form-control" required>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Equipment</label>
-                                <input type="text" name="equipment" class="form-control">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Tools</label>
-                                <input type="text" name="tools" class="form-control">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Notes</label>
-                                <textarea name="notes" class="form-control"></textarea>
-                            </div>
-
-                            <button type="submit" name="save_duty" class="btn btn-primary w-100">Save Assignment</button>
-                        </form>
+            <div class="container-fluid">
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🗓️Doctor & Nurse Calendar</h2>
+                <form method="GET" class="filters mb-4 shadow-sm p-3 rounded bg-white">
+                    <label>Doctor:</label>
+                    <select name="doctor_id">
+                        <option value="">All</option>
+                        <?php foreach ($doctor_options as $doc): ?>
+                            <option value="<?= htmlspecialchars($doc['employee_id']) ?>" <?= $doctor_id==$doc['employee_id']?'selected':'' ?>>
+                                <?= htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label>Nurse:</label>
+                    <select name="nurse_id">
+                        <option value="">All</option>
+                        <?php foreach ($nurse_options as $nurse): ?>
+                            <option value="<?= htmlspecialchars($nurse['employee_id']) ?>" <?= $nurse_id==$nurse['employee_id']?'selected':'' ?>>
+                                <?= htmlspecialchars($nurse['first_name'] . ' ' . $nurse['last_name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label>Role:</label>
+                    <select name="role">
+                        <option value="">All</option>
+                        <option value="Doctor" <?= $role=='Doctor'?'selected':'' ?>>Doctor</option>
+                        <option value="Nurse" <?= $role=='Nurse'?'selected':'' ?>>Nurse</option>
+                    </select>
+                    <label>Department:</label>
+                    <select name="department">
+                        <option value="">All</option>
+                        <?php foreach ($dept_options as $dept): ?>
+                            <option value="<?= htmlspecialchars($dept) ?>" <?= $department==$dept?'selected':'' ?>><?= htmlspecialchars($dept) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <label>Status:</label>
+                    <select name="status">
+                        <option value="">All</option>
+                        <option value="On Duty" <?= $status=='On Duty'?'selected':'' ?>>On Duty</option>
+                        <option value="Off Duty" <?= $status=='Off Duty'?'selected':'' ?>>Off Duty</option>
+                        <option value="Leave" <?= $status=='Leave'?'selected':'' ?>>Leave</option>
+                        <option value="Sick" <?= $status=='Sick'?'selected':'' ?>>Sick</option>
+                    </select>
+                    <span class="view-switch">
+                        <label><input type="radio" name="view" value="week" <?= $view=='week'?'checked':'' ?>> Weekly by Staff</label>
+                        <label><input type="radio" name="view" value="day" <?= $view=='day'?'checked':'' ?>> Daily by Department</label>
+                    </span>
+                    <button type="submit">Apply</button>
+                    <a href="schedule_calendar.php" class="btn btn-secondary" style="margin-left:10px;">Reset Filters</a>
+                </form>
+                <div id="calendar"></div>
+            </div>
+            <!-- Modal for event details -->
+            <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title" id="eventModalLabel">Schedule Details</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <ul class="list-group list-group-flush" id="eventDetails">
+                                <!-- Details will be injected by JS -->
+                            </ul>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
                     </div>
                 </div>
-                <?php endif; ?>
             </div>
             <!-- END CODING HERE -->
-
-            <!-- My Duties Table -->
-            <div class="container mt-5">
-                <h2 class="mb-3">My Duties</h2>
-                <table class="table table-bordered table-hover">
-                    <thead class="table-info">
-                        <tr>
-                            <th>Duty ID</th>
-                            <th>Appointment ID</th>
-                            <th>Doctor ID</th>
-                            <th>Bed ID</th>
-                            <th>Nurse Assistant</th>
-                            <th>Procedure</th>
-                            <th>Equipment</th>
-                            <th>Tools</th>
-                            <th>Notes</th>
-                            <th>Status</th>
-                            <th>Created At</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($duties)): ?>
-                            <?php foreach ($duties as $duty): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($duty['duty_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['appointment_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['bed_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
-                                    <td><?= htmlspecialchars($duty['procedure']) ?></td>
-                                    <td><?= htmlspecialchars($duty['equipment']) ?></td>
-                                    <td><?= htmlspecialchars($duty['tools']) ?></td>
-                                    <td><?= htmlspecialchars($duty['notes']) ?></td>
-                                    <td><?= htmlspecialchars($duty['status']) ?></td>
-                                    <td><?= htmlspecialchars($duty['created_at']) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="11">No duties found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
         </div>
-        <!----- End of Main Content ----->
+        <!----- End of Main Content -----> 
     </div>
     <script>
         const toggler = document.querySelector(".toggler-btn");
-        toggler && toggler.addEventListener("click", function() {
+        toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
     </script>
-    <script src="../assets/Bootstrap/all.min.js"></script>
-    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="../assets/Bootstrap/jq.js"></script>
-</body>
-</html>
-        toggler && toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var initialView = 'timeGridWeek';
+        <?php if ($view == 'day'): ?>
+            initialView = 'timeGridDay';
+        <?php endif; ?>
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: initialView,
+            height: 'auto',
+            contentHeight: 600,
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            events: <?php echo json_encode($events); ?>,
+            eventDidMount: function(info) {
+                // Highlight today's events
+                var today = new Date();
+                var eventStart = info.event.start;
+                if (eventStart.getDate() === today.getDate() &&
+                    eventStart.getMonth() === today.getMonth() &&
+                    eventStart.getFullYear() === today.getFullYear()) {
+                    info.el.style.backgroundColor = '#ffe066';
+                    info.el.style.borderColor = '#ffc107';
+                }
+                // Make event text bold and larger
+                info.el.style.fontWeight = '600';
+                info.el.style.fontSize = '1.05rem';
+            },
+            eventClick: function(info) {
+                var props = info.event.extendedProps;
+                var details = `
+                    <li class="list-group-item"><strong>Name:</strong> ${props.staff}</li>
+                    <li class="list-group-item"><strong>Role:</strong> ${props.role}</li>
+                    <li class="list-group-item"><strong>Profession:</strong> ${props.profession}</li>
+                    <li class="list-group-item"><strong>Department:</strong> ${props.department}</li>
+                    <li class="list-group-item"><strong>Status:</strong> ${props.status}</li>
+                    <li class="list-group-item"><strong>Start:</strong> ${new Date(props.start).toLocaleString()}</li>
+                    <li class="list-group-item"><strong>End:</strong> ${new Date(props.end).toLocaleString()}</li>
+                `;
+                document.getElementById('eventDetails').innerHTML = details;
+                var modal = new bootstrap.Modal(document.getElementById('eventModal'));
+                modal.show();
+            }
         });
+        calendar.render();
+    });
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

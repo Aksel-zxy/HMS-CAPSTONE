@@ -12,8 +12,12 @@
 
 /* Table border radius and overflow */
 .shift-table {
-    border-radius: 8px;
-    overflow: hidden;
+   width:100%;
+    border-collapse:collapse;
+     font-family:Arial, sans-serif;
+      font-size:14px; background:#fff; 
+      border-radius:8px;
+       overflow:hidden; min-height:200px;
 }
 
 /* Card header for doctor/nurse shift list */
@@ -29,10 +33,10 @@
     /* Add any custom styling if needed */
 }
 .container-fluid{
-      margin-left: 20px;
-  padding: 15px;
-  width: 97%;
-  height: auto;
-  background-color: rgb(177, 50, 50);
-  border-radius: 30px;
+     width:95%;
+      margin:20px auto;
+       padding:15px;
+        background:#f8f9fa;
+         border-radius:10px;
+          box-shadow:0 2px 6px rgba(0,0,0,0.08);
 }

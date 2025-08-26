@@ -1,13 +1,81 @@
 body {
     font-family: Arial, sans-serif;
-    margin: 20px;
+   
 }
+.container-fluid{
+     width:95%;
+      margin:20px auto;
+       padding:15px;
+        background:#f8f9fa;
+         border-radius:10px;
+          box-shadow:0 2px 6px rgba(0,0,0,0.08);
+}
+
 .filters {
     margin-bottom: 20px;
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    display: block;
 }
-.filters select {
-    margin-right: 10px;
-    padding: 5px;
+.filters .form-label {
+    font-weight: 600;
+    color: #0d6efd;
+    font-size: 0.97rem;
+    margin-bottom: 2px;
+}
+.filters .form-select,
+.filters .form-select-sm {
+    min-width: 120px;
+    max-width: 160px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    font-size: 0.97rem;
+    padding: 4px 8px;
+}
+.filters .form-check-label {
+    font-size: 0.97rem;
+    color: #333;
+    margin-right: 8px;
+}
+.filters .btn {
+    font-weight: 600;
+    font-size: 0.97rem;
+    border-radius: 6px;
+    padding: 6px 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: background 0.2s, color 0.2s;
+}
+.filters .btn-primary {
+    background: #0d6efd;
+    border: none;
+}
+.filters .btn-primary:hover {
+    background: #0b5ed7;
+}
+.filters .btn-outline-secondary {
+    border: 1px solid #6c757d;
+    color: #6c757d;
+    background: #fff;
+}
+.filters .btn-outline-secondary:hover {
+    background: #f8f9fa;
+    color: #495057;
+    border-color: #495057;
+}
+.filters .form-check-input[type="radio"] {
+    margin-right: 4px;
+}
+.filters .gap-2 > * {
+    margin-right: 10px !important;
+}
+.filters .d-flex {
+    flex-wrap: wrap;
+    align-items: center;
+}
+.filters .form-check-inline {
+    margin-right: 8px;
 }
 .view-switch {
     margin-bottom: 20px;
@@ -31,7 +99,7 @@ body {
 }
 .calendar-container {
     background: #f8f9fa;
-    border-radius: 24px;
+    border-radius: 10px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.08);
     padding: 32px 24px;
     margin: 32px auto;
@@ -39,7 +107,7 @@ body {
 }
 #calendar {
     background: #fff;
-    border-radius: 16px;
+    border-radius: 10px;
     box-shadow: 0 2px 12px rgba(0,0,0,0.07);
     padding: 16px;
 }

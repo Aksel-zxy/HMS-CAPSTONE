@@ -14,7 +14,7 @@ class NurseShiftScheduling {
         $this->authenticate();
         $this->fetchUser();
         $this->fetchNurses();
-        $this->fetchProfessions();
+        $this->fetchProfessions();  
         $this->fetchDepartments();
     }
 
@@ -43,8 +43,9 @@ class NurseShiftScheduling {
     }
 
     private function fetchNurses() {
+        // Fetch all nurses with details and active clinical status
         $nurse_query = "
-            SELECT e.employee_id, e.first_name, e.last_name
+            SELECT e.employee_id, e.first_name, e.middle_name, e.last_name, e.role, e.profession, e.department
             FROM hr_employees e
             INNER JOIN clinical_profiles cp ON e.employee_id = cp.employee_id
             WHERE e.profession = 'Nurse' AND cp.clinical_status = 'Active'
@@ -85,8 +86,8 @@ $nurses = $nurseSched->nurses;
 $professions = $nurseSched->professions;
 $departments = $nurseSched->departments;
 
-// Handle schedule form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['employee_id'], $_POST['week_start'])) {
+// Handle schedule form submission (CREATE)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
     $employee_id = $_POST['employee_id'];
     $week_start = $_POST['week_start'];
     $created_at = date('Y-m-d H:i:s');
@@ -148,6 +149,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['employee_id'], $_POST
         } else {
             $error = "Error saving schedule: " . $stmt->error;
         }
+    }
+}
+
+// Handle schedule update (EDIT)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_schedule'])) {
+    $schedule_id = $_POST['schedule_id'];
+    $employee_id = $_POST['employee_id'];
+    $week_start = $_POST['week_start'];
+    $created_at = date('Y-m-d H:i:s');
+    $params = [];
+    $types = '';
+    $fields = '';
+    foreach ($days as $day) {
+        $prefix = strtolower(substr($day, 0, 3));
+        $fields .= "{$prefix}_start = ?, {$prefix}_end = ?, {$prefix}_status = ?, ";
+        $params[] = $_POST[$prefix . '_start'] ?? null;
+        $params[] = $_POST[$prefix . '_end'] ?? null;
+        $params[] = $_POST[$prefix . '_status'] ?? null;
+        $types .= 'sss';
+    }
+    $fields .= "week_start = ?, created_at = ?";
+    $params[] = $week_start;
+    $params[] = $created_at;
+    $types .= 'ss';
+    $params[] = $schedule_id;
+    $types .= 's';
+
+    $sql = "UPDATE shift_scheduling SET $fields WHERE schedule_id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $success = "Schedule updated successfully!";
+    header("Location: nurse_shift_scheduling.php?view_sched_id=" . urlencode($employee_id));
+    exit();
+}
+
+// Handle schedule delete
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_schedule'])) {
+    $schedule_id = $_POST['schedule_id'];
+    $stmt = $conn->prepare("DELETE FROM shift_scheduling WHERE schedule_id = ?");
+    $stmt->bind_param("s", $schedule_id);
+    $stmt->execute();
+    $success = "Schedule deleted successfully!";
+}
+
+// Fetch all schedules for modal view
+$modal_schedules = [];
+$edit_sched_id = $_GET['edit_sched_id'] ?? null;
+if (isset($_GET['view_sched_id'])) {
+    $view_id = $_GET['view_sched_id'];
+    $stmt = $conn->prepare("SELECT * FROM shift_scheduling WHERE employee_id = ? ORDER BY week_start DESC");
+    $stmt->bind_param("i", $view_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $modal_schedules[] = $row;
     }
 }
 ?>
@@ -341,8 +398,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['employee_id'], $_POST
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid calendar-container">
-                <h2 class="mb-4 text-primary fw-bold">Nurse Shift Scheduling</h2>
+            <div class="container-fluid">
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">👩‍⚕️Nurse Shift Scheduling</h2>
                 <div class="card shadow-sm rounded mb-4">
                     <div class="card-body bg-white rounded">
                         <?php if (isset($_GET['success'])): ?>
@@ -356,9 +413,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['employee_id'], $_POST
                                     <label for="employee_id" class="form-label">Select Nurse</label>
                                     <select name="employee_id" id="employee_id" class="form-select" required>
                                         <option value="">-- Choose a Nurse --</option>
-                                        <?php foreach ($nurses as $doc): ?>
-                                            <option value="<?= htmlspecialchars($doc['employee_id']) ?>">
-                                                <?= htmlspecialchars($doc['employee_id'] . ' - ' . $doc['first_name'] . ' ' . $doc['last_name']) ?>
+                                        <?php foreach ($nurses as $nur): ?>
+                                            <option value="<?= htmlspecialchars($nur['employee_id']) ?>">
+                                                <?= htmlspecialchars($nur['employee_id'] . ' - ' . $nur['first_name'] . ' ' . $nur['last_name']) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -367,11 +424,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['employee_id'], $_POST
                                     <label for="week_start" class="form-label">Week Starting</label>
                                     <input type="date" name="week_start" id="week_start" class="form-control" required>
                                 </div>
-                                <div class="col-md-5 align-self-end d-flex gap-2">
-                                    <a href="nurse_schedule_editing.php" class="btn btn-info">Nurse Schedule Editing</a>
-                                </div>
                             </div>
-                            <table class="table table-bordered table-striped nurse-shift-table rounded shadow-sm">
+                            <table class="table table-bordered table-striped shift-table ">
                                 <thead>
                                     <tr class="shift-table-header">
                                         <th>Day</th>
@@ -399,13 +453,170 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['employee_id'], $_POST
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
-                            <button type="submit" class="btn btn-success mt-3">Save Schedule</button>
+                            <button type="submit" name="save_schedule" class="btn btn-success mt-3">Save Schedule</button>
                         </form>
                     </div>
                 </div>
             </div>
-            <!-- END CODING HERE -->
+            
+
+
+
+
+             <div class="container-fluid ">
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">📃List of Nurses</h2>
+                <?php if (!empty($success)): ?>
+                    <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
+                <?php elseif (!empty($error)): ?>
+                    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+                <?php endif; ?>
+                <div class="card shadow-sm rounded mb-4">
+                    <div class="card-header">Nurses List</div>
+                    <div class="card-body bg-white rounded">
+                        <table class="table table-bordered table-striped nurses-list-table rounded shadow-sm">
+                            <thead>
+                                <tr>
+                                    <th>Employee ID</th>
+                                    <th>First Name</th>
+                                    <th>Middle Name</th>
+                                    <th>Last Name</th>
+                                    <th>Role</th>
+                                    <th>Profession</th>
+                                    <th>Department</th>
+                                    <th>Action</th>
+                                    <th>Download</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($nurses as $nur): ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($nur['employee_id']) ?></td>
+                                        <td><?= htmlspecialchars($nur['first_name']) ?></td>
+                                        <td><?= htmlspecialchars($nur['middle_name']) ?></td>
+                                        <td><?= htmlspecialchars($nur['last_name']) ?></td>
+                                        <td><?= htmlspecialchars($nur['role']) ?></td>
+                                        <td><?= htmlspecialchars($nur['profession']) ?></td>
+                                        <td><?= htmlspecialchars($nur['department']) ?></td>
+                                        <td>
+                                            <form method="get" style="display:inline;">
+                                                <input type="hidden" name="view_sched_id" value="<?= htmlspecialchars($nur['employee_id']) ?>">
+                                                <button type="submit" class="btn btn-sm btn-info">View Schedule</button>
+                                            </form>
+                                        </td>
+                                        <td>
+    <form action="Nurse_download_schedule.php" method="get" target="_blank">
+        <input type="hidden" name="employee_id" value="<?= htmlspecialchars($nur['employee_id']) ?>">
+        <button type="submit" class="btn btn-success">Download as PDF</button>
+    </form>
+</td>
+
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+                </table>
+                </div>
+            </div>
+            <?php if (!empty($modal_schedules)): ?>
+                <div class="modal fade show schedule-modal" id="scheduleModal" tabindex="-1" aria-modal="true" role="dialog" style="display:block;">
+                    <div class="modal-dialog modal-xl">
+                        <div class="modal-content rounded shadow">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title">Schedules for Nurse ID: <?= htmlspecialchars($modal_schedules[0]['employee_id']) ?></h5>
+                                <a href="Nurse_shift_scheduling.php" class="btn-close"></a>
+                            </div>
+                            <div class="modal-body">
+                                <?php foreach ($modal_schedules as $modal_schedule): ?>
+                                    <?php $is_editing = ($edit_sched_id == $modal_schedule['schedule_id']); ?>
+                                    <form method="POST" class="mb-4 border rounded p-3">
+                                        <input type="hidden" name="schedule_id" value="<?= htmlspecialchars($modal_schedule['schedule_id']) ?>">
+                                        <input type="hidden" name="employee_id" value="<?= htmlspecialchars($modal_schedule['employee_id']) ?>">
+                                        <h6>Week:
+                                            <?php if ($is_editing): ?>
+                                                <input type="date" name="week_start" class="form-control d-inline-block w-auto"
+                                                    value="<?= htmlspecialchars($modal_schedule['week_start']) ?>">
+                                            <?php else: ?>
+                                                <?= htmlspecialchars($modal_schedule['week_start']) ?>
+                                            <?php endif; ?>
+                                        </h6>
+                                        <table class="table table-bordered bg-white schedule-table">
+                                            <thead>
+                                                <tr class="schedule-table-header">
+                                                    <th>Day</th>
+                                                    <th>Start Time</th>
+                                                    <th>End Time</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($days as $day): ?>
+                                                    <?php $prefix = strtolower(substr($day, 0, 3)); ?>
+                                                    <tr>
+                                                        <td><?= $day ?></td>
+                                                        <td>
+                                                            <?php if (!$is_editing): ?>
+                                                                <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
+                                                                    ---
+                                                                <?php else: ?>
+                                                                    <?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?>
+                                                                <?php endif; ?>
+                                                            <?php else: ?>
+                                                                <input type="time" name="<?= $prefix ?>_start" class="form-control"
+                                                                    value="<?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?>">
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td>
+                                                            <?php if (!$is_editing): ?>
+                                                                <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
+                                                                    ---
+                                                                <?php else: ?>
+                                                                    <?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?>
+                                                                <?php endif; ?>
+                                                            <?php else: ?>
+                                                                <input type="time" name="<?= $prefix ?>_end" class="form-control"
+                                                                    value="<?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?>">
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td>
+                                                            <?php if (!$is_editing): ?>
+                                                                <?= htmlspecialchars($modal_schedule[$prefix . '_status'] ?? '') ?>
+                                                            <?php else: ?>
+                                                                <select name="<?= $prefix ?>_status" class="form-select">
+                                                                    <option value="">-- Select Status --</option>
+                                                                    <option value="On Duty" <?= ($modal_schedule[$prefix . '_status'] ?? '') == 'On Duty' ? 'selected' : '' ?>>On Duty</option>
+                                                                    <option value="Off Duty" <?= ($modal_schedule[$prefix . '_status'] ?? '') == 'Off Duty' ? 'selected' : '' ?>>Off Duty</option>
+                                                                    <option value="Leave" <?= ($modal_schedule[$prefix . '_status'] ?? '') == 'Leave' ? 'selected' : '' ?>>Leave</option>
+                                                                    <option value="Sick" <?= ($modal_schedule[$prefix . '_status'] ?? '') == 'Sick' ? 'selected' : '' ?>>Sick</option>
+                                                                </select>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                        <div class="d-flex gap-2 mt-2">
+                                            <?php if ($is_editing): ?>
+                                                <button type="submit" name="update_schedule" class="btn btn-success">Save Changes</button>
+                                                <a href="?view_sched_id=<?= htmlspecialchars($modal_schedule['employee_id']) ?>" class="btn btn-secondary">Cancel</a>
+                                            <?php else: ?>
+                                                <a href="?view_sched_id=<?= htmlspecialchars($modal_schedule['employee_id']) ?>&edit_sched_id=<?= htmlspecialchars($modal_schedule['schedule_id']) ?>" class="btn btn-warning">Edit</a>
+                                            <?php endif; ?>
+                                            <button type="submit" name="delete_schedule" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this schedule?');">Delete</button>
+                                        </div>
+                                    </form>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="modal-footer">
+                                <a href="nurse_shift_scheduling.php" class="btn btn-secondary">Close</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    document.body.classList.add('modal-open');
+                </script>
+            <?php endif; ?>
         </div>
+            <!-- END CODING HERE -->
         <!----- End of Main Content ----->
     </div>
     <script>

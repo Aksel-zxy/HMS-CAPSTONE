@@ -61,9 +61,7 @@ while ($row = $dept_result->fetch_assoc()) {
 // Filters
 $doctor_id = $_GET['doctor_id'] ?? '';
 $nurse_id = $_GET['nurse_id'] ?? '';
-$role = $_GET['role'] ?? '';
 $department = $_GET['department'] ?? '';
-$status = $_GET['status'] ?? '';
 $view = $_GET['view'] ?? 'week'; // 'week' or 'day'
 
 // Build query with filters
@@ -86,22 +84,8 @@ if ($doctor_id !== '') {
 if ($nurse_id !== '') {
     $query .= " AND e.employee_id = '" . $conn->real_escape_string($nurse_id) . "' AND e.profession = 'Nurse'";
 }
-if ($role !== '') {
-    $query .= " AND e.role = '" . $conn->real_escape_string($role) . "'";
-}
 if ($department !== '') {
     $query .= " AND e.department = '" . $conn->real_escape_string($department) . "'";
-}
-if ($status !== '') {
-    $query .= " AND (
-        s.mon_status = '" . $conn->real_escape_string($status) . "' OR
-        s.tue_status = '" . $conn->real_escape_string($status) . "' OR
-        s.wed_status = '" . $conn->real_escape_string($status) . "' OR
-        s.thu_status = '" . $conn->real_escape_string($status) . "' OR
-        s.fri_status = '" . $conn->real_escape_string($status) . "' OR
-        s.sat_status = '" . $conn->real_escape_string($status) . "' OR
-        s.sun_status = '" . $conn->real_escape_string($status) . "'
-    )";
 }
 
 $result = $conn->query($query);
@@ -333,54 +317,59 @@ while ($row = $result->fetch_assoc()) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid calendar-container">
-                <h2 class="mb-4 text-primary fw-bold">Schedule Viewer / Calendar Display</h2>
-                <form method="GET" class="filters mb-4 shadow-sm p-3 rounded bg-white">
-                    <label>Doctor:</label>
-                    <select name="doctor_id">
-                        <option value="">All</option>
-                        <?php foreach ($doctor_options as $doc): ?>
-                            <option value="<?= htmlspecialchars($doc['employee_id']) ?>" <?= $doctor_id==$doc['employee_id']?'selected':'' ?>>
-                                <?= htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <label>Nurse:</label>
-                    <select name="nurse_id">
-                        <option value="">All</option>
-                        <?php foreach ($nurse_options as $nurse): ?>
-                            <option value="<?= htmlspecialchars($nurse['employee_id']) ?>" <?= $nurse_id==$nurse['employee_id']?'selected':'' ?>>
-                                <?= htmlspecialchars($nurse['first_name'] . ' ' . $nurse['last_name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <label>Role:</label>
-                    <select name="role">
-                        <option value="">All</option>
-                        <option value="Doctor" <?= $role=='Doctor'?'selected':'' ?>>Doctor</option>
-                        <option value="Nurse" <?= $role=='Nurse'?'selected':'' ?>>Nurse</option>
-                    </select>
-                    <label>Department:</label>
-                    <select name="department">
-                        <option value="">All</option>
-                        <?php foreach ($dept_options as $dept): ?>
-                            <option value="<?= htmlspecialchars($dept) ?>" <?= $department==$dept?'selected':'' ?>><?= htmlspecialchars($dept) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <label>Status:</label>
-                    <select name="status">
-                        <option value="">All</option>
-                        <option value="On Duty" <?= $status=='On Duty'?'selected':'' ?>>On Duty</option>
-                        <option value="Off Duty" <?= $status=='Off Duty'?'selected':'' ?>>Off Duty</option>
-                        <option value="Leave" <?= $status=='Leave'?'selected':'' ?>>Leave</option>
-                        <option value="Sick" <?= $status=='Sick'?'selected':'' ?>>Sick</option>
-                    </select>
-                    <span class="view-switch">
-                        <label><input type="radio" name="view" value="week" <?= $view=='week'?'checked':'' ?>> Weekly by Staff</label>
-                        <label><input type="radio" name="view" value="day" <?= $view=='day'?'checked':'' ?>> Daily by Department</label>
-                    </span>
-                    <button type="submit">Apply</button>
-                    <a href="schedule_calendar.php" class="btn btn-secondary" style="margin-left:10px;">Reset Filters</a>
+            <div class="container-fluid">
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🗓️Doctor & Nurse Calendar</h2>
+                <form method="GET" class="filters mb-4 shadow-sm p-2 rounded bg-white">
+                    <div class="d-flex flex-wrap align-items-end gap-3 justify-content-between" style="flex-wrap: wrap;">
+                        <div>
+                            <label for="doctor_id" class="form-label mb-1">Doctor</label>
+                            <select name="doctor_id" id="doctor_id" class="form-select form-select-sm" style="width: 160px;">
+                                <option value="">All</option>
+                                <?php foreach ($doctor_options as $doc): ?>
+                                    <option value="<?= htmlspecialchars($doc['employee_id']) ?>" <?= $doctor_id==$doc['employee_id']?'selected':'' ?>>
+                                        <?= htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="nurse_id" class="form-label mb-1">Nurse</label>
+                            <select name="nurse_id" id="nurse_id" class="form-select form-select-sm" style="width: 160px;">
+                                <option value="">All</option>
+                                <?php foreach ($nurse_options as $nurse): ?>
+                                    <option value="<?= htmlspecialchars($nurse['employee_id']) ?>" <?= $nurse_id==$nurse['employee_id']?'selected':'' ?>>
+                                        <?= htmlspecialchars($nurse['first_name'] . ' ' . $nurse['last_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="department" class="form-label mb-1">Department</label>
+                            <select name="department" id="department" class="form-select form-select-sm" style="width: 160px;">
+                                <option value="">All</option>
+                                <?php foreach ($dept_options as $dept): ?>
+                                    <option value="<?= htmlspecialchars($dept) ?>" <?= $department==$dept?'selected':'' ?>><?= htmlspecialchars($dept) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label mb-1">View</label>
+                            <div class="d-flex gap-2">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="view" value="week" id="viewWeek" <?= $view=='week'?'checked':'' ?>>
+                                    <label class="form-check-label" for="viewWeek">Weekly</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="view" value="day" id="viewDay" <?= $view=='day'?'checked':'' ?>>
+                                    <label class="form-check-label" for="viewDay">Daily</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm px-3">Apply</button>
+                            <a href="schedule_calendar.php" class="btn btn-outline-secondary btn-sm px-3">Reset</a>
+                        </div>
+                    </div>
                 </form>
                 <div id="calendar"></div>
             </div>
@@ -458,6 +447,17 @@ while ($row = $result->fetch_assoc()) {
                 document.getElementById('eventDetails').innerHTML = details;
                 var modal = new bootstrap.Modal(document.getElementById('eventModal'));
                 modal.show();
+            }
+        });
+        calendar.render();
+    });
+    </script>
+    <script src="../assets/Bootstrap/all.min.js"></script>
+    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="../assets/Bootstrap/jq.js"></script>
+</body>
+</html>
             }
         });
         calendar.render();
