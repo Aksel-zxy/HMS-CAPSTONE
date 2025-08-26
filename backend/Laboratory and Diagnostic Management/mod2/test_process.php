@@ -171,7 +171,162 @@ $allPatients = $patient->getAllPatients();
                 </div>
             </div>
             <!-- START CODING HERE -->
+            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
 
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
+                    🧪 Sample Processing Status
+                </h2>
+
+                <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:220px; display:block;">
+                    <thead style="display:table; width:100%; table-layout:fixed;">
+                        <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
+                            <th style="padding:12px;">Patient ID</th>
+                            <th style="padding:12px;">Patient Name</th>
+                            <th style="padding:12px;">Date | Time</th>
+                            <th style="padding:12px;">Test Name</th>
+                            <th style="padding:12px;">Status</th>
+                            <th style="padding:12px; text-align:center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody style="display:block; max-height:180px; overflow-y:auto; width:100%; table-layout:fixed;">
+                        <?php
+                        $hasAppointments = false;
+
+                        foreach ($allPatients as $p):
+                            $counter = $p['patient_id'];
+                            $name     = $p['fname'] . ' ' . $p['lname'];
+                            $dateTime = $p['appointment_date'];
+                            $type     = $p['notes'];
+                            $status   = $p['status'];
+
+                            // Override status if exists in dl_schedule
+                            $schedQuery = $conn->prepare("SELECT status, scheduleID, scheduleDate, scheduleTime 
+                          FROM dl_schedule 
+                          WHERE patientID = ? LIMIT 1");
+                            $schedQuery->bind_param("i", $counter);
+                            $schedQuery->execute();
+                            $schedResult = $schedQuery->get_result();
+                            if ($schedRow = $schedResult->fetch_assoc()) {
+                                $status = $schedRow['status'];
+                                $scheduleID   = $schedRow['scheduleID'];
+                                $scheduleDate = $schedRow['scheduleDate'];
+                                $scheduleTime = $schedRow['scheduleTime'];
+                            }
+                            $schedQuery->close();
+
+                            // 🚫 Skip if Scheduled OR Cancelled
+                            if ($status === 'Scheduled' || $status === 'Cancelled') continue;
+
+                            $hasAppointments = true;
+                        ?>
+                            <tr style="display:table; width:100%; table-layout:fixed; border-bottom:1px solid #f1f1f1; transition:background 0.2s;"
+                                onmouseover="this.style.background='#f9fbfd';"
+                                onmouseout="this.style.background='';">
+                                <td style="padding:12px;"><?= htmlspecialchars($counter) ?></td>
+                                <td style="padding:12px;"><?= htmlspecialchars($name) ?></td>
+                                <td style="padding:12px;"><?= htmlspecialchars($scheduleDate . ' ' . $scheduleTime) ?></td>
+                                <td style="padding:12px;"><?= htmlspecialchars($type) ?></td>
+                                <td style="padding:12px;">
+                                    <?php if ($status === 'Completed'): ?>
+                                        <span style="background:#d4edda; color:#155724; padding:4px 12px; border-radius:16px; font-weight:500;">
+                                            <?= htmlspecialchars($status) ?>
+                                        </span>
+                                    <?php elseif ($status === 'Processing'): ?>
+                                        <span style="background:#cce5ff; color:#004085; padding:4px 12px; border-radius:16px; font-weight:500;">
+                                            <?= htmlspecialchars($status) ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($status) ?>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?php if ($status !== 'Completed'): ?>
+                                        <button class="btn btn-sm btn-primary edit-btn"
+                                            style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0d6efd; border:none; color:#fff; cursor:pointer;"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#editScheduleModal"
+                                            data-id="<?= $scheduleID ?>"
+                                            data-date="<?= $scheduleDate ?>"
+                                            data-time="<?= $scheduleTime ?>"
+                                            data-status="<?= $status ?>">
+                                            Update
+                                        </button>
+
+                                        <form method="POST" action="oop2/upd_stats.php" style="display:inline-block; margin-left:6px;" id="cancelForm_<?= $scheduleID ?>">
+                                            <input type="hidden" name="scheduleID" value="<?= $scheduleID ?>">
+                                            <input type="hidden" name="cancel_reason" id="cancelReasonInput_<?= $scheduleID ?>">
+                                            <input type="hidden" name="delete_schedule" value="1">
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                style="padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer;"
+                                                onclick="askCancelReason(<?= $scheduleID ?>)">Cancel</button>
+                                        </form>
+                                    <?php else: ?>
+                                        <span style="color:gray;">No Actions</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+
+                        <?php if (!$hasAppointments): ?>
+                            <tr style="display:table; width:100%; table-layout:fixed;">
+                                <td colspan="6" style="padding:20px; text-align:center; color:gray; font-style:italic;">
+                                    No Schedule
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
+
+            <!-- MODAL AREA -->
+            <div class="modal fade" id="editScheduleModal" tabindex="-1" aria-labelledby="editScheduleModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <form method="POST" action="oop2/upd_stats.php">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="editScheduleModalLabel">Update Schedule</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+
+                                <input type="hidden" name="scheduleID" id="modalScheduleId">
+
+                                <div class="mb-3">
+                                    <label for="modalScheduleDate" class="form-label">Schedule Date</label>
+                                    <input type="date" class="form-control" id="modalScheduleDate" name="schedule_date" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="modalScheduleTime" class="form-label">Schedule Time</label>
+                                    <input type="time" class="form-control" id="modalScheduleTime" name="schedule_time" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="modalStatus" class="form-label">Status</label>
+                                    <select class="form-select" id="modalStatus" name="status" required>
+                                        <option value="Scheduled">Scheduled</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                        <option value="Processing">Processing</option>
+                                    </select>
+                                </div>
+
+                                <!-- ✅ Reason textarea (only used when Cancelled) -->
+                                <div class="mb-3" id="cancelReasonBox" style="display:none;">
+                                    <label for="cancelReason" class="form-label">Reason for Cancellation</label>
+                                    <textarea class="form-control" id="cancelReason" name="cancel_reason" rows="3"></textarea>
+                                </div>
+
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" name="update_schedule" class="btn btn-primary">Update</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
             <!----- End of Main Content ----->
             <script>
@@ -179,6 +334,25 @@ $allPatients = $patient->getAllPatients();
                 document.querySelector(".toggler-btn")?.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
+
+                document.querySelectorAll('.edit-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        document.getElementById('modalScheduleId').value = this.dataset.id;
+                        document.getElementById('modalScheduleDate').value = this.dataset.date;
+                        document.getElementById('modalScheduleTime').value = this.dataset.time;
+                        document.getElementById('modalStatus').value = this.dataset.status;
+                    });
+                });
+
+                function askCancelReason(scheduleID) {
+                    const reason = prompt("Please provide a reason for cancellation:");
+                    if (reason !== null && reason.trim() !== "") {
+                        document.getElementById("cancelReasonInput_" + scheduleID).value = reason;
+                        document.querySelector("input[name='scheduleID'][value='" + scheduleID + "']").form.submit();
+                    } else {
+                        alert("❌ Cancellation aborted. Reason is required.");
+                    }
+                }
             </script>
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
