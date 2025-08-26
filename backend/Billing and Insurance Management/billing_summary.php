@@ -1,19 +1,10 @@
 <?php
-include '../../SQL/config.php';
-require_once 'classincludes/billing_summary_class.php';
 
-// Add this class for dl_services
-class DLServices {
-    private $conn;
-    public function __construct($conn) {
-        $this->conn = $conn;
-    }
-    public function getAllServices() {
-        $query = "SELECT * FROM dl_services";
-        $result = $this->conn->query($query);
-        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-    }
-}
+session_start();
+include '../../SQL/config.php';
+
+// Include the class files
+require_once 'classincludes/billing_records_class.php';
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
@@ -37,10 +28,128 @@ if (!$user) {
     exit();
 }
 
-// Fetch all services
-$dlServices = new DLServices($conn);
-$services = $dlServices->getAllServices();
+class Patient
+{
+    public $conn;
+    public $appointmentsTable = "p_appointments";
+    public $patientTable = "patientinfo";
+
+    public function __construct($db)
+    {
+        $this->conn = $db;
+    }
+    public function getAllPatients()
+    {
+        $query = "
+        SELECT p., a.
+        FROM {$this->patientTable} p
+        INNER JOIN {$this->appointmentsTable} a 
+            ON p.patient_id = a.patient_id
+        WHERE a.purpose = 'laboratory'
+    ";
+        $result = $this->conn->query($query);
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+
+    public function getPatientById($id)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT p., a.
+            FROM {$this->patientTable} p
+            INNER JOIN {$this->appointmentsTable} a 
+                ON p.patient_id = a.patient_id
+            WHERE p.patient_id = ?
+        ");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_assoc();
+    }
+}
+class BillingRecords {
+
+    private $conn;
+
+    public function __construct($db) {
+        $this->conn = $db;
+
+    }
+
+
+    
+    /**
+     * Fetch all billing records with related dl_results and insurance_request
+     */
+      public function getBillingSummary($patientID) {
+        $query = "
+            SELECT 
+                p.patient_id,
+                p.fname,
+                p.discount,
+                ba.assigned_date,
+                ba.released_date,
+                dr.result AS diagnostic_results,
+                ir.insurance_type,
+                ir.insurance_covered,
+                br.status,
+                ds.price,
+                (ds.price - (p.discount + IFNULL(ir.insurance_covered,0))) AS out_of_pocket
+            FROM patientinfo p
+            JOIN p_bed_assignments ba ON p.patient_id = ba.patient_id
+            JOIN dl_results dr ON p.patient_id = dr.patientID
+            JOIN insurance_request ir ON p.patient_id = ir.patient_id
+            JOIN billing_records br ON p.patient_id = br.patient_id
+            JOIN dl_services ds ON dr.result = ds.servicename
+            WHERE p.patient_id = ?
+        ";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("i", $patientID);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+    
+    /**
+     * Fetch only dl_results for a given patient (optional, if needed separately)
+     */
+    public function getDLResults($patientID) {
+        try {
+            $query = "SELECT result FROM dl_results WHERE patientID = :patient_id";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':patient_id', $patientID, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Error fetching DL results: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Fetch insurance request details (optional, if needed separately)
+     */
+    public function getInsuranceRequest($patientID) {
+        try {
+            $query = "SELECT insurance_covered FROM insurance_request WHERE patientID = :patient_id";
+            $stmt = $this->conn->prepare($query);
+            $stmt->bindParam(':patient_id', $patientID, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Error fetching insurance request: " . $e->getMessage());
+            return null;
+        }
+    }
+
+}
+
+$services = new BillingRecords($conn);
+$getpatient = new Patient($conn);
+$patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
+$services = $services->getBillingSummary($patient_id);
+
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -145,9 +254,8 @@ $services = $dlServices->getAllServices();
                         <table class="table table-bordered table-hover" style="border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(44,62,80,0.08); background:#f8f6f0;">
                             <thead style="background-color:#f3f1eb;">
                                 <tr>
-                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Service Name</th>
+                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Particulars</th>
                                     <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Actual Charges</th>
-                                    <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">VAT</th>
                                     <th class="text-center" colspan="3" style="font-size:1.1rem;">Amount of Discount</th>
                                     <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Out of Pocket</th>
                                     <th class="text-center align-middle" rowspan="2" style="font-size:1.1rem;">Status</th>
@@ -162,15 +270,15 @@ $services = $dlServices->getAllServices();
                                 <?php if (!empty($services)): ?>
                                     <?php foreach ($services as $service): ?>
                                         <tr>
-                                            <td class="text-center align-middle"><?= htmlspecialchars($service['serviceName']) ?></td>
+                                            <td class="text-center align-middle"><?= htmlspecialchars($service['diagnostic_results']) ?></td>
                                             <td class="text-center align-middle"><?= isset($service['price']) ? htmlspecialchars($service['price']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['actual_charges']) ? htmlspecialchars($service['actual_charges']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['vat']) ? htmlspecialchars($service['vat']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['sc_pwd_discount']) ? htmlspecialchars($service['sc_pwd_discount']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['insurance_discount']) ? htmlspecialchars($service['insurance_discount']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['benefit_discount']) ? htmlspecialchars($service['benefit_discount']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['discount']) ? htmlspecialchars($service['discount']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['insurance_covered']) ? htmlspecialchars($service['insurance_covered']) : '-' ?></td>
+                                            <td class="text-center align-middle"><?= isset($service['insurance_type']) ? htmlspecialchars($service['insurance_type']) : '-' ?></td>
                                             <td class="text-center align-middle"><?= isset($service['out_of_pocket']) ? htmlspecialchars($service['out_of_pocket']) : '-' ?></td>
                                             <td class="text-center align-middle"><?= isset($service['status']) ? htmlspecialchars($service['status']) : '-' ?></td>
+                                           
+                                        
                                         </tr>
                                     <?php endforeach; ?>
                                 <?php else: ?>
