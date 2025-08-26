@@ -1,12 +1,11 @@
-/* billingandinsurance.css - Fixed Version */
-.billing-body {
+body {
     font-family: 'Segoe UI', Arial, sans-serif;
     background: #f7f9fa;
     margin: 0;
     padding: 0;
     min-height: 100vh;
+    /* Remove flex/grid from body */
 }
-
 .center-wrapper {
     width: 100vw;
     min-height: 100vh;
@@ -34,9 +33,8 @@
     left: 0;
     right: 0;
     height: 6px;
-    background: linear-gradient(to right, #1976d2, #42a5f5);
-}
 
+}
 h2 {
     color: #2d3e50;
     text-align: center;
@@ -54,7 +52,6 @@ h2::after {
     height: 4px;
     margin: 12px auto 0;
     border-radius: 2px;
-    background: linear-gradient(to right, #1976d2, #42a5f5);
 }
 
 .form-card {
@@ -207,175 +204,31 @@ h2::after {
     gap: 10px;
 }
 
-/* Billing Records Specific Styles */
-.action-buttons {
-    margin-bottom: 20px;
-    text-align: right;
-}
-
-.minimal-btn {
-    background: linear-gradient(90deg, #1976d2, #42a5f5);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
-    font-weight: 500;
-    text-decoration: none;
-    display: inline-block;
-    transition: all 0.3s ease;
-}
-
-.minimal-btn:hover {
-    background: linear-gradient(90deg, #1565c0, #1976d2);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3);
-    color: white;
-    text-decoration: none;
-}
-
-.alert-box {
-    padding: 14px 18px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-    font-size: 15px;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-}
-
-.alert-success {
-    background: #e8f5e9;
-    color: #388e3c;
-    border-left: 4px solid #388e3c;
-}
-
-.alert-info {
-    background: #e3f2fd;
-    color: #1565c0;
-    border-left: 4px solid #1565c0;
-}
-
-.alert-warning {
-    background: #fff3e0;
-    color: #f57c00;
-    border-left: 4px solid #f57c00;
-}
-
-/* Refined Billing Records Table Styling */
-.billing-records-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    background-color: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
-    overflow: hidden;
-    font-size: 15px;
-    margin-bottom: 30px;
-}
-
-.billing-records-table thead {
-    background: linear-gradient(to right, #1976d2, #42a5f5);
-    color: #ffffff;
-}
-
-.billing-records-table thead tr {
-    border-bottom: none;
-}
-
-.billing-records-table th, 
-.billing-records-table td {
-    padding: 16px 18px;
-    text-align: left;
-}
-
-.billing-records-table tbody tr {
-    border-bottom: 1px solid #f0f0f0;
-    transition: background 0.2s ease-in-out;
-}
-
-.billing-records-table tbody tr:nth-child(even) {
-    background-color: #f9fbfd;
-}
-
-.billing-records-table tbody tr:hover {
-    background-color: #e3f2fd;
-}
-
-.billing-records-table td {
-    color: #2c3e50;
-}
-
-.billing-records-table td a.minimal-btn {
-    background-color: #1976d2;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 14px;
-    font-weight: 500;
-    text-decoration: none;
-    transition: background-color 0.3s ease;
-}
-
-.billing-records-table td a.minimal-btn:hover {
-    background-color: #125ea3;
-}
-
-/* Status Badges */
-.minimal-badge {
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 600;
-    display: inline-block;
-}
-
-.minimal-badge.bg-success {
-    background-color: #e6f4ea;
-    color: #2e7d32;
-}
-
-.minimal-badge.bg-warning {
-    background-color: #fff3cd;
-    color: #856404;
-}
-
-.minimal-badge.bg-info {
-    background-color: #d1ecf1;
-    color: #0c5460;
-}
-
-.minimal-badge.bg-secondary {
-    background-color: #e2e3e5;
-    color: #383d41;
-}
-
-/* Responsive Behavior */
-@media (max-width: 768px) {
-    .billing-records-table {
-        font-size: 14px;
-        display: block;
-        overflow-x: auto;
-    }
-
-    .billing-records-table th,
-    .billing-records-table td {
-        padding: 12px;
-    }
-
-    .billing-records-table td a.minimal-btn {
-        font-size: 13px;
-        padding: 5px 10px;
-    }
-    
+/* Responsive adjustments */
+@media (max-width: 600px) {
     .container {
-        padding: 20px 15px;
+        padding: 30px 25px;
+        border-radius: 14px;
     }
     
-    .action-buttons {
-        text-align: center;
+    h2 {
+        font-size: 24px;
+        margin-bottom: 28px;
+    }
+    
+    .form-card {
+        padding: 20px;
+    }
+    
+    .form-card input[type="number"],
+    .form-card input[type="text"],
+    .form-card select,
+    .form-card textarea {
+        padding: 12px 14px;
+    }
+    
+    .logs-link {
+        padding: 10px 16px;
     }
 }
 
@@ -394,3 +247,103 @@ h2::after {
 .form-group:nth-child(3) { animation-delay: 0.3s; }
 .form-group:nth-child(4) { animation-delay: 0.4s; }
 .form-group:nth-child(5) { animation-delay: 0.5s; }
+.hospital-billing-table h3 {
+    color: #1976d2;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 18px;
+    text-align: left;
+    letter-spacing: 1px;
+}
+.hospital-billing-table table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 8px rgba(33, 150, 243, 0.07);
+}
+.hospital-billing-table th, .hospital-billing-table td {
+    padding: 14px 12px;
+    font-size: 15px;
+    border-bottom: 1px solid #e3eaf1;
+}
+
+.hospital-billing-table tr:nth-child(even) td {
+    background: #f4f8fb;
+}
+.hospital-billing-table tr:hover td {
+    background: #e3f0fc;
+    transition: background 0.2s;
+}
+.hospital-billing-table td {
+    color: #2d3e50;
+    vertical-align: middle;
+}
+.hospital-billing-table td:last-child {
+    text-align: center;
+}
+.hospital-billing-table a {
+    font-weight: 600;
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+}
+.hospital-billing-table a[style*="green"] {
+    background: #e8f5e9;
+    color: #388e3c !important;
+}
+.hospital-billing-table a[style*="red"] {
+    background: #ffebee;
+    color: #c62828 !important;
+}
+.hospital-billing-table span[style*="gray"] {
+    color: #888 !important;
+    font-style: italic;
+}
+@media (max-width: 900px) {
+    .container { padding: 10px; }
+    .form-card { padding: 12px; }
+    th, td { font-size: 13px; }
+}
+@media (max-width: 700px) {
+    .hospital-billing-table table, .hospital-billing-table thead, .hospital-billing-table tbody, .hospital-billing-table th, .hospital-billing-table td, .hospital-billing-table tr {
+        display: block;
+    }
+    .hospital-billing-table th {
+        position: absolute;
+        left: -9999px;
+    }
+    .hospital-billing-table tr {
+        margin-bottom: 18px;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(33, 150, 243, 0.07);
+        background: #fff;
+    }
+    .hospital-billing-table td {
+        border: none;
+        position: relative;
+        padding-left: 52%;
+        min-height: 38px;
+        font-size: 15px;
+    }
+    .hospital-billing-table td:before {
+        position: absolute;
+        left: 12px;
+        width: 45%;
+        white-space: nowrap;
+        font-weight: bold;
+        color: #1976d2;
+        font-size: 14px;
+    }
+    .hospital-billing-table td:nth-of-type(1):before { content: "ID"; }
+    .hospital-billing-table td:nth-of-type(2):before { content: "Patient ID"; }
+    .hospital-billing-table td:nth-of-type(3):before { content: "Billing ID"; }
+    .hospital-billing-table td:nth-of-type(4):before { content: "Insurance Type"; }
+    .hospital-billing-table td:nth-of-type(5):before { content: "Notes"; }
+    .hospital-billing-table td:nth-of-type(6):before { content: "Status"; }
+    .hospital-billing-table td:nth-of-type(7):before { content: "Action"; }
+}
+

@@ -1,0 +1,197 @@
+/* Billing Records Specific Styles */
+.action-buttons {
+    margin-bottom: 20px;
+    text-align: right;
+}
+
+.minimal-btn {
+    background: linear-gradient(90deg, #1976d2, #42a5f5);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.minimal-btn:hover {
+    background: linear-gradient(90deg, #1565c0, #1976d2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(25, 118, 210, 0.3);
+    color: white;
+    text-decoration: none;
+}
+
+.alert-box {
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-size: 15px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.alert-success {
+    background: #e8f5e9;
+    color: #388e3c;
+    border-left: 4px solid #388e3c;
+}
+
+.alert-info {
+    background: #e3f2fd;
+    color: #1565c0;
+
+}
+
+.alert-warning {
+    background: #fff3e0;
+    color: #f57c00;
+    border-left: 4px solid #f57c00;
+}
+
+/* Refined Billing Records Table Styling */
+.billing-records-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    font-size: 15px;
+    margin-bottom: 30px;
+}
+
+.billing-records-table thead {
+    background: linear-gradient(to right, #1976d2, #42a5f5);
+    color: #ffffff;
+}
+
+.billing-records-table thead th {
+    
+    background: linear-gradient(90deg, #1976d2 80%, #42a5f5 100%);
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    border-bottom: 2px solid #1565c0;
+    letter-spacing: 0.5px;
+
+}
+.billing-records-table thead tr {
+    border-bottom: none;
+}
+
+.billing-records-table th, 
+.billing-records-table td {
+    padding: 16px 18px;
+    text-align: left;
+}
+
+.billing-records-table tbody tr {
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.2s ease-in-out;
+}
+
+.billing-records-table tbody tr:nth-child(even) {
+    background-color: #f9fbfd;
+}
+
+.billing-records-table tbody tr:hover {
+    background-color: #e3f2fd;
+}
+
+.billing-records-table td {
+    color: #2c3e50;
+}
+
+.billing-records-table td a.minimal-btn {
+    background-color: #1976d2;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+}
+
+.billing-records-table td a.minimal-btn:hover {
+    background-color: #125ea3;
+}
+
+/* Status Badges */
+.minimal-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.minimal-badge.bg-success {
+    background-color: #e6f4ea;
+    color: #2e7d32;
+}
+
+.minimal-badge.bg-warning {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.minimal-badge.bg-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.minimal-badge.bg-secondary {
+    background-color: #e2e3e5;
+    color: #383d41;
+}
+
+/* Responsive Behavior */
+@media (max-width: 768px) {
+    .billing-records-table {
+        font-size: 14px;
+        display: block;
+        overflow-x: auto;
+    }
+
+    .billing-records-table th,
+    .billing-records-table td {
+        padding: 12px;
+    }
+
+    .billing-records-table td a.minimal-btn {
+        font-size: 13px;
+        padding: 5px 10px;
+    }
+    
+    .container {
+        padding: 20px 15px;
+    }
+    
+    .action-buttons {
+        text-align: center;
+    }
+}
+
+/* Animation for form elements */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.form-group {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+.form-group:nth-child(1) { animation-delay: 0.1s; }
+.form-group:nth-child(2) { animation-delay: 0.2s; }
+.form-group:nth-child(3) { animation-delay: 0.3s; }
+.form-group:nth-child(4) { animation-delay: 0.4s; }
+.form-group:nth-child(5) { animation-delay: 0.5s; }
