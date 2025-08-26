@@ -341,7 +341,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['employee_id'], $_POST
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid calendar-container">
+            <div class="container-fluid">
                 <h2 class="mb-4 text-primary fw-bold">Doctor Shift Scheduling</h2>
                 <div class="card shadow-sm rounded mb-4">
                     <div class="card-body bg-white rounded">
