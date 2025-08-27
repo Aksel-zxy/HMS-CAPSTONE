@@ -11,7 +11,6 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// Fetch user details from database
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
@@ -23,6 +22,35 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+$query = "SELECT s.scheduleID, s.patientID, s.scheduleDate, s.scheduleTime,
+                 s.serviceName,
+                 p.fname, p.lname
+          FROM dl_schedule s
+          JOIN patientinfo p ON s.patientID = p.patient_id
+          WHERE s.employee_id = ?
+            AND NOT EXISTS (
+                SELECT 1 FROM dl_lab_cbc lp 
+                WHERE lp.scheduleID = s.scheduleID
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM dl_lab_xray lx
+                WHERE lx.scheduleID = s.scheduleID
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM dl_lab_mri lm
+                WHERE lm.scheduleID = s.scheduleID
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM dl_lab_ct lc
+                WHERE lc.scheduleID = s.scheduleID
+            )
+          ORDER BY s.scheduleDate ASC, s.scheduleTime ASC";
+
+$stmt = $conn->prepare($query);
+$stmt->bind_param("i", $_SESSION['employee_id']);
+$stmt->execute();
+$result = $stmt->get_result();
 ?>
 
 <!DOCTYPE html>
@@ -49,7 +77,7 @@ if (!$user) {
             <div class="menu-title">Navigation</div>
 
             <!----- Sidebar Navigation ----->
-        
+
             <li class="sidebar-item">
                 <a href="user_lab.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -65,7 +93,7 @@ if (!$user) {
                 <a href="sample_processing.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-virus" viewBox="0 0 16 16">
-                    <path d="M8 0a1 1 0 0 1 1 1v1.402c0 .511.677.693.933.25l.7-1.214a1 1 0 0 1 1.733 1l-.701 1.214c-.256.443.24.939.683.683l1.214-.701a1 1 0 0 1 1 1.732l-1.214.701c-.443.256-.262.933.25.933H15a1 1 0 1 1 0 2h-1.402c-.512 0-.693.677-.25.933l1.214.701a1 1 0 1 1-1 1.732l-1.214-.7c-.443-.257-.939.24-.683.682l.701 1.214a1 1 0 1 1-1.732 1l-.701-1.214c-.256-.443-.933-.262-.933.25V15a1 1 0 1 1-2 0v-1.402c0-.512-.677-.693-.933-.25l-.701 1.214a1 1 0 0 1-1.732-1l.7-1.214c.257-.443-.24-.939-.682-.683l-1.214.701a1 1 0 1 1-1-1.732l1.214-.701c.443-.256.261-.933-.25-.933H1a1 1 0 1 1 0-2h1.402c.511 0 .693-.677.25-.933l-1.214-.701a1 1 0 1 1 1-1.732l1.214.701c.443.256.939-.24.683-.683l-.701-1.214a1 1 0 0 1 1.732-1l.701 1.214c.256.443.933.261.933-.25V1a1 1 0 0 1 1-1m2 5a1 1 0 1 0-2 0 1 1 0 0 0 2 0M6 7a1 1 0 1 0-2 0 1 1 0 0 0 2 0m1 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m5-3a1 1 0 1 0-2 0 1 1 0 0 0 2 0"/>
+                        <path d="M8 0a1 1 0 0 1 1 1v1.402c0 .511.677.693.933.25l.7-1.214a1 1 0 0 1 1.733 1l-.701 1.214c-.256.443.24.939.683.683l1.214-.701a1 1 0 0 1 1 1.732l-1.214.701c-.443.256-.262.933.25.933H15a1 1 0 1 1 0 2h-1.402c-.512 0-.693.677-.25.933l1.214.701a1 1 0 1 1-1 1.732l-1.214-.7c-.443-.257-.939.24-.683.682l.701 1.214a1 1 0 1 1-1.732 1l-.701-1.214c-.256-.443-.933-.262-.933.25V15a1 1 0 1 1-2 0v-1.402c0-.512-.677-.693-.933-.25l-.701 1.214a1 1 0 0 1-1.732-1l.7-1.214c.257-.443-.24-.939-.682-.683l-1.214.701a1 1 0 1 1-1-1.732l1.214-.701c.443-.256.261-.933-.25-.933H1a1 1 0 1 1 0-2h1.402c.511 0 .693-.677.25-.933l-1.214-.701a1 1 0 1 1 1-1.732l1.214.701c.443.256.939-.24.683-.683l-.701-1.214a1 1 0 0 1 1.732-1l.701 1.214c.256.443.933.261.933-.25V1a1 1 0 0 1 1-1m2 5a1 1 0 1 0-2 0 1 1 0 0 0 2 0M6 7a1 1 0 1 0-2 0 1 1 0 0 0 2 0m1 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m5-3a1 1 0 1 0-2 0 1 1 0 0 0 2 0" />
                     </svg>
                     <span style="font-size: 18px;">Sample Process</span>
                 </a>
@@ -106,9 +134,38 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1>BASAHIN PO YUNG MGA COMMENT SA CODE PARA DI MALIGAW</h1> <br>
-                <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
-                <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
+                <h3>Scheduled Patients</h3>
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Schedule ID</th>
+                            <th>Patient ID</th>
+                            <th>Patient Name</th>
+                            <th>Test Type</th>
+                            <th>Schedule Date</th>
+                            <th>Schedule Time</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while ($row = $result->fetch_assoc()): ?>
+                            <tr>
+                                <td><?= $row['scheduleID'] ?></td>
+                                <td><?= $row['patientID'] ?></td>
+                                <td><?= $row['fname'] . ' ' . $row['lname'] ?></td>
+                                <td><?= $row['serviceName'] ?></td>
+                                <td><?= $row['scheduleDate'] ?></td>
+                                <td><?= $row['scheduleTime'] ?></td>
+                                <td>
+                                    <a href="process_sample.php?scheduleID=<?= $row['scheduleID'] ?>&serviceName=<?= urlencode($row['serviceName']) ?>"
+                                        class="btn btn-sm btn-primary">
+                                        Process
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
             </div>
             <!-- END CODING HERE -->
         </div>

@@ -11,7 +11,6 @@ class Login
         $this->conn = $conn;
         $this->error = '';
     }
-
     public function authenticate()
     {
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -23,7 +22,6 @@ class Login
             }
         }
     }
-
     private function validateInputs($username, $password)
     {
         if (empty($username) || empty($password)) {
@@ -32,10 +30,8 @@ class Login
         }
         return true;
     }
-
     private function loginUser($username, $password)
     {
-        // 1️⃣ Check hr_employees table
         $stmt = $this->conn->prepare("SELECT * FROM hr_employees WHERE username = ?");
         $stmt->bind_param("s", $username);
         $stmt->execute();
@@ -46,8 +42,6 @@ class Login
             $this->processEmployeeLogin($employee, $password);
             return;
         }
-
-        // 2️⃣ Check patient_user table
         $stmt = $this->conn->prepare("SELECT * FROM patient_user WHERE username = ?");
         $stmt->bind_param("s", $username);
         $stmt->execute();
@@ -58,8 +52,6 @@ class Login
             $this->processPatientLogin($patient, $password);
             return;
         }
-
-        // 3️⃣ Check user table (general users with roles)
         $stmt = $this->conn->prepare("SELECT * FROM users WHERE username = ?");
         $stmt->bind_param("s", $username);
         $stmt->execute();
@@ -70,14 +62,11 @@ class Login
             $this->processUserLogin($user, $password);
             return;
         }
-
-        // If not found in any table
         $this->error = "User not found.";
     }
-
     private function processUserLogin($user, $password)
     {
-        if ($password === $user['password']) { // ⚠️ Replace with password_verify() if hashed
+        if ($password === $user['password']) {
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['role'] = $user['role'];
@@ -93,13 +82,11 @@ class Login
                 case '7': $_SESSION['inventory'] = true; break;
                 case '8': $_SESSION['report'] = true; break;
             }
-
             $this->redirectBasedOnRole($user['role']);
         } else {
             $this->error = "Incorrect password.";
         }
     }
-
     private function processEmployeeLogin($employee, $password)
     {
         if ($password === $employee['password']) {
@@ -132,7 +119,6 @@ class Login
             $this->error = "Incorrect password.";
         }
     }
-
     private function processPatientLogin($patient, $password)
     {
         if ($password === $patient['password']) {
@@ -140,14 +126,12 @@ class Login
             $_SESSION['username'] = $patient['username'];
             $_SESSION['profession'] = 'patient';
 
-            // Redirect patient to their dashboard
             header("Location: Patient Management/user_panel/user_patient.php");
             exit();
         } else {
             $this->error = "Incorrect password.";
         }
     }
-
     private function redirectBasedOnRole($role)
     {
         switch ($role) {
@@ -164,12 +148,10 @@ class Login
         }
         exit;
     }
-
     public function getError()
     {
         return $this->error;
     }
 }
-
 $login = new Login($conn);
 $login->authenticate();
