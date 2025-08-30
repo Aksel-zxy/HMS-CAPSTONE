@@ -267,21 +267,21 @@ $user = $result->fetch_assoc();
                                 <td style="text-align:center;">
                                     <a class="btn btn-sm"
                                         href="../Patient Management/iview.php?patient_id=<?= $row['patient_id'] ?>"
-                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#337ab7; cursor:pointer;">
                                         View
                                     </a>
                                 </td>
                                 <td style="text-align:center;">
                                     <a class="btn btn-sm"
                                         href="../Patient Management/iupdate.php?patient_id=<?= $row['patient_id'] ?>"
-                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#337ab7; cursor:pointer;">
                                         Edit
                                     </a>
                                 </td>
                                 <td style="text-align:center;">
                                     <a class="btn btn-sm"
                                         href="../Patient Management/admit.php?patient_id=<?= $row['patient_id'] ?>"
-                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#337ab7; cursor:pointer;">
                                         Admit
                                     </a>
                                 </td>
