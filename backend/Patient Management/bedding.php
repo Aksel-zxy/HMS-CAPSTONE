@@ -2,7 +2,7 @@
 include '../../SQL/config.php';
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: login.php'); 
     exit();
 }
 
@@ -22,6 +22,15 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+// ✅ Fetch all rooms & beds from p_beds
+$rooms_query = "SELECT room_number, bed_number, status FROM p_beds ORDER BY room_number, bed_number";
+$rooms_result = $conn->query($rooms_query);
+
+$rooms = [];
+while ($row = $rooms_result->fetch_assoc()) {
+    $rooms[$row['room_number']][] = $row; 
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,7 +44,6 @@ if (!$user) {
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-
 </head>
 
 <body>
@@ -196,65 +204,21 @@ if (!$user) {
                 <h1 class="mb-4 text-center text-primary">Room Layout Overview</h1>
                 <div class="row gy-4 justify-content-center">
 
-                    <!-- Room 102 -->
+                    <?php foreach ($rooms as $room_number => $beds): ?>
                     <div class="col-12 col-md-5 col-lg-4">
                         <div class="room-card text-center">
                             <div class="seats">
-                                <div class="seat" title="Seat 1"></div>
-                                <div class="seat" title="Seat 2"></div>
-                                <div class="seat" title="Seat 3"></div>
-                                <div class="room-header">Room 101</div>
-                                <div class="seat" title="Seat 4"></div>
-                                <div class="seat" title="Seat 5"></div>
-                                <div class="seat" title="Seat 6"></div>
+                                <?php foreach ($beds as $bed): ?>
+                                <div class="seat 
+                                <?php echo ($bed['status'] == 'Occupied') ? 'Occupied' : 'Available'; ?>"
+                                    title="Seat <?php echo $bed['bed_number']; ?>">
+                                </div>
+                                <?php endforeach; ?>
+                                <div class="room-header">Room <?php echo $room_number; ?></div>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Room 104 -->
-                    <div class="col-12 col-md-5 col-lg-4">
-                        <div class="room-card text-center">
-                            <div class="seats">
-                                <div class="seat" title="Seat 1"></div>
-                                <div class="seat" title="Seat 2"></div>
-                                <div class="seat" title="Seat 3"></div>
-                                <div class="room-header">Room 102</div>
-                                <div class="seat" title="Seat 4"></div>
-                                <div class="seat" title="Seat 5"></div>
-                                <div class="seat" title="Seat 6"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Room 101 -->
-                    <div class="col-12 col-md-5 col-lg-4">
-                        <div class="room-card text-center">
-                            <div class="seats">
-                                <div class="seat" title="Seat 1"></div>
-                                <div class="seat" title="Seat 2"></div>
-                                <div class="seat" title="Seat 3"></div>
-                                <div class="room-header">Room 103</div>
-                                <div class="seat" title="Seat 4"></div>
-                                <div class="seat" title="Seat 5"></div>
-                                <div class="seat" title="Seat 6"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Room 103 -->
-                    <div class="col-12 col-md-5 col-lg-4">
-                        <div class="room-card text-center">
-                            <div class="seats">
-                                <div class="seat" title="Seat 1"></div>
-                                <div class="seat" title="Seat 2"></div>
-                                <div class="seat" title="Seat 3"></div>
-                                <div class="room-header">Room 104</div>
-                                <div class="seat" title="Seat 4"></div>
-                                <div class="seat" title="Seat 5"></div>
-                                <div class="seat" title="Seat 6"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <?php endforeach; ?>
 
                 </div>
             </div>
