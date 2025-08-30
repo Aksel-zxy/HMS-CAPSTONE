@@ -38,15 +38,16 @@ class Patient
     {
         $this->conn = $db;
     }
+    
     public function getAllPatients()
     {
         $query = "
-        SELECT p., a.
+        SELECT p.*, a.*
         FROM {$this->patientTable} p
         INNER JOIN {$this->appointmentsTable} a 
             ON p.patient_id = a.patient_id
         WHERE a.purpose = 'laboratory'
-    ";
+        ";
         $result = $this->conn->query($query);
         return $result->fetch_all(MYSQLI_ASSOC);
     }
@@ -54,7 +55,7 @@ class Patient
     public function getPatientById($id)
     {
         $stmt = $this->conn->prepare("
-            SELECT p., a.
+            SELECT p.*, a.*
             FROM {$this->patientTable} p
             INNER JOIN {$this->appointmentsTable} a 
                 ON p.patient_id = a.patient_id
@@ -66,90 +67,83 @@ class Patient
         return $result->fetch_assoc();
     }
 }
-class BillingRecords {
 
+class BillingRecords {
     private $conn;
 
     public function __construct($db) {
         $this->conn = $db;
-
     }
-
-
     
     /**
      * Fetch all billing records with related dl_results and insurance_request
      */
-      public function getBillingSummary($patientID) {
-        $query = "
-            SELECT 
-                p.patient_id,
-                p.fname,
-                p.discount,
-                ba.assigned_date,
-                ba.released_date,
-                dr.result AS diagnostic_results,
-                ir.insurance_type,
-                ir.insurance_covered,
-                br.status,
-                ds.price,
-                (ds.price - (p.discount + IFNULL(ir.insurance_covered,0))) AS out_of_pocket
-            FROM patientinfo p
-            JOIN p_bed_assignments ba ON p.patient_id = ba.patient_id
-            JOIN dl_results dr ON p.patient_id = dr.patientID
-            JOIN insurance_request ir ON p.patient_id = ir.patient_id
-            JOIN billing_records br ON p.patient_id = br.patient_id
-            JOIN dl_services ds ON dr.result = ds.servicename
-            WHERE p.patient_id = ?
-        ";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $patientID);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        return $result->fetch_all(MYSQLI_ASSOC);
-    }
+    public function getBillingSummary($patientID) {
+    $query = "
+        SELECT 
+            p.patient_id,
+            CONCAT(p.fname, ' ', COALESCE(p.mname, ''), ' ', p.lname) AS full_name,
+            p.phone_number,
+            p.address,
+            p.discount,
+            ba.assigned_date,
+            ba.released_date,
+            dr.result AS diagnostic_results,
+            ir.insurance_type,
+            ir.insurance_covered,
+            br.status,
+            ds.price,
+            (ds.price - (COALESCE(p.discount, 0) + COALESCE(ir.insurance_covered, 0))) AS out_of_pocket
+        FROM patientinfo p
+        LEFT JOIN p_bed_assignments ba ON p.patient_id = ba.patient_id
+        LEFT JOIN dl_results dr ON p.patient_id = dr.patientID
+        LEFT JOIN insurance_request ir ON p.patient_id = ir.patient_id
+        LEFT JOIN billing_records br ON p.patient_id = br.patient_id
+        LEFT JOIN dl_services ds ON dr.result = ds.servicename
+        WHERE p.patient_id = ?
+    ";
     
-    /**
-     * Fetch only dl_results for a given patient (optional, if needed separately)
-     */
-    public function getDLResults($patientID) {
-        try {
-            $query = "SELECT result FROM dl_results WHERE patientID = :patient_id";
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':patient_id', $patientID, PDO::PARAM_INT);
-            $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {
-            error_log("Error fetching DL results: " . $e->getMessage());
-            return [];
-        }
-    }
-
-    /**
-     * Fetch insurance request details (optional, if needed separately)
-     */
-    public function getInsuranceRequest($patientID) {
-        try {
-            $query = "SELECT insurance_covered FROM insurance_request WHERE patientID = :patient_id";
-            $stmt = $this->conn->prepare($query);
-            $stmt->bindParam(':patient_id', $patientID, PDO::PARAM_INT);
-            $stmt->execute();
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {
-            error_log("Error fetching insurance request: " . $e->getMessage());
-            return null;
-        }
-    }
-
+    $stmt = $this->conn->prepare($query);
+    $stmt->bind_param("i", $patientID);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_all(MYSQLI_ASSOC);
 }
 
-$services = new BillingRecords($conn);
+    
+    /**
+     * Get all patients with laboratory appointments for selection
+     */
+    public function getLabPatients() {
+        $query = "
+            SELECT DISTINCT p.patient_id, p.fname, p.lname 
+            FROM patientinfo p
+            INNER JOIN p_appointments a ON p.patient_id = a.patient_id
+            WHERE a.purpose = 'laboratory'
+        ";
+        $result = $this->conn->query($query);
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+}
+
+$billing = new BillingRecords($conn);
 $getpatient = new Patient($conn);
+
+// Get patient ID from URL or form
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
-$services = $services->getBillingSummary($patient_id);
+
+// Get all lab patients for the dropdown
+$patients = $billing->getLabPatients();
+
+// Get billing summary if a patient is selected
+$services = [];
+$selected_patient = null;
+if ($patient_id > 0) {
+    $services = $billing->getBillingSummary($patient_id);
+    $selected_patient = $getpatient->getPatientById($patient_id);
+}
 
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -158,8 +152,10 @@ $services = $services->getBillingSummary($patient_id);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Billing and Insurance Management</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../assets/CSS/billing_summary.css">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
+
 </head>
 
 <body>
@@ -247,7 +243,44 @@ $services = $services->getBillingSummary($patient_id);
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem;">Summary of Fees</h1>
+                            <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem;">
+                Summary of Fees
+            </h1>
+
+            <h2>Patient Name: 
+    <?php 
+        if (!empty($selected_patient)) {
+            $fullName = $selected_patient['fname'] . ' ' . 
+                        (!empty($selected_patient['mname']) ? $selected_patient['mname'] . ' ' : '') . 
+                        $selected_patient['lname'];
+            echo htmlspecialchars($fullName);
+        } else {
+            echo "N/A";
+        }
+    ?>
+</h2>
+
+<h2>Contact Number: 
+    <?php 
+        if (!empty($selected_patient['phone_number'])) {
+            echo htmlspecialchars($selected_patient['phone_number']);
+        } else {
+            echo "N/A";
+        }
+    ?>
+</h2>
+
+<h2>Address: 
+    <?php 
+        if (!empty($selected_patient['address'])) {
+            echo htmlspecialchars($selected_patient['address']);
+        } else {
+            echo "N/A";
+        }
+    ?>
+</h2>
+
+
 
                 <div class="row">
                     <div class="col-md-12">
@@ -307,4 +340,4 @@ $services = $services->getBillingSummary($patient_id);
     <script src="assets/Bootstrap/jq.js"></script>
 </body>
 
-</html>
+</html> 
