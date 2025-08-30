@@ -1,6 +1,11 @@
-body {
-  background: #f8f9fa;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+.seat {
+  width: 60px;
+  height: 90px;
+  background: linear-gradient(145deg, #e9ecef, #dee2e6);
+  border-radius: 0.4rem;
+  box-shadow: inset 3px 3px 5px #c1c7cd, inset -3px -3px 5px white;
+  position: relative;
+  overflow: hidden; /* So overlay doesn’t spill out */
 }
 
 .room-card {
@@ -18,16 +23,6 @@ body {
   justify-items: center;
   align-items: center;
 }
-
-.seat {
-  width: 60px;
-  height: 90px;
-  background: linear-gradient(145deg, #e9ecef, #dee2e6);
-  border-radius: 0.4rem;
-  box-shadow: inset 3px 3px 5px #c1c7cd, inset -3px -3px 5px white;
-  position: relative;
-}
-
 .seat::before {
   content: "";
   position: absolute;
@@ -38,6 +33,23 @@ body {
   background: #adb5bd;
   border-radius: 0.2rem;
   box-shadow: inset 2px 2px 4px #6c757d;
+}
+
+/* ✅ Status overlay instead of replacing */
+.seat.Available::after,
+.seat.Occupied::after {
+  content: "";
+  position: absolute;
+  inset: 0; /* full cover */
+  opacity: 0.4; /* semi-transparent overlay */
+}
+
+.seat.Available::after {
+  background-color: #28a745; /* green overlay */
+}
+
+.seat.Occupied::after {
+  background-color: #dc3545; /* red overlay */
 }
 
 .room-header {

@@ -62,7 +62,6 @@ $records = $billing->getAllBillingRecords();
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/billingrecord.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-   
 </head>
 
 <body>
@@ -77,13 +76,12 @@ $records = $billing->getAllBillingRecords();
             <div class="menu-title">Navigation</div>
 
             <!----- Sidebar Navigation ----->
-        
             <li class="sidebar-item">
                 <a href="billing_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a.5.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
                     <span style="font-size: 18px;">Dashboard</span>
                 </a>
@@ -94,10 +92,8 @@ $records = $billing->getAllBillingRecords();
                     aria-expanded="true" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
                         viewBox="0 0 16 16" style="margin-bottom: 6px;">
-                        <path
-                            d="M5 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4m4-2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5M9 8a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4A.5.5 0 0 1 9 8m1 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5" />
-                        <path
-                            d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
+                        <path d="M5 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4m4-2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5M9 8a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4A.5.5 0 0 1 9 8m1 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5" />
+                        <path d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
                     </svg>
                     <span style="font-size: 18px;">Billing Management</span>
                 </a>
@@ -114,12 +110,12 @@ $records = $billing->getAllBillingRecords();
                     </li>
                 </ul>
 
-                 <li class="sidebar-item">
+                <li class="sidebar-item">
                 <a href="insurance_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a.5.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
                     <span style="font-size: 18px;">Insurance Request</span>
                 </a>
@@ -141,7 +137,7 @@ $records = $billing->getAllBillingRecords();
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -155,7 +151,6 @@ $records = $billing->getAllBillingRecords();
                                 </a>
                             </li>
                         </ul>
-
                     </div>
                 </div>
             </div>
@@ -164,13 +159,11 @@ $records = $billing->getAllBillingRecords();
                 <h1 class="text-center" style="font-size:2.3rem; font-weight:700; letter-spacing:1px; margin-bottom:1.5rem; color:#2c3e50;">Billing Records</h1>
                 
                 <?php
-                // Display messages if any
                 if (isset($message)) {
                     $alert_class = $message_type == 'success' ? 'alert-success' : ($message_type == 'info' ? 'alert-info' : 'alert-warning');
                     echo "<div class='alert-box $alert_class'>$message</div>";
                 }
                 
-                // Check if there are patients without billing records
                 if ($patientsWithoutBillingCount > 0) {
                     echo '<div class="alert alert-warning">';
                     echo 'There are ' . $patientsWithoutBillingCount . ' patients without billing records. ';
@@ -213,16 +206,13 @@ $records = $billing->getAllBillingRecords();
                                             echo "<td>" . (isset($row['billing_date']) ? $row['billing_date'] : 'N/A') . "</td>";
                                             echo "<td>₱" . (isset($row['total_amount']) ? number_format($row['total_amount'], 2) : '0.00') . "</td>";
                                             
-                                            // Insurance covered amount (from insurance_request table)
                                             $insurance_covered = isset($row['insurance_covered_amount']) ? $row['insurance_covered_amount'] : 0;
                                             echo "<td>₱" . number_format($insurance_covered, 2) . "</td>";
                                             
-                                            // Out of pocket calculation
                                             $total_amount = isset($row['total_amount']) ? $row['total_amount'] : 0;
                                             $out_of_pocket = max(0, $total_amount - $insurance_covered);
                                             echo "<td>₱" . number_format($out_of_pocket, 2) . "</td>";
                                             
-                                            // Billing status
                                             $badgeClass = 'minimal-badge ';
                                             $status = isset($row['status']) ? $row['status'] : 'pending';
                                             switch($status) {
@@ -242,8 +232,7 @@ $records = $billing->getAllBillingRecords();
                                             echo "<td><span class='" . $badgeClass . "'>" . $status . "</span></td>";
                                             echo "<td>" . (isset($row['payment_method']) ? $row['payment_method'] : 'N/A') . "</td>";
                                             echo "<td>" . (isset($row['transaction_id']) ? $row['transaction_id'] : 'N/A') . "</td>";
-                                          echo "<td><a href='billing_summary.php?patient_id=" . (isset($row['patient_id']) ? $row['patient_id'] : '') . "' class='minimal-btn'>Generate Receipt</a></td>";
-
+                                            echo "<td><a href='billing_summary.php?patient_id=" . (isset($row['patient_id']) ? $row['patient_id'] : '') . "' class='minimal-btn'>Generate Receipt</a></td>";
                                             echo "</tr>";
                                         }
                                     } else {
@@ -271,5 +260,4 @@ $records = $billing->getAllBillingRecords();
     <script src="assets/Bootstrap/fontawesome.min.js"></script>
     <script src="assets/Bootstrap/jq.js"></script>
 </body>
-
 </html>

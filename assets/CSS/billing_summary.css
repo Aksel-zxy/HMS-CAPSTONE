@@ -1,0 +1,75 @@
+.container-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        }
+        .page-header {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eae7de;
+        }
+        .table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .table thead th {
+            background-color: #f3f1eb;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(243, 241, 235, 0.5);
+        }
+        .status-paid {
+            color: #28a745;
+            font-weight: 600;
+        }
+        .status-pending {
+            color: #ffc107;
+            font-weight: 600;
+        }
+        .status-unpaid {
+            color: #dc3545;
+            font-weight: 600;
+        }
+        .discount-badge {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        .footer-note {
+            background-color: #f8f6f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 25px;
+            font-size: 0.9rem;
+            color: #5a5a5a;
+        }
+        .print-btn {
+            background-color: #5a6b7c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        .print-btn:hover {
+            background-color: #4a5967;
+            transform: translateY(-2px);
+        }
+        @media (max-width: 768px) {
+            .table-responsive {
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            .container-wrapper {
+                padding: 15px;
+            }
+        }
