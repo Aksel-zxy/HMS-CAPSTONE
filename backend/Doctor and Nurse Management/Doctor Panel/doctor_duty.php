@@ -1,5 +1,7 @@
 <?php
 include '../../../SQL/config.php';
+require '../../Pharmacy Management/classes/Prescription.php';
+require '../../Pharmacy Management/classes/Medicine.php';
 
 class DoctorDashboard {
     public $conn;
@@ -149,6 +151,46 @@ if ($duty_res && $duty_res->num_rows > 0) {
         $duties[] = $row;
     }
 }
+
+
+
+
+$medicineObj = new Medicine($conn);
+$medicines = $medicineObj->getAllMedicines();
+
+$query = "SELECT * FROM users WHERE user_id = ?";
+$stmt = $conn->prepare($query);
+$stmt->bind_param("i", $_SESSION['user_id']);
+$stmt->execute();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
+
+if (!$user) {
+    echo "No user found.";
+    exit();
+}
+
+$prescription = new Prescription($conn);
+$doctors = $prescription->getDoctors();
+$patients = $prescription->getPatients();
+// $medicines = $prescription->getMedicines();
+
+$doctors = [];
+$result_doc = $prescription->getDoctors();
+if ($result_doc && $result_doc->num_rows > 0) {
+    while ($row = $result_doc->fetch_assoc()) {
+        $doctors[] = $row;
+    }
+}
+
+
+$patients = [];
+$result_pat = $prescription->getPatients();
+if ($result_pat && $result_pat->num_rows > 0) {
+    while ($row = $result_pat->fetch_assoc()) {
+        $patients[] = $row;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -160,37 +202,7 @@ if ($duty_res && $duty_res->num_rows > 0) {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="../assets/CSS/duty_assignment.css">
-    <link rel="stylesheet" href="../assets/CSS/schedule_editing.css">
-    <style>
-        /* Extra modal styling for the assignment form */
-        .duty-modal {
-            background: rgba(0,0,0,0.25);
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .duty-modal .form-container {
-            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-            border-radius: 16px;
-            max-width: 500px;
-            width: 100%;
-        }
-        .close-modal-btn {
-            float: right;
-            font-size: 1.5rem;
-            color: #888;
-            background: none;
-            border: none;
-            margin-top: -10px;
-        }
-        .close-modal-btn:hover {
-            color: #333;
-        }
-    </style>
+    <link rel="stylesheet" href="../assets/CSS/user_duty.css">
 </head>
 <body>
     <div class="d-flex">
@@ -371,8 +383,9 @@ if ($duty_res && $duty_res->num_rows > 0) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-           <div class="container">
-                <h2 class="mt-4 mb-3">Appointments</h2>
+
+           <div class="container-fluid">
+    <h2 class="mt-4 mb-3">Appointments</h2>
                 <table class="appointments-table table table-bordered table-hover">
                     <thead class="table-primary">
                         <tr>
@@ -466,58 +479,167 @@ if ($duty_res && $duty_res->num_rows > 0) {
                     </div>
                 </div>
                 <?php endif; ?>
-            </div>
+</div>
+
+        
+   <!-- My Duties Table -->
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="mb-0">My Duties</h2>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#prescriptionModal" style="min-width:180px;">
+                Issued Prescription
+            </button>
+        </div>
+        <table class="table table-bordered table-hover">
+            <thead class="table-info">
+                <tr>
+                    <th>Duty ID</th>
+                    <th>Appointment ID</th>
+                    <th>Doctor ID</th>
+                    <th>Bed ID</th>
+                    <th>Nurse Assistant</th>
+                    <th>Procedure</th>
+                    <th>Equipment</th>
+                    <th>Tools</th>
+                    <th>Notes</th>
+                    <th>Status</th>
+                    <th>Created At</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($duties)): ?>
+                    <?php foreach ($duties as $duty): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($duty['duty_id']) ?></td>
+                            <td><?= htmlspecialchars($duty['appointment_id']) ?></td>
+                            <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
+                            <td><?= htmlspecialchars($duty['bed_id']) ?></td>
+                            <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
+                            <td><?= htmlspecialchars($duty['procedure']) ?></td>
+                            <td><?= htmlspecialchars($duty['equipment']) ?></td>
+                            <td><?= htmlspecialchars($duty['tools']) ?></td>
+                            <td><?= htmlspecialchars($duty['notes']) ?></td>
+                            <td><?= htmlspecialchars($duty['status']) ?></td>
+                            <td><?= htmlspecialchars($duty['created_at']) ?></td>
+                            <td>
+                                <a href="doctor_duty.php?complete_duty_id=<?= $duty['duty_id'] ?>" class="btn btn-success btn-sm" onclick="return confirm('Mark this duty as completed?')">Mark as Completed</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr><td colspan="12">No duties found.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+                        </div>
+
+
+
+                                                  
+                          
+                
+
+
+
+                    <!-- Modal -->
+                    <div class="modal fade" id="prescriptionModal" tabindex="-1" aria-labelledby="prescriptionModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="prescriptionModalLabel">Add Prescription</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+
+                                <form action="process_prescription.php" method="POST">
+                                    <div class="modal-body">
+
+                                        <!-- Doctor -->
+                                        <div class="mb-3">
+                                            <label for="doctor_id" class="form-label">Doctor</label>
+                                            <select class="form-select" id="doctor_id" name="doctor_id" required>
+                                                <option value="">-- Select Doctor --</option>
+                                                <?php foreach ($doctors as $doc): ?>
+                                                    <option value="<?= $doc['employee_id'] ?>">
+                                                        <?= $doc['first_name'] . ' ' . $doc['last_name'] ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+
+                                        <!-- Patient -->
+                                        <div class="mb-3">
+                                            <label for="patient_id" class="form-label">Patient</label>
+                                            <select class="form-select" id="patient_id" name="patient_id" required>
+                                                <option value="">-- Select Patient --</option>
+                                                <?php foreach ($patients as $pat): ?>
+                                                    <option value="<?= $pat['patient_id'] ?>">
+                                                        <?= htmlspecialchars($pat['fname'] . ' ' . $pat['lname']) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+
+                                        <!-- Medicine Rows -->
+                                        <div id="medicineRows">
+                                            <div class="medicine-row row mb-2">
+                                                <div class="col-md-4">
+                                                    <label class="form-label">Medicine</label>
+                                                    <select class="form-select medicine-select" name="med_id[]" required>
+                                                        <option value="">-- Select Medicine --</option>
+                                                        <?php foreach ($medicines as $med): ?>
+                                                            <option value="<?= htmlspecialchars($med['med_id']) ?>"
+                                                                data-dosage="<?= htmlspecialchars($med['dosage']) ?>"
+                                                                data-stock="<?= htmlspecialchars($med['stock_quantity'] ?? 0) ?>">
+                                                                <?= htmlspecialchars($med['med_name'] . ' (' . $med['dosage'] . ')') ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <input type="hidden" class="dosage-input" name="dosage[]">
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Stock</label>
+                                                    <input type="text" class="form-control stock-display" value="" readonly>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label">Quantity</label>
+                                                    <input type="number" class="form-control" name="quantity[]" required>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label">Note</label>
+                                                    <input type="text" class="form-control" name="note[]" placeholder="e.g. 3x a day">
+                                                </div>
+                                                <div class="col-md-1 d-flex align-items-end">
+                                                    <button type="button" class="btn btn-danger remove-medicine">X</button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Add Medicine Button -->
+                                        <button type="button" id="addMedicine" class="btn btn-success mb-3">+ Add Medicine</button>
+
+                                        <!-- Status (Auto Pending, hidden from doctor) -->
+                                        <input type="hidden" name="status" value="Pending">
+
+                                    </div>
+
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        <button type="submit" class="btn btn-primary">Save Prescription</button>
+                                    </div>
+                                </form>
+
+                            </div>
+                        </div>
+                    </div>
+
             <!-- END CODING HERE -->
 
-            <!-- My Duties Table -->
-            <div class="container mt-5">
-                <h2 class="mb-3">My Duties</h2>
-                <table class="table table-bordered table-hover">
-                    <thead class="table-info">
-                        <tr>
-                            <th>Duty ID</th>
-                            <th>Appointment ID</th>
-                            <th>Doctor ID</th>
-                            <th>Bed ID</th>
-                            <th>Nurse Assistant</th>
-                            <th>Procedure</th>
-                            <th>Equipment</th>
-                            <th>Tools</th>
-                            <th>Notes</th>
-                            <th>Status</th>
-                            <th>Created At</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($duties)): ?>
-                            <?php foreach ($duties as $duty): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($duty['duty_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['appointment_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['bed_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
-                                    <td><?= htmlspecialchars($duty['procedure']) ?></td>
-                                    <td><?= htmlspecialchars($duty['equipment']) ?></td>
-                                    <td><?= htmlspecialchars($duty['tools']) ?></td>
-                                    <td><?= htmlspecialchars($duty['notes']) ?></td>
-                                    <td><?= htmlspecialchars($duty['status']) ?></td>
-                                    <td><?= htmlspecialchars($duty['created_at']) ?></td>
-                                    <td>
-                                        <a href="doctor_duty.php?complete_duty_id=<?= $duty['duty_id'] ?>" class="btn btn-success btn-sm" onclick="return confirm('Mark this duty as completed?')">Mark as Completed</a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="12">No duties found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+         
         <!----- End of Main Content ----->
-    </div>
+
     <script>
         const toggler = document.querySelector(".toggler-btn");
         toggler && toggler.addEventListener("click", function() {
