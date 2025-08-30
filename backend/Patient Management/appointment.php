@@ -40,7 +40,7 @@ $user = $result->fetch_assoc();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HMS | Patient Management</title>
+    <title>Appointment</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
@@ -89,6 +89,9 @@ $user = $result->fetch_assoc();
                 </a>
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="../Patient Management/registered.php" class="sidebar-link">Registered Patient</a>
+                    </li>
                     <li class="sidebar-item">
                         <a href="../Patient Management/inpatient.php" class="sidebar-link">Inpatients</a>
                     </li>
@@ -309,7 +312,7 @@ $user = $result->fetch_assoc();
 
 
             <div class="container mt-4">
-                <h2 class="mb-4">All Appointments</h2>
+                <h2 class="mb-4" style="border-bottom:2px solid">All Appointments</h2>
 
                 <div class="container mt-4 mb-4 justify-content-end d-flex">
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal"

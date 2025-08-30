@@ -163,21 +163,21 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Condition Name</label>
                                 <div class="col-sm-9">
-                                    <input type="text" class="form-control" name="condition_name" default="N/A">
+                                    <input type="text" class="form-control" name="condition_name">
                                 </div>
                             </div>
 
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Diagnosis Date</label>
                                 <div class="col-sm-9">
-                                    <input type="date" class="form-control" name="diagnosis_date" default="N/A">
+                                    <input type="date" class="form-control" name="diagnosis_date">
                                 </div>
                             </div>
 
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Notes</label>
                                 <div class="col-sm-9">
-                                    <input type="text" class="form-control" name="note" default="N/A">
+                                    <input type="text" class="form-control" name="note">
                                 </div>
                             </div>
                         </div>
@@ -189,7 +189,9 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                         <button type="button" id="prevBtn" class="btn btn-secondary d-none">Back</button>
                         <button type="button" id="nextBtn" class="btn btn-primary">Next</button>
                         <button type="submit" id="submitBtn" class="btn btn-success d-none">Submit</button>
+                        <button type="submit" id="skipBtn" class="btn btn-warning">Skip</button>
                     </div>
+
                 </form>
             </div>
         </div>
@@ -230,6 +232,11 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
         document.getElementById("prevBtn").classList.add("d-none");
         document.getElementById("submitBtn").classList.add("d-none");
         document.getElementById("nextBtn").classList.remove("d-none");
+    });
+
+
+    document.getElementById("skipBtn").addEventListener("click", function() {
+        document.querySelector("#addPatientModal form").submit();
     });
     </script>
 

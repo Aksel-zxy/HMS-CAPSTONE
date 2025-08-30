@@ -1,136 +1,45 @@
-.tbl {
-  width: 95%;
-  margin: 0 auto 2rem auto;
-  border-collapse: collapse;
-  box-shadow: 0 4px 24px rgba(44, 62, 80, 0.08);
-  background: #f8f9fa;
+/* Make table responsive */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: 8px;
-  overflow: hidden;
 }
 
-.tbl thead {
-  background: linear-gradient(90deg, #b2bec3 0%, #dfe6e9 100%);
-  font-size: 1rem;
-  color: #2c3e50;
-}
-
-.tbl thead tr th {
-  font-size: 1.1rem;
-  padding: 1.2rem;
-  letter-spacing: 0.5px;
-  vertical-align: middle;
-  border: none;
-  text-align: center;
-  font-weight: 600;
-}
-
-.tbl tbody tr {
-  transition: background 0.3s, color 0.3s;
-}
-
-.tbl tbody tr td {
-  font-size: 1rem;
-  letter-spacing: 0;
-  font-weight: 400;
-  text-align: center;
-  border-top: 1px solid #dfe6e9;
-  padding: 1.1rem;
-  color: #2c3e50;
-  background: #fff;
-}
-
-.tbl tr td a {
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.tbl tr td a:hover {
-  color: black;
-}
-
-.tbl tr:hover td {
-  background: #dff9fb;
-  color: #2d3436;
-  cursor: pointer;
-}
-
-.tbl button {
-  display: inline-block;
-  border: none;
-  margin: 0 auto;
-  padding: 0.6rem 1.2rem;
-  border-radius: 4px;
-  outline: none;
-  cursor: pointer;
-  background: linear-gradient(90deg, #00b894 0%, #0984e3 100%);
-  color: #fff;
-  font-weight: 600;
-  font-size: 1rem;
-  box-shadow: 0 2px 8px rgba(44, 62, 80, 0.08);
-  transition: background 0.2s, box-shadow 0.2s;
-}
-.tbl button:hover {
-  background: linear-gradient(90deg, #0984e3 0%, #00b894 100%);
-  box-shadow: 0 4px 16px rgba(44, 62, 80, 0.12);
-}
-
-/* Responsive styles */
-@media (max-width: 900px) {
-  h1 {
-    font-size: 2rem;
-    padding: 1.5rem 0;
+/* Sidebar behavior for mobile */
+@media (max-width: 768px) {
+  #sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    height: 100%;
+    width: 250px;
+    background: #fff;
+    transition: all 0.3s ease;
+    z-index: 9999;
   }
-  .tbl {
+
+  #sidebar.collapsed {
+    left: 0;
+  }
+
+  .main {
+    margin-left: 0 !important;
     width: 100%;
   }
-  .tbl thead tr th,
-  .tbl tbody tr td {
-    padding: 0.8rem;
-    font-size: 0.95rem;
-  }
-  .tbl button {
-    font-size: 0.95rem;
-    padding: 0.5rem 1rem;
-  }
 }
 
-@media (max-width: 600px) {
-  h1 {
-    font-size: 1.5rem;
-    padding: 1rem 0;
-    margin-bottom: 1rem;
+/* For small devices, stack search + button */
+@media (max-width: 576px) {
+  .d-flex.mt-4 {
+    flex-direction: column;
+    gap: 10px;
   }
-  .tbl {
+
+  #patientSearch {
     width: 100%;
-    box-shadow: none;
-    border-radius: 0;
-    font-size: 0.9rem;
-    overflow-x: auto;
-    display: block;
   }
-  .tbl thead {
-    font-size: 0.9rem;
-  }
-  .tbl thead tr th,
-  .tbl tbody tr td {
-    padding: 0.5rem;
-    font-size: 0.85rem;
-  }
-  .tbl button {
-    font-size: 0.85rem;
-    padding: 0.4rem 0.8rem;
-  }
-  /* Make table scrollable horizontally */
-  .tbl {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-  }
-}
 
-/* Optional: Hide less important columns on very small screens */
-@media (max-width: 480px) {
-  .tbl thead tr th:nth-child(n + 4),
-  .tbl tbody tr td:nth-child(n + 4) {
-    display: none;
+  #Boton {
+    width: 100%;
   }
 }

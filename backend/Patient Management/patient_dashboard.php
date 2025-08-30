@@ -79,6 +79,9 @@ if (!$user) {
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
+                        <a href="../Patient Management/registered.php" class="sidebar-link">Registered Patient</a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="../Patient Management/inpatient.php" class="sidebar-link">Inpatients</a>
                     </li>
                     <li class="sidebar-item">

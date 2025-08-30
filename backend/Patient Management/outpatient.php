@@ -35,7 +35,7 @@ if (!$user) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HMS | Patient Management</title>
+    <title>Outpatient</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
@@ -84,6 +84,9 @@ if (!$user) {
                 </a>
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="../Patient Management/registered.php" class="sidebar-link">Registered Patient</a>
+                    </li>
                     <li class="sidebar-item">
                         <a href="../Patient Management/inpatient.php" class="sidebar-link">Inpatients</a>
                     </li>
@@ -196,63 +199,82 @@ if (!$user) {
             <!-- START CODING HERE -->
             <div class="container mt-4">
 
-                <h2>Lists of Outpatients</h2>
-                <!-- Button to trigger modal -->
-                <div class="d-flex justify-content-end mt-4">
-                    <button type="button" class="btn btn-primary" id="Boton" data-bs-toggle="modal"
-                        data-bs-target="#addPatientModal">
-                        Add New Patient
-                    </button>
+                <div style="border-bottom:2px solid">
+                    <h2>Lists of Outpatients</h2>
                 </div>
 
-                <?php include 'icreate.php'; // This includes the modal code ?>
+
+                <div class="d-flex mt-4">
+
+                    <div class="d-flex mb-3">
+                        <input type="text" id="patientSearch" class="form-control" placeholder="Search patient..."
+                            style="max-width: 100%;">
+                    </div>
+
+
+                </div>
+
+
+
+
 
                 <br>
-                <table class="table table-hover align-middle overflow-x-auto">
-                    <thead style="font-size: 1rem;" class="text-center">
-                        <tr class="text-center">
-                            <th class="text-center">Patient Id</th>
-                            <th class="text-center">First Name</th>
-                            <th class="text-center">Middle Name</th>
-                            <th class="text-center">Last Name</th>
-                            <th class="text-center">Address</th>
-                            <th class="text-center">Gender</th>
-                            <th class="text-center">Civil Status</th>
-                            <th class="text-center">Admission Type</th>
-                            <!--<th>Bed Number</th>-->
-                            <th class="text-center">Attending Doctor</th>
-                            <th class="text-center" colspan="2">Action</th>
+                <table
+                    style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:200px;">
+                    <thead>
+                        <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:center;">
+                            <th style="padding:12px;">Patient ID</th>
+                            <th style="padding:12px;">First Name</th>
+                            <th style="padding:12px;">Middle Name</th>
+                            <th style="padding:12px;">Last Name</th>
+                            <th style="padding:12px;">Address</th>
+                            <th style="padding:12px;">Gender</th>
+                            <th style="padding:12px;">Civil Status</th>
+                            <th style="padding:12px;">Admission Type</th>
+                            <th style="padding:12px;">Attending Doctor</th>
+                            <th style="padding:12px;" colspan="2">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php
-                       
-
-                        //read data of each row
-                        while($row = $patients->fetch_assoc()) {
-                            echo "
-                            <tr class='text-center'>
-                            <td class='text-center'>$row[patient_id]</td>
-                            <td class='text-center'>$row[fname]</td>
-                            <td class='text-center'>$row[mname]</td>
-                            <td class='text-center'>$row[lname]</td>
-                            <td class='text-center'>$row[address]</td>
-                            <td class='text-center'>$row[gender]</td>
-                            <td class='text-center'>$row[civil_status]</td>
-                            <td class='text-center'>$row[admission_type]</td>
-                            <td class='text-center'>$row[doctor_name]</td>
-                            <td class='text-center'>
-                                <a class='btn btn-info btn-sm' href='../Patient Management/iview.php?patient_id=$row[patient_id]'>View</a>
+                        <?php if ($patients->num_rows > 0): ?>
+                        <?php while($row = $patients->fetch_assoc()): ?>
+                        <tr style="border-bottom:1px solid #f1f1f1; transition:background 0.2s; text-align:center;"
+                            onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
+                            <td style="padding:12px;"><?= htmlspecialchars($row['patient_id']) ?></td>
+                            <td style="padding:12px;"><?= htmlspecialchars($row['fname']) ?></td>
+                            <td style="padding:12px;"><?= htmlspecialchars($row['mname']) ?></td>
+                            <td style="padding:12px;"><?= htmlspecialchars($row['lname']) ?></td>
+                            <td style="padding:12px;"><?= htmlspecialchars($row['address']) ?></td>
+                            <td style="padding:12px;"><?= htmlspecialchars($row['gender']) ?></td>
+                            <td style="padding:12px;"><?= htmlspecialchars($row['civil_status']) ?></td>
+                            <td style="padding:12px;"><?= htmlspecialchars($row['admission_type']) ?></td>
+                            <td style="padding:12px;"><?= htmlspecialchars($row['doctor_name']) ?></td>
+                            <td style="padding:12px; text-align:center;">
+                                <a class="btn btn-sm"
+                                    href="../Patient Management/iview.php?patient_id=<?= $row['patient_id'] ?>"
+                                    style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                    View
+                                </a>
                             </td>
-                            <td>
-                            <a class='btn btn-primary btn-sm' href='../Patient Management/iupdate.php?patient_id=$row[patient_id]'>Edit</a>
+                            <td style="padding:12px; text-align:center;">
+                                <a class="btn btn-sm"
+                                    href="../Patient Management/iupdate.php?patient_id=<?= $row['patient_id'] ?>"
+                                    style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                    Edit
+                                </a>
                             </td>
                         </tr>
-                            ";
-                        }
-                        ?>
+                        <?php endwhile; ?>
+                        <?php else: ?>
+                        <tr>
+                            <td colspan="11" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                📋 No Patients Found
+                            </td>
+                        </tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
+
 
             </div>
             <!-- END CODING HERE -->
@@ -260,6 +282,17 @@ if (!$user) {
         <!----- End of Main Content ----->
     </div>
     <script>
+    // Search filter for patient table
+    document.getElementById("patientSearch").addEventListener("keyup", function() {
+        let filter = this.value.toLowerCase();
+        let rows = document.querySelectorAll("table tbody tr");
+
+        rows.forEach(row => {
+            let text = row.textContent.toLowerCase();
+            row.style.display = text.includes(filter) ? "" : "none";
+        });
+    });
+
     const toggler = document.querySelector(".toggler-btn");
     toggler.addEventListener("click", function() {
         document.querySelector("#sidebar").classList.toggle("collapsed");

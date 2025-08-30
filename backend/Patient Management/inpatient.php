@@ -5,7 +5,7 @@ include '../../SQL/config.php';
 require_once 'class/patient.php';
 
 $patientObj = new Patient($conn);
-$patients = $patientObj->getAllPatients();
+$patients = $patientObj->getinPatients();
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
     header('Location: login.php');
@@ -33,7 +33,7 @@ $user = $result->fetch_assoc();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HMS | Patient Management</title>
+    <title>Inpatient</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
@@ -82,6 +82,9 @@ $user = $result->fetch_assoc();
                 </a>
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="../Patient Management/registered.php" class="sidebar-link">Registered Patient</a>
+                    </li>
                     <li class="sidebar-item">
                         <a href="../Patient Management/inpatient.php" class="sidebar-link">Inpatients</a>
                     </li>
@@ -194,83 +197,129 @@ $user = $result->fetch_assoc();
             <!-- START CODING HERE -->
             <div class="container mt-4">
 
-                <h2>Lists of Inpatients</h2>
 
-                <!-- Button to trigger modal -->
-                <div class="d-flex justify-content-end mt-4">
-                    <button type="button" class="btn btn-primary" id="Boton" data-bs-toggle="modal"
-                        data-bs-target="#addPatientModal">
-                        Add New Patient
-                    </button>
-                </div>
 
-                <?php include 'icreate.php'; // This includes the modal code ?>
+                <div class="container mt-4 table-responsive">
 
-                <br>
-                <table class="table table-hover align-middle overflow-x-auto">
-                    <thead style="font-size: 1rem;" class="text-center">
-                        <tr>
-                            <th class="text-center">Patient Id</th>
-                            <th class="text-center">First Name</th>
-                            <th class="text-center">Middle Name</th>
-                            <th class="text-center">Last Name</th>
-                            <th class="text-center">Address</th>
-                            <th class="text-center">Gender</th>
-                            <th class="text-center">Civil Status</th>
-                            <th class="text-center">Admission Type</th>
-                            <!--<th>Bed Number</th>-->
-                            <th class="text-center">Attending Doctor</th>
-                            <th colspan="3">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                       
+                    <div style="border-bottom:2px solid">
+                        <h2>Lists of Inpatient</h2>
+                    </div>
 
-                        //read data of each row
-                        while($row = $patients->fetch_assoc()) {
-                            echo "
+                    <!-- Button to trigger modal -->
+                    <div class="d-flex mt-4">
+
+                        <div class="d-flex mb-3">
+                            <input type="text" id="patientSearch" class="form-control" placeholder="Search patient..."
+                                style="max-width: 100%;">
+                        </div>
+
+
+
+                    </div>
+
+
+
+                    <br>
+                    <table
+                        style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:200px;">
+                        <thead>
+                            <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
+                                <th style="padding:12px; text-align:center;">Patient ID</th>
+                                <th style="padding:12px; text-align:center;">First Name</th>
+                                <th style="padding:12px; text-align:center;">Middle Name</th>
+                                <th style="padding:12px; text-align:center;">Last Name</th>
+                                <th style="padding:12px; text-align:center;">Address</th>
+                                <th style="padding:12px; text-align:center;">Gender</th>
+                                <th style="padding:12px; text-align:center;">Civil Status</th>
+                                <th style="padding:12px; text-align:center;">Admission Type</th>
+                                <th style="padding:12px; text-align:center;">Attending Doctor</th>
+                                <th style="padding:12px; text-align:center;" colspan="3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($patients->num_rows > 0): ?>
+                            <?php while($row = $patients->fetch_assoc()): ?>
+                            <tr style="border-bottom:1px solid #f1f1f1; transition:background 0.2s;"
+                                onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['patient_id']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['fname']) ?></td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['mname']) ?></td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['lname']) ?></td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['address']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['gender']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($row['civil_status']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($row['admission_type']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($row['doctor_name']) ?>
+                                </td>
+                                <td style="text-align:center;">
+                                    <a class="btn btn-sm"
+                                        href="../Patient Management/iview.php?patient_id=<?= $row['patient_id'] ?>"
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                        View
+                                    </a>
+                                </td>
+                                <td style="text-align:center;">
+                                    <a class="btn btn-sm"
+                                        href="../Patient Management/iupdate.php?patient_id=<?= $row['patient_id'] ?>"
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                        Edit
+                                    </a>
+                                </td>
+                                <td style="text-align:center;">
+                                    <a class="btn btn-sm"
+                                        href="../Patient Management/discharged.php?patient_id=<?= $row['patient_id'] ?>"
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:red; border:none; color:#fff; cursor:pointer;">
+                                        Discharge
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endwhile; ?>
+                            <?php else: ?>
                             <tr>
-                            <td class='text-center'>$row[patient_id]</td>
-                            <td class='text-center'>$row[fname]</td>
-                            <td class='text-center'>$row[mname]</td>
-                            <td class='text-center'>$row[lname]</td>
-                            <td class='text-center'>$row[address]</td>
-                            <td class='text-center'>$row[gender]</td>
-                            <td class='text-center'>$row[civil_status]</td>
-                            <td class='text-center'>$row[admission_type]</td>
-                            <td class='text-center'>$row[doctor_name]</td>
-                            <td>
-                                <a class='btn btn-info btn-sm' href='../Patient Management/iview.php?patient_id=$row[patient_id]'>View</a>
-                            </td>
-                            <td>
-                            <a class='btn btn-info btn-sm' href='../Patient Management/iupdate.php?patient_id=$row[patient_id]'>Edit</a>
-                            </td>
-                            <td>
-                            <a class='btn btn-info btn-sm' href='../Patient Management/admit.php?patient_id=$row[patient_id]'>Admit</a>
-                            </td>
-                        </tr>
-                            ";
-                        }
-                        ?>
-                    </tbody>
-                </table>
+                                <td colspan="11"
+                                    style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                    📋 No Patients Found
+                                </td>
+                            </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
 
+
+                </div>
+                <!-- END CODING HERE -->
             </div>
-            <!-- END CODING HERE -->
+            <!----- End of Main Content ----->
         </div>
-        <!----- End of Main Content ----->
-    </div>
-    <script>
-    const toggler = document.querySelector(".toggler-btn");
-    toggler.addEventListener("click", function() {
-        document.querySelector("#sidebar").classList.toggle("collapsed");
-    });
-    </script>
-    <script src="assets/Bootstrap/all.min.js"></script>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
+        <script>
+        // Search filter for patient table
+        document.getElementById("patientSearch").addEventListener("keyup", function() {
+            let filter = this.value.toLowerCase();
+            let rows = document.querySelectorAll("table tbody tr");
+
+            rows.forEach(row => {
+                let text = row.textContent.toLowerCase();
+                row.style.display = text.includes(filter) ? "" : "none";
+            });
+        });
+
+        const toggler = document.querySelector(".toggler-btn");
+        toggler.addEventListener("click", function() {
+            document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+        </script>
+        <script src="assets/Bootstrap/all.min.js"></script>
+        <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+        <script src="assets/Bootstrap/fontawesome.min.js"></script>
+        <script src="assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

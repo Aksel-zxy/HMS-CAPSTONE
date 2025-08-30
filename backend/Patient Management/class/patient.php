@@ -13,8 +13,7 @@ class Patient {
                    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
             FROM patientinfo p
             LEFT JOIN hr_employees e 
-                   ON p.attending_doctor = e.employee_id
-            WHERE p.admission_type != 'Outpatient'";
+                   ON p.attending_doctor = e.employee_id";
         $result = $this->conn->query($sql);
 
         if (!$result) {
@@ -23,6 +22,23 @@ class Patient {
 
         return $result;
     }
+    public function getinPatients() {
+        $sql = "SELECT p.patient_id, p.fname, p.mname, p.lname, p.address, p.gender, 
+                   p.civil_status, p.admission_type, 
+                   CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
+            FROM patientinfo p
+            LEFT JOIN hr_employees e 
+                   ON p.attending_doctor = e.employee_id
+                   WHERE p.admission_type != 'Outpatient'";
+        $result = $this->conn->query($sql);
+
+        if (!$result) {
+            die("Invalid query: " . $this->conn->error);
+        }
+
+        return $result;
+    }
+
 
     public function getPatientById($id) {
         $stmt = $this->conn->prepare("

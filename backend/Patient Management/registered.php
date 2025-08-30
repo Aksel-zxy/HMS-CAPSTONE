@@ -1,8 +1,14 @@
 <?php
+session_start();
+
 include '../../SQL/config.php';
+require_once 'class/patient.php';
+
+$patientObj = new Patient($conn);
+$patients = $patientObj->getAllPatients();
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: login.php');
     exit();
 }
 
@@ -11,35 +17,30 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     exit();
 }
 
+
 $query = "SELECT * FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
 ?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bedding</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/css/bedding.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registered Patient</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-
+    <link rel="stylesheet" href="assets/CSS/list.css">
 </head>
 
 <body>
-
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -65,6 +66,7 @@ if (!$user) {
                     <span style="font-size: 18px;">Dashboard</span>
                 </a>
             </li>
+
 
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse"
@@ -140,7 +142,6 @@ if (!$user) {
                     aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-regular fa-folder-closed" viewBox="0 0 16 16">
-
                         <path d=" M512 464L128 464C119.2 464 112 456.8 112 448L112 304L528 304L528 448C528 456.8 520.8
                         464 512 464zM528 256L112 256L112 160C112 151.2 119.2 144 128 144L266.7 144C270.2 144 273.5 145.1
                         276.3 147.2L314.7 176C328.5 186.4 345.4 192 362.7 192L512 192C520.8 192 528 199.2 528 208L528
@@ -151,6 +152,9 @@ if (!$user) {
                     <span style="font-size: 18px;">Summary</span>
                 </a>
             </li>
+
+
+
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -165,12 +169,13 @@ if (!$user) {
                         </svg>
                     </button>
                 </div>
+
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
                         <span class="username ml-1 me-2"><?php echo $user['fname']; ?>
                             <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton"
-                            data-bs-toggle="dropdown" aria-expanded="false">
+                            data-bs-toggle="dropdown" aria-expanded="true">
                             <i class="bi bi-person-circle"></i>
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton"
@@ -186,95 +191,140 @@ if (!$user) {
                                 </a>
                             </li>
                         </ul>
-
                     </div>
                 </div>
             </div>
-
             <!-- START CODING HERE -->
-            <div class="container py-5">
-                <h1 class="mb-4 text-center text-primary">Room Layout Overview</h1>
-                <div class="row gy-4 justify-content-center">
+            <div class="container mt-4">
 
-                    <!-- Room 102 -->
-                    <div class="col-12 col-md-5 col-lg-4">
-                        <div class="room-card text-center">
-                            <div class="seats">
-                                <div class="seat" title="Seat 1"></div>
-                                <div class="seat" title="Seat 2"></div>
-                                <div class="seat" title="Seat 3"></div>
-                                <div class="room-header">Room 101</div>
-                                <div class="seat" title="Seat 4"></div>
-                                <div class="seat" title="Seat 5"></div>
-                                <div class="seat" title="Seat 6"></div>
-                            </div>
-                        </div>
+
+
+                <div class="container mt-4 table-responsive">
+
+                    <div style="border-bottom:2px solid">
+                        <h2>Lists of Registered Patient</h2>
                     </div>
 
-                    <!-- Room 104 -->
-                    <div class="col-12 col-md-5 col-lg-4">
-                        <div class="room-card text-center">
-                            <div class="seats">
-                                <div class="seat" title="Seat 1"></div>
-                                <div class="seat" title="Seat 2"></div>
-                                <div class="seat" title="Seat 3"></div>
-                                <div class="room-header">Room 102</div>
-                                <div class="seat" title="Seat 4"></div>
-                                <div class="seat" title="Seat 5"></div>
-                                <div class="seat" title="Seat 6"></div>
-                            </div>
+                    <!-- Button to trigger modal -->
+                    <div class="d-flex mt-4">
+
+                        <div class="d-flex mb-3">
+                            <input type="text" id="patientSearch" class="form-control" placeholder="Search patient..."
+                                style="max-width: 100%;">
                         </div>
+                        <div class="d-flex justify-content-end mb-3" style="margin-left: auto;">
+                            <button type="button" class="btn btn-primary btn-xs" id="Boton" data-bs-toggle="modal"
+                                data-bs-target="#addPatientModal" style="padding:2px 8px; font-size:12px; ">
+                                Add New Patient
+                            </button>
+                        </div>
+
+
                     </div>
 
-                    <!-- Room 101 -->
-                    <div class="col-12 col-md-5 col-lg-4">
-                        <div class="room-card text-center">
-                            <div class="seats">
-                                <div class="seat" title="Seat 1"></div>
-                                <div class="seat" title="Seat 2"></div>
-                                <div class="seat" title="Seat 3"></div>
-                                <div class="room-header">Room 103</div>
-                                <div class="seat" title="Seat 4"></div>
-                                <div class="seat" title="Seat 5"></div>
-                                <div class="seat" title="Seat 6"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <?php include 'icreate.php'; // This includes the modal code ?>
 
-                    <!-- Room 103 -->
-                    <div class="col-12 col-md-5 col-lg-4">
-                        <div class="room-card text-center">
-                            <div class="seats">
-                                <div class="seat" title="Seat 1"></div>
-                                <div class="seat" title="Seat 2"></div>
-                                <div class="seat" title="Seat 3"></div>
-                                <div class="room-header">Room 104</div>
-                                <div class="seat" title="Seat 4"></div>
-                                <div class="seat" title="Seat 5"></div>
-                                <div class="seat" title="Seat 6"></div>
-                            </div>
-                        </div>
-                    </div>
+                    <br>
+                    <table
+                        style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:200px;">
+                        <thead>
+                            <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
+                                <th style="padding:12px; text-align:center;">Patient ID</th>
+                                <th style="padding:12px; text-align:center;">First Name</th>
+                                <th style="padding:12px; text-align:center;">Middle Name</th>
+                                <th style="padding:12px; text-align:center;">Last Name</th>
+                                <th style="padding:12px; text-align:center;">Address</th>
+                                <th style="padding:12px; text-align:center;">Gender</th>
+                                <th style="padding:12px; text-align:center;">Civil Status</th>
+                                <th style="padding:12px; text-align:center;">Admission Type</th>
+                                <th style="padding:12px; text-align:center;">Attending Doctor</th>
+                                <th style="padding:12px; text-align:center;" colspan="3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($patients->num_rows > 0): ?>
+                            <?php while($row = $patients->fetch_assoc()): ?>
+                            <tr style="border-bottom:1px solid #f1f1f1; transition:background 0.2s;"
+                                onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['patient_id']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['fname']) ?></td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['mname']) ?></td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['lname']) ?></td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['address']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['gender']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($row['civil_status']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($row['admission_type']) ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($row['doctor_name']) ?>
+                                </td>
+                                <td style="text-align:center;">
+                                    <a class="btn btn-sm"
+                                        href="../Patient Management/iview.php?patient_id=<?= $row['patient_id'] ?>"
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                        View
+                                    </a>
+                                </td>
+                                <td style="text-align:center;">
+                                    <a class="btn btn-sm"
+                                        href="../Patient Management/iupdate.php?patient_id=<?= $row['patient_id'] ?>"
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                        Edit
+                                    </a>
+                                </td>
+                                <td style="text-align:center;">
+                                    <a class="btn btn-sm"
+                                        href="../Patient Management/admit.php?patient_id=<?= $row['patient_id'] ?>"
+                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#fff; cursor:pointer;">
+                                        Admit
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endwhile; ?>
+                            <?php else: ?>
+                            <tr>
+                                <td colspan="11"
+                                    style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                    📋 No Patients Found
+                                </td>
+                            </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+
 
                 </div>
+                <!-- END CODING HERE -->
             </div>
-
-
-            <!-- END CODING HERE -->
+            <!----- End of Main Content ----->
         </div>
-        <!----- End of Main Content ----->
-    </div>
-    <script>
-    const toggler = document.querySelector(".toggler-btn");
-    toggler.addEventListener("click", function() {
-        document.querySelector("#sidebar").classList.toggle("collapsed");
-    });
-    </script>
-    <script src="assets/Bootstrap/all.min.js"></script>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
+        <script>
+        // Search filter for patient table
+        document.getElementById("patientSearch").addEventListener("keyup", function() {
+            let filter = this.value.toLowerCase();
+            let rows = document.querySelectorAll("table tbody tr");
 
+            rows.forEach(row => {
+                let text = row.textContent.toLowerCase();
+                row.style.display = text.includes(filter) ? "" : "none";
+            });
+        });
+
+        const toggler = document.querySelector(".toggler-btn");
+        toggler.addEventListener("click", function() {
+            document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+        </script>
+        <script src="assets/Bootstrap/all.min.js"></script>
+        <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+        <script src="assets/Bootstrap/fontawesome.min.js"></script>
+        <script src="assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
