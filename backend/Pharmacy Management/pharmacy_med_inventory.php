@@ -116,6 +116,13 @@
                         <span style="font-size: 18px;">Sales</span>
                     </a>
                 </li>
+                <li class="sidebar-item">
+                    <a href="pharmacy_expiry_tracking.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                        aria-expanded="false" aria-controls="auth">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        <span style="font-size: 18px;">Drug Expiry Tracking</span>
+                    </a>
+                </li>
 
             </aside>
             <!----- End of Sidebar ----->
@@ -184,8 +191,21 @@
                                         <!-- Category -->
                                         <div class="mb-3">
                                             <label class="form-label">Category</label>
-                                            <input type="text" class="form-control" name="category" required>
+                                            <select class="form-control" name="category" required>
+                                                <option value="">-- Select Category --</option>
+                                                <option value="Paracetamol">Paracetamol</option>
+                                                <option value="Pain Killers">Pain Killers</option>
+                                                <option value="Antibiotics">Antibiotics</option>
+                                                <option value="Cough & Cold">Cough & Cold</option>
+                                                <option value="Allergy Medicine">Allergy Medicine</option>
+                                                <option value="Stomach Medicine">Stomach Medicine</option>
+                                                <option value="Antifungal">Antifungal</option>
+                                                <option value="Vitamins">Vitamins</option>
+                                                <option value="First Aid">First Aid</option>
+                                                <option value="Other">Other</option>
+                                            </select>
                                         </div>
+
 
                                         <!-- Dosage -->
                                         <div class="mb-3">
@@ -199,11 +219,29 @@
                                             <input type="number" class="form-control" name="stock_quantity" required>
                                         </div>
 
+                                        <!-- Unit Price -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Unit Price (₱)</label>
+                                            <input type="number" step="0.01" class="form-control" name="unit_price" required>
+                                        </div>
+
                                         <!-- Unit -->
                                         <div class="mb-3">
-                                            <label class="form-label">Unit</label>
-                                            <input type="text" class="form-control" name="unit" required>
+                                            <label class="form-label">Unit / Formulation</label>
+                                            <select class="form-control" name="unit" required>
+                                                <option value="">-- Select Unit / Formulation --</option>
+                                                <option value="Tablets & Capsules">Tablets & Capsules</option>
+                                                <option value="Syrups / Oral Liquids">Syrups / Oral Liquids</option>
+                                                <option value="Antibiotic Dry Syrup (Powder)">Antibiotic Dry Syrup (Powder)</option>
+                                                <option value="Injectables (Ampoules / Vials)">Injectables (Ampoules / Vials)</option>
+                                                <option value="Eye Drops / Ear Drops">Eye Drops / Ear Drops</option>
+                                                <option value="Insulin">Insulin</option>
+                                                <option value="Topical Creams / Ointments">Topical Creams / Ointments</option>
+                                                <option value="Vaccines">Vaccines</option>
+                                                <option value="IV Fluids">IV Fluids</option>
+                                            </select>
                                         </div>
+
 
                                         <!-- Submit Button -->
                                         <button type="submit" class="btn btn-success">Add Medicine</button>
@@ -239,6 +277,7 @@
                                     <th>Category</th>
                                     <th>Dosage</th>
                                     <th>Stock Quantity</th>
+                                    <th>Unit Price (₱)</th> <!-- NEW -->
                                     <th>Unit</th>
                                     <th>Status</th>
                                     <th>Actions</th>
@@ -261,6 +300,7 @@
                                             <td><?= htmlspecialchars($row['category']) ?></td>
                                             <td><?= htmlspecialchars($row['dosage']) ?></td>
                                             <td><?= htmlspecialchars($row['stock_quantity']) ?></td>
+                                            <td><?= number_format($row['unit_price'], 2) ?></td>
                                             <td><?= htmlspecialchars($row['unit']) ?></td>
                                             <td>
                                                 <span class="badge bg-<?= $badgeClass ?>">
@@ -278,7 +318,8 @@
                                                     data-category="<?= htmlspecialchars($row['category']) ?>"
                                                     data-dosage="<?= htmlspecialchars($row['dosage']) ?>"
                                                     data-stock="<?= $row['stock_quantity'] ?>"
-                                                    data-unit="<?= htmlspecialchars($row['unit']) ?>">Edit</button>
+                                                    data-unit="<?= htmlspecialchars($row['unit']) ?>"
+                                                    data-price="<?= $row['unit_price'] ?>">Edit</button>
 
                                                 <!-- Delete Button Form -->
                                                 <form action="update_medicine.php" method="POST" style="display:inline;">
@@ -334,6 +375,10 @@
                                         <input type="number" class="form-control" name="stock_quantity" id="edit_stock_quantity" readonly>
                                     </div>
                                     <div class="mb-3">
+                                        <label class="form-label">Unit Price (₱)</label>
+                                        <input type="number" step="0.01" class="form-control" name="unit_price" id="edit_unit_price" required>
+                                    </div>
+                                    <div class="mb-3">
                                         <label class="form-label">Unit</label>
                                         <input type="text" class="form-control" name="unit" id="edit_unit" required>
                                     </div>
@@ -362,6 +407,7 @@
                     document.getElementById('edit_dosage').value = this.dataset.dosage;
                     document.getElementById('edit_stock_quantity').value = this.dataset.stock;
                     document.getElementById('edit_unit').value = this.dataset.unit;
+                    document.getElementById('edit_unit_price').value = this.dataset.price; // NEW
                 });
             });
         </script>

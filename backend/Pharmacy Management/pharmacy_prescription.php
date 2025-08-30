@@ -105,6 +105,13 @@ if (!$user) {
                     <span style="font-size: 18px;">Sales</span>
                 </a>
             </li>
+            <li class="sidebar-item">
+                <a href="pharmacy_expiry_tracking.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <span style="font-size: 18px;">Drug Expiry Tracking</span>
+                </a>
+            </li>
 
         </aside>
         <!----- End of Sidebar ----->
@@ -152,6 +159,7 @@ if (!$user) {
                                 data-bs-target="#prescription"
                                 type="button" role="tab">
                                 <i class="fa-solid fa-capsules"></i>
+
                                 <span>Prescription</span>
                             </button>
                         </li>
@@ -286,7 +294,7 @@ if (!$user) {
                                     <th>Quantity Dispensed</th>
                                     <th>Status</th>
                                     <th>Note</th>
-                                    <th>Date</th>
+                                    <th>Dispensed Date</th>
                                     <th>Download</th>
                                 </tr>
                             </thead>
@@ -294,28 +302,28 @@ if (!$user) {
                                 <?php
                                 // Dispensed / Cancelled prescriptions
                                 $sql_records = "
-                    SELECT 
-                        p.prescription_id,
-                        CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
-                        CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
-                        GROUP_CONCAT(
-                            CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
-                            SEPARATOR '<br>'
-                        ) AS medicines_list,
-                        SUM(i.quantity_prescribed) AS total_quantity,
-                        SUM(i.quantity_dispensed) AS total_dispensed,
-                        p.status,
-                        p.note,
-                        DATE_FORMAT(p.prescription_date, '%b %e, %Y %l:%i%p') AS formatted_date
-                    FROM pharmacy_prescription p
-                    JOIN patientinfo pi ON p.patient_id = pi.patient_id
-                    JOIN hr_employees e ON p.doctor_id = e.employee_id
-                    JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
-                    JOIN pharmacy_inventory m ON i.med_id = m.med_id
-                    WHERE p.status IN ('Dispensed', 'Cancelled') AND LOWER(e.profession) = 'doctor'
-                    GROUP BY p.prescription_id
-                    ORDER BY p.prescription_date DESC
-                ";
+                SELECT 
+                    p.prescription_id,
+                    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+                    CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
+                    GROUP_CONCAT(
+                        CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
+                        SEPARATOR '<br>'
+                    ) AS medicines_list,
+                    SUM(i.quantity_prescribed) AS total_quantity,
+                    SUM(i.quantity_dispensed) AS total_dispensed,
+                    p.status,
+                    p.note,
+                    DATE_FORMAT(MAX(i.dispensed_date), '%b %e, %Y %l:%i%p') AS dispensed_date
+                FROM pharmacy_prescription p
+                JOIN patientinfo pi ON p.patient_id = pi.patient_id
+                JOIN hr_employees e ON p.doctor_id = e.employee_id
+                JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
+                JOIN pharmacy_inventory m ON i.med_id = m.med_id
+                WHERE p.status IN ('Dispensed', 'Cancelled') AND LOWER(e.profession) = 'doctor'
+                GROUP BY p.prescription_id
+                ORDER BY MAX(i.dispensed_date) DESC
+            ";
 
                                 $records_result = $conn->query($sql_records);
 
@@ -344,7 +352,7 @@ if (!$user) {
                                             <td>
                                                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $noteId; ?>">View Note</button>
                                             </td>
-                                            <td><?= $row['formatted_date']; ?></td>
+                                            <td><?= $row['dispensed_date']; ?></td>
                                             <td>
                                                 <a href="download_prescription.php?id=<?= $prescriptionId; ?>" class="btn btn-info btn-sm" target="_blank">
                                                     <i class="fa-solid fa-download"></i>
