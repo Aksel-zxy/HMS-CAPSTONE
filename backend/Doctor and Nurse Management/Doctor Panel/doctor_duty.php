@@ -96,6 +96,34 @@ if ($nurse_res && $nurse_res->num_rows > 0) {
     }
 }
 
+// Fetch equipment types and names (example static, replace with DB if needed)
+$equipment_types = [
+    'PPE' => ['Surgical gloves', 'Examination gloves', 'Face masks', 'Surgical caps', 'Shoe covers', 'Gowns', 'Face shields'],
+    'Patient Care Supplies' => ['Disposable bed sheets', 'Adult diapers', 'Underpads', 'Disposable towels', 'Paper gowns'],
+    'Surgical & Procedure Consumables' => ['Syringes', 'Needles', 'IV cannulas', 'Infusion sets', 'Surgical drapes', 'Surgical blades', 'Sutures', 'Cotton balls', 'Gauze pads', 'Bandages', 'Suction catheters'],
+    'Laboratory Consumables' => ['Test tubes', 'Pipette tips', 'Petri dishes', 'Blood collection tubes', 'Urine containers', 'Swabs', 'Disposable centrifuge tubes'],
+    'General Hospital Consumables' => ['Alcohol pads', 'Hand sanitizers', 'Disinfectant wipes', 'Disposable thermometers', 'Sharps containers', 'Biohazard bags']
+];
+
+// Flatten tools for selection
+$tool_options = [];
+foreach ($equipment_types as $type => $names) {
+    foreach ($names as $name) {
+        $tool_options[] = ['type' => $type, 'name' => $name];
+    }
+}
+
+// Fetch machine equipments for equipment selection and listing
+$machine_equipments = [];
+$machine_types = [];
+$machine_res = $conn->query("SELECT machine_id, machine_type, machine_name FROM machine_equipments");
+if ($machine_res && $machine_res->num_rows > 0) {
+    while ($row = $machine_res->fetch_assoc()) {
+        $machine_equipments[] = $row;
+        $machine_types[$row['machine_type']][] = $row;
+    }
+}
+
 // Handle duty assignment form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     $appointment_id = $_POST['appointment_id'];
@@ -103,11 +131,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     $bed_id = !empty($_POST['bed_id']) ? $_POST['bed_id'] : null;
     $nurse_assistant = !empty($_POST['nurse_assistant']) ? $_POST['nurse_assistant'] : null;
     $procedure = $_POST['procedure'];
-    $equipment = !empty($_POST['equipment']) ? $_POST['equipment'] : null;
-    $tools = !empty($_POST['tools']) ? $_POST['tools'] : null;
     $notes = $_POST['notes'];
-    $status = "Pending"; // Always insert as Pending
+    $status = "Pending";
 
+    // Equipment array: collect selected machine type/name pairs
+    $equipments = [];
+    if (!empty($_POST['equipment_type']) && !empty($_POST['equipment_name'])) {
+        foreach ($_POST['equipment_type'] as $idx => $type) {
+            $name = $_POST['equipment_name'][$idx] ?? '';
+            if ($type && $name) {
+                $equipments[] = $type . ' - ' . $name;
+            }
+        }
+    }
+    $equipment = implode(', ', $equipments); // Save as comma-separated string
+
+    // Tools array
+    $tools = [];
+    if (!empty($_POST['tool_name']) && !empty($_POST['tool_qty'])) {
+        foreach ($_POST['tool_name'] as $idx => $tool_name) {
+            $qty = $_POST['tool_qty'][$idx] ?? 1;
+            if ($tool_name) {
+                $tools[] = ['name' => $tool_name, 'qty' => intval($qty)];
+            }
+        }
+    }
+    $tools_json = json_encode($tools);
+
+    // Save duty assignment
     $stmt = $conn->prepare("INSERT INTO duty_assignments (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
     $stmt->bind_param(
@@ -118,17 +169,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
         $nurse_assistant,
         $procedure,
         $equipment,
-        $tools,
+        $tools_json,
         $notes,
         $status
     );
+    $stmt->execute();
 
-    if ($stmt->execute()) {
-        header("Location: doctor_duty.php?success=1");
-        exit;
-    } else {
-        echo "<div class='alert alert-danger'>Error: " . $stmt->error . "</div>";
+    // Insert purchase request for tools
+    if (!empty($tools)) {
+        $user_id = $doctor_id; // hr_employees.employee_id
+        $items = $tools_json;
+        $pr_status = "Pending";
+        $created_at = date('Y-m-d H:i:s');
+        $stmt2 = $conn->prepare("INSERT INTO purchase_requests (user_id, items, status, created_at) VALUES (?, ?, ?, ?)");
+        $stmt2->bind_param("isss", $user_id, $items, $pr_status, $created_at);
+        $stmt2->execute();
     }
+
+    header("Location: doctor_duty.php?success=1");
+    exit;
 }
 
 // Handle mark as completed action
@@ -191,6 +250,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
         $patients[] = $row;
     }
 }
+
 ?>
 
 <!DOCTYPE html>
@@ -423,28 +483,33 @@ if ($result_pat && $result_pat->num_rows > 0) {
                 <!-- Modal-like form for duty assignment -->
                 <?php if ($appointment_id): ?>
                 <div class="duty-modal" id="dutyModal">
-                    <div class="form-container">
-                        <button class="close-modal-btn" onclick="window.location.href='doctor_duty.php'">&times;</button>
-                        <h2 class="mb-3 text-center">Manage Appointment</h2>
+                    <div class="form-container bg-white p-4 shadow rounded position-relative" style="max-width: 500px; width: 100%;">
+                        <button class="close-modal-btn position-absolute top-0 end-0 m-2" onclick="window.location.href='doctor_duty.php'" aria-label="Close">&times;</button>
+                        <h4 class="mb-4 text-center text-primary fw-bold">Manage Appointment</h4>
                         <form action="" method="POST">
                             <input type="hidden" name="appointment_id" value="<?= htmlspecialchars($appointment_id) ?>">
-                            <!-- Remove doctor_id hidden field, it's now fetched from appointment -->
 
                             <div class="mb-3">
                                 <label class="form-label">Bed</label>
-                                <select name="bed_id" class="form-select">
+                                <select name="bed_id" class="form-select form-select-sm" required>
                                     <option value="">-- Select Bed --</option>
                                     <?php foreach($beds as $row): ?>
-                                        <option value="<?= $row['bed_id'] ?>">
-                                            <?= htmlspecialchars($row['bed_number']) ?> (<?= htmlspecialchars($row['ward']) ?>, Room <?= htmlspecialchars($row['room_number']) ?>, <?= htmlspecialchars($row['bed_type']) ?>)
+                                        <?php if(strtolower($row['status']) == 'available'): ?>
+                                            <option value="<?= $row['bed_id'] ?>">
+                                                <?= htmlspecialchars($row['bed_number']) ?> (<?= htmlspecialchars($row['ward']) ?>, Room <?= htmlspecialchars($row['room_number']) ?>, <?= htmlspecialchars($row['bed_type']) ?>)
                                         </option>
+                                        <?php else: ?>
+                                            <option value="<?= $row['bed_id'] ?>" disabled style="color:#aaa;">
+                                                <?= htmlspecialchars($row['bed_number']) ?> (<?= htmlspecialchars($row['ward']) ?>, Room <?= htmlspecialchars($row['room_number']) ?>, <?= htmlspecialchars($row['bed_type']) ?>) - <?= ucfirst($row['status']) ?>
+                                        </option>
+                                        <?php endif; ?>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label">Nurse Assistant</label>
-                                <select name="nurse_assistant" class="form-select">
+                                <select name="nurse_assistant" class="form-select form-select-sm">
                                     <option value="">-- Select Nurse --</option>
                                     <?php foreach($nurses as $row): ?>
                                         <option value="<?= $row['employee_id'] ?>">
@@ -456,27 +521,152 @@ if ($result_pat && $result_pat->num_rows > 0) {
 
                             <div class="mb-3">
                                 <label class="form-label">Procedure</label>
-                                <input type="text" name="procedure" class="form-control" required>
+                                <input type="text" name="procedure" class="form-control form-control-sm" required>
                             </div>
 
+                            <!-- Equipment selection by machine type and name -->
                             <div class="mb-3">
                                 <label class="form-label">Equipment</label>
-                                <input type="text" name="equipment" class="form-control">
+                                <div id="equipmentsList">
+                                    <div class="d-flex mb-2 equipment-row">
+                                        <select name="equipment_type[]" class="form-select form-select-sm equipment-type" style="width:48%;" required>
+                                            <option value="">-- Select Machine Type --</option>
+                                            <?php foreach(array_keys($machine_types) as $type): ?>
+                                                <option value="<?= htmlspecialchars($type) ?>"><?= htmlspecialchars($type) ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <select name="equipment_name[]" class="form-select form-select-sm equipment-name ms-2" style="width:48%;" required>
+                                            <option value="">-- Select Machine Name --</option>
+                                            <!-- JS will populate based on type -->
+                                        </select>
+                                        <button type="button" class="btn btn-danger btn-sm ms-2 remove-equipment">&times;</button>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-success btn-sm mt-2" id="addEquipmentBtn">+ Add Equipment</button>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">Tools</label>
-                                <input type="text" name="tools" class="form-control">
+                                <label class="form-label">Tools Needed</label>
+                                <div id="toolsList">
+                                    <div class="d-flex mb-2 tool-row">
+                                        <select name="tool_name[]" class="form-select form-select-sm" style="width:60%;">
+                                            <option value="">-- Select Tool --</option>
+                                            <?php foreach($tool_options as $tool): ?>
+                                                <option value="<?= htmlspecialchars($tool['name']) ?>">
+                                                    <?= htmlspecialchars($tool['type']) ?> - <?= htmlspecialchars($tool['name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <input type="number" name="tool_qty[]" class="form-control form-control-sm ms-2" style="width:30%;" min="1" value="1" placeholder="Qty">
+                                        <button type="button" class="btn btn-danger btn-sm ms-2 remove-tool">&times;</button>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-success btn-sm mt-2" id="addToolBtn">+ Add Tool</button>
                             </div>
 
                             <div class="mb-3">
                                 <label class="form-label">Notes</label>
-                                <textarea name="notes" class="form-control"></textarea>
+                                <textarea name="notes" class="form-control form-control-sm" rows="2"></textarea>
                             </div>
 
-                            <button type="submit" name="save_duty" class="btn btn-primary w-100">Save Assignment</button>
+                            <button type="submit" name="save_duty" class="btn btn-primary w-100 mt-2">Save Assignment</button>
                         </form>
                     </div>
+                </div>
+                <script>
+                    // Equipment name dynamic population
+                    const machineTypes = <?= json_encode($machine_types) ?>;
+                    function updateEquipmentName(selectType, selectName) {
+                        const type = selectType.value;
+                        selectName.innerHTML = '<option value="">-- Select Machine Name --</option>';
+                        if (machineTypes[type]) {
+                            machineTypes[type].forEach(function(equip) {
+                                selectName.innerHTML += '<option value="' + equip.machine_name + '">' + equip.machine_name + '</option>';
+                            });
+                        }
+                    }
+                    document.querySelectorAll('.equipment-type').forEach(function(selectType, idx) {
+                        const selectName = document.querySelectorAll('.equipment-name')[idx];
+                        selectType.addEventListener('change', function() {
+                            updateEquipmentName(selectType, selectName);
+                        });
+                    });
+                    document.getElementById('addEquipmentBtn').onclick = function() {
+                        const equipmentsList = document.getElementById('equipmentsList');
+                        const row = document.createElement('div');
+                        row.className = 'd-flex mb-2 equipment-row';
+                        row.innerHTML = `
+                            <select name="equipment_type[]" class="form-select form-select-sm equipment-type" style="width:48%;" required>
+                                <option value="">-- Select Machine Type --</option>
+                                <?php foreach(array_keys($machine_types) as $type): ?>
+                                    <option value="<?= htmlspecialchars($type) ?>"><?= htmlspecialchars($type) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select name="equipment_name[]" class="form-select form-select-sm equipment-name ms-2" style="width:48%;" required>
+                                <option value="">-- Select Machine Name --</option>
+                            </select>
+                            <button type="button" class="btn btn-danger btn-sm ms-2 remove-equipment">&times;</button>
+                        `;
+                        equipmentsList.appendChild(row);
+                        // Attach change event for new row
+                        const selectType = row.querySelector('.equipment-type');
+                        const selectName = row.querySelector('.equipment-name');
+                        selectType.addEventListener('change', function() {
+                            updateEquipmentName(selectType, selectName);
+                        });
+                    };
+                    document.getElementById('equipmentsList').addEventListener('click', function(e) {
+                        if (e.target.classList.contains('remove-equipment')) {
+                            e.target.parentElement.remove();
+                        }
+                    });
+
+                    // Tools dynamic add/remove
+                    document.getElementById('addToolBtn').onclick = function() {
+                        const toolsList = document.getElementById('toolsList');
+                        const row = document.createElement('div');
+                        row.className = 'd-flex mb-2 tool-row';
+                        row.innerHTML = `
+                            <select name="tool_name[]" class="form-select form-select-sm" style="width:60%;">
+                                <option value="">-- Select Tool --</option>
+                                <?php foreach($tool_options as $tool): ?>
+                                    <option value="<?= htmlspecialchars($tool['name']) ?>">
+                                        <?= htmlspecialchars($tool['type']) ?> - <?= htmlspecialchars($tool['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <input type="number" name="tool_qty[]" class="form-control form-control-sm ms-2" style="width:30%;" min="1" value="1" placeholder="Qty">
+                            <button type="button" class="btn btn-danger btn-sm ms-2 remove-tool">&times;</button>
+                        `;
+                        toolsList.appendChild(row);
+                    };
+                    document.getElementById('toolsList').addEventListener('click', function(e) {
+                        if (e.target.classList.contains('remove-tool')) {
+                            e.target.parentElement.remove();
+                        }
+                    });
+                </script>
+                <!-- Machine Equipments Table -->
+                <div class="container-fluid mt-4">
+                    <h4 class="mb-3 text-primary">Machine Equipments List</h4>
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>Machine ID</th>
+                                <th>Machine Type</th>
+                                <th>Machine Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach($machine_equipments as $equip): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($equip['machine_id']) ?></td>
+                                    <td><?= htmlspecialchars($equip['machine_type']) ?></td>
+                                    <td><?= htmlspecialchars($equip['machine_name']) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
                 <?php endif; ?>
 </div>
@@ -486,9 +676,6 @@ if ($result_pat && $result_pat->num_rows > 0) {
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="mb-0">My Duties</h2>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#prescriptionModal" style="min-width:180px;">
-                Issued Prescription
-            </button>
         </div>
         <table class="table table-bordered table-hover">
             <thead class="table-info">
@@ -509,7 +696,11 @@ if ($result_pat && $result_pat->num_rows > 0) {
             </thead>
             <tbody>
                 <?php if (!empty($duties)): ?>
-                    <?php foreach ($duties as $duty): ?>
+                    <?php foreach ($duties as $duty): 
+                        $equipModalId = "equipModal" . $duty['duty_id'];
+                        $toolsModalId = "toolsModal" . $duty['duty_id'];
+                        $notesModalId = "notesModal" . $duty['duty_id'];
+                    ?>
                         <tr>
                             <td><?= htmlspecialchars($duty['duty_id']) ?></td>
                             <td><?= htmlspecialchars($duty['appointment_id']) ?></td>
@@ -517,9 +708,67 @@ if ($result_pat && $result_pat->num_rows > 0) {
                             <td><?= htmlspecialchars($duty['bed_id']) ?></td>
                             <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
                             <td><?= htmlspecialchars($duty['procedure']) ?></td>
-                            <td><?= htmlspecialchars($duty['equipment']) ?></td>
-                            <td><?= htmlspecialchars($duty['tools']) ?></td>
-                            <td><?= htmlspecialchars($duty['notes']) ?></td>
+                            <td>
+                                <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $equipModalId ?>">See</button>
+                                <!-- Equipment Modal -->
+                                <div class="modal fade" id="<?= $equipModalId ?>" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Equipment</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <pre><?= htmlspecialchars($duty['equipment']) ?></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $toolsModalId ?>">See</button>
+                                <!-- Tools Modal -->
+                                <div class="modal fade" id="<?= $toolsModalId ?>" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Tools</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <pre><?php
+                                                    // Try to pretty print JSON if possible
+                                                    $tools = $duty['tools'];
+                                                    if ($tools && ($decoded = json_decode($tools, true))) {
+                                                        foreach ($decoded as $tool) {
+                                                            echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")\n";
+                                                        }
+                                                    } else {
+                                                        echo htmlspecialchars($tools);
+                                                    }
+                                                ?></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $notesModalId ?>">See</button>
+                                <!-- Notes Modal -->
+                                <div class="modal fade" id="<?= $notesModalId ?>" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Notes</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <pre><?= htmlspecialchars($duty['notes']) ?></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
                             <td><?= htmlspecialchars($duty['status']) ?></td>
                             <td><?= htmlspecialchars($duty['created_at']) ?></td>
                             <td>
@@ -533,13 +782,28 @@ if ($result_pat && $result_pat->num_rows > 0) {
             </tbody>
         </table>
     </div>
+                        
+
+
+
+    
+            <div class="container-fluid">
+                <div class="title-container">
+                    <i class="fa-solid fa-capsules"></i>
+                    <h1 class="page-title">Add Prescription</h1>
+                </div>
+
+                <div class="content mt-4">
+                    <!-- Header Section -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2></h2>
+                        <div>
+                            <!-- Button trigger modal -->
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#prescriptionModal">
+                                Add Prescription
+                            </button>
                         </div>
-
-
-
-                                                  
-                          
-                
+                    </div>
 
 
 
@@ -553,7 +817,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
 
-                                <form action="process_prescription.php" method="POST">
+                                <form action="../../Pharmacy Management/process_prescription.php" method="POST">
                                     <div class="modal-body">
 
                                         <!-- Doctor -->
@@ -634,6 +898,110 @@ if ($result_pat && $result_pat->num_rows > 0) {
                             </div>
                         </div>
                     </div>
+
+
+                    <script>
+                        // Update medicine info and validate quantity
+                        function updateMedicineInfo(selectElem) {
+                            let selected = selectElem.options[selectElem.selectedIndex];
+                            let dosage = selected.getAttribute('data-dosage') || '';
+                            let stock = selected.getAttribute('data-stock') || '0';
+
+                            let row = selectElem.closest('.medicine-row');
+                            row.querySelector('.dosage-input').value = dosage;
+                            row.querySelector('.stock-display').value = stock;
+
+                            // Remove old input listener to prevent stacking
+                            let qtyInput = row.querySelector('input[name="quantity[]"]');
+                            let newQtyInput = qtyInput.cloneNode(true);
+                            qtyInput.parentNode.replaceChild(newQtyInput, qtyInput);
+
+                            newQtyInput.addEventListener('input', function() {
+                                let currentStock = parseInt(row.querySelector('.stock-display').value) || 0;
+                                let enteredQty = parseInt(this.value);
+
+                                if (!isNaN(enteredQty) && enteredQty > currentStock) {
+                                    alert("Entered quantity exceeds available stock (" + currentStock + ")");
+                                    this.value = currentStock;
+                                }
+                            });
+
+                            updateMedicineOptions(); // refresh options to disable already selected medicines
+                        }
+
+                        // Disable already selected medicines in all rows
+                        function updateMedicineOptions() {
+                            let selectedValues = Array.from(document.querySelectorAll('.medicine-select'))
+                                .map(sel => sel.value)
+                                .filter(val => val !== '');
+
+                            document.querySelectorAll('.medicine-select').forEach(sel => {
+                                Array.from(sel.options).forEach(option => {
+                                    if (option.value !== '' && option.value !== sel.value) {
+                                        option.disabled = selectedValues.includes(option.value);
+                                    }
+                                });
+                            });
+                        }
+
+                        // Bind existing medicine selects
+                        document.querySelectorAll('.medicine-select').forEach(sel => {
+                            sel.addEventListener('change', function() {
+                                updateMedicineInfo(this);
+                            });
+                        });
+
+                        // Add new medicine row
+                        document.getElementById('addMedicine').addEventListener('click', function() {
+                            let newRow = document.querySelector('.medicine-row').cloneNode(true);
+
+                            // Clear inputs and selects
+                            newRow.querySelectorAll('input').forEach(input => input.value = '');
+                            newRow.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
+
+                            document.getElementById('medicineRows').appendChild(newRow);
+
+                            // Re-bind events for the new row
+                            let newSelect = newRow.querySelector('.medicine-select');
+                            newSelect.addEventListener('change', function() {
+                                updateMedicineInfo(this);
+                            });
+
+                            newRow.querySelector('.remove-medicine').addEventListener('click', function() {
+                                newRow.remove();
+                                updateMedicineOptions(); // re-enable removed medicine
+                            });
+
+                            updateMedicineOptions(); // refresh options for all rows
+                        });
+
+                        // Remove medicine row buttons
+                        document.querySelectorAll('.remove-medicine').forEach(btn => {
+                            btn.addEventListener('click', function() {
+                                this.closest('.medicine-row').remove();
+                                updateMedicineOptions();
+                            });
+                        });
+
+                        // Prevent form submission if any quantity is 0 or empty
+                        document.querySelector('form').addEventListener('submit', function(e) {
+                            let invalid = false;
+                            document.querySelectorAll('input[name="quantity[]"]').forEach(qtyInput => {
+                                let val = parseInt(qtyInput.value);
+                                if (isNaN(val) || val <= 0) {
+                                    invalid = true;
+                                    qtyInput.classList.add('is-invalid'); // optional: highlight invalid fields
+                                } else {
+                                    qtyInput.classList.remove('is-invalid');
+                                }
+                            });
+
+                            if (invalid) {
+                                e.preventDefault();
+                                alert("Please enter a valid quantity greater than 0 for all medicines.");
+                            }
+                        });
+                    </script>
 
             <!-- END CODING HERE -->
 

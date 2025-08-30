@@ -12,17 +12,24 @@
             border-radius: 16px;
             max-width: 500px;
             width: 100%;
+            background: #fff;
+            padding: 32px 24px 24px 24px;
+            position: relative;
         }
         .close-modal-btn {
-            float: right;
-            font-size: 1.5rem;
+            position: absolute;
+            top: 10px;
+            right: 18px;
+            font-size: 2rem;
             color: #888;
             background: none;
             border: none;
-            margin-top: -10px;
+            z-index: 2;
+            cursor: pointer;
+            transition: color 0.2s;
         }
         .close-modal-btn:hover {
-            color: #333;
+            color: #0d6efd;
         }
 .container-fluid{
      width:95%;
@@ -55,5 +62,44 @@ a {
     margin-left: auto;
     margin-bottom: 0;
     min-width: 180px;
+}
+.modal-content {
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    background: #fff;
+    padding: 24px 18px 18px 18px;
+    border: none;
+}
+
+.modal-header {
+    border-bottom: 1px solid #eee;
+    background: #f8f9fa;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 16px 18px;
+}
+
+.modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #0d6efd;
+}
+
+.modal-body {
+    padding: 16px 0;
+    font-size: 1rem;
+    color: #333;
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #888;
+    transition: color 0.2s;
+    margin-left: auto;
+}
+.btn-close:hover {
+    color: #0d6efd;
 }
 
