@@ -49,6 +49,28 @@ $patientsWithoutBillingCount = $patientsWithoutBilling ? $patientsWithoutBilling
 
 // Get all billing records
 $records = $billing->getAllBillingRecords();
+
+// Helper function to calculate total amount from diagnostic results for a patient
+function getTotalAmountForPatient($conn, $patient_id) {
+    $total = 0;
+    // Get diagnostic results for patient
+    $sql_diag = "SELECT result FROM dl_results WHERE patientID = ?";
+    $stmt_diag = $conn->prepare($sql_diag);
+    $stmt_diag->bind_param('i', $patient_id);
+    $stmt_diag->execute();
+    $result_diag = $stmt_diag->get_result();
+    while ($row = $result_diag->fetch_assoc()) {
+        $service_name = $row['result'];
+        $service_stmt = $conn->prepare("SELECT price FROM dl_services WHERE serviceName = ?");
+        $service_stmt->bind_param("s", $service_name);
+        $service_stmt->execute();
+        $service_result = $service_stmt->get_result();
+        if ($service_row = $service_result->fetch_assoc()) {
+            $total += floatval($service_row['price']);
+        }
+    }
+    return $total;
+}
 ?>
 
 <!DOCTYPE html>
@@ -204,15 +226,18 @@ $records = $billing->getAllBillingRecords();
                                             echo "<td>" . (isset($row['patient_id']) ? $row['patient_id'] : 'N/A') . "</td>";
                                             echo "<td>" . (isset($row['fname']) ? $row['fname'] . ' ' . $row['lname'] : 'N/A') . "</td>";
                                             echo "<td>" . (isset($row['billing_date']) ? $row['billing_date'] : 'N/A') . "</td>";
-                                            echo "<td>₱" . (isset($row['total_amount']) ? number_format($row['total_amount'], 2) : '0.00') . "</td>";
-                                            
+
+                                            // Calculate total amount from dl_services prices
+                                            $patient_id = isset($row['patient_id']) ? $row['patient_id'] : 0;
+                                            $total_amount = getTotalAmountForPatient($conn, $patient_id);
+                                            echo "<td>₱" . number_format($total_amount, 2) . "</td>";
+
                                             $insurance_covered = isset($row['insurance_covered_amount']) ? $row['insurance_covered_amount'] : 0;
                                             echo "<td>₱" . number_format($insurance_covered, 2) . "</td>";
-                                            
-                                            $total_amount = isset($row['total_amount']) ? $row['total_amount'] : 0;
+
                                             $out_of_pocket = max(0, $total_amount - $insurance_covered);
                                             echo "<td>₱" . number_format($out_of_pocket, 2) . "</td>";
-                                            
+
                                             $badgeClass = 'minimal-badge ';
                                             $status = isset($row['status']) ? $row['status'] : 'pending';
                                             switch($status) {

@@ -1,0 +1,24 @@
+body { font-family: Arial, sans-serif; margin: 30px; }
+.header-bar { background-color: #1976d2; height: 12px; border-radius: 8px 8px 0 0; }
+.footer-bar { background-color: #1976d2; color: #fff; padding: 8px; border-radius: 0 0 8px 8px; font-weight: bold; margin-top:30px;}
+.section-title { font-weight: bold; font-size: 18px; margin-bottom: 8px; }
+.info-table td { padding: 2px 8px; font-size: 13px; }
+.invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+.invoice-table th, .invoice-table td { border: 1px solid #1976d2; padding: 6px; font-size: 13px; }
+.invoice-table th { background-color: #e3f2fd; color: #1976d2; font-weight: bold; }
+.total-box { background-color: #e3f2fd; font-weight: bold; padding: 8px; font-size: 15px; }
+.blue-label { color: #1976d2; font-weight: bold; }
+.amount-due-box { background-color: #e3f2fd; font-weight: bold; padding: 6px; text-align: center; }
+.print-btn {
+    background: #1976d2;
+    color: #fff;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 5px;
+    font-size: 15px;
+    cursor: pointer;
+    margin-bottom: 18px;
+}
+.print-btn:hover {
+    background: #145ea8;
+}
