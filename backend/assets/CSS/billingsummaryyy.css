@@ -1,0 +1,64 @@
+.billing-summary-table thead {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.billing-summary-table td,
+.billing-summary-table th {
+    vertical-align: middle;
+}
+
+.billing-summary-table tbody tr:nth-child(odd) {
+    background-color: #fdfdfd;
+}
+
+.billing-summary-table tfoot td {
+    font-size: 16px;
+    padding-top: 12px;
+}
+
+.billing-summary-table tfoot .text-danger {
+    color: #dc3545;
+}
+
+.billing-summary-table tfoot .fw-bold {
+    font-weight: 600;
+}
+
+.billing-table-section {
+    background: #fff;
+    border-radius: 8px;
+    padding: 25px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    margin-bottom: 40px;
+}
+
+.billing-summary-title,
+.billing-table-title {
+    font-weight: 600;
+    font-size: 26px;
+    color: #333;
+}
+
+.patient-info-card {
+    background: #f9fafc;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+
+.patient-info-title {
+    font-weight: 600;
+    font-size: 18px;
+}
+
+.patient-info-label {
+    font-weight: 500;
+    color: #555;
+}
+
+.patient-info-value {
+    font-weight: 400;
+    color: #111;
+}
