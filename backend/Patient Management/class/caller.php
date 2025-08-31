@@ -123,26 +123,31 @@ class PatientAdmission {
         return $this->patient;
     }
 
-    // Handle admission form submission
-    public function admitPatient($patient_id, $bed_id, $assigned_date) {
-        $insert = "INSERT INTO p_bed_assignments (patient_id, bed_id, assigned_date) 
-                   VALUES (?, ?, ?)";
+     public function admit($patient_id, $bed_id, $assigned_date, $admission_type) {
+        //  Insert into bed_assignment
+        $insert = "INSERT INTO bed_assignment (patient_id, bed_id, assigned_date) VALUES (?, ?, ?)";
         $stmt = $this->conn->prepare($insert);
         $stmt->bind_param("iis", $patient_id, $bed_id, $assigned_date);
 
         if ($stmt->execute()) {
-            // Update bed status
-            $update = "UPDATE p_beds SET status = 'Occupied' WHERE bed_id = ?";
-            $stmt2 = $this->conn->prepare($update);
+            //  Update bed status
+            $updateBed = "UPDATE p_beds SET status = 'Occupied' WHERE bed_id = ?";
+            $stmt2 = $this->conn->prepare($updateBed);
             $stmt2->bind_param("i", $bed_id);
             $stmt2->execute();
 
-            echo "<script>alert('Patient admitted and bed marked as Occupied!'); 
-                  window.location='inpatient.php';</script>";
+            //  Update patient admission type
+            $updateType = "UPDATE patients SET admission_type = ? WHERE patient_id = ?";
+            $stmt3 = $this->conn->prepare($updateType);
+            $stmt3->bind_param("si", $admission_type, $patient_id);
+            $stmt3->execute();
+
+            echo "<script>alert('Patient admitted successfully!'); window.location='inpatient.php';</script>";
         } else {
             echo "Error: " . $this->conn->error;
         }
     }
+
 
     // Get available beds
     public function getAvailableBeds() {
@@ -158,14 +163,14 @@ class PatientDischarge {
     public function __construct($conn) {
         $this->conn = $conn;
 
-        // ✅ Check login
+        //  Check login
         if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
             header("Location: login.php");
             exit();
         }
     }
 
-    // ✅ Find active admission
+    //  Find active admission
     public function getActiveAdmission($patient_id) {
         $query = "SELECT * FROM p_bed_assignments WHERE patient_id = ? AND released_date IS NULL";
         $stmt = $this->conn->prepare($query);
@@ -177,21 +182,23 @@ class PatientDischarge {
         return $this->assignment;
     }
 
-    // ✅ Discharge patient
+
     public function discharge($assignment_id, $bed_id, $patient_id, $released_date) {
-        // 1️⃣ Update bed_assignment released_date
+
+        //  Update bed_assignment released_date
         $updateAssign = "UPDATE p_bed_assignments SET released_date = ? WHERE assignment_id = ?";
         $stmt = $this->conn->prepare($updateAssign);
         $stmt->bind_param("si", $released_date, $assignment_id);
 
         if ($stmt->execute()) {
-            // 2️⃣ Set bed back to Available
+            //  Set bed back to Available
             $updateBed = "UPDATE p_beds SET status = 'Available' WHERE bed_id = ?";
             $stmt2 = $this->conn->prepare($updateBed);
             $stmt2->bind_param("i", $bed_id);
 
             if ($stmt2->execute()) {
-                // 3️⃣ Update patient status
+                
+                //  Update patient status
                 $updatePatientStatus = "UPDATE patientinfo SET admission_type = 'Outpatient' WHERE patient_id = ?";
                 $stmt3 = $this->conn->prepare($updatePatientStatus);
                 $stmt3->bind_param("i", $patient_id);

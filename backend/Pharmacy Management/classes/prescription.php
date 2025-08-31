@@ -9,30 +9,33 @@ class Prescription
     }
 
     // Add new prescription
-    public function addPrescription($doctor_id, $patient_id, $note, $status, $items)
+    public function addPrescription($doctor_id, $patient_id, $note, $status, $payment_type, $items)
     {
         mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
         try {
             $this->conn->begin_transaction();
 
+            // Set billing_status to pending initially for all prescriptions
+            $billing_status = 'pending';
+
             // Insert into pharmacy_prescription
             $stmt = $this->conn->prepare("
-                INSERT INTO pharmacy_prescription 
-                (doctor_id, patient_id, prescription_date, note, status) 
-                VALUES (?, ?, NOW(), ?, ?)
-            ");
-            $stmt->bind_param("iiss", $doctor_id, $patient_id, $note, $status);
+            INSERT INTO pharmacy_prescription 
+            (doctor_id, patient_id, prescription_date, note, status, payment_type, billing_status) 
+            VALUES (?, ?, NOW(), ?, ?, ?, ?)
+        ");
+            $stmt->bind_param("iissss", $doctor_id, $patient_id, $note, $status, $payment_type, $billing_status);
             $stmt->execute();
             $prescription_id = $this->conn->insert_id;
 
             // Insert each medicine into items table
             foreach ($items as $item) {
                 $stmtItem = $this->conn->prepare("
-                    INSERT INTO pharmacy_prescription_items 
-                    (prescription_id, med_id, dosage, quantity_prescribed, quantity_dispensed) 
-                    VALUES (?, ?, ?, ?, 0)
-                ");
+                INSERT INTO pharmacy_prescription_items 
+                (prescription_id, med_id, dosage, quantity_prescribed, quantity_dispensed) 
+                VALUES (?, ?, ?, ?, 0)
+            ");
                 $stmtItem->bind_param(
                     "iisi",
                     $prescription_id,
@@ -50,6 +53,7 @@ class Prescription
             die("MySQL Error: " . $e->getMessage());
         }
     }
+
 
     // Fetch doctors only
     public function getDoctors()

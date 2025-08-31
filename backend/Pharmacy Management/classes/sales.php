@@ -9,7 +9,7 @@ class Sales
         $this->conn = $db;
     }
 
-    // Total Sales
+    // Total Sales (only cash)
     public function getTotalSales($period = 'all')
     {
         $where = "1";
@@ -23,7 +23,10 @@ class Sales
 
         $sql = "SELECT SUM(i.total_price) as total
                 FROM pharmacy_prescription_items i
-                WHERE i.quantity_dispensed > 0 AND $where";
+                JOIN pharmacy_prescription p ON i.prescription_id = p.prescription_id
+                WHERE i.quantity_dispensed > 0
+                  AND p.payment_type = 'cash'
+                  AND $where";
         $result = $this->conn->query($sql);
         if (!$result) die("Query failed in getTotalSales(): " . $this->conn->error);
 
@@ -31,7 +34,7 @@ class Sales
         return $row['total'] ?? 0;
     }
 
-    // Total Orders
+    // Total Orders (only cash)
     public function getTotalOrders($period = 'all')
     {
         $where = "1";
@@ -44,15 +47,17 @@ class Sales
         }
 
         $sql = "SELECT COUNT(DISTINCT p.prescription_id) as orders
-                FROM pharmacy_prescription p
-                JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
-                WHERE p.status = 'Dispensed' AND $where";
+                FROM pharmacy_prescription_items i
+                JOIN pharmacy_prescription p ON i.prescription_id = p.prescription_id
+                WHERE i.quantity_dispensed > 0
+                  AND p.payment_type = 'cash'
+                  AND $where";
         $result = $this->conn->query($sql);
         $row = $result->fetch_assoc();
         return $row['orders'] ?? 0;
     }
 
-    // Revenue by Category
+    // Revenue by Category (only cash)
     public function getRevenueByCategory($period = 'all')
     {
         $where = "1";
@@ -67,7 +72,10 @@ class Sales
         $sql = "SELECT inv.category, SUM(i.total_price) AS total
                 FROM pharmacy_prescription_items i
                 JOIN pharmacy_inventory inv ON i.med_id = inv.med_id
-                WHERE i.quantity_dispensed > 0 AND $where
+                JOIN pharmacy_prescription p ON i.prescription_id = p.prescription_id
+                WHERE i.quantity_dispensed > 0
+                  AND p.payment_type = 'cash'
+                  AND $where
                 GROUP BY inv.category";
         $result = $this->conn->query($sql);
         if (!$result) die("Query failed in getRevenueByCategory(): " . $this->conn->error);
@@ -77,7 +85,7 @@ class Sales
         return $data;
     }
 
-    // Top Products
+    // Top Products (only cash)
     public function getTopProducts($period = 'all', $limit = 10)
     {
         $where = "1";
@@ -97,7 +105,10 @@ class Sales
                     inv.expiry_date
                 FROM pharmacy_prescription_items i
                 JOIN pharmacy_inventory inv ON i.med_id = inv.med_id
-                WHERE i.quantity_dispensed > 0 AND $where
+                JOIN pharmacy_prescription p ON i.prescription_id = p.prescription_id
+                WHERE i.quantity_dispensed > 0
+                  AND p.payment_type = 'cash'
+                  AND $where
                 GROUP BY inv.med_id, inv.med_name, inv.category, inv.expiry_date
                 ORDER BY qty DESC
                 LIMIT {$limit}";
@@ -107,19 +118,21 @@ class Sales
         return $result;
     }
 
-    // -------------------- NEW: Sales Performance (Weekly, Monthly, Yearly) --------------------
+    // Sales Performance (Weekly, Monthly, Yearly) (only cash)
     public function getSalesPerformance()
     {
         $data = [];
 
         // Weekly (last 7 days)
         $sqlWeek = "
-            SELECT DATE_FORMAT(dispensed_date, '%a') AS day_name, SUM(total_price) AS total
-            FROM pharmacy_prescription_items
-            WHERE quantity_dispensed > 0
-              AND dispensed_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-            GROUP BY DAY(dispensed_date)
-            ORDER BY dispensed_date ASC
+            SELECT DATE_FORMAT(i.dispensed_date, '%a') AS day_name, SUM(i.total_price) AS total
+            FROM pharmacy_prescription_items i
+            JOIN pharmacy_prescription p ON i.prescription_id = p.prescription_id
+            WHERE i.quantity_dispensed > 0
+              AND p.payment_type = 'cash'
+              AND i.dispensed_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+            GROUP BY DAY(i.dispensed_date)
+            ORDER BY i.dispensed_date ASC
         ";
         $result = $this->conn->query($sqlWeek);
         $daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -132,13 +145,15 @@ class Sales
 
         // Monthly (current month)
         $sqlMonth = "
-            SELECT DAY(dispensed_date) AS day_num, SUM(total_price) AS total
-            FROM pharmacy_prescription_items
-            WHERE quantity_dispensed > 0
-              AND MONTH(dispensed_date) = MONTH(CURDATE()) 
-              AND YEAR(dispensed_date) = YEAR(CURDATE())
-            GROUP BY DAY(dispensed_date)
-            ORDER BY dispensed_date ASC
+            SELECT DAY(i.dispensed_date) AS day_num, SUM(i.total_price) AS total
+            FROM pharmacy_prescription_items i
+            JOIN pharmacy_prescription p ON i.prescription_id = p.prescription_id
+            WHERE i.quantity_dispensed > 0
+              AND p.payment_type = 'cash'
+              AND MONTH(i.dispensed_date) = MONTH(CURDATE())
+              AND YEAR(i.dispensed_date) = YEAR(CURDATE())
+            GROUP BY DAY(i.dispensed_date)
+            ORDER BY i.dispensed_date ASC
         ";
         $result = $this->conn->query($sqlMonth);
         $daysInMonth = range(1, date('t'));
@@ -151,12 +166,14 @@ class Sales
 
         // Yearly (current year)
         $sqlYear = "
-            SELECT MONTH(dispensed_date) AS month_num, SUM(total_price) AS total
-            FROM pharmacy_prescription_items
-            WHERE quantity_dispensed > 0
-              AND YEAR(dispensed_date) = YEAR(CURDATE())
-            GROUP BY MONTH(dispensed_date)
-            ORDER BY MONTH(dispensed_date) ASC
+            SELECT MONTH(i.dispensed_date) AS month_num, SUM(i.total_price) AS total
+            FROM pharmacy_prescription_items i
+            JOIN pharmacy_prescription p ON i.prescription_id = p.prescription_id
+            WHERE i.quantity_dispensed > 0
+              AND p.payment_type = 'cash'
+              AND YEAR(i.dispensed_date) = YEAR(CURDATE())
+            GROUP BY MONTH(i.dispensed_date)
+            ORDER BY MONTH(i.dispensed_date) ASC
         ";
         $result = $this->conn->query($sqlYear);
         $months = range(1, 12);

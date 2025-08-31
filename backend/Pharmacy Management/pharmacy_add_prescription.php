@@ -196,7 +196,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
 
-                                <form action="../../Pharmacy Management/process_prescription.php" method="POST">
+                                <form action="process_prescription.php" method="POST">
                                     <div class="modal-body">
 
                                         <!-- Doctor -->

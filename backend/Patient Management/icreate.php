@@ -120,16 +120,8 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Admission Type</label>
                                 <div class="col-sm-9">
-                                    <select class="form-select" name="admission_type" required>
-                                        <option value="">-- Select Admission Type --</option>
-                                        <option value="Emergency">Emergency</option>
-                                        <option value="Planned">Planned</option>
-                                        <option value="Elective">Elective</option>
-                                        <option value="Day Case">Day Case</option>
-                                        <option value="Maternity">Maternity</option>
-                                        <option value="Outpatient">Outpatient</option>
-                                        <option value="Observation">Observation</option>
-                                    </select>
+                                    <input class="form-control" name="admission_type" value="Registered Patient"
+                                        readonly>
                                 </div>
                             </div>
 
