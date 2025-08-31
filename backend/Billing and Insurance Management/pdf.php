@@ -64,6 +64,26 @@ $stmt_user->execute();
 $result_user = $stmt_user->get_result();
 $user = $result_user->fetch_assoc();
 
+// Calculate subtotal from diagnostic results
+$subtotal = 0;
+if (!empty($diag_results)) {
+    foreach ($diag_results as $item) {
+        $service_name = $item['result'];
+        $service_stmt = $conn->prepare("SELECT price FROM dl_services WHERE serviceName = ?");
+        $service_stmt->bind_param("s", $service_name);
+        $service_stmt->execute();
+        $service_result = $service_stmt->get_result();
+        if ($service_row = $service_result->fetch_assoc()) {
+            $subtotal += floatval($service_row['price']);
+        }
+    }
+}
+
+// Ensure out_of_pocket is set and numeric
+$out_of_pocket = (isset($billing['out_of_pocket']) && is_numeric($billing['out_of_pocket']))
+    ? floatval($billing['out_of_pocket'])
+    : 0.00;
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -131,7 +151,7 @@ $user = $result_user->fetch_assoc();
                 <?php echo date('Y-m-d', strtotime($billing['billing_date'] . ' +7 days')); ?>
             </td>
             <td class="amount-due-box">
-                <?php echo '₱ ' . number_format($billing['out_of_pocket'], 2); ?>
+                <?php echo '₱ ' . number_format($out_of_pocket, 2); ?>
             </td>
         </tr>
     </table>
@@ -148,8 +168,18 @@ $user = $result_user->fetch_assoc();
                     <td><?php echo htmlspecialchars($item['remarks']); ?></td>
                     <td>
                         <?php
-                        // If you have price info, fetch from dl_services table or show '-'
-                        echo '-';
+                        // Fetch price from dl_services table based on result (serviceName)
+                        $service_name = $item['result'];
+                        $price = '-';
+
+                        $service_stmt = $conn->prepare("SELECT price FROM dl_services WHERE serviceName = ?");
+                        $service_stmt->bind_param("s", $service_name);
+                        $service_stmt->execute();
+                        $service_result = $service_stmt->get_result();
+                        if ($service_row = $service_result->fetch_assoc()) {
+                            $price = '₱ ' . number_format($service_row['price'], 2);
+                        }
+                        echo $price;
                         ?>
                     </td>
                 </tr>
@@ -164,10 +194,28 @@ $user = $result_user->fetch_assoc();
         <tr>
             <td width="70%"></td>
             <td width="30%">
-                SUB TOTAL: ₱ <?php echo number_format($billing['total_amount'], 2); ?><br>
-                TAX RATE: 0.00%<br>
+                SUB TOTAL: ₱ <?php echo number_format($subtotal, 2); ?><br>
+                <?php
+                // Fetch insurance covered for this billing_id and patient_id
+                $insurance_covered = 0.00;
+                $insurance_type = 'N/A';
+
+                $ins_stmt = $conn->prepare(
+                    "SELECT insurance_covered, insurance_type 
+                     FROM insurance_request 
+                     WHERE billing_id = ? AND patient_id = ? AND status = 'Approved' LIMIT 1"
+                );
+                $ins_stmt->bind_param("ii", $billing_id, $billing['patient_id']);
+                $ins_stmt->execute();
+                $ins_result = $ins_stmt->get_result();
+                if ($ins_row = $ins_result->fetch_assoc()) {
+                    $insurance_covered = floatval($ins_row['insurance_covered']);
+                    $insurance_type = !empty($ins_row['insurance_type']) ? $ins_row['insurance_type'] : 'N/A';
+                }
+                ?>
+                INSURANCE COVERED (<?php echo htmlspecialchars($insurance_type); ?>): ₱ <?php echo number_format($insurance_covered, 2); ?><br>
                 TAX: ₱ 0.00<br>
-                <div class="total-box">TOTAL: ₱ <?php echo number_format($billing['out_of_pocket'], 2); ?></div>
+                <div class="total-box">TOTAL: ₱ <?php echo number_format($out_of_pocket, 2); ?></div>
             </td>
         </tr>
     </table>
