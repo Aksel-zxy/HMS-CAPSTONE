@@ -1,6 +1,8 @@
 <?php
-require '../../SQL/config.php';
-require 'classes/prescription.php';
+require '../../../SQL/config.php';
+require '../../Pharmacy Management/classes/prescription.php';
+
+
 
 // Check if only one doctor exists
 $sql = "SELECT employee_id FROM hr_employees WHERE profession = 'Doctor'";
@@ -53,13 +55,13 @@ try {
     );
 
     if ($success) {
-        header("Location: pharmacy_add_prescription.php?success=1");
+        header("Location: doctor_duty.php?success=1");
         exit;
     } else {
-        header("Location: pharmacy_add_prescription.php?error=1");
+        header("Location: doctor_duty.php?error=1");
         exit;
     }
 } catch (mysqli_sql_exception $e) {
-    header("Location: pharmacy_add_prescription.php?error=" . urlencode($e->getMessage()));
+    header("Location: doctor_duty.php?error=" . urlencode($e->getMessage()));
     exit;
 }

@@ -193,6 +193,7 @@ if (!$user) {
                                     <th>Total Quantity</th>
                                     <th>Quantity Dispensed</th>
                                     <th>Status</th>
+                                    <th>Payment Type</th> <!-- NEW COLUMN -->
                                     <th>Note</th>
                                     <th>Date</th>
                                 </tr>
@@ -201,28 +202,29 @@ if (!$user) {
                                 <?php
                                 // Pending prescriptions
                                 $sql_prescriptions = "
-                    SELECT 
-                        p.prescription_id,
-                        CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
-                        CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
-                        GROUP_CONCAT(
-                            CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
-                            SEPARATOR '<br>'
-                        ) AS medicines_list,
-                        SUM(i.quantity_prescribed) AS total_quantity,
-                        SUM(i.quantity_dispensed) AS total_dispensed,
-                        p.status,
-                        p.note,
-                        DATE_FORMAT(p.prescription_date, '%b %e, %Y %l:%i%p') AS formatted_date
-                    FROM pharmacy_prescription p
-                    JOIN patientinfo pi ON p.patient_id = pi.patient_id
-                    JOIN hr_employees e ON p.doctor_id = e.employee_id
-                    JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
-                    JOIN pharmacy_inventory m ON i.med_id = m.med_id
-                    WHERE p.status = 'Pending' AND LOWER(e.profession) = 'doctor'
-                    GROUP BY p.prescription_id
-                    ORDER BY p.prescription_date DESC
-                ";
+                SELECT 
+                    p.prescription_id,
+                    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+                    CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
+                    GROUP_CONCAT(
+                        CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
+                        SEPARATOR '<br>'
+                    ) AS medicines_list,
+                    SUM(i.quantity_prescribed) AS total_quantity,
+                    SUM(i.quantity_dispensed) AS total_dispensed,
+                    p.status,
+                    p.payment_type, -- FETCH PAYMENT TYPE
+                    p.note,
+                    DATE_FORMAT(p.prescription_date, '%b %e, %Y %l:%i%p') AS formatted_date
+                FROM pharmacy_prescription p
+                JOIN patientinfo pi ON p.patient_id = pi.patient_id
+                JOIN hr_employees e ON p.doctor_id = e.employee_id
+                JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
+                JOIN pharmacy_inventory m ON i.med_id = m.med_id
+                WHERE p.status = 'Pending' AND LOWER(e.profession) = 'doctor'
+                GROUP BY p.prescription_id
+                ORDER BY p.prescription_date DESC
+            ";
 
                                 $pending_result = $conn->query($sql_prescriptions);
 
@@ -249,6 +251,16 @@ if (!$user) {
                                                 </select>
                                             </td>
                                             <td>
+                                                <select class="form-select form-select-sm"
+                                                    data-old="<?= $row['payment_type']; ?>"
+                                                    onchange="handlePaymentTypeChange(this, <?= $prescriptionId; ?>)"
+                                                    <?= ($status === 'Dispensed' || $status === 'Cancelled') ? 'disabled' : ''; ?>>
+                                                    <option value="cash" <?= ($row['payment_type'] === 'cash' ? 'selected' : ''); ?>>Cash</option>
+                                                    <option value="post_discharged" <?= ($row['payment_type'] === 'post_discharged' ? 'selected' : ''); ?>>Post-Discharge</option>
+                                                </select>
+                                            </td>
+
+                                            <td>
                                                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $noteId; ?>">View Note</button>
                                             </td>
                                             <td><?= $row['formatted_date']; ?></td>
@@ -274,12 +286,13 @@ if (!$user) {
                                 <?php
                                     }
                                 } else {
-                                    echo "<tr><td colspan='9' class='text-center'>No prescriptions found</td></tr>";
+                                    echo "<tr><td colspan='10' class='text-center'>No prescriptions found</td></tr>";
                                 }
                                 ?>
                             </tbody>
                         </table>
                     </div>
+
 
                     <!-- Record Tab -->
                     <div class="tab-pane fade" id="record" role="tabpanel">
@@ -293,6 +306,7 @@ if (!$user) {
                                     <th>Total Quantity</th>
                                     <th>Quantity Dispensed</th>
                                     <th>Status</th>
+                                    <th>Payment Type</th> <!-- Added -->
                                     <th>Note</th>
                                     <th>Dispensed Date</th>
                                     <th>Download</th>
@@ -313,6 +327,7 @@ if (!$user) {
                     SUM(i.quantity_prescribed) AS total_quantity,
                     SUM(i.quantity_dispensed) AS total_dispensed,
                     p.status,
+                    p.payment_type, -- fetch payment type
                     p.note,
                     DATE_FORMAT(MAX(i.dispensed_date), '%b %e, %Y %l:%i%p') AS dispensed_date
                 FROM pharmacy_prescription p
@@ -333,22 +348,15 @@ if (!$user) {
                                         $prescriptionId = $row['prescription_id'];
                                         $status = $row['status'];
                                 ?>
-                                        <tr <?= ($status === 'Dispensed' || $status === 'Cancelled') ? 'style="opacity:0.6;"' : ''; ?>>
+                                        <tr style="opacity:0.6;">
                                             <td><?= $row['prescription_id']; ?></td>
                                             <td><?= $row['doctor_name']; ?></td>
                                             <td><?= $row['patient_name']; ?></td>
                                             <td><?= $row['medicines_list']; ?></td>
                                             <td><?= $row['total_quantity']; ?></td>
                                             <td><?= $row['total_dispensed']; ?></td>
-                                            <td>
-                                                <select class="form-select form-select-sm"
-                                                    onchange="handleStatusChange(this, <?= $prescriptionId; ?>, '<?= $status; ?>')"
-                                                    <?= ($status === 'Dispensed' || $status === 'Cancelled') ? 'disabled' : ''; ?>>
-                                                    <option value="Pending" <?= ($status == 'Pending' ? 'selected' : ''); ?>>Pending</option>
-                                                    <option value="Dispensed" <?= ($status == 'Dispensed' ? 'selected' : ''); ?>>Dispensed</option>
-                                                    <option value="Cancelled" <?= ($status == 'Cancelled' ? 'selected' : ''); ?>>Cancelled</option>
-                                                </select>
-                                            </td>
+                                            <td><?= $row['status']; ?></td>
+                                            <td><?= ucfirst(str_replace('_', ' ', $row['payment_type'])); ?></td>
                                             <td>
                                                 <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $noteId; ?>">View Note</button>
                                             </td>
@@ -380,12 +388,13 @@ if (!$user) {
                                 <?php
                                     }
                                 } else {
-                                    echo "<tr><td colspan='10' class='text-center'>No prescriptions found</td></tr>";
+                                    echo "<tr><td colspan='11' class='text-center'>No prescriptions found</td></tr>";
                                 }
                                 ?>
                             </tbody>
                         </table>
                     </div>
+
 
                 </div>
 
@@ -406,11 +415,10 @@ if (!$user) {
                 return;
             }
 
-            // If new status is same as old, do nothing
             if (newStatus === oldStatus) return;
 
             if (!confirm("Are you sure you want to change status to " + newStatus + "?")) {
-                selectEl.value = oldStatus; // revert if cancelled
+                selectEl.value = oldStatus;
                 return;
             }
 
@@ -428,38 +436,42 @@ if (!$user) {
                         selectEl.value = oldStatus;
                     } else if (data.success) {
                         alert(data.success);
-
                         const row = selectEl.closest('tr');
 
-                        // ✅ If Dispensed or Cancelled → move row to Records tab
+                        // Update Quantity Dispensed if returned
+                        if (data.dispensed_quantity !== undefined) {
+                            row.querySelector('td:nth-child(6)').textContent = data.dispensed_quantity;
+                        }
+
+                        // Move to Record tab if Dispensed or Cancelled
                         if (newStatus === 'Dispensed' || newStatus === 'Cancelled') {
                             selectEl.disabled = true;
 
-                            // Remove row from current table
+                            // Update payment type text
+                            const paymentSelect = row.querySelector('td:nth-child(8) select');
+                            if (paymentSelect) {
+                                paymentSelect.parentNode.textContent = paymentSelect.value.charAt(0).toUpperCase() + paymentSelect.value.slice(1);
+                            }
+
+                            // Remove from Prescription tab
                             row.parentNode.removeChild(row);
 
-                            // Append to Records table
+                            // Append to Record tab
                             const recordTable = document.querySelector("#record table tbody");
                             if (recordTable) {
                                 recordTable.appendChild(row);
-                                row.style.opacity = "0.8"; // faded
+                                row.style.opacity = "0.8";
                             }
                         }
 
-                        // ✅ If it’s still Pending → keep in Prescription tab
+                        // Keep in Prescription tab if Pending
                         if (newStatus === 'Pending') {
                             const prescriptionTable = document.querySelector("#prescription table tbody");
                             if (prescriptionTable && row.closest("#record")) {
-                                // If somehow it’s in Records, move it back
                                 row.parentNode.removeChild(row);
                                 prescriptionTable.appendChild(row);
                                 row.style.opacity = "1";
                             }
-                        }
-
-                        // Update Quantity Dispensed if returned
-                        if (data.dispensed_quantity) {
-                            row.querySelector('td:nth-child(6)').textContent = data.dispensed_quantity;
                         }
                     }
                 })
@@ -468,7 +480,42 @@ if (!$user) {
                     selectEl.value = oldStatus;
                 });
         }
+
+        function handlePaymentTypeChange(selectEl, prescriptionId) {
+            const newType = selectEl.value;
+            const oldType = selectEl.getAttribute('data-old');
+
+            if (newType === oldType) return;
+
+            if (!confirm("Are you sure you want to change payment type to " + newType + "?")) {
+                selectEl.value = oldType;
+                return;
+            }
+
+            fetch('update_prescription.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'prescription_id=' + prescriptionId + '&payment_type=' + newType
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        selectEl.value = oldType;
+                    } else if (data.success) {
+                        alert(data.success);
+                        selectEl.setAttribute('data-old', newType);
+                    }
+                })
+                .catch(err => {
+                    alert("An error occurred: " + err);
+                    selectEl.value = oldType;
+                });
+        }
     </script>
+
 
 
 
