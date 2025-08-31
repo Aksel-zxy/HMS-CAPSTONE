@@ -79,24 +79,8 @@ if ($modal_emp_id) {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-     <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-        }
-        th {
-            background: #f4f4f4;
-        }
-        a {
-            color: blue;
-            text-decoration: none;
-        }
-    </style>
+     <link rel="stylesheet" href="../assets/CSS/license_management.css">
+     
 </head>
 
 <body>
@@ -278,7 +262,11 @@ if ($modal_emp_id) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-<h2>Doctor & Nurse Documents</h2>
+             <div class="container-fluid">
+
+
+
+             <h2  style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🪪Doctor & Nurse Documents</h2>
 <table>
     <tr>
         <th>Employee ID</th>
@@ -346,6 +334,9 @@ if ($modal_emp_id) {
     <script>document.body.classList.add('modal-open');</script>
 </div>
 <?php endif; ?>
+
+</div>
+
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->

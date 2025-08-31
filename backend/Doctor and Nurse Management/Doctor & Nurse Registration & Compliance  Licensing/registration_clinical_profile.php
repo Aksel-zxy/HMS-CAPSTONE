@@ -98,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
+     <link rel="stylesheet" href="../assets/CSS/clinical_profile.css">
 </head>
 
 <body>
@@ -279,7 +280,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <h2 class="mb-4">Doctor & Nurse Clinical Profile Management</h2>
+
+            <div class="container-fluid">
+
+             <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🧑‍💻Doctor & Nurse Clinical Profile Management</h2>
             <?php if (isset($_GET['success'])): ?>
                 <div class="alert alert-success">Profile saved successfully!</div>
             <?php endif; ?>
@@ -381,6 +385,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endwhile; ?>
                 </tbody>
             </table>
+  
+</div>
+           
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->

@@ -160,8 +160,7 @@ if ($duty_res && $duty_res->num_rows > 0) {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="../assets/CSS/duty_assignment.css">
-    <link rel="stylesheet" href="../assets/CSS/schedule_editing.css">
+    <link rel="stylesheet" href="../assets/CSS/user_duty.css">
     <style>
         /* Extra modal styling for the assignment form */
         .duty-modal {
