@@ -14,7 +14,7 @@ class Patient
     public function getAllPatients()
     {
         $query = "
-        SELECT p.*, a.*
+        SELECT p.*, a.appointment_id, a.appointment_date, a.notes, a.purpose, a.status
         FROM {$this->patientTable} p
         INNER JOIN {$this->appointmentsTable} a 
             ON p.patient_id = a.patient_id
@@ -40,19 +40,21 @@ class Patient
     }
 }
 
-class Schedule {
+class Schedule
+{
     private $conn;
 
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
-    public function save($patient_id, $service_id, $laboratorist_id, $schedule_datetime) {
-
+    public function save($patient_id, $service_id, $laboratorist_id, $schedule_datetime, $appointment_id)
+    {
         $scheduleDate = date('Y-m-d', strtotime($schedule_datetime));
         $scheduleTime = date('H:i:s', strtotime($schedule_datetime));
 
-        // Get the service name
+        // Get service name
         $stmtService = $this->conn->prepare("SELECT serviceName FROM dl_services WHERE serviceID = ?");
         $stmtService->bind_param("i", $service_id);
         $stmtService->execute();
@@ -60,50 +62,38 @@ class Schedule {
         $serviceName = $resultService->fetch_assoc()['serviceName'] ?? null;
         $stmtService->close();
 
-        if (!$serviceName) {
-            return false;
-        }
+        if (!$serviceName) return false;
 
-        // Insert into dl_schedule
+        // Insert into dl_schedule (with appointment_id ✅)
         $stmt = $this->conn->prepare("
-            INSERT INTO dl_schedule (patientID, serviceName, employee_id, scheduleDate, scheduleTime) 
-            VALUES (?, ?, ?, ?, ?)
-        ");
-        $stmt->bind_param("isiss", $patient_id, $serviceName, $laboratorist_id, $scheduleDate, $scheduleTime);
+        INSERT INTO dl_schedule (appointment_id, patientID, serviceName, employee_id, scheduleDate, scheduleTime, status) 
+        VALUES (?, ?, ?, ?, ?, ?, 'Processing')
+    ");
+        $stmt->bind_param("iissss", $appointment_id, $patient_id, $serviceName, $laboratorist_id, $scheduleDate, $scheduleTime);
         $result = $stmt->execute();
         $stmt->close();
-
-        if ($result) {
-            // ✅ Update appointment_date in p_appointments
-            $stmtUpdate = $this->conn->prepare("
-                UPDATE p_appointments 
-                SET appointment_date = ? 
-                WHERE patient_id = ?
-            ");
-            $stmtUpdate->bind_param("si", $schedule_datetime, $patient_id);
-            $stmtUpdate->execute();
-            $stmtUpdate->close();
-        }
 
         return $result;
     }
 }
 
-function getLatestSchedule($conn, $patient_id) {
+function getLatestSchedule($conn, $appointment_id)
+{
     $stmt = $conn->prepare("
         SELECT status, cancel_reason, scheduleDate, scheduleTime
         FROM dl_schedule
-        WHERE patientID = ?
+        WHERE appointment_id = ?
         ORDER BY scheduleID DESC
         LIMIT 1
     ");
-    $stmt->bind_param("i", $patient_id);
+    $stmt->bind_param("i", $appointment_id);
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
     $stmt->close();
     return $row ?: null; // return null if no record
 }
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $schedule = new Schedule($conn);
 
@@ -113,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $schedule_datetime = $_POST['schedule_datetime'] ?? null;
 
     if ($patient_id && $service_id && $laboratorist_id && $schedule_datetime) {
-        if ($schedule->save($patient_id, $service_id, $laboratorist_id, $schedule_datetime)) {
+        if ($schedule->save($patient_id, $service_id, $laboratorist_id, $schedule_datetime, $_POST['appointment_id'] ?? null)) {
             header("Location: ../doctor_referral.php?success=1");
             exit;
         } else {

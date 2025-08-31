@@ -29,6 +29,7 @@ $query = "SELECT s.scheduleID, s.patientID, s.scheduleDate, s.scheduleTime,
           FROM dl_schedule s
           JOIN patientinfo p ON s.patientID = p.patient_id
           WHERE s.employee_id = ?
+            AND s.status = 'Processing'
             AND NOT EXISTS (
                 SELECT 1 FROM dl_lab_cbc lp 
                 WHERE lp.scheduleID = s.scheduleID
@@ -51,6 +52,7 @@ $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
 $stmt->execute();
 $result = $stmt->get_result();
+
 ?>
 
 <!DOCTYPE html>
@@ -150,21 +152,21 @@ $result = $stmt->get_result();
                     </thead>
                     <tbody>
                         <?php while ($row = $result->fetch_assoc()): ?>
-                            <tr>
-                                <td><?= $row['scheduleID'] ?></td>
-                                <td><?= $row['patientID'] ?></td>
-                                <td><?= $row['fname'] . ' ' . $row['lname'] ?></td>
-                                <td><?= $row['serviceName'] ?></td>
-                                <td><?= $row['scheduleDate'] ?></td>
-                                <td><?= $row['scheduleTime'] ?></td>
-                                <td>
-                                    <a href="process_sample.php?scheduleID=<?= $row['scheduleID'] ?>&serviceName=<?= urlencode($row['serviceName']) ?>"
-                                        class="btn btn-sm btn-primary">
-                                        Process
-                                    </a>
-                                </td>
-                            </tr>
-                        <?php endwhile; ?>
+    <tr>
+        <td><?= $row['scheduleID'] ?></td>
+        <td><?= $row['patientID'] ?></td>
+        <td><?= htmlspecialchars($row['fname'] . ' ' . $row['lname']) ?></td>
+        <td><?= htmlspecialchars($row['serviceName']) ?></td>
+        <td><?= htmlspecialchars($row['scheduleDate']) ?></td>
+        <td><?= htmlspecialchars($row['scheduleTime']) ?></td>
+        <td>
+            <a href="process_sample.php?scheduleID=<?= $row['scheduleID'] ?>&serviceName=<?= urlencode($row['serviceName']) ?>"
+                class="btn btn-sm btn-primary">
+                Process
+            </a>
+        </td>
+    </tr>
+<?php endwhile; ?>
                     </tbody>
                 </table>
             </div>

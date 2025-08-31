@@ -200,13 +200,13 @@ $allPatients = $patient->getAllPatients();
 
                             // ✅ fetch status + cancel reason
                             $schedQuery = $conn->prepare("
-                    SELECT status, cancel_reason
-                    FROM dl_schedule
-                    WHERE patientID = ?
-                    ORDER BY scheduleID DESC
-                    LIMIT 1
-                ");
-                            $schedQuery->bind_param("i", $counter);
+    SELECT status, cancel_reason
+    FROM dl_schedule
+    WHERE appointment_id = ?
+    ORDER BY scheduleID DESC
+    LIMIT 1
+");
+                            $schedQuery->bind_param("i", $p['appointment_id']);
                             $schedQuery->execute();
                             $schedResult = $schedQuery->get_result();
                             if ($schedRow = $schedResult->fetch_assoc()) {
@@ -250,10 +250,10 @@ $allPatients = $patient->getAllPatients();
                                         data-bs-toggle="modal"
                                         data-bs-target="#addScheduleModal"
                                         data-id="<?= $counter ?>"
+                                        data-appointment-id="<?= $p['appointment_id'] ?>"
                                         data-name="<?= htmlspecialchars($name) ?>"
                                         data-test="<?= htmlspecialchars($type) ?>"
-                                        data-date="<?= htmlspecialchars($dateTime) ?>"
-                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0d6efd; border:none; color:#fff; cursor:pointer;">
+                                        data-date="<?= htmlspecialchars($dateTime) ?>">
                                         Lab Scheduling (+)
                                     </button>
                                 </td>
@@ -319,6 +319,7 @@ $allPatients = $patient->getAllPatients();
                         <div class="modal-body">
                             <form id="scheduleForm" method="POST" action="oop/fetchdetails.php">
                                 <input type="hidden" name="patient_id" id="modalPatientId">
+                                <input type="hidden" name="appointment_id" id="modalAppointmentId">
                                 <div class="mb-3">
                                     <label class="form-label">Patient Name</label>
                                     <input type="text" class="form-control" id="modalPatientName" name="patient_name" readonly>
@@ -381,8 +382,8 @@ $allPatients = $patient->getAllPatients();
                 // Add Schedule button click
                 document.querySelectorAll(".addScheduleBtn").forEach(button => {
                     button.addEventListener("click", function() {
-                        // Fill patient details
                         document.getElementById("modalPatientId").value = this.dataset.id || "";
+                        document.getElementById("modalAppointmentId").value = this.dataset.appointmentId || "";
                         document.getElementById("modalPatientName").value = this.dataset.name || "";
 
                         // Get test name
@@ -411,6 +412,7 @@ $allPatients = $patient->getAllPatients();
                     });
                 });
             </script>
+
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
             <script src="../assets/Bootstrap/fontawesome.min.js"></script>

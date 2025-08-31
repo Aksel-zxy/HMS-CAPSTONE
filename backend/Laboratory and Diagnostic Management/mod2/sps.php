@@ -190,35 +190,46 @@ $allPatients = $patient->getAllPatients();
                     </thead>
                     <tbody style="display:block; max-height:180px; overflow-y:auto; width:100%; table-layout:fixed;">
                         <?php
-                        $hasAppointments = false;
+$hasAppointments = false;
 
-                        foreach ($allPatients as $p):
-                            $counter = $p['patient_id'];
-                            $name     = $p['fname'] . ' ' . $p['lname'];
-                            $dateTime = $p['appointment_date'];
-                            $type     = $p['notes'];
-                            $status   = $p['status'];
+foreach ($allPatients as $p):
+    $counter   = $p['patient_id'];
+    $name      = $p['fname'] . ' ' . $p['lname'];
+    $dateTime  = $p['appointment_date'];
+    $type      = $p['notes'];
+    $status    = $p['status'];
+    $apptID    = $p['appointment_id']; // ✅ appointment_id from p_appointments
 
-                            // Override status if exists in dl_schedule
-                            $schedQuery = $conn->prepare("SELECT status, scheduleID, scheduleDate, scheduleTime 
-                          FROM dl_schedule 
-                          WHERE patientID = ? LIMIT 1");
-                            $schedQuery->bind_param("i", $counter);
-                            $schedQuery->execute();
-                            $schedResult = $schedQuery->get_result();
-                            if ($schedRow = $schedResult->fetch_assoc()) {
-                                $status = $schedRow['status'];
-                                $scheduleID   = $schedRow['scheduleID'];
-                                $scheduleDate = $schedRow['scheduleDate'];
-                                $scheduleTime = $schedRow['scheduleTime'];
-                            }
-                            $schedQuery->close();
+    // Default schedule info
+    $scheduleID   = null;
+    $scheduleDate = $dateTime ? date('Y-m-d', strtotime($dateTime)) : null;
+    $scheduleTime = $dateTime ? date('H:i:s', strtotime($dateTime)) : null;
 
-                            // 🚫 Skip if Scheduled OR Cancelled
-                            if ($status === 'Scheduled' || $status === 'Cancelled') continue;
+    // ✅ Override status if exists in dl_schedule (check by appointment_id)
+    $schedQuery = $conn->prepare("
+        SELECT status, scheduleID, scheduleDate, scheduleTime 
+        FROM dl_schedule 
+        WHERE appointment_id = ? 
+        ORDER BY scheduleID DESC 
+        LIMIT 1
+    ");
+    $schedQuery->bind_param("i", $apptID);
+    $schedQuery->execute();
+    $schedResult = $schedQuery->get_result();
 
-                            $hasAppointments = true;
-                        ?>
+    if ($schedRow = $schedResult->fetch_assoc()) {
+        $status       = $schedRow['status'];
+        $scheduleID   = $schedRow['scheduleID'];
+        $scheduleDate = $schedRow['scheduleDate'];
+        $scheduleTime = $schedRow['scheduleTime'];
+    }
+    $schedQuery->close();
+
+    // 🚫 Skip if Scheduled OR Cancelled
+    if ($status === 'Scheduled' || $status === 'Cancelled') continue;
+
+    $hasAppointments = true;
+?>
                             <tr style="display:table; width:100%; table-layout:fixed; border-bottom:1px solid #f1f1f1; transition:background 0.2s;"
                                 onmouseover="this.style.background='#f9fbfd';"
                                 onmouseout="this.style.background='';">
@@ -305,9 +316,7 @@ $allPatients = $patient->getAllPatients();
                                 <div class="mb-3">
                                     <label for="modalStatus" class="form-label">Status</label>
                                     <select class="form-select" id="modalStatus" name="status" required>
-                                        <option value="Scheduled">Scheduled</option>
                                         <option value="Completed">Completed</option>
-                                        <option value="Cancelled">Cancelled</option>
                                         <option value="Processing">Processing</option>
                                     </select>
                                 </div>
