@@ -24,7 +24,20 @@ if (!$user) {
 }
 
 // ✅ Fetch all rooms & beds from p_beds
-$rooms_query = "SELECT room_number, bed_number, status FROM p_beds ORDER BY room_number, bed_number";
+$rooms_query = "
+       SELECT 
+    b.room_number, 
+    b.bed_number, 
+    b.status, 
+    p.fname, 
+    p.lname
+FROM p_beds b
+LEFT JOIN p_bed_assignments ba ON b.bed_id = ba.bed_id
+LEFT JOIN patientinfo p ON ba.patient_id = p.patient_id
+GROUP BY b.room_number, b.bed_number
+ORDER BY b.room_number, b.bed_number;
+
+    ";
 $rooms_result = $conn->query($rooms_query);
 
 $rooms = [];
@@ -209,11 +222,18 @@ while ($row = $rooms_result->fetch_assoc()) {
                         <div class="room-card text-center">
                             <div class="seats">
                                 <?php foreach ($beds as $bed): ?>
-                                <div class="seat 
-                                <?php echo ($bed['status'] == 'Occupied') ? 'Occupied' : 'Available'; ?>"
-                                    title="Seat <?php echo $bed['bed_number']; ?>">
+                                <div class="seat <?php echo ($bed['status'] == 'Occupied') ? 'Occupied' : 'Available'; ?>"
+                                    title="<?php 
+                                    if ($bed['status'] == 'Occupied' && !empty($bed['fname'])) {
+                                        echo 'Occupied by: ' . $bed['fname'] . ' ' . $bed['lname'];
+                                    } else {
+                                        echo 'Available (Bed ' . $bed['bed_number'] . ')';
+                                    }
+                                ?>">
                                 </div>
                                 <?php endforeach; ?>
+
+
                                 <div class="room-header">Room <?php echo $room_number; ?></div>
                             </div>
                         </div>
