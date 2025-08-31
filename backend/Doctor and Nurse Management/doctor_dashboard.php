@@ -144,10 +144,13 @@ $user = $dashboard->user;
 
                 <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                   <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="Doctor Panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
                         <a href="Doctor Panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                    </li>
+                        <li class="sidebar-item">
+                        <a href="Doctor Panel/prescription.php" class="sidebar-link">Prescription</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -173,10 +176,10 @@ $user = $dashboard->user;
 
                 <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="Nurse Panel/my_nurse_schedule.php" class="sidebar-link">My Schedule</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Nurse Duty</a>
+                        <a href="Nurse Panel/nurse_duty.php" class="sidebar-link">Nurse Duty</a>
                     </li>
                       <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>

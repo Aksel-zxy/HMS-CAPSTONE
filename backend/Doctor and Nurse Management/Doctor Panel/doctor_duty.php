@@ -356,7 +356,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
 
                 <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                   <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
                         <a href="doctor_duty.php" class="sidebar-link">Doctor Duty</a>
@@ -445,7 +445,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
             <!-- START CODING HERE -->
 
            <div class="container-fluid">
-    <h2 class="mt-4 mb-3">Appointments</h2>
+    <h2   style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">📌Appointments</h2>
                 <table class="appointments-table table table-bordered table-hover">
                     <thead class="table-primary">
                         <tr>
@@ -674,8 +674,8 @@ if ($result_pat && $result_pat->num_rows > 0) {
         
    <!-- My Duties Table -->
     <div class="container-fluid">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2 class="mb-0">My Duties</h2>
+        <div   style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
+            <h2 class="mb-0">📋My Duties</h2>
         </div>
         <table class="table table-bordered table-hover">
             <thead class="table-info">

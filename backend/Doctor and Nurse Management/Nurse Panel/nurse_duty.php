@@ -39,120 +39,18 @@ class DoctorDashboard {
 $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
 
-// Fetch all appointment_ids already assigned in duty_assignments
-$assigned_appointments = [];
-$res = $conn->query("SELECT appointment_id FROM duty_assignments");
-if ($res && $res->num_rows > 0) {
-    while ($row = $res->fetch_assoc()) {
-        $assigned_appointments[] = $row['appointment_id'];
-    }
-}
-
-// Fetch all appointments, only show those not managed and not assigned in duty_assignments
-$appointments = [];
-$sql = "SELECT appointment_id, patient_id, appointment_date, purpose, status, notes, doctor_id 
-        FROM p_appointments 
-        WHERE status != 'Managed'" . 
-        (!empty($assigned_appointments) ? " AND appointment_id NOT IN (" . implode(',', array_map('intval', $assigned_appointments)) . ")" : "") . 
-        " ORDER BY appointment_date DESC";
-$result = $conn->query($sql);
-if ($result && $result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $appointments[] = $row;
-    }
-}
-
-// Get selected appointment_id from GET
-$appointment_id = $_GET['appointment_id'] ?? '';
-
-// Fetch doctor_id from appointment for duty assignment
-$selected_doctor_id = '';
-if ($appointment_id) {
-    $stmt = $conn->prepare("SELECT doctor_id FROM p_appointments WHERE appointment_id = ?");
-    $stmt->bind_param("i", $appointment_id);
-    $stmt->execute();
-    $stmt->bind_result($selected_doctor_id);
-    $stmt->fetch();
-    $stmt->close();
-}
-
-// Fetch beds for dropdown
-$beds = [];
-$bed_res = $conn->query("SELECT bed_id, bed_number, ward, room_number, bed_type, status, notes FROM p_beds");
-if ($bed_res && $bed_res->num_rows > 0) {
-    while ($row = $bed_res->fetch_assoc()) {
-        $beds[] = $row;
-    }
-}
-
-// Fetch nurses for dropdown (profession = 'Nurse')
-$nurses = [];
-$nurse_res = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse' AND status = 'active'");
-if ($nurse_res && $nurse_res->num_rows > 0) {
-    while ($row = $nurse_res->fetch_assoc()) {
-        $nurses[] = $row;
-    }
-}
-
-// Handle duty assignment form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
-    $appointment_id = $_POST['appointment_id'];
-    $doctor_id = $selected_doctor_id;
-    $bed_id = !empty($_POST['bed_id']) ? $_POST['bed_id'] : null;
-    $nurse_assistant = !empty($_POST['nurse_assistant']) ? $_POST['nurse_assistant'] : null;
-    $procedure = $_POST['procedure'];
-    $equipment = !empty($_POST['equipment']) ? $_POST['equipment'] : null;
-    $tools = !empty($_POST['tools']) ? $_POST['tools'] : null;
-    $notes = $_POST['notes'];
-    $status = "Pending"; // Always insert as Pending
-
-    $stmt = $conn->prepare("INSERT INTO duty_assignments (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-    $stmt->bind_param(
-        "iiissssss",
-        $appointment_id,
-        $doctor_id,
-        $bed_id,
-        $nurse_assistant,
-        $procedure,
-        $equipment,
-        $tools,
-        $notes,
-        $status
-    );
-
-    if ($stmt->execute()) {
-        header("Location: doctor_duty.php?success=1");
-        exit;
-    } else {
-        echo "<div class='alert alert-danger'>Error: " . $stmt->error . "</div>";
-    }
-}
-
-// Handle mark as completed action
-if (isset($_GET['complete_duty_id'])) {
-    $complete_duty_id = intval($_GET['complete_duty_id']);
-    // Update status and updated_at timestamp
-    $stmt = $conn->prepare("UPDATE duty_assignments SET status = 'Completed', updated_at = NOW() WHERE duty_id = ?");
-    $stmt->bind_param("i", $complete_duty_id);
-    $stmt->execute();
-    $stmt->close();
-    header("Location: doctor_duty.php");
-    exit;
-}
-
-// Fetch all duty assignments for "My Duties" table, only show non-completed
+// Fetch all duty assignments
 $duties = [];
-$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at FROM duty_assignments WHERE status != 'Completed' ORDER BY created_at DESC");
+$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at, updated_at FROM duty_assignments");
 if ($duty_res && $duty_res->num_rows > 0) {
     while ($row = $duty_res->fetch_assoc()) {
         $duties[] = $row;
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -161,36 +59,8 @@ if ($duty_res && $duty_res->num_rows > 0) {
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
     <link rel="stylesheet" href="../assets/CSS/user_duty.css">
-    <style>
-        /* Extra modal styling for the assignment form */
-        .duty-modal {
-            background: rgba(0,0,0,0.25);
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 9999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .duty-modal .form-container {
-            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-            border-radius: 16px;
-            max-width: 500px;
-            width: 100%;
-        }
-        .close-modal-btn {
-            float: right;
-            font-size: 1.5rem;
-            color: #888;
-            background: none;
-            border: none;
-            margin-top: -10px;
-        }
-        .close-modal-btn:hover {
-            color: #333;
-        }
-    </style>
 </head>
+
 <body>
     <div class="d-flex">
         <!----- Sidebar ----->
@@ -224,16 +94,16 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -247,10 +117,10 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
+                        <a href="Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
@@ -283,10 +153,13 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                   <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="Doctor Panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
-                        <a href="../Doctor Panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                        <a href="Doctor Panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                    </li>
+                        <li class="sidebar-item">
+                        <a href="../Doctor Panel/prescription.php" class="sidebar-link">Prescription</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -312,7 +185,7 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="my_nurse_schedule.php" class="sidebar-link">My Schedule</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="nurse_duty.php" class="sidebar-link">Nurse Duty</a>
@@ -370,156 +243,59 @@ if ($duty_res && $duty_res->num_rows > 0) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-           <div class="container">
-                <h2 class="mt-4 mb-3">Appointments</h2>
-                <table class="appointments-table table table-bordered table-hover">
-                    <thead class="table-primary">
-                        <tr>
-                            <th>Appointment ID</th>
-                            <th>Patient ID</th>
-                            <th>Date</th>
-                            <th>Purpose</th>
-                            <th>Status</th>
-                            <th>Notes</th>
-                            <th>Doctor ID</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($appointments)): ?>
-                            <?php foreach ($appointments as $appt): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($appt['appointment_id']); ?></td>
-                                    <td><?= htmlspecialchars($appt['patient_id']); ?></td>
-                                    <td><?= htmlspecialchars($appt['appointment_date']); ?></td>
-                                    <td><?= htmlspecialchars($appt['purpose']); ?></td>
-                                    <td><?= htmlspecialchars($appt['status']); ?></td>
-                                    <td><?= htmlspecialchars($appt['notes']); ?></td>
-                                    <td><?= htmlspecialchars($appt['doctor_id']); ?></td>
-                                    <td>
-                                        <a href="doctor_duty.php?appointment_id=<?= $appt['appointment_id']; ?>" class="assign-btn btn btn-primary btn-sm">Manage</a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="8">No appointments found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-                <!-- Modal-like form for duty assignment -->
-                <?php if ($appointment_id): ?>
-                <div class="duty-modal" id="dutyModal">
-                    <div class="form-container">
-                        <button class="close-modal-btn" onclick="window.location.href='doctor_duty.php'">&times;</button>
-                        <h2 class="mb-3 text-center">Manage Appointment</h2>
-                        <form action="" method="POST">
-                            <input type="hidden" name="appointment_id" value="<?= htmlspecialchars($appointment_id) ?>">
-                            <!-- Remove doctor_id hidden field, it's now fetched from appointment -->
-
-                            <div class="mb-3">
-                                <label class="form-label">Bed</label>
-                                <select name="bed_id" class="form-select">
-                                    <option value="">-- Select Bed --</option>
-                                    <?php foreach($beds as $row): ?>
-                                        <option value="<?= $row['bed_id'] ?>">
-                                            <?= htmlspecialchars($row['bed_number']) ?> (<?= htmlspecialchars($row['ward']) ?>, Room <?= htmlspecialchars($row['room_number']) ?>, <?= htmlspecialchars($row['bed_type']) ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Nurse Assistant</label>
-                                <select name="nurse_assistant" class="form-select">
-                                    <option value="">-- Select Nurse --</option>
-                                    <?php foreach($nurses as $row): ?>
-                                        <option value="<?= $row['employee_id'] ?>">
-                                            <?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Procedure</label>
-                                <input type="text" name="procedure" class="form-control" required>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Equipment</label>
-                                <input type="text" name="equipment" class="form-control">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Tools</label>
-                                <input type="text" name="tools" class="form-control">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Notes</label>
-                                <textarea name="notes" class="form-control"></textarea>
-                            </div>
-
-                            <button type="submit" name="save_duty" class="btn btn-primary w-100">Save Assignment</button>
-                        </form>
-                    </div>
-                </div>
-                <?php endif; ?>
-            </div>
-            <!-- END CODING HERE -->
-
-            <!-- My Duties Table -->
-            <div class="container mt-5">
-                <h2 class="mb-3">My Duties</h2>
-                <table class="table table-bordered table-hover">
-                    <thead class="table-info">
-                        <tr>
-                            <th>Duty ID</th>
-                            <th>Appointment ID</th>
-                            <th>Doctor ID</th>
-                            <th>Bed ID</th>
-                            <th>Nurse Assistant</th>
-                            <th>Procedure</th>
-                            <th>Equipment</th>
-                            <th>Tools</th>
-                            <th>Notes</th>
-                            <th>Status</th>
-                            <th>Created At</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($duties)): ?>
-                            <?php foreach ($duties as $duty): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($duty['duty_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['appointment_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['bed_id']) ?></td>
-                                    <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
-                                    <td><?= htmlspecialchars($duty['procedure']) ?></td>
-                                    <td><?= htmlspecialchars($duty['equipment']) ?></td>
-                                    <td><?= htmlspecialchars($duty['tools']) ?></td>
-                                    <td><?= htmlspecialchars($duty['notes']) ?></td>
-                                    <td><?= htmlspecialchars($duty['status']) ?></td>
-                                    <td><?= htmlspecialchars($duty['created_at']) ?></td>
-                                    <td>
-                                        <a href="doctor_duty.php?complete_duty_id=<?= $duty['duty_id'] ?>" class="btn btn-success btn-sm" onclick="return confirm('Mark this duty as completed?')">Mark as Completed</a>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <tr><td colspan="12">No duties found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+        <div class="container-fluid">
+            <h2   style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">📋My Duties</h2>
+            <table class="table table-bordered table-hover duty-table">
+                <thead class="table-info">
+                    <tr>
+                        <th>Duty ID</th>
+                        <th>Doctor ID</th>
+                        <th>Bed ID</th>
+                        <th>Nurse Assistant</th>
+                        <th>Procedure</th>
+                        <th>Equipment</th>
+                        <th>Tools</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($duties)): ?>
+                        <?php foreach ($duties as $duty): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($duty['duty_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['bed_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
+                                <td><?= htmlspecialchars($duty['procedure']) ?></td>
+                                <td><?= htmlspecialchars($duty['equipment']) ?></td>
+                                <td>
+                                    <?php
+                                    $tools = $duty['tools'];
+                                    if ($tools && ($decoded = json_decode($tools, true))) {
+                                        foreach ($decoded as $tool) {
+                                            echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")<br>";
+                                        }
+                                    } else {
+                                        echo htmlspecialchars($tools);
+                                    }
+                                    ?>
+                                </td>
+                                <td><?= htmlspecialchars($duty['notes']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="8">No duty assignments found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
     </div>
     <script>
         const toggler = document.querySelector(".toggler-btn");
-        toggler && toggler.addEventListener("click", function() {
+        toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
     </script>
@@ -528,6 +304,15 @@ if ($duty_res && $duty_res->num_rows > 0) {
     <script src="../assets/Bootstrap/fontawesome.min.js"></script>
     <script src="../assets/Bootstrap/jq.js"></script>
 </body>
+
+</html>
+    </script>
+    <script src="../assets/Bootstrap/all.min.js"></script>
+    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="../assets/Bootstrap/jq.js"></script>
+</body>
+
 </html>
 
 

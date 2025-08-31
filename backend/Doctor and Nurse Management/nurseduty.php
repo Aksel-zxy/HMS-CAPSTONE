@@ -1,17 +1,14 @@
 <?php
 include '../../../SQL/config.php';
 
-class NurseDashboard {
+class DoctorDashboard {
     public $conn;
     public $user;
-    public $nurses = [];
-    public $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     public function __construct($conn) {
         $this->conn = $conn;
         $this->authenticate();
         $this->fetchUser();
-        $this->fetchNurses();
     }
 
     private function authenticate() {
@@ -37,42 +34,20 @@ class NurseDashboard {
             exit();
         }
     }
-
-    private function fetchNurses() {
-        $nurse_query = "
-            SELECT e.employee_id, e.first_name, e.middle_name, e.last_name, e.role, e.profession, e.department
-            FROM hr_employees e
-            INNER JOIN clinical_profiles cp ON e.employee_id = cp.employee_id
-            WHERE e.profession = 'Nurse' AND cp.clinical_status = 'Active'
-        ";
-        $nurse_result = $this->conn->query($nurse_query);
-        if ($nurse_result && $nurse_result->num_rows > 0) {
-            while ($row = $nurse_result->fetch_assoc()) {
-                $this->nurses[] = $row;
-            }
-        }
-    }
 }
 
-$dashboard = new NurseDashboard($conn);
+$dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
-$nurses = $dashboard->nurses;
-$days = $dashboard->days;
 
-// Fetch schedules for selected nurse
-$modal_schedules = [];
-if (isset($_GET['view_sched_id'])) {
-    $view_id = $_GET['view_sched_id'];
-    $stmt = $conn->prepare("SELECT * FROM shift_scheduling WHERE employee_id = ? ORDER BY week_start DESC");
-    $stmt->bind_param("i", $view_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $modal_schedules[] = $row;
+// Fetch all duty assignments
+$duties = [];
+$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at, updated_at FROM duty_assignments");
+if ($duty_res && $duty_res->num_rows > 0) {
+    while ($row = $duty_res->fetch_assoc()) {
+        $duties[] = $row;
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -83,7 +58,7 @@ if (isset($_GET['view_sched_id'])) {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="../assets/CSS/my_schedule.css">
+    <link rel="stylesheet" href="../assets/CSS/user_duty.css">
 </head>
 
 <body>
@@ -119,16 +94,16 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -142,10 +117,10 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
+                        <a href="Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
@@ -178,10 +153,13 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                   <li class="sidebar-item">
-                        <a href="my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
+                        <a href="Doctor Panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
-                        <a href="doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                        <a href="Doctor Panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                    </li>
+                        <li class="sidebar-item">
+                        <a href="../Doctor Panel/prescription.php" class="sidebar-link">Prescription</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -207,10 +185,10 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="my_nurse_schedule.php" class="sidebar-link">My Schedule</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Nurse Panel/nurse_duty.php" class="sidebar-link">Nurse Duty</a>
+                        <a href="nurse_duty.php" class="sidebar-link">Nurse Duty</a>
                     </li>
                       <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -265,108 +243,53 @@ if (isset($_GET['view_sched_id'])) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h2 class="schedule-title">👩‍⚕️Nurse List</h2>
-                <div class="card shadow-sm rounded mb-4 schedule-card">
-                    <div class="card-header">Nurses List</div>
-                    <div class="card-body bg-white rounded">
-                        <table class="table table-bordered table-striped nurses-list-table rounded shadow-sm">
-                            <thead>
-                                <tr>
-                                    <th>Employee ID</th>
-                                    <th>First Name</th>
-                                    <th>Middle Name</th>
-                                    <th>Last Name</th>
-                                    <th>Role</th>
-                                    <th>Profession</th>
-                                    <th>Department</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($nurses as $nur): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($nur['employee_id']) ?></td>
-                                        <td><?= htmlspecialchars($nur['first_name']) ?></td>
-                                        <td><?= htmlspecialchars($nur['middle_name']) ?></td>
-                                        <td><?= htmlspecialchars($nur['last_name']) ?></td>
-                                        <td><?= htmlspecialchars($nur['role']) ?></td>
-                                        <td><?= htmlspecialchars($nur['profession']) ?></td>
-                                        <td><?= htmlspecialchars($nur['department']) ?></td>
-                                        <td>
-                                            <form method="get" style="display:inline;">
-                                                <input type="hidden" name="view_sched_id" value="<?= htmlspecialchars($nur['employee_id']) ?>">
-                                                <button type="submit" class="btn btn-sm btn-info">View Schedule</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <?php if (!empty($modal_schedules)): ?>
-                <div class="modal fade show schedule-modal" id="scheduleModal" tabindex="-1" aria-modal="true" role="dialog" style="display:block;">
-                    <div class="modal-dialog modal-xl">
-                        <div class="modal-content rounded shadow schedule-card">
-                            <div class="modal-header bg-primary text-white">
-                                <h5 class="modal-title">Schedules for Nurse ID: <?= htmlspecialchars($modal_schedules[0]['employee_id']) ?></h5>
-                                <a href="my_nurse_schedule.php" class="btn-close"></a>
-                            </div>
-                            <div class="modal-body">
-                                <?php foreach ($modal_schedules as $modal_schedule): ?>
-                                    <div class="mb-4 border rounded p-3 schedule-list-view">
-                                        <h6 class="schedule-date">Week: <?= htmlspecialchars($modal_schedule['week_start']) ?></h6>
-                                        <table class="table table-bordered bg-white schedule-calendar-table">
-                                            <thead>
-                                                <tr class="schedule-table-header">
-                                                    <th>Day</th>
-                                                    <th>Start Time</th>
-                                                    <th>End Time</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($days as $day): ?>
-                                                    <?php $prefix = strtolower(substr($day, 0, 3)); ?>
-                                                    <tr>
-                                                        <td><?= $day ?></td>
-                                                        <td>
-                                                            <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
-                                                                ---
-                                                            <?php else: ?>
-                                                                <?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?>
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td>
-                                                            <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
-                                                                ---
-                                                            <?php else: ?>
-                                                                <?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?>
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td>
-                                                            <?= htmlspecialchars($modal_schedule[$prefix . '_status'] ?? '') ?>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <div class="modal-footer">
-                                <a href="my_nurse_schedule.php" class="btn btn-secondary">Close</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <script>
-                    document.body.classList.add('modal-open');
-                </script>
-            <?php endif; ?>
+        <div class="container-fluid">
+            <h2 class="mb-3">📋My Duties</h2>
+            <table class="table table-bordered table-hover duty-table">
+                <thead class="table-info">
+                    <tr>
+                        <th>Duty ID</th>
+                        <th>Doctor ID</th>
+                        <th>Bed ID</th>
+                        <th>Nurse Assistant</th>
+                        <th>Procedure</th>
+                        <th>Equipment</th>
+                        <th>Tools</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($duties)): ?>
+                        <?php foreach ($duties as $duty): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($duty['duty_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['bed_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
+                                <td><?= htmlspecialchars($duty['procedure']) ?></td>
+                                <td><?= htmlspecialchars($duty['equipment']) ?></td>
+                                <td>
+                                    <?php
+                                    $tools = $duty['tools'];
+                                    if ($tools && ($decoded = json_decode($tools, true))) {
+                                        foreach ($decoded as $tool) {
+                                            echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")<br>";
+                                        }
+                                    } else {
+                                        echo htmlspecialchars($tools);
+                                    }
+                                    ?>
+                                </td>
+                                <td><?= htmlspecialchars($duty['notes']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="8">No duty assignments found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
     </div>
@@ -379,7 +302,15 @@ if (isset($_GET['view_sched_id'])) {
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="..//assets/Bootstrap/jq.js"></script>
+    <script src="../assets/Bootstrap/jq.js"></script>
+</body>
+
+</html>
+    </script>
+    <script src="../assets/Bootstrap/all.min.js"></script>
+    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

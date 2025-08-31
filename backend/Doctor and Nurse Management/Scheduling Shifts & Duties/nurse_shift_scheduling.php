@@ -220,6 +220,36 @@ if (isset($_GET['view_sched_id'])) {
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
     <link rel="stylesheet" href="../assets/CSS/shift_scheduling.css">
+    <script>
+    // Validate max 8 hours per day before submitting
+    document.addEventListener("DOMContentLoaded", function() {
+        var form = document.querySelector('form[method="POST"]');
+        if (form) {
+            form.addEventListener("submit", function(e) {
+                var days = ["mon","tue","wed","thu","fri","sat","sun"];
+                for (var i = 0; i < days.length; i++) {
+                    var start = form.querySelector('[name="'+days[i]+'_start"]').value;
+                    var end = form.querySelector('[name="'+days[i]+'_end"]').value;
+                    if (start && end) {
+                        var startDate = new Date("1970-01-01T" + start + ":00");
+                        var endDate = new Date("1970-01-01T" + end + ":00");
+                        var diff = (endDate - startDate) / (1000 * 60 * 60);
+                        if (diff > 8) {
+                            alert("Maximum shift per day is 8 hours ("+days[i].charAt(0).toUpperCase()+days[i].slice(1)+")");
+                            e.preventDefault();
+                            return false;
+                        }
+                        if (diff < 0) {
+                            alert("End time must be after start time ("+days[i].charAt(0).toUpperCase()+days[i].slice(1)+")");
+                            e.preventDefault();
+                            return false;
+                        }
+                    }
+                }
+            });
+        }
+    });
+    </script>
 </head>
 
 <body>
