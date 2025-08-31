@@ -338,6 +338,17 @@ if ($patient_id > 0) {
                             </tbody>
                         </table>
                     </div>
+                    <?php if (!empty($services) && $patient_id > 0): ?>
+                        <div class="text-end mt-3">
+                            <a 
+                                href="pdf.php?billing_id=<?= isset($services[0]['patient_id']) ? htmlspecialchars($services[0]['patient_id']) : $patient_id ?>" 
+                                target="_blank" 
+                                class="btn btn-primary"
+                            >
+                                Generate Receipt
+                            </a>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
