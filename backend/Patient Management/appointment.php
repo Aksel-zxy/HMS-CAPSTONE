@@ -292,8 +292,10 @@ $user = $result->fetch_assoc();
 
                                 <!-- Notes -->
                                 <div class="mb-3">
+
                                     <label for="notes" class="form-label">Notes</label>
                                     <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                                    <p>Please Indicate what test is taken</p>
                                 </div>
 
                             </div>
