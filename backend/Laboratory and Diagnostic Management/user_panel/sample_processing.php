@@ -95,8 +95,8 @@ $result = $stmt->get_result();
                 <a href="sample_processing.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill-up" viewBox="0 0 16 16">
-                    <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.354-5.854 1.5 1.5a.5.5 0 0 1-.708.708L13 11.707V14.5a.5.5 0 0 1-1 0v-2.793l-.646.647a.5.5 0 0 1-.708-.708l1.5-1.5a.5.5 0 0 1 .708 0M11 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
-                    <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
+                        <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.354-5.854 1.5 1.5a.5.5 0 0 1-.708.708L13 11.707V14.5a.5.5 0 0 1-1 0v-2.793l-.646.647a.5.5 0 0 1-.708-.708l1.5-1.5a.5.5 0 0 1 .708 0M11 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0" />
+                        <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4" />
                     </svg>
                     <span style="font-size: 18px;">Sample Process</span>
                 </a>
@@ -152,21 +152,21 @@ $result = $stmt->get_result();
                     </thead>
                     <tbody>
                         <?php while ($row = $result->fetch_assoc()): ?>
-    <tr>
-        <td><?= $row['scheduleID'] ?></td>
-        <td><?= $row['patientID'] ?></td>
-        <td><?= htmlspecialchars($row['fname'] . ' ' . $row['lname']) ?></td>
-        <td><?= htmlspecialchars($row['serviceName']) ?></td>
-        <td><?= htmlspecialchars($row['scheduleDate']) ?></td>
-        <td><?= htmlspecialchars($row['scheduleTime']) ?></td>
-        <td>
-            <a href="process_sample.php?scheduleID=<?= $row['scheduleID'] ?>&serviceName=<?= urlencode($row['serviceName']) ?>"
-                class="btn btn-sm btn-primary">
-                Process
-            </a>
-        </td>
-    </tr>
-<?php endwhile; ?>
+                            <tr>
+                                <td><?= $row['scheduleID'] ?></td>
+                                <td><?= $row['patientID'] ?></td>
+                                <td><?= htmlspecialchars($row['fname'] . ' ' . $row['lname']) ?></td>
+                                <td><?= htmlspecialchars($row['serviceName']) ?></td>
+                                <td><?= htmlspecialchars($row['scheduleDate']) ?></td>
+                                <td><?= htmlspecialchars($row['scheduleTime']) ?></td>
+                                <td>
+                                    <a href="process_sample.php?scheduleID=<?= $row['scheduleID'] ?>&serviceName=<?= urlencode($row['serviceName']) ?>"
+                                        class="btn btn-sm btn-primary">
+                                        Process
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endwhile; ?>
                     </tbody>
                 </table>
             </div>

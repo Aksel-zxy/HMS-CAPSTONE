@@ -172,123 +172,117 @@ $allPatients = $patient->getAllPatients();
             </div>
             <!-- START CODING HERE -->
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
-
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
                     🧪 Sample Processing Status
                 </h2>
-
-                <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:220px; display:block;">
-                    <thead style="display:table; width:100%; table-layout:fixed;">
-                        <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
-                            <th style="padding:12px;">Patient ID</th>
-                            <th style="padding:12px;">Patient Name</th>
-                            <th style="padding:12px;">Date | Time</th>
-                            <th style="padding:12px;">Test Name</th>
-                            <th style="padding:12px;">Status</th>
-                            <th style="padding:12px; text-align:center;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody style="display:block; max-height:180px; overflow-y:auto; width:100%; table-layout:fixed;">
-                        <?php
-$hasAppointments = false;
-
-foreach ($allPatients as $p):
-    $counter   = $p['patient_id'];
-    $name      = $p['fname'] . ' ' . $p['lname'];
-    $dateTime  = $p['appointment_date'];
-    $type      = $p['notes'];
-    $status    = $p['status'];
-    $apptID    = $p['appointment_id']; // ✅ appointment_id from p_appointments
-
-    // Default schedule info
-    $scheduleID   = null;
-    $scheduleDate = $dateTime ? date('Y-m-d', strtotime($dateTime)) : null;
-    $scheduleTime = $dateTime ? date('H:i:s', strtotime($dateTime)) : null;
-
-    // ✅ Override status if exists in dl_schedule (check by appointment_id)
-    $schedQuery = $conn->prepare("
-        SELECT status, scheduleID, scheduleDate, scheduleTime 
-        FROM dl_schedule 
-        WHERE appointment_id = ? 
-        ORDER BY scheduleID DESC 
-        LIMIT 1
-    ");
-    $schedQuery->bind_param("i", $apptID);
-    $schedQuery->execute();
-    $schedResult = $schedQuery->get_result();
-
-    if ($schedRow = $schedResult->fetch_assoc()) {
-        $status       = $schedRow['status'];
-        $scheduleID   = $schedRow['scheduleID'];
-        $scheduleDate = $schedRow['scheduleDate'];
-        $scheduleTime = $schedRow['scheduleTime'];
-    }
-    $schedQuery->close();
-
-    // 🚫 Skip if Scheduled OR Cancelled
-    if ($status === 'Scheduled' || $status === 'Cancelled') continue;
-
-    $hasAppointments = true;
-?>
-                            <tr style="display:table; width:100%; table-layout:fixed; border-bottom:1px solid #f1f1f1; transition:background 0.2s;"
-                                onmouseover="this.style.background='#f9fbfd';"
-                                onmouseout="this.style.background='';">
-                                <td style="padding:12px;"><?= htmlspecialchars($counter) ?></td>
-                                <td style="padding:12px;"><?= htmlspecialchars($name) ?></td>
-                                <td style="padding:12px;"><?= htmlspecialchars($scheduleDate . ' ' . $scheduleTime) ?></td>
-                                <td style="padding:12px;"><?= htmlspecialchars($type) ?></td>
-                                <td style="padding:12px;">
-                                    <?php if ($status === 'Completed'): ?>
-                                        <span style="background:#d4edda; color:#155724; padding:4px 12px; border-radius:16px; font-weight:500;">
-                                            <?= htmlspecialchars($status) ?>
-                                        </span>
-                                    <?php elseif ($status === 'Processing'): ?>
-                                        <span style="background:#cce5ff; color:#004085; padding:4px 12px; border-radius:16px; font-weight:500;">
-                                            <?= htmlspecialchars($status) ?>
-                                        </span>
-                                    <?php else: ?>
-                                        <?= htmlspecialchars($status) ?>
-                                    <?php endif; ?>
-                                </td>
-                                <td style="padding:12px; text-align:center;">
-                                    <?php if ($status !== 'Completed'): ?>
-                                        <button class="btn btn-sm btn-primary edit-btn"
-                                            style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0d6efd; border:none; color:#fff; cursor:pointer;"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#editScheduleModal"
-                                            data-id="<?= $scheduleID ?>"
-                                            data-date="<?= $scheduleDate ?>"
-                                            data-time="<?= $scheduleTime ?>"
-                                            data-status="<?= $status ?>">
-                                            Update
-                                        </button>
-
-                                        <form method="POST" action="oop2/upd_stats.php" style="display:inline-block; margin-left:6px;" id="cancelForm_<?= $scheduleID ?>">
-                                            <input type="hidden" name="scheduleID" value="<?= $scheduleID ?>">
-                                            <input type="hidden" name="cancel_reason" id="cancelReasonInput_<?= $scheduleID ?>">
-                                            <input type="hidden" name="delete_schedule" value="1">
-                                            <button type="button" class="btn btn-danger btn-sm"
-                                                style="padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer;"
-                                                onclick="askCancelReason(<?= $scheduleID ?>)">Cancel</button>
-                                        </form>
-                                    <?php else: ?>
-                                        <span style="color:gray;">No Actions</span>
-                                    <?php endif; ?>
-                                </td>
+                <!-- Fixed height scroll container -->
+                <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+                    <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
+                        <thead style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left; position:sticky; top:0; z-index:1;">
+                            <tr>
+                                <th style="padding:12px; text-align:center;">Patient ID</th>
+                                <th style="padding:12px; text-align:center;">Patient Name</th>
+                                <th style="padding:12px; text-align:center;">Date | Time</th>
+                                <th style="padding:12px; text-align:center;">Test Name</th>
+                                <th style="padding:12px; text-align:center;">Status</th>
+                                <th style="padding:12px; text-align:center;">Action</th>
                             </tr>
-                        <?php endforeach; ?>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $hasAppointments = false;
 
-                        <?php if (!$hasAppointments): ?>
-                            <tr style="display:table; width:100%; table-layout:fixed;">
-                                <td colspan="6" style="padding:20px; text-align:center; color:gray; font-style:italic;">
-                                    No Schedule
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                            foreach ($allPatients as $p):
+                                $counter   = $p['patient_id'];
+                                $name      = $p['fname'] . ' ' . $p['lname'];
+                                $dateTime  = $p['appointment_date'];
+                                $type      = $p['notes'];
+                                $status    = $p['status'];
+                                $apptID    = $p['appointment_id'];
+
+                                $scheduleID   = null;
+                                $scheduleDate = $dateTime ? date('Y-m-d', strtotime($dateTime)) : null;
+                                $scheduleTime = $dateTime ? date('H:i:s', strtotime($dateTime)) : null;
+
+                                $schedQuery = $conn->prepare("
+                        SELECT status, scheduleID, scheduleDate, scheduleTime 
+                        FROM dl_schedule 
+                        WHERE appointment_id = ? 
+                        ORDER BY scheduleID DESC 
+                        LIMIT 1
+                    ");
+                                $schedQuery->bind_param("i", $apptID);
+                                $schedQuery->execute();
+                                $schedResult = $schedQuery->get_result();
+
+                                if ($schedRow = $schedResult->fetch_assoc()) {
+                                    $status       = $schedRow['status'];
+                                    $scheduleID   = $schedRow['scheduleID'];
+                                    $scheduleDate = $schedRow['scheduleDate'];
+                                    $scheduleTime = $schedRow['scheduleTime'];
+                                }
+                                $schedQuery->close();
+
+                                if ($status === 'Scheduled' || $status === 'Cancelled') continue;
+                                $hasAppointments = true;
+                            ?>
+                                <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
+                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($counter) ?></td>
+                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($name) ?></td>
+                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($scheduleDate . ' ' . $scheduleTime) ?></td>
+                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($type) ?></td>
+                                    <td style="padding:12px; text-align:center;">
+                                        <?php if ($status === 'Completed'): ?>
+                                            <span style="background:#d4edda; color:#155724; padding:4px 12px; border-radius:16px; font-weight:500;">
+                                                <?= htmlspecialchars($status) ?>
+                                            </span>
+                                        <?php elseif ($status === 'Processing'): ?>
+                                            <span style="background:#cce5ff; color:#004085; padding:4px 12px; border-radius:16px; font-weight:500;">
+                                                <?= htmlspecialchars($status) ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <?= htmlspecialchars($status) ?>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td style="padding:12px; text-align:center;">
+                                        <?php if ($status !== 'Completed'): ?>
+                                            <button class="btn btn-sm btn-primary edit-btn"
+                                                style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0d6efd; border:none; color:#fff; cursor:pointer;"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editScheduleModal"
+                                                data-id="<?= $scheduleID ?>"
+                                                data-date="<?= $scheduleDate ?>"
+                                                data-time="<?= $scheduleTime ?>"
+                                                data-status="<?= $status ?>">
+                                                Update
+                                            </button>
+
+                                            <form method="POST" action="oop2/upd_stats.php" style="display:inline-block; margin-left:6px;" id="cancelForm_<?= $scheduleID ?>">
+                                                <input type="hidden" name="scheduleID" value="<?= $scheduleID ?>">
+                                                <input type="hidden" name="cancel_reason" id="cancelReasonInput_<?= $scheduleID ?>">
+                                                <input type="hidden" name="delete_schedule" value="1">
+                                                <button type="button" class="btn btn-danger btn-sm"
+                                                    style="padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer;"
+                                                    onclick="askCancelReason(<?= $scheduleID ?>)">Cancel</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span style="color:gray;">No Actions</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+
+                            <?php if (!$hasAppointments): ?>
+                                <tr>
+                                    <td colspan="6" style="padding:20px; text-align:center; color:gray; font-style:italic;">
+                                        No Schedule
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-
 
             <!-- MODAL AREA -->
             <div class="modal fade" id="editScheduleModal" tabindex="-1" aria-labelledby="editScheduleModalLabel" aria-hidden="true">
