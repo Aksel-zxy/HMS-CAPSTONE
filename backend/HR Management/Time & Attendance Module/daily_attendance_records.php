@@ -25,6 +25,35 @@ if (!$user) {
 
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
+// Standard working hours
+$standard_start = '08:00:00';
+$standard_end   = '17:00:00';
+
+// Get date from GET parameter, default to today
+$date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+
+// Previous and next day for navigation
+$prev_day = date('Y-m-d', strtotime($date .' -1 day'));
+$next_day = date('Y-m-d', strtotime($date .' +1 day'));
+
+// Fetch attendance records for selected date
+$sql = "SELECT 
+    employee_id,
+    attendance_date,
+    time_in,
+    time_out,
+    working_hours,
+    late_minutes,
+    undertime_minutes,
+    overtime_minutes,
+    status
+FROM hr_daily_attendance
+WHERE attendance_date = '$date'
+ORDER BY employee_id ASC
+";
+
+
+$result = $conn->query($sql);
 ?>
 
 <!DOCTYPE html>
@@ -37,9 +66,22 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="stylesheet" href="css/daily_attendance_records.css">
 </head>
 
 <body>
+
+    <!----- Full-page Loader ----->
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -101,10 +143,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <li class="sidebar-item">
                         <a href="daily_attendance_records.php" class="sidebar-link">Daily Attendance Records</a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="shift_management.php" class="sidebar-link">Shift Management</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="attendance_records.php" class="sidebar-link">Attendance Reports</a>
                     </li>
                 </ul>
@@ -206,8 +244,94 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>DAILY ATTENDANCE RECORDS</h1> 
+            <div class="attendance">
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Daily Attendance Records (<?php echo $date; ?>)</p>
+
+                <!-- Navigation -->
+                <form method="GET" class="attendance-nav" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 900px; margin-left: auto; margin-right: auto;">
+                    
+                    <!-- Previous Day Button -->
+                    <button type="submit" class="nav-btn" 
+                        onclick="document.getElementById('form-date').value='<?= $prev_day; ?>'">
+                        ⬅ Previous Day
+                    </button>
+
+                    <!-- Hidden input to store the selected date -->
+                    <input type="hidden" name="date" id="form-date" value="<?= $date; ?>">
+
+                    <!-- Calendar Date Picker -->
+                    <input type="date" class="date-picker" value="<?= $date; ?>" 
+                        onchange="document.getElementById('form-date').value=this.value; this.form.submit();"
+                        style="padding: 5px 10px; font-size: 16px;">
+
+                    <!-- Next Day Button -->
+                    <button type="submit" class="nav-btn" 
+                        onclick="document.getElementById('form-date').value='<?= $next_day; ?>'">
+                        Next Day ➡
+                    </button>
+
+                </form>
+                <br />
+
+                <table id="AttendanceTable">
+                    <thead>
+                        <tr>
+                            <th>Employee ID</th>
+                            <th>Date</th>
+                            <th>Time In</th>
+                            <th>Time Out</th>
+                            <th>Hours Worked</th>
+                            <th>Late (min)</th>
+                            <th>Undertime (min)</th>
+                            <th>Overtime (min)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if($result->num_rows > 0): ?>
+                            <?php while($row = $result->fetch_assoc()): ?>
+                                <?php
+                                    // Determine status to show in badge
+                                    if(empty($row['time_in']) && empty($row['time_out']) && $row['status'] != 'On Leave') {
+                                        $statusText = 'Absent';
+                                    } elseif(isset($row['late_minutes']) && $row['late_minutes'] > 0) {
+                                        $statusText = 'Late';
+                                    } elseif(isset($row['undertime_minutes']) && $row['undertime_minutes'] > 0) {
+                                        $statusText = 'Undertime';
+                                    } elseif(isset($row['overtime_minutes']) && $row['overtime_minutes'] > 0) {
+                                        $statusText = 'Overtime';
+                                    } else {
+                                        $statusText = !empty($row['status']) ? $row['status'] : '-';
+                                    }
+
+                                    // Generate CSS class dynamically
+                                    $statusClass = 'status-' . strtolower(str_replace(' ', '', $statusText));
+                                ?>                
+                                <tr>
+                                    <td><?= !empty($row['employee_id']) ? $row['employee_id'] : '-'; ?></td>
+                                    <td><?= !empty($row['attendance_date']) ? $row['attendance_date'] : '-'; ?></td>
+                                    <td><?= !empty($row['time_in']) ? $row['time_in'] : '-'; ?></td>
+                                    <td><?= !empty($row['time_out']) ? $row['time_out'] : '-'; ?></td>
+                                    <td><?= isset($row['working_hours']) ? $row['working_hours'] : '0'; ?></td>
+                                    <td><?= isset($row['late_minutes']) ? $row['late_minutes'] : '0'; ?></td>
+                                    <td><?= isset($row['undertime_minutes']) ? $row['undertime_minutes'] : '0'; ?></td>
+                                    <td><?= isset($row['overtime_minutes']) ? $row['overtime_minutes'] : '0'; ?></td>
+                                    <td>
+                                        <span class="status-badge <?= $statusClass; ?>"><?= $statusText; ?></span>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="9">No attendance records for this date.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+
+                <!-- ----- Pagination Controls ----- -->
+                <div id="pagination" class="pagination"></div>
+
             </div>
             <!-- END CODING HERE -->
         </div>
@@ -220,10 +344,68 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <!----- End of Footer Content ----->
     
     <script>
+
+        window.addEventListener("load", function(){
+            setTimeout(function(){
+                document.getElementById("loading-screen").style.display = "none";
+            }, 2000);
+        });
+
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const table = document.getElementById("AttendanceTable");
+            const rows = table.querySelectorAll("tbody tr");
+            const pagination = document.getElementById("pagination");
+
+            let rowsPerPage = 10;
+            let currentPage = 1;
+            let totalPages = Math.ceil(rows.length / rowsPerPage);
+
+            function displayRows() {
+                rows.forEach((row, index) => {
+                    row.style.display =
+                    index >= (currentPage - 1) * rowsPerPage && index < currentPage * rowsPerPage
+                    ? ""
+                    : "none";
+                });
+            }
+
+            function updatePagination() {
+                pagination.innerHTML = ""; 
+
+                const createButton = (text, page, isDisabled = false, isActive = false) => {
+                    const button = document.createElement("button");
+                    button.textContent = text;
+                    if (isDisabled) button.disabled = true;
+                    if (isActive) button.classList.add("active");
+
+                    button.addEventListener("click", function () {
+                        currentPage = page;
+                        displayRows();
+                        updatePagination();
+                    });
+                    return button;
+                };
+
+                pagination.appendChild(createButton("First", 1, currentPage === 1));
+                pagination.appendChild(createButton("Previous", currentPage - 1, currentPage === 1));
+
+                for (let i = 1; i <= totalPages; i++) {
+                    pagination.appendChild(createButton(i, i, false, i === currentPage));
+                }
+
+                pagination.appendChild(createButton("Next", currentPage + 1, currentPage === totalPages));
+                pagination.appendChild(createButton("Last", totalPages, currentPage === totalPages));
+            }
+
+            displayRows();
+            updatePagination();
+        });
+
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

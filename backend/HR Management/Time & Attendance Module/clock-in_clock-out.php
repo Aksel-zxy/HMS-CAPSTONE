@@ -4,6 +4,7 @@ include '../includes/FooterComponent.php';
 require '../classes/Auth.php';
 require '../classes/User.php';
 require '../classes/LeaveNotification.php';
+require 'classes/Attendance.php';
 
 Auth::checkHR();
 
@@ -16,6 +17,7 @@ if (!$userId) {
 
 $userModel = new User($conn);
 $leaveNotif = new LeaveNotification($conn);
+$attendance = new Attendance($conn);
 
 $userObj = new User($conn);
 $user = $userObj->getById($userId);
@@ -23,6 +25,24 @@ if (!$user) {
     die("User not found.");
 }
 
+if (isset($_POST['check_leave'])) {
+    $onLeave = $attendance->isOnLeave($_POST['employee_id'], $_POST['attendance_date']);
+    echo json_encode(['on_leave' => $onLeave]);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['check_leave'])) {
+    $result = $attendance->saveAttendance($_POST['employee_id'], $_POST['attendance_date'], $_POST['time_in'] ?? null, $_POST['time_out'] ?? null);
+    if ($result['success']) {
+        echo "<script>alert('Attendance recorded successfully with status: {$result['status']}'); window.location.href='clock-in_clock-out.php';</script>";
+        exit;
+    } else {
+        echo "<script>alert('Error saving attendance.'); window.location.href='clock-in_clock-out.php';</script>";
+        exit;
+    }
+}
+
+$employees = $attendance->getEmployees();
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 ?>
@@ -37,9 +57,22 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="stylesheet" href="css/clock-in_clock-out.css">
 </head>
 
 <body>
+
+    <!----- Full-page Loader ----->
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -100,9 +133,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     </li>
                     <li class="sidebar-item">
                         <a href="daily_attendance_records.php" class="sidebar-link">Daily Attendance Records</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="shift_management.php" class="sidebar-link">Shift Management</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="attendance_records.php" class="sidebar-link">Attendance Reports</a>
@@ -206,10 +236,41 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>CLOCK-IN / CLOCK-OUT</h1> 
+            <div class="card">
+                <h3>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16">
+                        <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z"/>
+                        <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0"/>
+                    </svg> 
+                    Employee Attendance
+                </h3>
+                <form method="POST" action="clock-in_clock-out.php">
+
+                    <label for="employee_id">Employee</label>
+                    <select name="employee_id" id="employee_id" required>
+                        <option value="">----- Select Employee -----</option>
+                        <?php foreach ($employees as $emp): ?>
+                            <option value="<?php echo $emp['employee_id']; ?>">
+                                <?php echo htmlspecialchars($emp['full_name']); ?> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Employee ID: <?php echo $emp['employee_id']; ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+
+                    <label for="attendance_date">Date</label>
+                    <input type="date" name="attendance_date" id="attendance_date" required>
+
+                    <label for="time_in">Time In</label>
+                    <input type="time" name="time_in" id="time_in">
+
+                    <label for="time_out">Time Out</label>
+                    <input type="time" name="time_out" id="time_out">
+
+                    <button type="submit">Save Attendance</button>
+
+                </form>
             </div>
             <!-- END CODING HERE -->
+
         </div>
         <!----- End of Main Content ----->
     </div>
@@ -220,9 +281,45 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <!----- End of Footer Content ----->
     
     <script>
+
+        window.addEventListener("load", function(){
+            setTimeout(function(){
+                document.getElementById("loading-screen").style.display = "none";
+            }, 2000);
+        });
+
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+
+        document.getElementById('attendance_date').addEventListener('change', function() {
+            let employeeId = document.getElementById('employee_id').value;
+            let selectedDate = this.value;
+
+            if (selectedDate) {
+                fetch('clock-in_clock-out.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'check_leave=1&employee_id=' + employeeId + '&attendance_date=' + selectedDate
+                })
+                .then(res => res.json())
+                .then(data => {
+                    let timeIn = document.getElementById('time_in');
+                    let timeOut = document.getElementById('time_out');
+
+                    if (data.on_leave) {
+                        alert("This employee is on leave for " + selectedDate);
+                        timeIn.disabled = true;
+                        timeOut.disabled = true;
+                        timeIn.value = "";
+                        timeOut.value = "";
+                    } else {
+                        timeIn.disabled = false;
+                        timeOut.disabled = false;
+                    }
+                });
+            }
         });
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
