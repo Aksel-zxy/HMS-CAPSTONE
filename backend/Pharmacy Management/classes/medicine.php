@@ -8,124 +8,194 @@ class Medicine
         $this->conn = $dbConnection;
     }
 
-    // Fetch all medicines
     public function getAllMedicines()
     {
-        $query = "SELECT * FROM pharmacy_inventory ORDER BY med_id ASC";
+        $query = "SELECT med_id, med_name, category, dosage, stock_quantity, unit_price, unit, status 
+              FROM pharmacy_inventory 
+              ORDER BY med_name ASC";
         $result = $this->conn->query($query);
-
-        if (!$result) {
-            throw new Exception("Error fetching medicines: " . $this->conn->error);
-        }
-
+        if (!$result) throw new Exception("Error fetching medicines: " . $this->conn->error);
         return $result->fetch_all(MYSQLI_ASSOC);
     }
 
-    // Shelf life constants in years
-    private function getShelfLife()
+
+
+    // Fetch stock batches for a medicine
+    public function getStockBatches($med_id)
     {
-        return [
-            "Tablets & Capsules" => 3,
-            "Syrups / Oral Liquids" => 2,
-            "Antibiotic Dry Syrup (Powder)" => 2,
-            "Injectables (Ampoules / Vials)" => 3,
-            "Eye Drops / Ear Drops" => 2,
-            "Insulin" => 2,
-            "Topical Creams / Ointments" => 3,
-            "Vaccines" => 2,
-            "IV Fluids" => 2
-        ];
+        $stmt = $this->conn->prepare("
+            SELECT * FROM pharmacy_stock_batches 
+            WHERE med_id = ? AND stock_quantity > 0
+            ORDER BY expiry_date ASC
+        ");
+        $stmt->bind_param("i", $med_id);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
 
-    // Add new medicine or update existing one
-    public function addMedicine($med_name, $category, $dosage, $stock_quantity, $unit, $status, $unit_price)
+    public function addStock($med_id, $quantity, $expiry_date = null, $batch_no = null)
     {
-        $shelf_life = $this->getShelfLife();
-        $expiry_date = array_key_exists($unit, $shelf_life)
-            ? date('Y-m-d', strtotime("+" . $shelf_life[$unit] . " years"))
-            : NULL;
+        if (!$expiry_date) {
+            throw new Exception("Expiry date must be provided when adding stock.");
+        }
 
-        // Check if medicine exists
-        $stmt = $this->conn->prepare("SELECT med_id, stock_quantity FROM pharmacy_inventory WHERE med_name = ? AND dosage = ?");
-        $stmt->bind_param("ss", $med_name, $dosage);
+        // Auto-generate batch number if not provided
+        if (!$batch_no) {
+            $batch_no = 'B' . date('YmdHis'); // e.g., B20250901153045
+        }
+
+        // Insert batch
+        $stmt = $this->conn->prepare("
+        INSERT INTO pharmacy_stock_batches (med_id, batch_no, stock_quantity, expiry_date)
+        VALUES (?, ?, ?, ?)
+    ");
+        $stmt->bind_param("isis", $med_id, $batch_no, $quantity, $expiry_date);
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to add stock batch: " . $stmt->error);
+        }
+
+        // Update total inventory stock to match sum of batches
+        $stmt2 = $this->conn->prepare("
+        UPDATE pharmacy_inventory
+        SET stock_quantity = (SELECT IFNULL(SUM(stock_quantity),0) FROM pharmacy_stock_batches WHERE med_id = ?)
+        WHERE med_id = ?
+    ");
+        $stmt2->bind_param("ii", $med_id, $med_id);
+        $stmt2->execute();
+
+        // Update status
+        $this->autoUpdateStatus($med_id);
+
+        return true;
+    }
+
+
+
+    // Dispense medicine (FIFO by earliest expiry)
+    public function dispenseMedicine($med_id, $dispense_qty)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT batch_id, stock_quantity 
+            FROM pharmacy_stock_batches 
+            WHERE med_id = ? AND stock_quantity > 0
+            ORDER BY expiry_date ASC
+        ");
+        $stmt->bind_param("i", $med_id);
         $stmt->execute();
         $result = $stmt->get_result();
 
-        if ($result->num_rows > 0) {
-            // Update stock and price if exists
-            $row = $result->fetch_assoc();
-            $new_quantity = $row['stock_quantity'] + $stock_quantity;
+        while ($dispense_qty > 0 && ($row = $result->fetch_assoc())) {
+            $batch_id = $row['batch_id'];
+            $available = $row['stock_quantity'];
 
-            $updateStmt = $this->conn->prepare("
-                UPDATE pharmacy_inventory 
-                SET stock_quantity = ?, status = ?, unit_price = ?, expiry_date = ? 
-                WHERE med_id = ?
-            ");
-            $updateStmt->bind_param("isdsi", $new_quantity, $status, $unit_price, $expiry_date, $row['med_id']);
-
-            if (!$updateStmt->execute()) {
-                throw new Exception("Failed to update stock: " . $updateStmt->error);
-            }
-        } else {
-            // Insert new medicine
-            $insertStmt = $this->conn->prepare("
-                INSERT INTO pharmacy_inventory 
-                (med_name, category, dosage, stock_quantity, unit, status, unit_price, expiry_date) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ");
-            $insertStmt->bind_param("sssissds", $med_name, $category, $dosage, $stock_quantity, $unit, $status, $unit_price, $expiry_date);
-
-            if (!$insertStmt->execute()) {
-                throw new Exception("Failed to add medicine: " . $insertStmt->error);
+            if ($available >= $dispense_qty) {
+                $new_qty = $available - $dispense_qty;
+                $update = $this->conn->prepare("UPDATE pharmacy_stock_batches SET stock_quantity = ? WHERE batch_id = ?");
+                $update->bind_param("ii", $new_qty, $batch_id);
+                $update->execute();
+                $dispense_qty = 0;
+            } else {
+                $dispense_qty -= $available;
+                $update = $this->conn->prepare("UPDATE pharmacy_stock_batches SET stock_quantity = 0 WHERE batch_id = ?");
+                $update->bind_param("i", $batch_id);
+                $update->execute();
             }
         }
 
-        return true;
-    }
-
-    // Update medicine fully
-    public function updateMedicine($med_id, $med_name, $category, $dosage, $stock_quantity, $unit, $status, $unit_price)
-    {
-        $shelf_life = $this->getShelfLife();
-        $expiry_date = array_key_exists($unit, $shelf_life)
-            ? date('Y-m-d', strtotime("+" . $shelf_life[$unit] . " years"))
-            : NULL;
-
-        $stmt = $this->conn->prepare("
-            UPDATE pharmacy_inventory 
-            SET med_name = ?, category = ?, dosage = ?, stock_quantity = ?, unit = ?, status = ?, unit_price = ?, expiry_date = ?
+        // Update inventory total stock
+        $stmt2 = $this->conn->prepare("
+            UPDATE pharmacy_inventory
+            SET stock_quantity = (SELECT IFNULL(SUM(stock_quantity),0) FROM pharmacy_stock_batches WHERE med_id = ?)
             WHERE med_id = ?
         ");
-        $stmt->bind_param("sssissdsi", $med_name, $category, $dosage, $stock_quantity, $unit, $status, $unit_price, $expiry_date, $med_id);
+        $stmt2->bind_param("ii", $med_id, $med_id);
+        $stmt2->execute();
 
+        $this->autoUpdateStatus($med_id);
+
+        return $dispense_qty === 0;
+    }
+
+    // Update medicine general info
+    public function updateMedicine($med_id, $med_name, $category, $dosage, $unit, $unit_price)
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE pharmacy_inventory 
+            SET med_name = ?, category = ?, dosage = ?, unit = ?, unit_price = ?
+            WHERE med_id = ?
+        ");
+        $stmt->bind_param("sssdsi", $med_name, $category, $dosage, $unit, $unit_price, $med_id);
         if (!$stmt->execute()) {
             throw new Exception("Failed to update medicine: " . $stmt->error);
         }
-
         return true;
     }
 
-    // Update medicine status only
-    public function updateStatus($med_id, $new_status)
+    // Auto-update stock status
+    public function autoUpdateStatus($med_id = null)
     {
-        $stmt = $this->conn->prepare("UPDATE pharmacy_inventory SET status = ? WHERE med_id = ?");
-        $stmt->bind_param("si", $new_status, $med_id);
-
-        if (!$stmt->execute()) {
-            throw new Exception("Failed to update status: " . $stmt->error);
+        if ($med_id) {
+            // Single medicine
+            $stmt = $this->conn->prepare("
+                UPDATE pharmacy_inventory i
+                JOIN (SELECT med_id, SUM(stock_quantity) AS total_qty FROM pharmacy_stock_batches WHERE med_id = ? GROUP BY med_id) b
+                ON i.med_id = b.med_id
+                SET i.status = CASE WHEN b.total_qty > 0 THEN 'Available' ELSE 'Out of Stock' END
+            ");
+            $stmt->bind_param("i", $med_id);
+            $stmt->execute();
+        } else {
+            // All medicines
+            $this->conn->query("
+                UPDATE pharmacy_inventory i
+                LEFT JOIN (SELECT med_id, SUM(stock_quantity) AS total_qty FROM pharmacy_stock_batches GROUP BY med_id) b
+                ON i.med_id = b.med_id
+                SET i.status = CASE WHEN b.total_qty > 0 THEN 'Available' ELSE 'Out of Stock' END
+            ");
         }
-
-        return true;
     }
 
-    // Auto update stock status
+    // Get expiry tracking
+    public function getExpiryTracking()
+    {
+        $query = "
+            SELECT i.med_name, b.batch_no, b.stock_quantity, b.expiry_date,
+            CASE 
+                WHEN b.expiry_date < CURDATE() THEN 'Expired'
+                WHEN b.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 'Near Expiry'
+                ELSE 'Available'
+            END AS status
+            FROM pharmacy_stock_batches b
+            JOIN pharmacy_inventory i ON i.med_id = b.med_id
+            ORDER BY b.expiry_date ASC
+        ";
+        $result = $this->conn->query($query);
+        if (!$result) {
+            throw new Exception("Failed to fetch expiry tracking: " . $this->conn->error);
+        }
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+
     public function autoUpdateOutOfStock()
     {
-        $sql = "UPDATE pharmacy_inventory 
-            SET status = CASE 
-                WHEN stock_quantity = 0 THEN 'Out of Stock'
-                ELSE 'Available'
-            END";
+        $sql = "UPDATE pharmacy_inventory SET status = CASE WHEN stock_quantity = 0 THEN 'Out of Stock' ELSE 'Available' END";
         $this->conn->query($sql);
+    }
+    public function getAllBatches()
+    {
+        $query = "
+        SELECT i.med_name, b.batch_no, b.stock_quantity, b.expiry_date,
+        CASE 
+            WHEN b.expiry_date < CURDATE() THEN 'Expired'
+            WHEN b.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 'Near Expiry'
+            ELSE 'Available'
+        END AS status
+        FROM pharmacy_stock_batches b
+        JOIN pharmacy_inventory i ON i.med_id = b.med_id
+        ORDER BY i.med_name, b.expiry_date ASC
+    ";
+        $result = $this->conn->query($query);
+        if (!$result) throw new Exception("Error fetching batches: " . $this->conn->error);
+        return $result->fetch_all(MYSQLI_ASSOC);
     }
 }

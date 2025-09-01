@@ -2,33 +2,79 @@
 include '../../SQL/config.php';
 require_once 'classes/Medicine.php';
 
-session_start();
+$medicineObj = new Medicine($conn);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    try {
-        $medicineObj = new Medicine($conn);
+// Shelf life in years by category
+$shelf_life = [
+    "Tablets & Capsules" => 3,
+    "Syrups / Oral Liquids" => 2,
+    "Antibiotic Dry Syrup (Powder)" => 2,
+    "Injectables (Ampoules / Vials)" => 3,
+    "Eye Drops / Ear Drops" => 2,
+    "Insulin" => 2,
+    "Topical Creams / Ointments" => 3,
+    "Vaccines" => 2,
+    "IV Fluids" => 2
+];
 
-        $med_name = $_POST['med_name'];
-        $category = $_POST['category'];
-        $dosage = $_POST['dosage'];
-        $stock_quantity = $_POST['stock_quantity'];
-        $unit = $_POST['unit'];
-        $status = $_POST['status'];
-        $unit_price = $_POST['unit_price']; // ✅ new field
+// Get POST data safely
+$med_name = $_POST['med_name'] ?? '';
+$category = $_POST['category'] ?? '';
+$dosage = $_POST['dosage'] ?? '';
+$stock_quantity = intval($_POST['stock_quantity'] ?? 0);
+$unit = $_POST['unit'] ?? '';
+$unit_price = floatval($_POST['unit_price'] ?? 0);
+$expiry_date = $_POST['expiry_date'] ?? null; // optional
+$batch_no = $_POST['batch_no'] ?? null;
 
-        $medicineObj->addMedicine(
-            $med_name,
-            $category,
-            $dosage,
-            $stock_quantity,
-            $unit,
-            $status,
-            $unit_price
-        );
+// Basic validation
+if (!$med_name || !$dosage || $stock_quantity <= 0) {
+    die("Medicine name, dosage, and stock quantity are required.");
+}
 
-        header("Location: pharmacy_med_inventory.php?success=1");
-        exit;
-    } catch (Exception $e) {
-        echo "Error: " . $e->getMessage();
+try {
+    // Determine default expiry if not provided
+    if (!$expiry_date) {
+        $years = $shelf_life[$category] ?? 1; // default 1 year if category not listed
+        $expiry_date = date("Y-m-d", strtotime("+$years year"));
     }
+
+    // 1️⃣ Check if medicine already exists
+    $stmt = $conn->prepare("SELECT med_id FROM pharmacy_inventory WHERE med_name = ? AND dosage = ?");
+    $stmt->bind_param("ss", $med_name, $dosage);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows > 0) {
+        // Medicine exists
+        $row = $result->fetch_assoc();
+        $med_id = $row['med_id'];
+
+        // 2️⃣ Add stock batch
+        $medicineObj->addStock($med_id, $stock_quantity, $expiry_date, $batch_no);
+
+        // 3️⃣ Optionally update unit price & unit
+        $stmt2 = $conn->prepare("UPDATE pharmacy_inventory SET unit_price = ?, unit = ? WHERE med_id = ?");
+        $stmt2->bind_param("dsi", $unit_price, $unit, $med_id);
+        $stmt2->execute();
+    } else {
+        // 4️⃣ Insert new medicine with zero stock
+        $stmt = $conn->prepare("
+            INSERT INTO pharmacy_inventory 
+            (med_name, category, dosage, stock_quantity, unit_price, unit, status)
+            VALUES (?, ?, ?, 0, ?, ?, 'Available')
+        ");
+        $stmt->bind_param("sssds", $med_name, $category, $dosage, $unit_price, $unit);
+        $stmt->execute();
+
+        $med_id = $conn->insert_id;
+
+        // 5️⃣ Add initial stock batch
+        $medicineObj->addStock($med_id, $stock_quantity, $expiry_date, $batch_no);
+    }
+
+    header("Location: pharmacy_med_inventory.php?success=1");
+    exit;
+} catch (Exception $e) {
+    die("Error: " . $e->getMessage());
 }

@@ -1,6 +1,6 @@
 <?php
 include '../../SQL/config.php';
-
+require_once 'classes/Medicine.php';
 if (!isset($_SESSION['pharmacy']) || $_SESSION['pharmacy'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
     exit();
@@ -22,6 +22,13 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+$medicineObj = new Medicine($conn);
+$data = $medicineObj->getAllBatches();
+$grouped = [];
+foreach ($data as $batch) {
+    $grouped[$batch['med_name']][] = $batch;
+}
 ?>
 
 <!DOCTYPE html>
@@ -34,6 +41,7 @@ if (!$user) {
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
+    <link rel="stylesheet" href="assets/CSS/med_inventory.css">
 </head>
 
 <body>
@@ -142,13 +150,145 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
+            <div class="content">
+                <div class="title-container">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    <h1 class="page-title">Medicine Expiry Tracking</h1>
+                </div>
+
+                <!-- Filter + Search -->
+                <div class="row mb-3">
+                    <!-- Search (Left) -->
+                    <div class="col-md-6">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search medicine name...">
+                    </div>
+
+                    <!-- Filter (Right) -->
+                    <div class="col-md-3 ms-auto">
+                        <select id="statusFilter" class="form-select">
+                            <option value="All" selected>Show All</option>
+                            <option value="Available">Available</option>
+                            <option value="Near Expiry">Near Expiry</option>
+                            <option value="Expired">Expired</option>
+                        </select>
+                    </div>
+                </div>
+
+
+                <!-- Medicine Expiry Tracking Table -->
+                <?php
+                // Helper function to format date as Month Year
+                function formatMonthYear($dateStr)
+                {
+                    if (!$dateStr) return '-';
+                    $date = DateTime::createFromFormat('Y-m-d', $dateStr);
+                    return $date ? $date->format('M Y') : '-'; // e.g., Sep 2025
+                }
+                ?>
+
+                <table class="table" id="medicineExpiryTable">
+                    <thead class="table">
+                        <tr>
+                            <th>Medicine Name</th>
+                            <th>Stock Quantity</th>
+                            <th>Expiry Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($grouped as $medName => $batches): ?>
+                            <?php
+                            $totalStock = array_sum(array_column($batches, 'stock_quantity'));
+                            $earliestExpiry = $batches[0]['expiry_date'] ?? '-';
+                            $status = $batches[0]['status'] ?? 'Available';
+                            ?>
+                            <!-- Main Medicine Row -->
+                            <tr class="medicine-main" data-med-name="<?= htmlspecialchars($medName) ?>" style="cursor:pointer;">
+                                <td><strong><?= htmlspecialchars($medName) ?></strong></td>
+                                <td><?= $totalStock ?></td>
+                                <td><?= formatMonthYear($earliestExpiry) ?></td>
+                                <td>
+                                    <span class="badge <?= $status == 'Available' ? 'bg-success' : ($status == 'Near Expiry' ? 'bg-warning text-dark' : 'bg-danger') ?>">
+                                        <?= $status ?>
+                                    </span>
+                                </td>
+                            </tr>
+
+                            <!-- Hidden Batch Rows -->
+                            <?php foreach ($batches as $batch): ?>
+                                <tr class="batch-row batch-<?= htmlspecialchars($medName) ?>" style="display:none; background-color:#f9f9f9;">
+                                    <td style="padding-left:30px;">— Batch <?= $batch['batch_no'] ?? 'N/A' ?></td>
+                                    <td><?= $batch['stock_quantity'] ?></td>
+                                    <td><?= formatMonthYear($batch['expiry_date']) ?></td>
+                                    <td>
+                                        <span class="badge <?= $batch['status'] == 'Available' ? 'bg-success' : ($batch['status'] == 'Near Expiry' ? 'bg-warning text-dark' : 'bg-danger') ?>">
+                                            <?= $batch['status'] ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+
+
+
+                <script>
+                    // Toggle batch rows only when no filter/search applied
+                    document.querySelectorAll('.medicine-main').forEach(row => {
+                        row.addEventListener('click', () => {
+                            const medName = row.dataset.medName;
+                            document.querySelectorAll('.batch-' + medName).forEach(batchRow => {
+                                batchRow.style.display = batchRow.style.display === 'none' ? '' : 'none';
+                            });
+                        });
+                    });
+
+                    // Hide batch rows when filtering/searching
+                    const searchInput = document.getElementById("searchInput");
+                    const statusFilter = document.getElementById("statusFilter");
+
+                    function filterTable() {
+                        const searchValue = searchInput.value.toLowerCase();
+                        const filterValue = statusFilter.value;
+
+                        document.querySelectorAll('#medicineExpiryTable tbody tr').forEach(row => {
+                            const cols = row.getElementsByTagName("td");
+                            if (cols.length === 0) return;
+
+                            const medName = cols[0].textContent.toLowerCase();
+                            const status = cols[3].textContent.trim();
+
+                            const matchesSearch = medName.includes(searchValue);
+                            const matchesFilter = filterValue === "All" || status === filterValue;
+
+                            // Show main row only if it matches search/filter
+                            if (!row.classList.contains('batch-row')) {
+                                row.style.display = (matchesSearch && matchesFilter) ? '' : 'none';
+                            } else {
+                                // Always hide batch rows when filtering
+                                row.style.display = 'none';
+                            }
+                        });
+                    }
+
+                    searchInput.addEventListener("keyup", filterTable);
+                    statusFilter.addEventListener("change", filterTable);
+                </script>
+
+
+
 
             </div>
-            <!-- END CODING HERE -->
         </div>
-        <!----- End of Main Content ----->
+
+        <!-- END CODING HERE -->
     </div>
+    <!----- End of Main Content ----->
+    </div>
+
+
+
     <script>
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
