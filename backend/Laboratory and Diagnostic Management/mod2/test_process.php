@@ -194,8 +194,6 @@ $allPatients = $patient->getAllPatients();
                                 $pid   = $p['patient_id'];
                                 $name  = $p['fname'] . ' ' . $p['lname'];
                                 $apptId = $p['appointment_id'];
-
-                                // Get schedule(s) for this appointment
                                 $schedQuery = $conn->prepare("
                                     SELECT status, scheduleID, scheduleDate, scheduleTime, serviceName, completed_at
                                     FROM dl_schedule 
@@ -205,10 +203,8 @@ $allPatients = $patient->getAllPatients();
                                 $schedQuery->bind_param("i", $apptId);
                                 $schedQuery->execute();
                                 $schedResult = $schedQuery->get_result();
-
                                 while ($schedRow = $schedResult->fetch_assoc()) {
                                     if ($schedRow['status'] === 'Scheduled' || $schedRow['status'] === 'Cancelled') continue;
-
                                     $patientsGrouped[$pid]['name'] = $name;
                                     $patientsGrouped[$pid]['tests'][] = [
                                         'scheduleID'   => $schedRow['scheduleID'],
@@ -221,7 +217,6 @@ $allPatients = $patient->getAllPatients();
                                 }
                                 $schedQuery->close();
                             }
-
                             if (empty($patientsGrouped)) {
                                 echo "<tr><td colspan='6' style='padding:20px; text-align:center; color:gray; font-style:italic;'>No Schedule</td></tr>";
                             } else {
@@ -265,7 +260,6 @@ $allPatients = $patient->getAllPatients();
                                                 data-results='<?= json_encode($tests) ?>'>
                                                 View Result
                                             </button>
-
                                             <form action="save_result.php" method="POST" style="display:inline;">
                                                 <input type="hidden" name="patientID" value="<?= htmlspecialchars($pid) ?>">
                                                 <input type="hidden" name="scheduleIDs" value='<?= json_encode(array_column($tests, "scheduleID")) ?>'>
