@@ -1,7 +1,7 @@
 <?php
-include '../../../SQL/config.php';
+include '../../../../SQL/config.php';
 
-if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Nurse') {
+if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
     header('Location: login.php');
     exit();
 }
@@ -23,6 +23,20 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+// Only fetch schedule for the logged-in doctor
+$modal_schedules = [];
+$employee_id = $_SESSION['employee_id'];
+$stmt = $conn->prepare("SELECT * FROM shift_scheduling WHERE employee_id = ? ORDER BY week_start DESC");
+$stmt->bind_param("i", $employee_id);
+$stmt->execute();
+$result = $stmt->get_result();
+while ($row = $result->fetch_assoc()) {
+    $modal_schedules[] = $row;
+}
+
+// Define days of the week
+$days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 ?>
 
 <!DOCTYPE html>
@@ -32,9 +46,10 @@ if (!$user) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Doctor User Panel</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="shortcut icon" href="../../assets/image/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../../assets/CSS/bootstrap.min.css">
+    <link rel="stylesheet" href="../../assets/CSS/super.css">
+     <link rel="stylesheet" href="../../assets/CSS/my_schedule.css">
 </head>
 
 <body>
@@ -43,25 +58,25 @@ if (!$user) {
         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
-                <img src="../assets/image/logo-dark.png" width="90px" height="20px">
+                <img src="../../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
             <div class="menu-title">Navigation</div>
 
             <!----- Sidebar Navigation ----->
         
-          <li class="sidebar-item">
-                <a href="Nurse/my_nurse_schedule.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+            <li class="sidebar-item">
+                <a href="my_doctor_schedule.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M224 64C241.7 64 256 78.3 256 96L256 128L384 128L384 96C384 78.3 398.3 64 416 64C433.7 64 448 78.3 448 96L448 128L480 128C515.3 128 544 156.7 544 192L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 192C96 156.7 124.7 128 160 128L192 128L192 96C192 78.3 206.3 64 224 64zM160 304L160 336C160 344.8 167.2 352 176 352L208 352C216.8 352 224 344.8 224 336L224 304C224 295.2 216.8 288 208 288L176 288C167.2 288 160 295.2 160 304zM288 304L288 336C288 344.8 295.2 352 304 352L336 352C344.8 352 352 344.8 352 336L352 304C352 295.2 344.8 288 336 288L304 288C295.2 288 288 295.2 288 304zM432 288C423.2 288 416 295.2 416 304L416 336C416 344.8 423.2 352 432 352L464 352C472.8 352 480 344.8 480 336L480 304C480 295.2 472.8 288 464 288L432 288zM160 432L160 464C160 472.8 167.2 480 176 480L208 480C216.8 480 224 472.8 224 464L224 432C224 423.2 216.8 416 208 416L176 416C167.2 416 160 423.2 160 432zM304 416C295.2 416 288 423.2 288 432L288 464C288 472.8 295.2 480 304 480L336 480C344.8 480 352 472.8 352 464L352 432C352 423.2 344.8 416 336 416L304 416zM416 432L416 464C416 472.8 423.2 480 432 480L464 480C472.8 480 480 472.8 480 464L480 432C480 423.2 472.8 416 464 416L432 416C423.2 416 416 423.2 416 432z"/></svg>
                     <span style="font-size: 18px;">My Schedule</span>
                 </a>
             </li>
              <li class="sidebar-item">
-                <a href="Nurse/nurse_duty.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="doctor_duty.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                   <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M160 96C160 78.3 174.3 64 192 64L448 64C465.7 64 480 78.3 480 96C480 113.7 465.7 128 448 128L418.5 128L428.8 262.1C465.9 283.3 494.6 318.5 507 361.8L510.8 375.2C513.6 384.9 511.6 395.2 505.6 403.3C499.6 411.4 490 416 480 416L160 416C150 416 140.5 411.3 134.5 403.3C128.5 395.3 126.5 384.9 129.3 375.2L133 361.8C145.4 318.5 174 283.3 211.2 262.1L221.5 128L192 128C174.3 128 160 113.7 160 96zM288 464L352 464L352 576C352 593.7 337.7 608 320 608C302.3 608 288 593.7 288 576L288 464z"/></svg>
-                    <span style="font-size: 18px;">Nurse Duty</span>
+                    <span style="font-size: 18px;">Doctor Duty</span>
                 </a>
             </li>
              <li class="sidebar-item">
@@ -93,6 +108,10 @@ if (!$user) {
                 </a>
             </li>
 
+
+
+
+
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -118,7 +137,7 @@ if (!$user) {
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['last_name']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -128,10 +147,54 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>BASAHIN PO YUNG MGA COMMENT SA CODE PARA DI MALIGAW</h1> <br>
-                <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
-                <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
+           
+
+             <div class="container-fluid">
+                <h2 class="schedule-title">🧑‍⚕️My Schedule</h2>
+                <?php if (!empty($modal_schedules)): ?>
+                    <?php foreach ($modal_schedules as $modal_schedule): ?>
+                        <div class="mb-4 border rounded p-3 schedule-list-view">
+                            <h6 class="schedule-date">Week: <?= htmlspecialchars($modal_schedule['week_start']) ?></h6>
+                            <table class="table table-bordered bg-white schedule-calendar-table">
+                                <thead>
+                                    <tr class="schedule-table-header">
+                                        <th>Day</th>
+                                        <th>Start Time</th>
+                                        <th>End Time</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($days as $day): ?>
+                                        <?php $prefix = strtolower(substr($day, 0, 3)); ?>
+                                        <tr>
+                                            <td><?= $day ?></td>
+                                            <td>
+                                                <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
+                                                    ---
+                                                <?php else: ?>
+                                                    <?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
+                                                    ---
+                                                <?php else: ?>
+                                                    <?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?= htmlspecialchars($modal_schedule[$prefix . '_status'] ?? '') ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="alert alert-info mt-4">No schedule found for you.</div>
+                <?php endif; ?>
             </div>
             <!-- END CODING HERE -->
         </div>
@@ -143,10 +206,10 @@ if (!$user) {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
     </script>
-    <script src="../assets/Bootstrap/all.min.js"></script>
-    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="../assets/Bootstrap/jq.js"></script>
+    <script src="../../assets/Bootstrap/all.min.js"></script>
+    <script src="../../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../../assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="../../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
