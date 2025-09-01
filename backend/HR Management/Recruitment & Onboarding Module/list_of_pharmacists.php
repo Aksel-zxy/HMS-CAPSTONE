@@ -338,8 +338,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <option value="Dispensing Pharmacist">Dispensing Pharmacist</option>
                 </select>
 
-                <input type="text" id="otherPharmacySpecialization" name="otherPharmacySpecialization" placeholder="Please specify" style="display:none; margin-top:5px;">
-
                 <label for="employment_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Employment Type:</label>
                 <select id="employment_type" name="employment_type" required>
                     <option value="">--- Select Employment Type ---</option>

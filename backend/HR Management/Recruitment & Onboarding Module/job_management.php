@@ -6,6 +6,7 @@ require '../classes/User.php';
 require '../classes/Employee.php';
 require '../classes/LeaveNotification.php';
 require 'classes/JobManager.php';
+require 'classes/ReplacementRequest.php';
 
 Auth::checkHR();
 
@@ -23,6 +24,7 @@ if (!$user) {
 }
 
 $jobManager = new JobManager($conn);
+$requestManager = new ReplacementRequest($conn);
 $leaveNotif = new LeaveNotification($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -44,7 +46,17 @@ if (isset($_GET['job_id'])) {
     }
 }
 
+if (isset($_GET['request_id'])) {
+    if ($requestManager->deleteRequest(intval($_GET['request_id']))) {
+        header('Location: job_management.php?message=Replacement Request deleted successfully.');
+        exit;
+    } else {
+        echo "Replacement Request not found.";
+    }
+}
+
 $jobs = $jobManager->getJobs();
+$requests = $requestManager->getRequests();
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 ?>
@@ -135,9 +147,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     </li>
                     <li class="sidebar-item">
                         <a href="../Time & Attendance Module/daily_attendance_records.php" class="sidebar-link">Daily Attendance Records</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Time & Attendance Module/shift_management.php" class="sidebar-link">Shift Management</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Time & Attendance Module/attendance_records.php" class="sidebar-link">Attendance Reports</a>
@@ -248,6 +257,58 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 <button class="hahaha" onclick="openForm()">Post a Job</button>
             </center>
 
+            <center>
+                <a href="replacement_button.php" class="hahaha">Mga Button Nyo</a>
+            </center>
+
+            <br />
+            <br />
+            <br />
+            <br />
+
+            <div class="request">
+                <table >
+                    <thead>
+                        <tr>
+                            <th>Profession</th>
+                            <th>Department</th>
+                            <th>Position</th>
+                            <th>Leaving Employee Name</th>
+                            <th>Leaving Employee ID</th>
+                            <th>Reason for Leaving</th>
+                            <th>Requested By</th>
+                            <th>Date Requested</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($requests)): ?>
+                            <?php foreach ($requests as $req): ?>
+                                <tr>
+                                    <td><?= htmlspecialchars($req['profession']) ?></td>
+                                    <td><?= htmlspecialchars($req['department']) ?></td>
+                                    <td><?= htmlspecialchars($req['position']) ?></td>
+                                    <td><?= htmlspecialchars($req['leaving_employee_name']) ?></td>
+                                    <td><?= htmlspecialchars($req['leaving_employee_id']) ?></td>
+                                    <td><?= nl2br(htmlspecialchars($req['reason_for_leaving'])) ?></td>
+                                    <td><?= htmlspecialchars($req['requested_by']) ?></td>
+                                    <td><?= htmlspecialchars($req['date_requested']) ?></td>
+                                    <td>
+                                        <div class="request-delete">
+                                            <a href="job_management.php?request_id=<?php echo $req['request_id']; ?>" onclick="return confirm('Are you sure you want to delete this Request Replacement?')">Delete</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="8" class="text-center">No replacement requests found.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+
             <!-- ----- Pop-Up Form (Post a Job) ----- -->
             <div id="popupForm" class="popup-form">
                 <div class="form-container">
@@ -277,7 +338,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <br />
 
                     <label for="image">Upload Image:</label>
-                    <input type="file" id="image" name="image">
+                    <input type="file" id="image" name="image" required>
                     <br />
                     <br />
 
@@ -304,7 +365,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                                     echo '<p><strong>Title:</strong> ' . htmlspecialchars($row['title']) . '</p>';
                                     echo '<p><strong>Position:</strong> ' . htmlspecialchars($row['job_position']) . '</p>';
-                                    echo '<p><strong>Description:</strong> ' . htmlspecialchars($row['job_description']) . '</p>';
+                                    echo '<p style="text-align: justify;"><strong>Description:</strong> ' . htmlspecialchars($row['job_description']) . '</p>';
                                     echo '<p><strong>Specialization:</strong> ' . htmlspecialchars($row['specialization']) . '</p>';
                                     echo '<p><strong>Date Posted:</strong> ' . htmlspecialchars($row['date_post']) . '</p>';
 

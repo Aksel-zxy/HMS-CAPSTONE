@@ -125,9 +125,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <a href="../Time & Attendance Module/daily_attendance_records.php" class="sidebar-link">Daily Attendance Records</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Time & Attendance Module/shift_management.php" class="sidebar-link">Shift Management</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="../Time & Attendance Module/attendance_records.php" class="sidebar-link">Attendance Reports</a>
                     </li>
                 </ul>
@@ -233,7 +230,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
             <!-- START CODING HERE -->
             <!-- ----- Card-List of Employees ----- -->
-            <p style="text-align: center;font-size: 35px;font-weight: bold;padding-bottom: 20px;">Registration of Applicant</p>
+            <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Registration of Applicant</p>
 
             <div class="row1">
                 <div class="card">
