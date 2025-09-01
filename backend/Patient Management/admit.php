@@ -24,7 +24,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $bed_id = $_POST['bed_id'];
     $assigned_date = $_POST['assigned_date'];
     $admission_type = $_POST['admission_type'];
-    $admission->admitPatient($patient_id, $bed_id, $assigned_date);
+    $admission->admit($patient_id, $bed_id, $assigned_date, $admission_type);
 }
 ?>
 

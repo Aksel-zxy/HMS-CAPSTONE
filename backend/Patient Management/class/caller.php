@@ -137,7 +137,7 @@ class PatientAdmission {
 
      public function admit($patient_id, $bed_id, $assigned_date, $admission_type) {
         //  Insert into bed_assignment
-        $insert = "INSERT INTO bed_assignment (patient_id, bed_id, assigned_date) VALUES (?, ?, ?)";
+        $insert = "INSERT INTO p_bed_assignments (patient_id, bed_id, assigned_date) VALUES (?, ?, ?)";
         $stmt = $this->conn->prepare($insert);
         $stmt->bind_param("iis", $patient_id, $bed_id, $assigned_date);
 
@@ -149,7 +149,7 @@ class PatientAdmission {
             $stmt2->execute();
 
             //  Update patient admission type
-            $updateType = "UPDATE patients SET admission_type = ? WHERE patient_id = ?";
+            $updateType = "UPDATE patientinfo SET admission_type = ? WHERE patient_id = ?";
             $stmt3 = $this->conn->prepare($updateType);
             $stmt3->bind_param("si", $admission_type, $patient_id);
             $stmt3->execute();
