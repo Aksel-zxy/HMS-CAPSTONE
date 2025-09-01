@@ -22,7 +22,7 @@ if ($billing_id <= 0) {
 
 // Fetch billing record + patient info
 $sql = "
-    SELECT br.*, pi.fname, pi.mname, pi.lname, pi.address, pi.age, pi.dob, pi.gender, pi.civil_status,
+    SELECT br.*, br.insurance_covered, pi.fname, pi.mname, pi.lname, pi.address, pi.age, pi.dob, pi.gender, pi.civil_status,
            pi.phone_number, pi.email, pi.admission_type, pi.discount
     FROM billing_records br
     JOIN patientinfo pi ON br.patient_id = pi.patient_id
@@ -56,13 +56,47 @@ while ($row = $result_diag->fetch_assoc()) {
     $diag_results[] = $row;
 }
 
-// Fetch user/doctor info
+// Fetch user info from users table
 $query = "SELECT * FROM users WHERE user_id = ?";
 $stmt_user = $conn->prepare($query);
 $stmt_user->bind_param("i", $_SESSION['user_id']);
 $stmt_user->execute();
 $result_user = $stmt_user->get_result();
 $user = $result_user->fetch_assoc();
+
+// Fetch doctor info from hr_employees using employee_id from users table
+$doctor = null;
+if ($user && !empty($user['employee_id'])) {
+    $doctor_stmt = $conn->prepare(
+        "SELECT first_name, middle_name, last_name, suffix_name, contact_number, specialization 
+         FROM hr_employees 
+         WHERE employee_id = ? LIMIT 1"
+    );
+    $doctor_stmt->bind_param("i", $user['employee_id']);
+    $doctor_stmt->execute();
+    $doctor_result = $doctor_stmt->get_result();
+    if ($doctor_row = $doctor_result->fetch_assoc()) {
+        $doctor = $doctor_row;
+    }
+}
+
+// Fetch assigned doctor for the patient from dl_schedule (latest schedule)
+$doctor = null;
+$doctor_stmt = $conn->prepare("
+    SELECT he.first_name, he.middle_name, he.last_name, he.suffix_name, 
+           he.contact_number, he.specialization
+    FROM dl_schedule ds
+    JOIN hr_employees he ON ds.employee_id = he.employee_id
+    WHERE ds.patientID = ?
+    ORDER BY ds.scheduleDate DESC, ds.scheduleTime DESC
+    LIMIT 1
+");
+$doctor_stmt->bind_param("i", $billing['patient_id']);
+$doctor_stmt->execute();
+$doctor_result = $doctor_stmt->get_result();
+if ($doctor_row = $doctor_result->fetch_assoc()) {
+    $doctor = $doctor_row;
+}
 
 // Calculate subtotal from diagnostic results
 $subtotal = 0;
@@ -83,6 +117,12 @@ if (!empty($diag_results)) {
 $out_of_pocket = (isset($billing['out_of_pocket']) && is_numeric($billing['out_of_pocket']))
     ? floatval($billing['out_of_pocket'])
     : 0.00;
+
+// Fetch insurance_covered for this billing_id from billing_records
+$insurance_covered = 0.00;
+if (isset($billing['insurance_covered']) && is_numeric($billing['insurance_covered'])) {
+    $insurance_covered = floatval($billing['insurance_covered']);
+}
 
 ?>
 <!DOCTYPE html>
@@ -119,15 +159,34 @@ $out_of_pocket = (isset($billing['out_of_pocket']) && is_numeric($billing['out_o
             </td>
             <td width="4%"></td>
             <td width="48%" valign="top" style="border-left:1px solid #1976d2;">
+                <span class="blue-label">DOCTOR INFORMATION</span><br>
                 <table class="info-table">
                     <tr><td>Name:</td><td>
-                        <?php echo htmlspecialchars($user['fname'] . ' ' . $user['lname']); ?>
+                        <?php
+                            if ($doctor) {
+                                $full_name = $doctor['first_name'];
+                                if (!empty($doctor['middle_name'])) $full_name .= ' ' . $doctor['middle_name'];
+                                if (!empty($doctor['last_name'])) $full_name .= ' ' . $doctor['last_name'];
+                                if (!empty($doctor['suffix_name'])) $full_name .= ', ' . $doctor['suffix_name'];
+                                echo htmlspecialchars($full_name);
+                            } else {
+                                echo "N/A";
+                            }
+                        ?>
                     </td></tr>
                     <tr><td>Contact Number:</td><td>
-                        <?php echo !empty($user['phone_number']) ? htmlspecialchars($user['phone_number']) : "N/A"; ?>
+                        <?php
+                            echo ($doctor && !empty($doctor['contact_number']))
+                                ? htmlspecialchars($doctor['contact_number'])
+                                : "N/A";
+                        ?>
                     </td></tr>
                     <tr><td>Specialization:</td><td>
-                        <?php echo !empty($user['specialization']) ? htmlspecialchars($user['specialization']) : "N/A"; ?>
+                        <?php
+                            echo ($doctor && !empty($doctor['specialization']))
+                                ? htmlspecialchars($doctor['specialization'])
+                                : "N/A";
+                        ?>
                     </td></tr>
                 </table>
             </td>
@@ -195,25 +254,7 @@ $out_of_pocket = (isset($billing['out_of_pocket']) && is_numeric($billing['out_o
             <td width="70%"></td>
             <td width="30%">
                 SUB TOTAL: ₱ <?php echo number_format($subtotal, 2); ?><br>
-                <?php
-                // Fetch insurance covered for this billing_id and patient_id
-                $insurance_covered = 0.00;
-                $insurance_type = 'N/A';
-
-                $ins_stmt = $conn->prepare(
-                    "SELECT insurance_covered, insurance_type 
-                     FROM insurance_request 
-                     WHERE billing_id = ? AND patient_id = ? AND status = 'Approved' LIMIT 1"
-                );
-                $ins_stmt->bind_param("ii", $billing_id, $billing['patient_id']);
-                $ins_stmt->execute();
-                $ins_result = $ins_stmt->get_result();
-                if ($ins_row = $ins_result->fetch_assoc()) {
-                    $insurance_covered = floatval($ins_row['insurance_covered']);
-                    $insurance_type = !empty($ins_row['insurance_type']) ? $ins_row['insurance_type'] : 'N/A';
-                }
-                ?>
-                INSURANCE COVERED (<?php echo htmlspecialchars($insurance_type); ?>): ₱ <?php echo number_format($insurance_covered, 2); ?><br>
+                INSURANCE COVERED: ₱ <?php echo number_format($insurance_covered, 2); ?><br>
                 TAX: ₱ 0.00<br>
                 <div class="total-box">TOTAL: ₱ <?php echo number_format($out_of_pocket, 2); ?></div>
             </td>

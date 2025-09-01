@@ -92,6 +92,7 @@ class BillingRecords {
             ir.insurance_type,
             ir.insurance_covered,
             br.status,
+            br.billing_date,
             ds.price,
             (ds.price - (COALESCE(p.discount, 0) + COALESCE(ir.insurance_covered, 0))) AS out_of_pocket
         FROM patientinfo p
@@ -252,9 +253,16 @@ if ($patient_id > 0) {
             <h1 style="margin: 0; font-size: 32px;">Billing Summary</h1>
         </div>
         <div style="text-align: right; font-size: 14px;">
-            
-            <strong>Date:</strong> <?= date('d F Y') ?>
-        </div>
+    <strong>Date:</strong> 
+    <?php 
+        if (!empty($services) && isset($services[0]['billing_date'])) {
+            echo date('d F Y', strtotime($services[0]['billing_date']));
+        } else {
+            echo date('d F Y');
+        }
+    ?>
+</div>
+
     </div>
 
     <!-- Patient Info -->
@@ -306,27 +314,28 @@ if ($patient_id > 0) {
             <?php 
                 $subtotal = 0;
                 $insurance_covered = 0;
-
-                if (!empty($services)):
-                    foreach ($services as $service):
+                // Find insurance_covered only once (first non-zero value)
+                if (!empty($services)) {
+                    foreach ($services as $service) {
                         $unit_price = $service['price'] ?? 0;
-                        $insurance = $service['insurance_covered'] ?? 0;
-
-                        $insurance_covered += $insurance;
-                        $total_price = $unit_price;
-                        $subtotal += $total_price;
+                        $subtotal += $unit_price;
+                        if ($insurance_covered == 0 && !empty($service['insurance_covered'])) {
+                            $insurance_covered = $service['insurance_covered'];
+                        }
+                    }
+                    foreach ($services as $service):
             ?>
             <tr>
                 <td style="padding: 10px 0;"><?= htmlspecialchars($service['diagnostic_results']) ?></td>
-                <td style="padding: 10px 0; text-align: right;">$<?= number_format($unit_price, 2) ?></td>
-                <td style="padding: 10px 0; text-align: right;">$<?= number_format($total_price, 2) ?></td>
+                <td style="padding: 10px 0; text-align: right;">₱<?= number_format($service['price'] ?? 0, 2) ?></td>
+                <td style="padding: 10px 0; text-align: right;">₱<?= number_format($service['price'] ?? 0, 2) ?></td>
             </tr>
             <?php endforeach; ?>
-            <?php else: ?>
+            <?php } else { ?>
             <tr>
                 <td colspan="3" style="text-align: center; padding: 20px;">No services found.</td>
             </tr>
-            <?php endif; ?>
+            <?php } ?>
         </tbody>
     </table>
 
@@ -335,15 +344,15 @@ if ($patient_id > 0) {
     <table style="width: 100%; font-size: 14px;">
         <tr>
             <td style="text-align: right; padding: 4px 0;">Insurance Covered:</td>
-            <td style="text-align: right; padding: 4px 0; color: red;">- $<?= number_format($insurance_covered, 2) ?></td>
+            <td style="text-align: right; padding: 4px 0; color: red;">- ₱<?= number_format($insurance_covered, 2) ?></td>
         </tr>
         <tr>
             <td style="text-align: right; padding: 4px 0;">Subtotal:</td>
-            <td style="text-align: right; padding: 4px 0;">$<?= number_format($subtotal, 2) ?></td>
+            <td style="text-align: right; padding: 4px 0;">₱<?= number_format($subtotal, 2) ?></td>
         </tr>
         <tr>
             <td style="text-align: right; font-weight: bold; padding-top: 12px;">Total:</td>
-            <td style="text-align: right; font-weight: bold; padding-top: 12px;">$<?= number_format($subtotal - $insurance_covered, 2) ?></td>
+            <td style="text-align: right; font-weight: bold; padding-top: 12px;">₱<?= number_format($subtotal - $insurance_covered, 2) ?></td>
         </tr>
     </table>
     <?php endif; ?>
@@ -354,16 +363,16 @@ if ($patient_id > 0) {
     <!-- Optional Payment Info -->
     <div style="margin-top: 30px; font-size: 12px;">
         <strong>PAYMENT INFORMATION</strong><br>
-        Bank: Briard Bank<br>
-        Account Name: Samira Hadid<br>
-        Account No: 123-456-7890<br>
-        Pay by: 5 July 2025
+        Bank: N/A<br>
+        Account Name: N/A<br>
+        Account No: N/A<br>
+        Pay by: N/A
     </div>
 
     <!-- Footer Signature -->
     <div style="margin-top: 40px; font-size: 12px; text-align: right;">
-        <strong>Samira Hadid</strong><br>
-        123 Anywhere St., Any City, ST 12345
+        <strong>N/A</strong><br>
+        N/A
     </div>
 </div>
 
