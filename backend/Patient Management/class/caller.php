@@ -33,6 +33,18 @@ public function callHistory($patient_id) {
     }
 }
 
+public function callResult($patient_id) {
+    $stmt = $this->conn->prepare("SELECT * FROM dl_results WHERE patient_id = ?");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        return $result->fetch_assoc();
+    } else {
+        throw new Exception("No lab results found for patient ID: " . $patient_id);
+    }
+}
+
 public function callBeddings ($patient_id) {
     $stmt = $this->conn->prepare("SELECT * FROM p_bed_assignments WHERE patient_id = ?");
     $stmt->bind_param("i", $patient_id);
@@ -125,7 +137,7 @@ class PatientAdmission {
 
      public function admit($patient_id, $bed_id, $assigned_date, $admission_type) {
         //  Insert into bed_assignment
-        $insert = "INSERT INTO bed_assignment (patient_id, bed_id, assigned_date) VALUES (?, ?, ?)";
+        $insert = "INSERT INTO p_bed_assignments (patient_id, bed_id, assigned_date) VALUES (?, ?, ?)";
         $stmt = $this->conn->prepare($insert);
         $stmt->bind_param("iis", $patient_id, $bed_id, $assigned_date);
 
@@ -137,7 +149,7 @@ class PatientAdmission {
             $stmt2->execute();
 
             //  Update patient admission type
-            $updateType = "UPDATE patients SET admission_type = ? WHERE patient_id = ?";
+            $updateType = "UPDATE patientinfo SET admission_type = ? WHERE patient_id = ?";
             $stmt3 = $this->conn->prepare($updateType);
             $stmt3->bind_param("si", $admission_type, $patient_id);
             $stmt3->execute();

@@ -15,6 +15,7 @@ try {
     //  Fetch admission/EMR details
     try {
         $admission = $callerObj->callHistory($patient_id);
+        $result = $callerObj->callResult($patient_id);
     } catch (Exception $e) {
         $admission = null; // No admission found
     }
@@ -42,27 +43,50 @@ try {
 
 <body>
     <div class="container mt-4">
-        <div class="card shadow">
-            <h4 class="mb-0">View Patient Details</h4>
-            <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow h-100">
+                    <h4 class="mb-0 p-3">View Patient Details</h4>
+                    <div class="card-body">
+                        <p><strong>Name:</strong>
+                            <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
+                        </p>
+                        <p><strong>Address:</strong> <?= htmlspecialchars($patient['address']) ?></p>
+                        <p><strong>Date of Birth:</strong>
+                            <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob']))) ?></p>
+                        <p><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
+                        <p><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?></p>
+                        <p><strong>Civil Status:</strong> <?= htmlspecialchars($patient['civil_status']) ?></p>
+                        <p><strong>Contact Number:</strong> <?= htmlspecialchars($patient['phone_number']) ?></p>
+                        <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
+                        <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
+                        <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['doctor_name']) ?></p>
 
-                <p><strong>Name:</strong>
-                    <?=  htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . '  ' . $patient['lname']) ?></p>
-                <p><strong>Address:</strong> <?= htmlspecialchars($patient['address']) ?></p>
-                <p><strong>Date of Birth:</strong>
-                    <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob']))) ?></p>
-                <p><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
-                <p><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?></p>
-                <p><strong>Civil Status:</strong> <?= htmlspecialchars($patient['civil_status']) ?></p>
-                <p><strong>Contact Number:</strong> <?= htmlspecialchars($patient['phone_number']) ?></p>
-                <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
-                <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
-                <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['doctor_name']) ?></p>
-                <p class="text-center"><strong> -- Previous Medical History -- </strong></p>
-                <p><strong>Condition Name:</strong> <?= htmlspecialchars($admission['condition_name'] ?? 'N/A') ?></p>
-                <p><strong>Diagnosis Date:</strong> <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
-                <p><strong>Notes: </strong><?= htmlspecialchars($admission['notes'] ?? 'N/A')?></p>
-                <a href="inpatient.php" class="btn btn-secondary">Back</a>
+                        <h4 class="mb-0 p-3">Previous Medical History</h4>
+                        <div class="card-body">
+                            <p><strong>Condition Name:</strong>
+                                <?= htmlspecialchars($admission['condition_name'] ?? 'N/A') ?></p>
+                            <p><strong>Diagnosis Date:</strong>
+                                <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
+                            <p><strong>Notes:</strong> <?= htmlspecialchars($admission['notes'] ?? 'N/A') ?></p>
+                        </div>
+                        <a href="inpatient.php" class="btn btn-secondary mt-3">Back</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow h-100">
+                    <h4 class="mb-0 p-3">Diagnosis Result</h4>
+                    <div class="card-body">
+                        <p><strong>Condition Name:</strong>
+                            <?= htmlspecialchars($result['condition_name'] ?? 'N/A') ?></p>
+                        <p><strong>Diagnosis Date:</strong>
+                            <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
+                        <p><strong>Notes:</strong> <?= htmlspecialchars($admission['notes'] ?? 'N/A') ?></p>
+
+                        <p><strong>ON GOING CONSTRUCTION BY DPWH!</strong></p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

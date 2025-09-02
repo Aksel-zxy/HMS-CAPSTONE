@@ -174,138 +174,128 @@ $allPatients = $patient->getAllPatients();
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
                     🏥 Doctor Referral
                 </h2>
-                <table id="patientsTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:200px;">
-                    <thead>
-                        <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
-                            <th style="padding:12px;">Patient ID</th>
-                            <th style="padding:12px;">Patient Name</th>
-                            <th style="padding:12px;">Date | Time</th>
-                            <th style="padding:12px;">Test Name</th>
-                            <th style="padding:12px;">Status</th>
-                            <th style="padding:12px; text-align:center;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php
-                        $cancelledPatients = [];
-                        $scheduledCount = 0;
 
-                        foreach ($allPatients as $p):
-                            $counter = $p['patient_id'];
-                            $name     = $p['fname'] . ' ' . $p['lname'];
-                            $dateTime = $p['appointment_date'];
-                            $type     = $p['notes'];
-                            $status   = $p['status'];
-                            $cancelReason = null;
-
-                            // ✅ fetch status + cancel reason
-                            $schedQuery = $conn->prepare("
-                    SELECT status, cancel_reason
-                    FROM dl_schedule
-                    WHERE patientID = ?
-                    ORDER BY scheduleID DESC
-                    LIMIT 1
-                ");
-                            $schedQuery->bind_param("i", $counter);
-                            $schedQuery->execute();
-                            $schedResult = $schedQuery->get_result();
-                            if ($schedRow = $schedResult->fetch_assoc()) {
-                                $status       = $schedRow['status'];
-                                $cancelReason = $schedRow['cancel_reason'];
-                            }
-                            $schedQuery->close();
-
-                            // Cancelled → save separately
-                            if ($status === 'Cancelled') {
-                                $cancelledPatients[] = [
-                                    'id' => $counter,
-                                    'name' => $name,
-                                    'date' => $dateTime,
-                                    'type' => $type,
-                                    'reason' => $cancelReason
-                                ];
-                                continue;
-                            }
-
-                            // Only show if Scheduled
-                            if ($status !== 'Scheduled') continue;
-
-                            $scheduledCount++;
-                        ?>
-                            <!-- Active Scheduled Patients -->
-                            <tr style="border-bottom:1px solid #f1f1f1; transition:background 0.2s;"
-                                onmouseover="this.style.background='#f9fbfd';"
-                                onmouseout="this.style.background='';">
-                                <td style="padding:12px;"><?= htmlspecialchars($counter) ?></td>
-                                <td style="padding:12px;"><?= htmlspecialchars($name) ?></td>
-                                <td style="padding:12px;"><?= $dateTime ?></td>
-                                <td style="padding:12px;"><?= $type ?></td>
-                                <td style="padding:12px;">
-                                    <span style="background:#fff3cd; color:#856404; padding:4px 12px; border-radius:16px; font-weight:500;">
-                                        Scheduled
-                                    </span>
-                                </td>
-                                <td style="text-align:center;">
-                                    <button class="btn btn-primary btn-sm addScheduleBtn"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#addScheduleModal"
-                                        data-id="<?= $counter ?>"
-                                        data-name="<?= htmlspecialchars($name) ?>"
-                                        data-test="<?= htmlspecialchars($type) ?>"
-                                        data-date="<?= htmlspecialchars($dateTime) ?>"
-                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0d6efd; border:none; color:#fff; cursor:pointer;">
-                                        Lab Scheduling (+)
-                                    </button>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-
-                        <!-- If no scheduled appointments -->
-                        <?php if ($scheduledCount === 0): ?>
+                <!-- Fixed height scroll container -->
+                <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+                    <table id="patientsTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
+                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
                             <tr>
-                                <td colspan="6" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
-                                    📋 No Appointments Found
-                                </td>
+                                <th style="padding:12px; text-align:center;">Patient ID</th>
+                                <th style="padding:12px; text-align:center;">Patient Name</th>
+                                <th style="padding:12px; text-align:center;">Date | Time</th>
+                                <th style="padding:12px; text-align:center;">Test Name</th>
+                                <th style="padding:12px; text-align:center;">Status</th>
+                                <th style="padding:12px; text-align:center;">Action</th>
                             </tr>
-                        <?php endif; ?>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $cancelledPatients = [];
+                            $scheduledCount = 0;
 
-                        <!-- Cancelled Patients always at bottom -->
-                        <?php if (!empty($cancelledPatients)): ?>
-                            <!-- Spacer Row -->
-                            <tr>
-                                <td colspan="6" style="padding:12px; border:none;"></td>
-                            </tr>
+                            foreach ($allPatients as $p):
+                                $counter = $p['patient_id'];
+                                $name     = $p['fname'] . ' ' . $p['lname'];
+                                $dateTime = $p['appointment_date'];
+                                $type     = $p['notes'];
+                                $status   = $p['status'];
+                                $cancelReason = null;
 
-                            <!-- Section Header -->
-                            <tr>
-                                <td colspan="6" style="padding:12px; background:#f8d7da; font-weight:bold; text-align:left; border-top:2px solid #dc3545; color:#721c24;">
-                                    ❌ Cancelled Appointments
-                                </td>
-                            </tr>
+                                $schedQuery = $conn->prepare("
+                        SELECT status, cancel_reason
+                        FROM dl_schedule
+                        WHERE appointment_id = ?
+                        ORDER BY scheduleID DESC
+                        LIMIT 1
+                    ");
+                                $schedQuery->bind_param("i", $p['appointment_id']);
+                                $schedQuery->execute();
+                                $schedResult = $schedQuery->get_result();
+                                if ($schedRow = $schedResult->fetch_assoc()) {
+                                    $status       = $schedRow['status'];
+                                    $cancelReason = $schedRow['cancel_reason'];
+                                }
+                                $schedQuery->close();
 
-                            <?php foreach ($cancelledPatients as $c): ?>
-                                <tr style="background:#fff; border-left:4px solid #dc3545; transition:background 0.2s;"
-                                    onmouseover="this.style.background='#fff5f5';"
-                                    onmouseout="this.style.background='';">
-                                    <td style="padding:12px;"><?= htmlspecialchars($c['id']) ?></td>
-                                    <td style="padding:12px;"><?= htmlspecialchars($c['name']) ?></td>
-                                    <td style="padding:12px;"><?= $c['date'] ?></td>
-                                    <td style="padding:12px;"><?= $c['type'] ?></td>
-                                    <td style="padding:12px;">
-                                        <span style="background:#f8d7da; color:#721c24; padding:4px 12px; border-radius:16px; font-weight:500;">
-                                            Cancelled
+                                if ($status === 'Cancelled') {
+                                    $cancelledPatients[] = [
+                                        'id' => $counter,
+                                        'name' => $name,
+                                        'date' => $dateTime,
+                                        'type' => $type,
+                                        'reason' => $cancelReason
+                                    ];
+                                    continue;
+                                }
+
+                                if ($status !== 'Scheduled') continue;
+
+                                $scheduledCount++;
+                            ?>
+                                <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
+                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($counter) ?></td>
+                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($name) ?></td>
+                                    <td style="padding:12px; text-align:center;"><?= $dateTime ?></td>
+                                    <td style="padding:12px; text-align:center;"><?= $type ?></td>
+                                    <td style="padding:12px; text-align:center;">
+                                        <span style="background:#fff3cd; color:#856404; padding:4px 12px; border-radius:16px; font-weight:500;">
+                                            Scheduled
                                         </span>
                                     </td>
-                                    <td style="padding:12px; text-align:left; max-width:350px; word-wrap:break-word; white-space:normal;">
-                                        <small style="color:#721c24; font-style:italic; display:block; line-height:1.4; background:#fcebea; padding:6px 10px; border-radius:6px;">
-                                            <?= !empty($c['reason']) ? "Reason: " . htmlspecialchars($c['reason']) : 'Reason: No reason provided' ?>
-                                        </small>
+                                    <td style="text-align:center;">
+                                        <button class="btn btn-primary btn-sm addScheduleBtn"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#addScheduleModal"
+                                            data-id="<?= $counter ?>"
+                                            data-appointment-id="<?= $p['appointment_id'] ?>"
+                                            data-name="<?= htmlspecialchars($name) ?>"
+                                            data-test="<?= htmlspecialchars($type) ?>"
+                                            data-date="<?= htmlspecialchars($dateTime) ?>">
+                                            Lab Scheduling (+)
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+
+                            <?php if ($scheduledCount === 0): ?>
+                                <tr>
+                                    <td colspan="6" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                        📋 No Appointments Found
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+
+                            <?php if (!empty($cancelledPatients)): ?>
+                                <tr>
+                                    <td colspan="6" style="padding:12px; border:none;"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="6" style="padding:12px; background:#f8d7da; font-weight:bold; text-align:left; border-top:2px solid #dc3545; color:#721c24;">
+                                        ❌ Cancelled Appointments
+                                    </td>
+                                </tr>
+                                <?php foreach ($cancelledPatients as $c): ?>
+                                    <tr style="background:#fff; border-left:4px solid #dc3545;" onmouseover="this.style.background='#fff5f5';" onmouseout="this.style.background='';">
+                                        <td style="padding:12px;"><?= htmlspecialchars($c['id']) ?></td>
+                                        <td style="padding:12px;"><?= htmlspecialchars($c['name']) ?></td>
+                                        <td style="padding:12px;"><?= $c['date'] ?></td>
+                                        <td style="padding:12px;"><?= $c['type'] ?></td>
+                                        <td style="padding:12px;">
+                                            <span style="background:#f8d7da; color:#721c24; padding:4px 12px; border-radius:16px; font-weight:500;">
+                                                Cancelled
+                                            </span>
+                                        </td>
+                                        <td style="padding:12px; text-align:left; max-width:350px; word-wrap:break-word; white-space:normal;">
+                                            <small style="color:#721c24; font-style:italic; display:block; line-height:1.4; background:#fcebea; padding:6px 10px; border-radius:6px;">
+                                                <?= !empty($c['reason']) ? "Reason: " . htmlspecialchars($c['reason']) : 'Reason: No reason provided' ?>
+                                            </small>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- MODAL AREA HERE -->
@@ -319,6 +309,7 @@ $allPatients = $patient->getAllPatients();
                         <div class="modal-body">
                             <form id="scheduleForm" method="POST" action="oop/fetchdetails.php">
                                 <input type="hidden" name="patient_id" id="modalPatientId">
+                                <input type="hidden" name="appointment_id" id="modalAppointmentId">
                                 <div class="mb-3">
                                     <label class="form-label">Patient Name</label>
                                     <input type="text" class="form-control" id="modalPatientName" name="patient_name" readonly>
@@ -381,8 +372,8 @@ $allPatients = $patient->getAllPatients();
                 // Add Schedule button click
                 document.querySelectorAll(".addScheduleBtn").forEach(button => {
                     button.addEventListener("click", function() {
-                        // Fill patient details
                         document.getElementById("modalPatientId").value = this.dataset.id || "";
+                        document.getElementById("modalAppointmentId").value = this.dataset.appointmentId || "";
                         document.getElementById("modalPatientName").value = this.dataset.name || "";
 
                         // Get test name
@@ -411,6 +402,7 @@ $allPatients = $patient->getAllPatients();
                     });
                 });
             </script>
+
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
             <script src="../assets/Bootstrap/fontawesome.min.js"></script>

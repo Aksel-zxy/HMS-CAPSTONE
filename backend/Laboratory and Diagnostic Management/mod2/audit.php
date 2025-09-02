@@ -176,48 +176,50 @@ $allPatients = $patient->getAllPatients();
                 <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
                     📜 Appointment Audit Trail
                 </h2>
-                <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden;">
-                    <thead>
-                        <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
-                            <th style="padding:12px;">#</th>
-                            <th style="padding:12px;">Patient</th>
-                            <th style="padding:12px;">Service</th>
-                            <th style="padding:12px;">Scheduled Date</th>
-                            <th style="padding:12px;">Time</th>
-                            <th style="padding:12px;">Laboratorist</th>
-                        </tr>
-                    </thead>
-<tbody>
-    <?php if ($fetchError): ?>
-        <tr>
-            <td colspan="9" style="text-align:center; padding:40px; color:#dc3545;">
-                ⚠️ <?= htmlspecialchars($fetchError) ?>
-            </td>
-        </tr>
-    <?php endif; ?>
 
-    <?php if (!empty($auditLogs)): ?>
-        <?php foreach ($auditLogs as $row): ?>
-            <tr style="border-bottom:1px solid #f1f1f1;">
-                <td style="padding:12px;"><?= htmlspecialchars($row['scheduleID']) ?></td>
-                <td style="padding:12px;"><?= htmlspecialchars($row['patient_name'] ?? '—') ?></td>
-                <td style="padding:12px;"><?= htmlspecialchars($row['serviceName']) ?></td>
-                <td style="padding:12px;"><?= htmlspecialchars($row['scheduleDate']) ?></td>
-                <td style="padding:12px;"><?= htmlspecialchars($row['scheduleTime']) ?></td>
-                <td style="padding:12px;"><?= !empty($row['employee_name']) ? htmlspecialchars($row['employee_name']) : 'System' ?></td>
-            </tr>
-        <?php endforeach; ?>
-    <?php else: ?>
-        <tr>
-            <td colspan="9" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
-                📋 No audit records found
-            </td>
-        </tr>
-    <?php endif; ?>
-</tbody>
-                </table>
+                <!-- Fixed height scroll container -->
+                <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+                    <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
+                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
+                            <tr>
+                                <th style="padding:12px; text-align:center;">#</th>
+                                <th style="padding:12px; text-align:center;">Patient</th>
+                                <th style="padding:12px; text-align:center;">Service</th>
+                                <th style="padding:12px; text-align:center;">Scheduled Date</th>
+                                <th style="padding:12px; text-align:center;">Time</th>
+                                <th style="padding:12px; text-align:center;">Laboratorist</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($fetchError): ?>
+                                <tr>
+                                    <td colspan="6" style="text-align:center; padding:40px; color:#dc3545;">
+                                        ⚠️ <?= htmlspecialchars($fetchError) ?>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                            <?php if (!empty($auditLogs)): ?>
+                                <?php foreach ($auditLogs as $row): ?>
+                                    <tr style="border-bottom:1px solid #f1f1f1;">
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleID']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['patient_name'] ?? '—') ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['serviceName']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleDate']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleTime']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= !empty($row['employee_name']) ? htmlspecialchars($row['employee_name']) : 'System' ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="6" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                        📋 No audit records found
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-
             <!----- End of Main Content ----->
             <script>
                 // Sidebar toggle

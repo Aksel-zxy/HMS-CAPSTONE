@@ -4,6 +4,17 @@ ini_set('display_errors', 1);
 
 include __DIR__ . "/../../../../SQL/config.php";
 
+/* ==============================
+   FUNCTION: Update Schedule Status
+============================== */
+function markScheduleCompleted($conn, $scheduleID)
+{
+    $update = $conn->prepare("UPDATE dl_schedule SET status = 'Completed', completed_at = NOW() WHERE scheduleID = ?");
+    $update->bind_param("i", $scheduleID);
+    $update->execute();
+    $update->close();
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $scheduleID = $_POST['scheduleID'] ?? null;
     $patientID  = $_POST['patientID'] ?? null;
@@ -33,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   VALUES (?, ?, 'CBC', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 
         $stmt = $conn->prepare($query) or die("Prepare failed: " . $conn->error);
-
         $stmt->bind_param(
             "iisssssssss",
             $scheduleID,
@@ -50,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         if ($stmt->execute()) {
+            markScheduleCompleted($conn, $scheduleID); // ✅ update status
             echo "<script>alert('CBC result saved successfully!'); window.location.href='../sample_processing.php';</script>";
         } else {
             echo "Error executing query: " . $stmt->error;
@@ -87,6 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("iissss", $scheduleID, $patientID, $findings, $impression, $remarks, $imagePath);
 
         if ($stmt->execute()) {
+            markScheduleCompleted($conn, $scheduleID); // ✅ update status
             echo "<script>alert('X-ray result saved successfully!'); window.location.href='../sample_processing.php';</script>";
         } else {
             echo "Error: " . $stmt->error;
@@ -124,6 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("iissss", $scheduleID, $patientID, $findings, $impression, $remarks, $imagePath);
 
         if ($stmt->execute()) {
+            markScheduleCompleted($conn, $scheduleID); // ✅ update status
             echo "<script>alert('MRI result saved successfully!'); window.location.href='../sample_processing.php';</script>";
         } else {
             echo "Error: " . $stmt->error;
@@ -161,6 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("iissss", $scheduleID, $patientID, $findings, $impression, $remarks, $imagePath);
 
         if ($stmt->execute()) {
+            markScheduleCompleted($conn, $scheduleID); // ✅ update status
             echo "<script>alert('CT Scan result saved successfully!'); window.location.href='../sample_processing.php';</script>";
         } else {
             echo "Error: " . $stmt->error;

@@ -123,7 +123,7 @@ class PatientSchedule
 
         return $success;
     }
-} // ✅ end class
+}
 
 
 // ----------------- POST Handling -----------------

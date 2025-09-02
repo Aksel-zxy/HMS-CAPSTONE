@@ -92,6 +92,7 @@ class BillingRecords {
             ir.insurance_type,
             ir.insurance_covered,
             br.status,
+            br.billing_date,
             ds.price,
             (ds.price - (COALESCE(p.discount, 0) + COALESCE(ir.insurance_covered, 0))) AS out_of_pocket
         FROM patientinfo p
@@ -152,7 +153,7 @@ if ($patient_id > 0) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Billing and Insurance Management</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="../assets/CSS/billingsummary.css">
+    <link rel="stylesheet" href="assets/CSS/billingsummary.css">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
 
@@ -245,99 +246,137 @@ if ($patient_id > 0) {
             <div class="container-fluid billing-summary-container">
         <div class="row justify-content-center">
             <div class="col-lg-8">
-                <h1 class="billing-summary-title">Summary of Fees</h1>
-                <div class="patient-info-card mb-4">
-                    <div class="patient-info-header">
-                        <span class="patient-info-icon"><i class="bi bi-person-circle"></i></span>
-                        <span class="patient-info-title">Patient Information</span>
-                    </div>
-                    <div class="patient-info-body">
-                        <div class="patient-info-row">
-                            <span class="patient-info-label">Full Name:</span>
-                            <span class="patient-info-value">
-                                <?php 
-                                    if (!empty($services) && isset($services[0]['full_name'])) {
-                                        echo htmlspecialchars(trim($services[0]['full_name']));
-                                    } elseif (!empty($selected_patient)) {
-                                        $fullName = $selected_patient['fname'] . ' ' . 
-                                                    (!empty($selected_patient['mname']) ? $selected_patient['mname'] . ' ' : '') . 
-                                                    $selected_patient['lname'];
-                                        echo htmlspecialchars($fullName);
-                                    } else {
-                                        echo "N/A";
-                                    }
-                                ?>
-                            </span>
-                        </div>
-                        <div class="patient-info-row">
-                            <span class="patient-info-label">Contact Number:</span>
-                            <span class="patient-info-value">
-                                <?php 
-                                    if (!empty($services) && isset($services[0]['phone_number'])) {
-                                        echo htmlspecialchars($services[0]['phone_number']);
-                                    } elseif (!empty($selected_patient['phone_number'])) {
-                                        echo htmlspecialchars($selected_patient['phone_number']);
-                                    } else {
-                                        echo "N/A";
-                                    }
-                                ?>
-                            </span>
-                        </div>
-                        <div class="patient-info-row">
-                            <span class="patient-info-label">Address:</span>
-                            <span class="patient-info-value">
-                                <?php 
-                                    if (!empty($services) && isset($services[0]['address'])) {
-                                        echo htmlspecialchars($services[0]['address']);
-                                    } elseif (!empty($selected_patient['address'])) {
-                                        echo htmlspecialchars($selected_patient['address']);
-                                    } else {
-                                        echo "N/A";
-                                    }
-                                ?>
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <div class="billing-table-section">
-                    <h2 class="billing-table-title">Billing Details</h2>
-                    <div class="table-responsive">
-                        <table class="table billing-summary-table">
-                            <thead>
-                                <tr>
-                                    <th class="text-center align-middle" rowspan="2">Particulars</th>
-                                    <th class="text-center align-middle" rowspan="2">Actual Charges</th>
-                                    <th class="text-center" colspan="3">Amount of Discount</th>
-                                    <th class="text-center align-middle" rowspan="2">Out of Pocket</th>
-                                    <th class="text-center align-middle" rowspan="2">Status</th>
-                                </tr>
-                                <tr>
-                                    <th class="text-center">SC/PWD</th>
-                                    <th class="text-center">Insurance</th>
-                                    <th class="text-center">Benefit</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (!empty($services)): ?>
-                                    <?php foreach ($services as $service): ?>
-                                        <tr>
-                                            <td class="text-center align-middle"><?= htmlspecialchars($service['diagnostic_results']) ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['price']) ? htmlspecialchars($service['price']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['discount']) ? htmlspecialchars($service['discount']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['insurance_covered']) ? htmlspecialchars($service['insurance_covered']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['insurance_type']) ? htmlspecialchars($service['insurance_type']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['out_of_pocket']) ? htmlspecialchars($service['out_of_pocket']) : '-' ?></td>
-                                            <td class="text-center align-middle"><?= isset($service['status']) ? htmlspecialchars($service['status']) : '-' ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="7" class="text-center">No services found.</td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                <div>
+    
+    <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
+        <div>
+            <h1 style="margin: 0; font-size: 32px;">Billing Summary</h1>
+        </div>
+        <div style="text-align: right; font-size: 14px;">
+    <strong>Date:</strong> 
+    <?php 
+        if (!empty($services) && isset($services[0]['billing_date'])) {
+            echo date('d F Y', strtotime($services[0]['billing_date']));
+        } else {
+            echo date('d F Y');
+        }
+    ?>
+</div>
+
+    </div>
+
+    <!-- Patient Info -->
+    <div style="margin-bottom: 40px; font-size: 14px;">
+        <strong>BILLED TO:</strong>
+        <br>
+        <?php 
+            if (!empty($services) && isset($services[0]['full_name'])) {
+                echo htmlspecialchars(trim($services[0]['full_name']));
+            } elseif (!empty($selected_patient)) {
+                $fullName = $selected_patient['fname'] . ' ' . 
+                            (!empty($selected_patient['mname']) ? $selected_patient['mname'] . ' ' : '') . 
+                            $selected_patient['lname'];
+                echo htmlspecialchars($fullName);
+            } else {
+                echo "N/A";
+            }
+        ?><br>
+        <?php 
+            if (!empty($services) && isset($services[0]['phone_number'])) {
+                echo htmlspecialchars($services[0]['phone_number']);
+            } elseif (!empty($selected_patient['phone_number'])) {
+                echo htmlspecialchars($selected_patient['phone_number']);
+            } else {
+                echo "N/A";
+            }
+        ?><br>
+        <?php 
+            if (!empty($services) && isset($services[0]['address'])) {
+                echo htmlspecialchars($services[0]['address']);
+            } elseif (!empty($selected_patient['address'])) {
+                echo htmlspecialchars($selected_patient['address']);
+            } else {
+                echo "N/A";
+            }
+        ?>
+    </div>
+
+    <!-- Billing Table -->
+    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 40px;">
+        <thead>
+            <tr>
+                <th style="border-bottom: 1px solid #ccc; text-align: left; padding-bottom: 8px;">Particulars</th>
+                <th style="border-bottom: 1px solid #ccc; text-align: right; padding-bottom: 8px;">Actual Charges</th>
+                <th style="border-bottom: 1px solid #ccc; text-align: right; padding-bottom: 8px;">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php 
+                $subtotal = 0;
+                $insurance_covered = 0;
+                // Find insurance_covered only once (first non-zero value)
+                if (!empty($services)) {
+                    foreach ($services as $service) {
+                        $unit_price = $service['price'] ?? 0;
+                        $subtotal += $unit_price;
+                        if ($insurance_covered == 0 && !empty($service['insurance_covered'])) {
+                            $insurance_covered = $service['insurance_covered'];
+                        }
+                    }
+                    foreach ($services as $service):
+            ?>
+            <tr>
+                <td style="padding: 10px 0;"><?= htmlspecialchars($service['diagnostic_results']) ?></td>
+                <td style="padding: 10px 0; text-align: right;">₱<?= number_format($service['price'] ?? 0, 2) ?></td>
+                <td style="padding: 10px 0; text-align: right;">₱<?= number_format($service['price'] ?? 0, 2) ?></td>
+            </tr>
+            <?php endforeach; ?>
+            <?php } else { ?>
+            <tr>
+                <td colspan="3" style="text-align: center; padding: 20px;">No services found.</td>
+            </tr>
+            <?php } ?>
+        </tbody>
+    </table>
+
+    <!-- Totals -->
+    <?php if (!empty($services)): ?>
+    <table style="width: 100%; font-size: 14px;">
+        <tr>
+            <td style="text-align: right; padding: 4px 0;">Insurance Covered:</td>
+            <td style="text-align: right; padding: 4px 0; color: red;">- ₱<?= number_format($insurance_covered, 2) ?></td>
+        </tr>
+        <tr>
+            <td style="text-align: right; padding: 4px 0;">Subtotal:</td>
+            <td style="text-align: right; padding: 4px 0;">₱<?= number_format($subtotal, 2) ?></td>
+        </tr>
+        <tr>
+            <td style="text-align: right; font-weight: bold; padding-top: 12px;">Total:</td>
+            <td style="text-align: right; font-weight: bold; padding-top: 12px;">₱<?= number_format($subtotal - $insurance_covered, 2) ?></td>
+        </tr>
+    </table>
+    <?php endif; ?>
+
+    <!-- Thank You -->
+    <p style="margin-top: 60px; font-size: 16px;">Thank you!</p>
+
+    <!-- Optional Payment Info -->
+    <div style="margin-top: 30px; font-size: 12px;">
+        <strong>PAYMENT INFORMATION</strong><br>
+        Bank: N/A<br>
+        Account Name: N/A<br>
+        Account No: N/A<br>
+        Pay by: N/A
+    </div>
+
+    <!-- Footer Signature -->
+    <div style="margin-top: 40px; font-size: 12px; text-align: right;">
+        <strong>N/A</strong><br>
+        N/A
+    </div>
+</div>
+
+
                     <?php if (!empty($services) && $patient_id > 0): ?>
                         <div class="text-end mt-3">
                             <a 

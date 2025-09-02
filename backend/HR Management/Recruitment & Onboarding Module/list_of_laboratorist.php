@@ -324,8 +324,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <option value="Immunology / Serology">Immunology / Serology</option>
                         <option value="Histopathology">Histopathology</option>
                     </select>
-
-                    <input type="text" id="otherLabDept" name="otherLabDept" placeholder="Please specify" style="display:none; margin-top:5px;">
                     <br />
 
                     <label for="employment_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Employment Type:</label>
