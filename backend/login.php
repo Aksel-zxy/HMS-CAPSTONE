@@ -37,7 +37,7 @@ require_once 'assets/oop/auth.php';
                 <button type="submit">Log In</button>
             </form>
             <div class="forgot-password">
-                <a href="#">Forgot your password?</a>
+                <a href="assets/auth/forgot_password.php">Forgot your password?</a><span> | </span><a href="../index.php">Back to Homepage</a>
             </div>
         </div>
     </div>

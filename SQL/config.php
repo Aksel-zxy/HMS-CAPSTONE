@@ -3,12 +3,9 @@
 if (!defined("BASE_URL")) {
     define("BASE_URL", "/hms-capstone/");
 }
-
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-
-// 1800 for 30mins
 $inactive = 1800;
 
 if (isset($_SESSION['timeout'])) {
@@ -23,15 +20,11 @@ if (isset($_SESSION['timeout'])) {
         exit();
     }
 }
-
 $_SESSION['timeout'] = time();
-
 $servername = "localhost";
 $username = "root";
 $password = "";
 $dbname = "hmscapstone";
-
-// DB connection
 $conn = new mysqli($servername, $username, $password, $dbname);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
