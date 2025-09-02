@@ -27,6 +27,7 @@
                         <li class="menu-active"><a href="index.php">Home</a></li>
                         <li><a href="backend/login.php">Login</a></li>
                     <li><a href="backend/join_our_team.php">Join Our Team</a></li>
+                        <li><a href="backend/join_our_team.php">Join Our Team</a></li>
                     </ul>
                 </nav>	    		
                 </div>
@@ -52,4 +53,5 @@
     <script src="assets/Bootstrap/jq.js"></script>
     <script src="assets/Bootstrap/landing.js"></script>
 </body>
+
 </html>
