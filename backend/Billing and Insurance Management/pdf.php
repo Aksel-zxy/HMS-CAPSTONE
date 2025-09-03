@@ -38,23 +38,27 @@ if (!$billing) {
     exit();
 }
 
-// Fetch last 5 diagnostic results for patient
+// Fetch grouped diagnostic results and total price for patient
 $sql_diag = "
-    SELECT resultDate, status, result, remarks
-    FROM dl_results
-    WHERE patientID = ?
-    ORDER BY resultDate DESC
+    SELECT 
+        GROUP_CONCAT(result SEPARATOR ', ') AS diagnostic_names,
+        GROUP_CONCAT(remarks SEPARATOR '; ') AS diagnostic_remarks,
+        SUM(ds.price) AS total_price
+    FROM dl_results dr
+    LEFT JOIN dl_services ds ON dr.result = ds.serviceName
+    WHERE dr.patientID = ?
+    ORDER BY dr.resultDate DESC
     LIMIT 5
 ";
 $stmt_diag = $conn->prepare($sql_diag);
 $stmt_diag->bind_param('i', $billing['patient_id']);
 $stmt_diag->execute();
 $result_diag = $stmt_diag->get_result();
+$diag_row = $result_diag->fetch_assoc();
 
-$diag_results = [];
-while ($row = $result_diag->fetch_assoc()) {
-    $diag_results[] = $row;
-}
+$diag_names = $diag_row['diagnostic_names'] ?? '';
+$diag_remarks = $diag_row['diagnostic_remarks'] ?? '';
+$diag_total = $diag_row['total_price'] ?? 0;
 
 // Fetch user info from users table
 $query = "SELECT * FROM users WHERE user_id = ?";
@@ -98,19 +102,26 @@ if ($doctor_row = $doctor_result->fetch_assoc()) {
     $doctor = $doctor_row;
 }
 
-// Calculate subtotal from diagnostic results
+// Fetch completed services for the patient from dl_schedule and dl_services
+$sql_services = "
+    SELECT sch.serviceName, ds.description, ds.price
+    FROM dl_schedule sch
+    LEFT JOIN dl_services ds ON sch.serviceName = ds.serviceName
+    WHERE sch.patientID = ?
+      AND sch.status = 'Completed'
+    ORDER BY sch.scheduleDate DESC, sch.scheduleTime DESC
+    LIMIT 5
+";
+$stmt_services = $conn->prepare($sql_services);
+$stmt_services->bind_param('i', $billing['patient_id']);
+$stmt_services->execute();
+$result_services = $stmt_services->get_result();
+
+$service_results = [];
 $subtotal = 0;
-if (!empty($diag_results)) {
-    foreach ($diag_results as $item) {
-        $service_name = $item['result'];
-        $service_stmt = $conn->prepare("SELECT price FROM dl_services WHERE serviceName = ?");
-        $service_stmt->bind_param("s", $service_name);
-        $service_stmt->execute();
-        $service_result = $service_stmt->get_result();
-        if ($service_row = $service_result->fetch_assoc()) {
-            $subtotal += floatval($service_row['price']);
-        }
-    }
+while ($row = $result_services->fetch_assoc()) {
+    $service_results[] = $row;
+    $subtotal += floatval($row['price']);
 }
 
 // Ensure out_of_pocket is set and numeric
@@ -192,7 +203,7 @@ if (isset($billing['insurance_covered']) && is_numeric($billing['insurance_cover
             </td>
         </tr>
     </table>
-    <table width="100%" style="margin-bottom:10px;">
+    <table width="100%" style="margin-bottom:10px;">`
         <tr>
             <td width="20%" class="blue-label">INVOICE NUMBER</td>
             <td width="20%" class="blue-label">DATE</td>
@@ -210,7 +221,7 @@ if (isset($billing['insurance_covered']) && is_numeric($billing['insurance_cover
                 <?php echo date('Y-m-d', strtotime($billing['billing_date'] . ' +7 days')); ?>
             </td>
             <td class="amount-due-box">
-                <?php echo '₱ ' . number_format($out_of_pocket, 2); ?>
+                <?php echo '₱ ' . number_format($subtotal - $insurance_covered, 2); ?>
             </td>
         </tr>
     </table>
@@ -220,32 +231,17 @@ if (isset($billing['insurance_covered']) && is_numeric($billing['insurance_cover
             <th width="55%">DESCRIPTION</th>
             <th width="20%">AMOUNT</th>
         </tr>
-        <?php if (!empty($diag_results)): ?>
-            <?php foreach ($diag_results as $item): ?>
+        <?php if (!empty($service_results)): ?>
+            <?php foreach ($service_results as $item): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($item['result']); ?></td>
-                    <td><?php echo htmlspecialchars($item['remarks']); ?></td>
-                    <td>
-                        <?php
-                        // Fetch price from dl_services table based on result (serviceName)
-                        $service_name = $item['result'];
-                        $price = '-';
-
-                        $service_stmt = $conn->prepare("SELECT price FROM dl_services WHERE serviceName = ?");
-                        $service_stmt->bind_param("s", $service_name);
-                        $service_stmt->execute();
-                        $service_result = $service_stmt->get_result();
-                        if ($service_row = $service_result->fetch_assoc()) {
-                            $price = '₱ ' . number_format($service_row['price'], 2);
-                        }
-                        echo $price;
-                        ?>
-                    </td>
+                    <td><?php echo htmlspecialchars($item['serviceName']); ?></td>
+                    <td><?php echo htmlspecialchars($item['description']); ?></td>
+                    <td><?php echo '₱ ' . number_format($item['price'], 2); ?></td>
                 </tr>
             <?php endforeach; ?>
         <?php else: ?>
             <tr>
-                <td colspan="3" class="text-center">No diagnostic results found.</td>
+                <td colspan="3" class="text-center">No completed services found.</td>
             </tr>
         <?php endif; ?>
     </table>
@@ -256,7 +252,7 @@ if (isset($billing['insurance_covered']) && is_numeric($billing['insurance_cover
                 SUB TOTAL: ₱ <?php echo number_format($subtotal, 2); ?><br>
                 INSURANCE COVERED: ₱ <?php echo number_format($insurance_covered, 2); ?><br>
                 TAX: ₱ 0.00<br>
-                <div class="total-box">TOTAL: ₱ <?php echo number_format($out_of_pocket, 2); ?></div>
+                <div class="total-box">TOTAL: ₱ <?php echo number_format($subtotal - $insurance_covered, 2); ?></div>
             </td>
         </tr>
     </table>
