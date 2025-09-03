@@ -202,12 +202,6 @@ $result = $stmt->get_result();
                         <a href="../Payroll & Compensation Benifits Module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Payroll & Compensation Benifits Module/payslip_generation.php" class="sidebar-link">Payslip Generation</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Payroll & Compensation Benifits Module/payroll_disbursement.php" class="sidebar-link">Payroll Disbursement</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="../Payroll & Compensation Benifits Module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
                     </li>
                 </ul>
