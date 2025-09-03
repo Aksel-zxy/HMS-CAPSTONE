@@ -50,7 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
     }
     $stmt->close();
-
     echo "<script>alert('✅ Result saved successfully!'); window.location.href='test_process.php';</script>";
 }
 ?>
