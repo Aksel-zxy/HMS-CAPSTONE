@@ -1,7 +1,6 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
-require_once "oop2/upd_stats.php";
 require_once "../mod1/oop/fetchdetails.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
@@ -88,13 +87,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="test_process.php" class="sidebar-link">Sample Process</a>
+                        <a href="../mod2/test_process.php" class="sidebar-link">Sample Process</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="sps.php" class="sidebar-link">Sample Processing Status</a>
+                        <a href="../mod2/sps.php" class="sidebar-link">Sample Processing Status</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="audit.php" class="sidebar-link">Audit Trail</a>
+                        <a href="../mod2/audit.php" class="sidebar-link">Audit Trail</a>
                     </li>
                 </ul>
             </li>
@@ -109,13 +108,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../mod3/results.php" class="sidebar-link">Test Results</a>
+                        <a href="results.php" class="sidebar-link">Test Results</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
+                        <a href="result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod3/operation_report.php" class="sidebar-link">Operation Equipment</a>
+                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -173,12 +172,12 @@ $allPatients = $patient->getAllPatients();
             <!-- START CODING HERE -->
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
-                   🧾 Sample Processing
+                    📊 Results
                 </h2>
                 <div class="col-md-3 mb-3">
                     <input type="text" id="searchInput" class="form-control"
                         style="width:300px; border-radius:20px; padding:8px 15px;"
-                        placeholder="🔍 Search patient, test, or status...">
+                        placeholder="🔍 Search patient, test, or remarks...">
                 </div>
                 <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
                     <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
@@ -186,131 +185,99 @@ $allPatients = $patient->getAllPatients();
                             <tr>
                                 <th style="padding:12px;text-align:center;">Patient ID</th>
                                 <th style="padding:12px;text-align:center;">Patient Name</th>
-                                <th style="padding:12px;text-align:center;">Test Names</th>
-                                <th style="padding:12px;text-align:center;">Status</th>
+                                <th style="padding:12px;text-align:center;">Remarks</th>
+                                <th style="padding:12px;text-align:center;">Test Name</th>
                                 <th style="padding:12px;text-align:center;">Completed Time</th>
                                 <th style="padding:12px;text-align:center;">Result</th>
-                                <th style="padding:12px;text-align:center;">AI Impression</th>
-                                <th style="padding:12px;text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php
-                            $patientsGrouped = [];
-                            foreach ($allPatients as $p) {
-                                $pid   = $p['patient_id'];
-                                $name  = $p['fname'] . ' ' . $p['lname'];
-                                $apptId = $p['appointment_id'];
+                            $query = "
+            SELECT 
+                p.patient_id,
+                CONCAT(p.fname, ' ', p.lname) AS patient_name,
+                s.scheduleID,    
+                s.serviceName,
+                s.completed_at,
+                r.result,
+                r.remarks
+            FROM dl_results r
+            INNER JOIN dl_result_schedules rs ON r.resultID = rs.resultID
+            INNER JOIN dl_schedule s ON rs.scheduleID = s.scheduleID
+            INNER JOIN patientinfo p ON s.patientid = p.patient_id
+            ORDER BY p.patient_id, s.completed_at DESC
+        ";
+                            $result = $conn->query($query);
 
-                                $schedQuery = $conn->prepare("
-                                    SELECT s.status, s.scheduleID, s.scheduleDate, s.scheduleTime, s.serviceName, s.completed_at
-                                    FROM dl_schedule s
-                                    WHERE s.appointment_id = ?
-                                    AND NOT EXISTS (
-                                        SELECT 1 
-                                        FROM dl_result_schedules rs
-                                        WHERE rs.scheduleID = s.scheduleID
-                                    )
-                                    ORDER BY s.scheduleID ASC
-                                ");
-                                $schedQuery->bind_param("i", $apptId);
-                                $schedQuery->execute();
-                                $schedResult = $schedQuery->get_result();
-
-                                while ($schedRow = $schedResult->fetch_assoc()) {
-                                    if ($schedRow['status'] === 'Scheduled' || $schedRow['status'] === 'Cancelled') continue;
-
-                                    $patientsGrouped[$pid]['name'] = $name;
-                                    $patientsGrouped[$pid]['tests'][] = [
-                                        'scheduleID'   => $schedRow['scheduleID'],
-                                        'date'         => $schedRow['scheduleDate'],
-                                        'time'         => $schedRow['scheduleTime'],
-                                        'serviceName'  => $schedRow['serviceName'],
-                                        'status'       => $schedRow['status'],
-                                        'completed_at' => $schedRow['completed_at'],
-                                    ];
-                                }
-                                $schedQuery->close();
-                            }
-
-                            if (empty($patientsGrouped)) {
-                                echo "<tr><td colspan='8' style='padding:20px; text-align:center; color:gray; font-style:italic;'>No Schedule</td></tr>";
-                            } else {
-                                foreach ($patientsGrouped as $pid => $info):
-                                    $tests = $info['tests'];
-                                    $statuses = array_column($tests, 'status');
-                                    $allCompleted = count(array_unique($statuses)) === 1 && $statuses[0] === 'Completed';
-                                    $testNames = array_column($tests, 'serviceName');
-                                    $testList = implode(", ", $testNames);
-                                    $completedTimes = array_filter(array_column($tests, 'completed_at'));
-
-                                    if (!empty($completedTimes)) {
-                                        $latestCompleted = max($completedTimes);
-                                        $dateTimeDisplay = date("Y-m-d | H:i", strtotime($latestCompleted));
-                                    } else {
-                                        $dateTimeDisplay = "N/A";
+                            if ($result && $result->num_rows > 0):
+                                $patients = [];
+                                while ($row = $result->fetch_assoc()) {
+                                    $pid = $row['patient_id'];
+                                    if (!isset($patients[$pid])) {
+                                        $patients[$pid] = [
+                                            'name'    => $row['patient_name'],
+                                            'tests'   => [],
+                                            'remarks' => []
+                                        ];
                                     }
+                                    $patients[$pid]['tests'][] = $row;
+                                    if (!empty($row['remarks'])) {
+                                        $patients[$pid]['remarks'][] = $row['remarks'];
+                                    }
+                                }
 
-                                    // Placeholder AI impression (for modal)
-                                    $aiImpression = $allCompleted
-                                        ? "AI Impression: All results appear stable."
-                                        : "AI Impression: Awaiting completion of tests.";
+                                foreach ($patients as $patientId => $pdata):
+                                    $rowspan = count($pdata['tests']);
+                                    $firstRow = true;
+                                    $allRemarks = !empty($pdata['remarks']) ? implode("\n---\n", array_unique($pdata['remarks'])) : "No remarks yet";
+
+                                    foreach ($pdata['tests'] as $test):
                             ?>
-                                    <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
-                                        <td style="padding:12px;text-align:center;"><?= htmlspecialchars($pid) ?></td>
-                                        <td style="padding:12px;text-align:center;"><?= htmlspecialchars($info['name']) ?></td>
-                                        <td style="padding:12px;text-align:center;"><?= htmlspecialchars($testList) ?></td>
-                                        <td style="padding:12px;text-align:center;">
-                                            <?php if ($allCompleted): ?>
-                                                <span style="background:#d4edda; color:#155724; padding:4px 12px; border-radius:16px; font-weight:500;">
-                                                    Completed
-                                                </span>
-                                            <?php else: ?>
-                                                <span style="background:#cce5ff; color:#004085; padding:4px 12px; border-radius:16px; font-weight:500;">
-                                                    Progressing
-                                                </span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td style="padding:12px;text-align:center;"><?= htmlspecialchars($dateTimeDisplay) ?></td>
-                                        <td style="padding:12px; text-align:center;">
-                                            <button class="btn btn-success view-result-btn"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#viewResultModal"
-                                                data-results='<?= json_encode($tests) ?>'>
-                                                View Result
-                                            </button>
-                                        </td>
-                                        <td style="padding:12px; text-align:center;">
-                                            <button class="btn btn-warning ai-impression-btn"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#aiImpressionModal"
-                                                data-impression="<?= htmlspecialchars($aiImpression) ?>">
-                                                View Impression
-                                            </button>
-                                        </td>
-                                        <td style="padding:12px; text-align:center;">
-                                            <?php if ($allCompleted): ?>
-                                                <!-- Open remarks modal -->
-                                                <button class="btn btn-primary add-remarks-btn"
+                                        <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
+                                            <?php if ($firstRow): ?>
+                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>"><?= htmlspecialchars($patientId) ?></td>
+                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>"><?= htmlspecialchars($pdata['name']) ?></td>
+                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
+                                                    <button class="btn btn-warning ai-impression-btn"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#aiImpressionModal"
+                                                        data-impression="<?= htmlspecialchars($allRemarks) ?>">
+                                                        View Remarks
+                                                    </button>
+                                                </td>
+                                            <?php $firstRow = false;
+                                            endif; ?>
+
+                                            <td style="padding:12px;text-align:center;"><?= htmlspecialchars($test['serviceName']) ?></td>
+                                            <td style="padding:12px;text-align:center;">
+                                                <?= $test['completed_at'] ? date("Y-m-d | H:i", strtotime($test['completed_at'])) : "N/A" ?>
+                                            </td>
+                                            <td style="padding:12px; text-align:center;">
+                                                <?php
+                                                $testData = [
+                                                    "scheduleID"  => $test['scheduleID'],
+                                                    "serviceName" => $test['serviceName']
+                                                ];
+                                                ?>
+                                                <button class="btn btn-success view-result-btn"
                                                     data-bs-toggle="modal"
-                                                    data-bs-target="#remarksModal"
-                                                    data-patientid="<?= htmlspecialchars($pid) ?>"
-                                                    data-scheduleids='<?= json_encode(array_column($tests, "scheduleID")) ?>'
-                                                    data-testlist="<?= htmlspecialchars($testList) ?>">
-                                                    Save Result
+                                                    data-bs-target="#viewResultModal"
+                                                    data-results='<?= json_encode([$testData]) ?>'>
+                                                    View Result
                                                 </button>
-                                            <?php else: ?>
-                                                <span style="color:gray; font-style:italic; margin-left:8px;">
-                                                    Still Processing...
-                                                </span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                            <?php endforeach;
-                            }
+                                            </td>
+                                        </tr>
+                            <?php
+                                    endforeach;
+                                endforeach;
+                            else:
+                                echo "<tr><td colspan='6' style='padding:20px; text-align:center; color:gray; font-style:italic;'>No Results Found</td></tr>";
+                            endif;
                             ?>
                         </tbody>
                     </table>
+
                 </div>
             </div>
             <!-- MODAL AREA -->
@@ -331,56 +298,49 @@ $allPatients = $patient->getAllPatients();
                     </div>
                 </div>
             </div>
-            <div class="modal fade" id="aiImpressionModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered modal-lg">
+            <!-- Impression Modal -->
+            <div class="modal fade" id="aiImpressionModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
                     <div class="modal-content">
+                        <!-- Header -->
                         <div class="modal-header" style="background: linear-gradient(90deg, #4facfe, #00f2fe); color: #fff;">
-                            <h5 class="modal-title">AI Impression</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            <h5 class="modal-title">Remarks</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="modal-body" id="aiImpressionText" style="background:#f0f8ff; padding:20px; border-radius:8px; font-family: 'Arial', sans-serif; font-size:14px; color:#333;">
-                            Loading...
-                        </div>
-                        <div class="modal-footer d-flex justify-content-end">
-                            <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal fade" id="remarksModal" tabindex="-1" aria-labelledby="remarksModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <form action="save_result.php" method="POST">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="remarksModalLabel">Add Remarks Before Saving</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <input type="hidden" name="patientID" id="remarksPatientID">
-                                <input type="hidden" name="scheduleIDs" id="remarksScheduleIDs">
-                                <input type="hidden" name="result" id="remarksTestList">
-                                <input type="hidden" name="status" value="Completed">
 
-                                <div class="mb-3">
-                                    <label for="remarksText" class="form-label">Remarks</label>
-                                    <textarea name="remarks" id="remarksText" class="form-control" rows="4" placeholder="Enter remarks..."></textarea>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Save Result</button>
-                            </div>
-                        </form>
+                        <!-- Body -->
+                        <div class="modal-body">
+                            <pre id="impressionText" class="p-3 bg-light rounded border" style="font-family: 'Arial', sans-serif; font-size:14px;">
+                                Loading...
+                            </pre>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="modal-footer d-flex justify-content-between">
+                            <button class="btn btn-outline-primary" data-bs-dismiss="modal">Close</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        <!----- End of Main Content ----->
-        <script src="../assets/javascript/test_process.js"></script>
-        <script src="../assets/Bootstrap/all.min.js"></script>
-        <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-        <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-        <script src="../assets/Bootstrap/jq.js"></script>
+            <!----- End of Main Content ----->
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const impressionButtons = document.querySelectorAll(".ai-impression-btn");
+                    const impressionText = document.getElementById("impressionText");
+
+                    impressionButtons.forEach((btn) => {
+                        btn.addEventListener("click", function() {
+                            const impression = this.getAttribute("data-impression") || "⚠️ No remarks available.";
+                            impressionText.textContent = impression;
+                        });
+                    });
+                });
+            </script>
+            <script src="../assets/javascript/test_process.js"></script>
+            <script src="../assets/Bootstrap/all.min.js"></script>
+            <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+            <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+            <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

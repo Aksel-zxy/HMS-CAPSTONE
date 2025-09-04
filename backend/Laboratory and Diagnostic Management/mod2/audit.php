@@ -110,13 +110,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/test_results.php" class="sidebar-link">Test Results</a>
+                        <a href="../mod3/results.php" class="sidebar-link">Test Results</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/result_items.php" class="sidebar-link">Result Deliveries</a>
+                        <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/report_deliveries.php" class="sidebar-link">Operation Equipment</a>
+                        <a href="../mod3/operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -176,10 +176,15 @@ $allPatients = $patient->getAllPatients();
                 <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
                     📜 Appointment Audit Trail
                 </h2>
+                <div class="col-md-3 mb-3">
+                    <input type="text" id="searchInput" class="form-control"
+                        style="width:300px; border-radius:20px; padding:8px 15px;"
+                        placeholder="🔍 Search patient, test, or status...">
+                </div>
 
-                <!-- Fixed height scroll container -->
+                <!-- Table -->
                 <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
-                    <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
+                    <table id="auditTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
                         <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
                             <tr>
                                 <th style="padding:12px; text-align:center;">#</th>
@@ -191,13 +196,6 @@ $allPatients = $patient->getAllPatients();
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if ($fetchError): ?>
-                                <tr>
-                                    <td colspan="6" style="text-align:center; padding:40px; color:#dc3545;">
-                                        ⚠️ <?= htmlspecialchars($fetchError) ?>
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
                             <?php if (!empty($auditLogs)): ?>
                                 <?php foreach ($auditLogs as $row): ?>
                                     <tr style="border-bottom:1px solid #f1f1f1;">
@@ -225,6 +223,23 @@ $allPatients = $patient->getAllPatients();
                 // Sidebar toggle
                 document.querySelector(".toggler-btn")?.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
+                });
+                document.addEventListener("DOMContentLoaded", function() {
+                    const searchInput = document.getElementById("searchInput");
+                    const tableRows = document.querySelectorAll("tbody tr");
+
+                    searchInput.addEventListener("keyup", function() {
+                        let filter = searchInput.value.toLowerCase();
+
+                        tableRows.forEach(row => {
+                            let text = row.textContent.toLowerCase();
+                            if (text.includes(filter)) {
+                                row.style.display = "";
+                            } else {
+                                row.style.display = "none";
+                            }
+                        });
+                    });
                 });
             </script>
             <script src="../assets/Bootstrap/all.min.js"></script>

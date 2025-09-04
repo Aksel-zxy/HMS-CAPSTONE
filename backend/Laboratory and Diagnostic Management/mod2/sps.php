@@ -109,13 +109,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/test_results.php" class="sidebar-link">Test Results</a>
+                        <a href="../mod3/results.php" class="sidebar-link">Test Results</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/result_items.php" class="sidebar-link">Result Deliveries</a>
+                        <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/report_deliveries.php" class="sidebar-link">Operation Equipment</a>
+                        <a href="../mod3/operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -175,6 +175,11 @@ $allPatients = $patient->getAllPatients();
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
                     🧪 Sample Processing Status
                 </h2>
+                <div class="col-md-3 mb-3">
+                    <input type="text" id="searchInput" class="form-control"
+                        style="width:300px; border-radius:20px; padding:8px 15px;"
+                        placeholder="🔍 Search patient, test, or status...">
+                </div>
                 <!-- Fixed height scroll container -->
                 <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
                     <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
@@ -191,8 +196,9 @@ $allPatients = $patient->getAllPatients();
                         <tbody>
                             <?php
                             $hasAppointments = false;
+                            ?>
 
-                            foreach ($allPatients as $p):
+                            <?php foreach ($allPatients as $p):
                                 $counter   = $p['patient_id'];
                                 $name      = $p['fname'] . ' ' . $p['lname'];
                                 $dateTime  = $p['appointment_date'];
@@ -205,12 +211,12 @@ $allPatients = $patient->getAllPatients();
                                 $scheduleTime = $dateTime ? date('H:i:s', strtotime($dateTime)) : null;
 
                                 $schedQuery = $conn->prepare("
-                        SELECT status, scheduleID, scheduleDate, scheduleTime 
-                        FROM dl_schedule 
-                        WHERE appointment_id = ? 
-                        ORDER BY scheduleID DESC 
-                        LIMIT 1
-                    ");
+        SELECT status, scheduleID, scheduleDate, scheduleTime 
+        FROM dl_schedule 
+        WHERE appointment_id = ? 
+        ORDER BY scheduleID DESC 
+        LIMIT 1
+    ");
                                 $schedQuery->bind_param("i", $apptID);
                                 $schedQuery->execute();
                                 $schedResult = $schedQuery->get_result();
@@ -223,7 +229,11 @@ $allPatients = $patient->getAllPatients();
                                 }
                                 $schedQuery->close();
 
-                                if ($status === 'Scheduled' || $status === 'Cancelled') continue;
+                                // ✅ skip rows if Completed, Scheduled, or Cancelled
+                                if ($status === 'Completed' || $status === 'Scheduled' || $status === 'Cancelled') {
+                                    continue;
+                                }
+
                                 $hasAppointments = true;
                             ?>
                                 <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
@@ -356,6 +366,23 @@ $allPatients = $patient->getAllPatients();
                         alert("❌ Cancellation aborted. Reason is required.");
                     }
                 }
+                document.addEventListener("DOMContentLoaded", function() {
+                    const searchInput = document.getElementById("searchInput");
+                    const tableRows = document.querySelectorAll("tbody tr");
+
+                    searchInput.addEventListener("keyup", function() {
+                        let filter = searchInput.value.toLowerCase();
+
+                        tableRows.forEach(row => {
+                            let text = row.textContent.toLowerCase();
+                            if (text.includes(filter)) {
+                                row.style.display = "";
+                            } else {
+                                row.style.display = "none";
+                            }
+                        });
+                    });
+                });
             </script>
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
