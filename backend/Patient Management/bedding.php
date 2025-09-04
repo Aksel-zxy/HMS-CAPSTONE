@@ -222,17 +222,28 @@ while ($row = $rooms_result->fetch_assoc()) {
                         <div class="room-card text-center">
                             <div class="seats">
                                 <?php foreach ($beds as $bed): ?>
-                                <div class="seat <?php echo ($bed['status'] == 'Occupied') ? 'Occupied' : 'Available'; ?>"
-                                    title="<?php 
-                                    if ($bed['status'] == 'Occupied' && !empty($bed['fname'])) {
-                                        echo 'Occupied by: ' . $bed['fname'] . ' ' . $bed['lname'];
-                                    } else {
-                                        echo 'Available (Bed ' . $bed['bed_number'] . ')';
-                                    }
-                                ?>">
+                                <?php
+                                            // Determine seat class based on status
+                                            $seatClass = '';
+                                            if ($bed['status'] == 'Occupied') {
+                                                $seatClass = 'Occupied';
+                                            } elseif ($bed['status'] == 'Available') {
+                                                $seatClass = 'Available';
+                                            } elseif ($bed['status'] == 'Under Maintenance') {
+                                                $seatClass = 'Maintenance';
+                                            }
+                                        ?>
+                                <div class="seat <?php echo $seatClass; ?>" title="<?php 
+                                                if ($bed['status'] == 'Occupied' && !empty($bed['fname'])) {
+                                                    echo 'Occupied by: ' . $bed['fname'] . ' ' . $bed['lname'];
+                                                } elseif ($bed['status'] == 'Under Maintenance') {
+                                                    echo 'Under Maintenance (Bed ' . $bed['bed_number'] . ')';
+                                                } else {
+                                                    echo 'Available (Bed ' . $bed['bed_number'] . ')';
+                                                }
+                                            ?>">
                                 </div>
                                 <?php endforeach; ?>
-
 
                                 <div class="room-header">Room <?php echo $room_number; ?></div>
                             </div>
