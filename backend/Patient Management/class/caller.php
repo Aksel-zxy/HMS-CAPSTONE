@@ -85,19 +85,19 @@ public function getDoctors() {
 }
 
   public function getAppointmentById($appointment_id) {
-        $query = "SELECT a.appointment_id, 
-                         a.patient_id,
-                         a.doctor_id,
-                         a.appointment_date,
-                         a.purpose,
-                         a.status,
-                         a.notes,
-                         CONCAT(p.fname, ' ', p.mname, ' ', p.lname) AS patient_name,
-                         CONCAT(d.first_name, ' ', d.last_name) AS doctor_name
-                  FROM p_appointments a
-                  JOIN patientinfo p ON a.patient_id = p.patient_id
-                  JOIN hr_employees d ON a.doctor_id = d.employee_id
-                  WHERE a.appointment_id = ?";
+    $query = "SELECT a.appointment_id, 
+                    a.patient_id,
+                    a.doctor_id,
+                    a.appointment_date,
+                    a.purpose,
+                    a.status,
+                    a.notes,
+                    CONCAT(p.fname, ' ', p.mname, ' ', p.lname) AS patient_name,
+                    CONCAT(d.first_name, ' ', d.last_name) AS doctor_name
+            FROM p_appointments a
+            JOIN patientinfo p ON a.patient_id = p.patient_id
+            JOIN hr_employees d ON a.doctor_id = d.employee_id
+            WHERE a.appointment_id = ?";
 
         $stmt = $this->conn->prepare($query);
         $stmt->bind_param("i", $appointment_id);
@@ -106,6 +106,54 @@ public function getDoctors() {
         return $result->fetch_assoc(); // returns array or null
     
 }
+
+    public function getResults($patient_id) {
+    $stmt = $this->conn->prepare("
+        SELECT 
+            p.patient_id,
+
+            -- CBC
+            c.testType AS cbc_test,
+            c.wbc, c.rbc, c.hemoglobin, c.hematocrit, c.platelets,
+            c.mcv, c.mch, c.mchc, c.remarks AS cbc_remarks,
+
+            -- CT
+            ct.testType AS ct_test,
+            ct.findings AS ct_findings,
+            ct.impression AS ct_impression,
+            ct.remarks AS ct_remarks,
+            ct.image_path AS ct_image,
+
+            -- MRI
+            mri.testType AS mri_test,
+            mri.findings AS mri_findings,
+            mri.impression AS mri_impression,
+            mri.remarks AS mri_remarks,
+            mri.image_path AS mri_image,
+
+            -- X-Ray
+            x.testType AS xray_test,
+            x.findings AS xray_findings,
+            x.impression AS xray_impression,
+            x.remarks AS xray_remarks,
+            x.image_path AS xray_image
+
+        FROM patientinfo p
+        LEFT JOIN dl_lab_cbc c   ON p.patient_id = c.patientID
+        LEFT JOIN dl_lab_ct ct   ON p.patient_id = ct.patientID
+        LEFT JOIN dl_lab_mri mri ON p.patient_id = mri.patientID
+        LEFT JOIN dl_lab_xray x  ON p.patient_id = x.patientID
+        WHERE p.patient_id = ? LIMIT 1
+    ");
+
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result->fetch_assoc(); 
+}
+
+
 }
 
 

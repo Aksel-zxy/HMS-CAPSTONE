@@ -20,25 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'admission_type' => $_POST["admission_type"] ?? '',
         'attending_doctor' => $_POST["attending_doctor"] ?? '',
     ];
-
-    // ✅ Validate first name (required: only letters, spaces, hyphens, and must contain at least one vowel)
-    if (!preg_match("/^(?=.*[AEIOUaeiou])[A-Za-z\s\-]+$/", $data['fname'])) {
-        header("Location: ../registered.php?error=Invalid First Name");
-        exit();
-    }
-
-    // ✅ Validate last name (required)
-    if (!preg_match("/^[A-Za-z\s\-]+$/", $data['lname'])) {
-        header("Location: ../registered.php?error=Invalid Last Name");
-        exit();
-    }
-
-    // ✅ Validate middle name (optional, only if provided)
-    if (!empty($data['mname']) && !preg_match("/^[A-Za-z\s\-]+$/", $data['mname'])) {
-        header("Location: ../registered.php?error=Invalid Middle Name");
-        exit();
-    }
-
+    
     // Start transaction
     $conn->begin_transaction();
 

@@ -215,6 +215,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
         const fname = form.querySelector("input[name='fname']").value.trim();
         const lname = form.querySelector("input[name='lname']").value.trim();
         const mname = form.querySelector("input[name='mname']").value.trim();
+        const age = form.querySelector("input[name='age']").value;
 
         const nameRegex = /^[A-Za-z\s\-]+$/;
         const vowelRegex = /[AEIOUaeiou]/;
@@ -222,7 +223,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
         if (fname.length < 2 || !nameRegex.test(fname) || !vowelRegex.test(fname)) {
             alert(
                 "First name invalid. Only letters, spaces, and hyphens allowed, and must contain at least one vowel."
-                );
+            );
             return false;
         }
 
@@ -233,6 +234,13 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
 
         if (mname !== "" && !nameRegex.test(mname)) {
             alert("Middle name invalid. Only letters, spaces, and hyphens allowed.");
+            return false;
+        }
+
+
+        // ✅ Check if age is -1
+        if (parseInt(age, 10) < 0) {
+            alert("Invalid Date of Birth.");
             return false;
         }
 

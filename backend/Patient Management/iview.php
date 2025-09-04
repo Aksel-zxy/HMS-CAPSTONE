@@ -7,15 +7,19 @@ $patientObj = new Patient($conn);
 
 $callerObj = new Caller($conn); // create Caller instance
 
+
+
 try {
     $patient_id = $_GET['patient_id'] ?? null;
   
     $patient = $patientObj->getPatientOrFail($patient_id);
-
+$wtf = $callerObj->getResults($patient_id);
     //  Fetch admission/EMR details
     try {
+   
         $admission = $callerObj->callHistory($patient_id);
-        $result = $callerObj->callResult($patient_id);
+   
+        
     } catch (Exception $e) {
         $admission = null; // No admission found
     }
@@ -74,22 +78,111 @@ try {
                     </div>
                 </div>
             </div>
-            <div class="col-md-6 mb-4">
-                <div class="card shadow h-100">
-                    <h4 class="mb-0 p-3">Diagnosis Result</h4>
-                    <div class="card-body">
-                        <p><strong>Condition Name:</strong>
-                            <?= htmlspecialchars($result['condition_name'] ?? 'N/A') ?></p>
-                        <p><strong>Diagnosis Date:</strong>
-                            <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
-                        <p><strong>Notes:</strong> <?= htmlspecialchars($admission['notes'] ?? 'N/A') ?></p>
 
-                        <p><strong>ON GOING CONSTRUCTION BY DPWH!</strong></p>
+            <!-- Laboratory Results -->
+            <div class="col-lg-6">
+                <div class="card shadow h-100">
+                    <h4 class="mb-0 p-3">Laboratory Result</h4>
+                    <div class="card-body">
+
+                        <!-- CBC + CT Row -->
+                        <div class="row d-flex align-items-stretch">
+                            <!-- CBC -->
+                            <div class="col-md-6 mb-3 d-flex">
+                                <div class="border rounded p-3 border-3 flex-fill">
+                                    <h6 class="text-primary">Complete Blood Count (CBC)</h6>
+                                    <p><strong>Test Type:</strong> <?= htmlspecialchars($wtf['cbc_test'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>WBC:</strong> <?= htmlspecialchars($wtf['wbc'] ?? 'N/A') ?></p>
+                                    <p><strong>RBC:</strong> <?= htmlspecialchars($wtf['rbc'] ?? 'N/A') ?></p>
+                                    <p><strong>Hemoglobin:</strong> <?= htmlspecialchars($wtf['hemoglobin'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Platelets:</strong> <?= htmlspecialchars($wtf['platelets'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['cbc_remarks'] ?? 'N/A') ?>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- CT -->
+                            <div class="col-md-6 mb-3 d-flex">
+                                <div class="border rounded p-3 border-3 flex-fill">
+                                    <h6 class="text-primary">CT Scan</h6>
+                                    <p><strong>Test Type:</strong> <?= htmlspecialchars($wtf['ct_test'] ?? 'N/A') ?></p>
+                                    <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['ct_findings'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Impression:</strong>
+                                        <?= htmlspecialchars($wtf['ct_impression'] ?? 'N/A') ?></p>
+                                    <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['ct_remarks'] ?? 'N/A') ?>
+                                    </p>
+                                    <?php if (!empty($wtf['ct_image'])): ?>
+                                    <a href="<?= htmlspecialchars($wtf['ct_image']) ?>" target="_blank"
+                                        class="btn btn-secondary btn-sm mt-2">
+                                        View CT Image
+                                    </a>
+                                    <?php else: ?>
+                                    <p class="text-muted"><em>No CT image available</em></p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MRI + X-Ray Row -->
+                        <div class="row d-flex align-items-stretch">
+                            <!-- MRI -->
+                            <div class="col-md-6 mb-3 d-flex">
+                                <div class="border rounded p-3 border-3 flex-fill">
+                                    <h6 class="text-primary">MRI</h6>
+                                    <p><strong>Test Type:</strong> <?= htmlspecialchars($wtf['mri_test'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['mri_findings'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Impression:</strong>
+                                        <?= htmlspecialchars($wtf['mri_impression'] ?? 'N/A') ?></p>
+                                    <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['mri_remarks'] ?? 'N/A') ?>
+                                    </p>
+                                    <?php if (!empty($wtf['mri_image'])): ?>
+                                    <a href="<?= htmlspecialchars($wtf['mri_image']) ?>" target="_blank"
+                                        class="btn btn-secondary btn-sm mt-2">
+                                        View MRI Image
+                                    </a>
+                                    <?php else: ?>
+                                    <p class="text-muted"><em>No MRI image available</em></p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+
+                            <!-- X-Ray -->
+                            <div class="col-md-6 mb-3 d-flex">
+                                <div class="border rounded p-3 border-3 flex-fill">
+                                    <h6 class="text-primary">X-Ray</h6>
+                                    <p><strong>Test Type:</strong> <?= htmlspecialchars($wtf['xray_test'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Findings:</strong>
+                                        <?= htmlspecialchars($wtf['xray_findings'] ?? 'N/A') ?></p>
+                                    <p><strong>Impression:</strong>
+                                        <?= htmlspecialchars($wtf['xray_impression'] ?? 'N/A') ?></p>
+                                    <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['xray_remarks'] ?? 'N/A') ?>
+                                    </p>
+                                    <?php if (!empty($wtf['xray_image'])): ?>
+                                    <a href="<?= htmlspecialchars($wtf['xray_image']) ?>" target="_blank"
+                                        class="btn btn-secondary btn-sm mt-2  ">
+                                        View X-Ray Image
+                                    </a>
+                                    <?php else: ?>
+                                    <p class="text-muted"><em>No X-Ray image available</em></p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
+
 
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
