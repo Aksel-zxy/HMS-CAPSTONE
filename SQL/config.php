@@ -26,10 +26,10 @@ if (isset($_SESSION['timeout'])) {
 
 $_SESSION['timeout'] = time();
 
-$servername = "localhost";
+$servername = "mysql";
 $username = "root";
 $password = "";
-$dbname = "hmscapstone";
+$dbname = "mydb";
 
 // DB connection
 $conn = new mysqli($servername, $username, $password, $dbname);

@@ -2,7 +2,7 @@
 $employeeId = 101;
 
 // Step 1: Get available pay periods (use cURL instead of file_get_contents)
-$apiUrl = "https://localhost:44383/Hr/getPayperiodStartDates/" . $employeeId;
+$apiUrl = "http://host.docker.internal:5288/Hr/getPayperiodStartDates/" . $employeeId;
 
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $apiUrl);
@@ -29,7 +29,7 @@ if (!$selectedPayPeriod) {
 }
 
 // Step 3: Build API URL for payroll info
-$apiUrl = "https://localhost:44383/Hr/getPayrollInformation/$employeeId/$selectedPayPeriod";
+$apiUrl = "http://host.docker.internal:5288/Hr/getPayrollInformation/$employeeId/$selectedPayPeriod";
 
 // Step 4: Fetch payroll information with cURL
 $ch = curl_init();
@@ -477,13 +477,6 @@ if ($payrollData === null) {
                                 <td></td>
                                 <td class="num">$ <?php echo number_format($payrollData['payCyclePhilHealthDeduction'], 2); ?></td>
                                 <td class="num">$ <?php echo number_format($payrollData['ytdphilHealthDeductions'], 2); ?></td>
-                            </tr>
-
-                            <tr>
-                                <td>Loan Deductions</td>
-                                <td></td>
-                                <td class="num">$ <?php echo number_format($payrollData['payCycleLoanDeduction'], 2); ?></td>
-                                <td class="num">$ <?php echo number_format($payrollData['ytdLoanDeductions'], 2); ?></td>
                             </tr>
                         </tbody>
                         <tfoot>
