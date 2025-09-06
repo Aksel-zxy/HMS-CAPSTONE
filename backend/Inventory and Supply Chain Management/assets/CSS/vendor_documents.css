@@ -1,0 +1,31 @@
+/* Push main content aside for sidebar */
+.vendor-main {
+    margin-left: 260px; /* Same width as .vendor-sidebar */
+    padding: 20px;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+}
+
+/* Improve card visuals */
+.card {
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* Table improvements */
+.table th, 
+.table td {
+    vertical-align: middle;
+    text-align: center;
+}
+
+.table th {
+    background-color: #f1f1f1;
+    font-weight: 600;
+}
+
+/* Button styling */
+.btn-sm {
+    padding: 5px 12px;
+    border-radius: 6px;
+}

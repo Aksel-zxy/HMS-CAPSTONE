@@ -1,7 +1,7 @@
 <?php
 $host = "127.0.0.1";
-$port = "3306";
-$dbname = "hmscapstone";
+$port = "3307";
+$dbname = "hmscapstone1";
 $username = "root";
 $password = "";
 
@@ -16,3 +16,4 @@ try {
     die("Database connection failed: " . $e->getMessage());
 }
 
+?>

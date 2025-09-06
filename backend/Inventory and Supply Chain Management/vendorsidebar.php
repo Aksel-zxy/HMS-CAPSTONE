@@ -23,7 +23,6 @@
                 <li><a href="vendor_products.php"><span class="text">Product List</span></a></li>
                 <li><a href="vendor_documents.php"><span class="text">View Compliance Document</span></a></li>
                 <li><a href="vendorcontract.php"><span class="text">Contract & Agreement</span></a></li>
-                <li><a href="#"><span class="text">Delivered & Reciept</span></a></li>
             </ul>
         </div>
 

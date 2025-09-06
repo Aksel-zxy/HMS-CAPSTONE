@@ -6,8 +6,9 @@ require 'db.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
     $purchase_request_id = $_POST['order_id'];
     $received_qtys = $_POST['received_qty'];
+    $expirations = $_POST['expiration'] ?? [];
 
-    // Fetch vendor info for this purchase request
+    // Fetch vendor info
     $stmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE purchase_request_id=? LIMIT 1");
     $stmt->execute([$purchase_request_id]);
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -15,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
     if ($order) {
         $vendor_id = $order['vendor_id'];
 
-        // Get all shipped items for this vendor & purchase request
+        // Get all shipped items
         $stmt = $pdo->prepare("
             SELECT vo.*, vp.item_name, vp.item_type, vp.sub_type, vp.price
             FROM vendor_orders vo
@@ -33,22 +34,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
 
                 if ($received > 0) {
-                    // Update inventory
-                    $stmt2 = $pdo->prepare("SELECT * FROM inventory WHERE item_id=?");
-                    $stmt2->execute([$item_id]);
-                    $inv = $stmt2->fetch(PDO::FETCH_ASSOC);
+                    // ✅ If medicine → put into medicine_batches only
+                    if (strtolower($o['item_type']) === 'medicine' || strtolower($o['item_type']) === 'medications and pharmacy supplies') {
+                        $exp_date = $expirations[$o['id']] ?? null;
+                        if (!$exp_date) {
+                            $_SESSION['error_message'] = "❌ Expiration date required for medicine: " . htmlspecialchars($o['item_name']);
+                            header("Location: " . $_SERVER['REQUEST_URI']);
+                            exit;
+                        }
 
-                    if ($inv) {
-                        $stmt2 = $pdo->prepare("UPDATE inventory SET quantity = quantity + ?, received_at = NOW() WHERE item_id=?");
-                        $stmt2->execute([$received, $item_id]);
+                        $stmtMed = $pdo->prepare("INSERT INTO medicine_batches (item_id, batch_no, quantity, expiration_date) VALUES (?, ?, ?, ?)");
+                        $stmtMed->execute([$item_id, uniqid("BATCH"), $received, $exp_date]);
+
                     } else {
-                        $stmt2 = $pdo->prepare("INSERT INTO inventory (item_id, item_name, item_type, sub_type, quantity, price) VALUES (?, ?, ?, ?, ?, ?)");
-                        $stmt2->execute([$item_id, $o['item_name'], $o['item_type'], $o['sub_type'], $received, $o['price']]);
+                        // ✅ Non-medicine → goes directly into inventory
+                        $stmt2 = $pdo->prepare("SELECT * FROM inventory WHERE item_id=?");
+                        $stmt2->execute([$item_id]);
+                        $inv = $stmt2->fetch(PDO::FETCH_ASSOC);
+
+                        if ($inv) {
+                            $stmt2 = $pdo->prepare("UPDATE inventory SET quantity = quantity + ?, received_at = NOW() WHERE item_id=?");
+                            $stmt2->execute([$received, $item_id]);
+                        } else {
+                            $stmt2 = $pdo->prepare("INSERT INTO inventory (item_id, item_name, item_type, sub_type, quantity, price) VALUES (?, ?, ?, ?, ?, ?)");
+                            $stmt2->execute([$item_id, $o['item_name'], $o['item_type'], $o['sub_type'], $received, $o['price']]);
+                        }
                     }
 
                     $subtotal += $received * $o['price'];
 
-                    // Mark order item as completed
+                    // ✅ Mark vendor order completed
                     $stmt = $pdo->prepare("UPDATE vendor_orders SET status='Completed' WHERE id=?");
                     $stmt->execute([$o['id']]);
                 }
@@ -58,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 $vat = $subtotal * 0.12;
                 $total = $subtotal + $vat;
 
-                // ✅ Check if receipt already exists today for same vendor
+                // ✅ Check if receipt already exists today for vendor
                 $stmt = $pdo->prepare("SELECT id FROM receipts WHERE vendor_id=? AND DATE(created_at)=CURDATE()");
                 $stmt->execute([$vendor_id]);
                 $existing_receipt = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -66,21 +81,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 if ($existing_receipt) {
                     $receipt_id = $existing_receipt['id'];
 
-                    // Update totals
                     $stmt = $pdo->prepare("UPDATE receipts SET subtotal=subtotal+?, vat=vat+?, total=total+? WHERE id=?");
                     $stmt->execute([$subtotal, $vat, $total, $receipt_id]);
                 } else {
-                    // Create new receipt
                     $stmt = $pdo->prepare("INSERT INTO receipts (order_id, vendor_id, subtotal, vat, total) VALUES (?, ?, ?, ?, ?)");
                     $stmt->execute([$purchase_request_id, $vendor_id, $subtotal, $vat, $total]);
                     $receipt_id = $pdo->lastInsertId();
 
-                    // ✅ Create pending payment record
                     $stmt = $pdo->prepare("INSERT INTO receipt_payments (receipt_id, status) VALUES (?, 'Pending')");
                     $stmt->execute([$receipt_id]);
                 }
 
-                // Insert receipt items
+                // ✅ Insert receipt items
                 foreach ($orders_to_receive as $o) {
                     $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
                     if ($received > 0) {
@@ -112,9 +124,6 @@ $stmt = $pdo->query("
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -130,6 +139,10 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <div class="container py-5">
     <h2 class="mb-4">Orders Ready to Receive</h2>
+
+    <?php if (isset($_SESSION['error_message'])): ?>
+        <div class="alert alert-danger"><?= $_SESSION['error_message']; unset($_SESSION['error_message']); ?></div>
+    <?php endif; ?>
 
     <?php if (count($orders) > 0): ?>
         <table class="table table-bordered bg-white shadow">
@@ -174,13 +187,14 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                 <th>Price per Item</th>
                                                 <th>Status</th>
                                                 <th>Qty Received</th>
+                                                <th>Expiration Date</th>
                                                 <th>Subtotal</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                         <?php
                                         $stmt2 = $pdo->prepare("
-                                            SELECT vo.*, vp.item_name, vp.price 
+                                            SELECT vo.*, vp.item_name, vp.price, vp.item_type
                                             FROM vendor_orders vo
                                             JOIN vendor_products vp ON vo.item_id = vp.id
                                             WHERE vo.purchase_request_id=? AND vo.status='Shipped'
@@ -204,6 +218,13 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                            min="1" max="<?= $it['quantity'] ?>" 
                                                            class="form-control qty-input" 
                                                            data-price="<?= $it['price'] ?>">
+                                                </td>
+                                                <td>
+                                                    <?php if (strtolower($it['item_type']) === 'medicine' || strtolower($it['item_type']) === 'medications and pharmacy supplies'): ?>
+                                                        <input type="date" name="expiration[<?= $it['id'] ?>]" class="form-control" required>
+                                                    <?php else: ?>
+                                                        -
+                                                    <?php endif; ?>
                                                 </td>
                                                 <td class="subtotal">₱<?= number_format($lineTotal, 2) ?></td>
                                             </tr>
@@ -249,7 +270,6 @@ document.querySelectorAll('.order-form').forEach(form => {
                 let qty = parseInt(inp.value) || 0;
                 subtotal += price * qty;
 
-                // Update row subtotal
                 inp.closest('tr').querySelector('.subtotal').innerText =
                     "₱" + (price * qty).toLocaleString(undefined, { minimumFractionDigits: 2 });
             });
