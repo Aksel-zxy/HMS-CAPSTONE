@@ -285,7 +285,7 @@ function getTotalAmountForPatient($conn, $patient_id) {
                                             echo "<td><span class='" . $badgeClass . "'>" . $status . "</span></td>";
                                             echo "<td>" . (isset($row['payment_method']) ? $row['payment_method'] : 'N/A') . "</td>";
                                             echo "<td>" . (isset($row['transaction_id']) ? $row['transaction_id'] : 'N/A') . "</td>";
-                                            echo "<td><a href='billing_summary.php?patient_id=" . (isset($row['patient_id']) ? $row['patient_id'] : '') . "' class='minimal-btn'>Generate Receipt</a></td>";
+                                            echo "<td><a href='billing_summary.php?patient_id=" . (isset($row['patient_id']) ? $row['patient_id'] : '') . "' class='minimal-btn'>Generate Summary</a></td>";
                                             echo "</tr>";
                                         }
                                     } else {

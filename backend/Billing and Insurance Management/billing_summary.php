@@ -397,7 +397,7 @@ if ($patient_id > 0) {
                                 target="_blank" 
                                 class="btn btn-primary"
                             >
-                                Generate Receipt
+                                Generate Invoice
                             </a>
                         </div>
                     <?php endif; ?>

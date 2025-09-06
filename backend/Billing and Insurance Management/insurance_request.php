@@ -194,7 +194,7 @@ if ($show_requests) {
                     <form method="post">
                         <div class="col-sm-9">
                                     <label>Patient Name</label>
-                                    <select class="form-select" name="patient_id" required>
+                                    <select class="form-select" style="width: 133%;" name="patient_id" required>
                                         <option value="">   </option>
                                        <?php
                                         if (!empty($patient)) {
