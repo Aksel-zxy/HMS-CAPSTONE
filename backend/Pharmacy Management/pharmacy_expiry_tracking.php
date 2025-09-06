@@ -157,14 +157,14 @@ foreach ($data as $batch) {
                 </div>
 
                 <!-- Filter + Search -->
-                <div class="row mb-3">
-                    <!-- Search (Left) -->
-                    <div class="col-md-6">
+                <div class="row mb-3 justify-content-end">
+                    <!-- Search -->
+                    <div class="col-md-5">
                         <input type="text" id="searchInput" class="form-control" placeholder="Search medicine name...">
                     </div>
 
-                    <!-- Filter (Right) -->
-                    <div class="col-md-3 ms-auto">
+                    <!-- Filter -->
+                    <div class="col-md-3">
                         <select id="statusFilter" class="form-select">
                             <option value="All" selected>Show All</option>
                             <option value="Available">Available</option>
@@ -173,6 +173,7 @@ foreach ($data as $batch) {
                         </select>
                     </div>
                 </div>
+
 
 
                 <!-- Medicine Expiry Tracking Table -->

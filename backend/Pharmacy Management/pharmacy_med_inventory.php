@@ -264,12 +264,18 @@ try {
                     <!-- Header Section -->
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h2></h2>
-                        <div>
-                            <button type="button" class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#medicineModal">
+
+                        <div class="d-flex align-items-center w-100" style="max-width: 700px;">
+                            <!-- Search bar -->
+                            <input type="text" id="searchInput" class="form-control me-2" placeholder="Search medicine...">
+
+                            <!-- Add Medicine button -->
+                            <button type="button" class="btn btn-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#medicineModal">
                                 Add Medicine
                             </button>
                         </div>
                     </div>
+
 
                     <!-- Medicine Inventory Table -->
                     <table id="medicineInventoryTable" class="table">
@@ -443,6 +449,23 @@ try {
                 });
             });
         });
+    </script>
+    <script>
+        const searchInput = document.getElementById("searchInput");
+
+        function filterInventoryTable() {
+            const searchValue = searchInput.value.toLowerCase();
+
+            document.querySelectorAll("#medicineInventoryTable tbody tr").forEach(row => {
+                const medNameCell = row.querySelector("td:nth-child(2)"); // 2nd column = Medicine Name
+                if (!medNameCell) return;
+
+                const medName = medNameCell.textContent.toLowerCase();
+                row.style.display = medName.includes(searchValue) ? "" : "none";
+            });
+        }
+
+        searchInput.addEventListener("keyup", filterInventoryTable);
     </script>
 
     <script>
