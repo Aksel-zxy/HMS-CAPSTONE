@@ -52,6 +52,16 @@
   background-color: #dc3545; /* red overlay */
 }
 
+.seat.Maintenance::after {
+  content: "⚠️";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2rem;
+  color: #ffc107; /* yellow warning */
+}
+
 .room-header {
   grid-column: span 3;
   text-align: center;

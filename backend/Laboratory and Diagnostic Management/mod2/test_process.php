@@ -109,13 +109,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/test_results.php" class="sidebar-link">Test Results</a>
+                        <a href="../mod3/results.php" class="sidebar-link">Test Results</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/result_items.php" class="sidebar-link">Result Deliveries</a>
+                        <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Laboratory and Diagnostic Management/labtechm3.php/report_deliveries.php" class="sidebar-link">Operation Equipment</a>
+                        <a href="../mod3/operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -173,8 +173,13 @@ $allPatients = $patient->getAllPatients();
             <!-- START CODING HERE -->
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
-                    🧪 Sample Processing
+                   🧾 Sample Processing
                 </h2>
+                <div class="col-md-3 mb-3">
+                    <input type="text" id="searchInput" class="form-control"
+                        style="width:300px; border-radius:20px; padding:8px 15px;"
+                        placeholder="🔍 Search patient, test, or status...">
+                </div>
                 <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
                     <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
                         <thead style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left; position:sticky; top:0; z-index:1;">
@@ -185,6 +190,8 @@ $allPatients = $patient->getAllPatients();
                                 <th style="padding:12px;text-align:center;">Status</th>
                                 <th style="padding:12px;text-align:center;">Completed Time</th>
                                 <th style="padding:12px;text-align:center;">Result</th>
+                                <th style="padding:12px;text-align:center;">AI Impression</th>
+                                <th style="padding:12px;text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -194,17 +201,25 @@ $allPatients = $patient->getAllPatients();
                                 $pid   = $p['patient_id'];
                                 $name  = $p['fname'] . ' ' . $p['lname'];
                                 $apptId = $p['appointment_id'];
+
                                 $schedQuery = $conn->prepare("
-                                    SELECT status, scheduleID, scheduleDate, scheduleTime, serviceName, completed_at
-                                    FROM dl_schedule 
-                                    WHERE appointment_id = ? 
-                                    ORDER BY scheduleID ASC
+                                    SELECT s.status, s.scheduleID, s.scheduleDate, s.scheduleTime, s.serviceName, s.completed_at
+                                    FROM dl_schedule s
+                                    WHERE s.appointment_id = ?
+                                    AND NOT EXISTS (
+                                        SELECT 1 
+                                        FROM dl_result_schedules rs
+                                        WHERE rs.scheduleID = s.scheduleID
+                                    )
+                                    ORDER BY s.scheduleID ASC
                                 ");
                                 $schedQuery->bind_param("i", $apptId);
                                 $schedQuery->execute();
                                 $schedResult = $schedQuery->get_result();
+
                                 while ($schedRow = $schedResult->fetch_assoc()) {
                                     if ($schedRow['status'] === 'Scheduled' || $schedRow['status'] === 'Cancelled') continue;
+
                                     $patientsGrouped[$pid]['name'] = $name;
                                     $patientsGrouped[$pid]['tests'][] = [
                                         'scheduleID'   => $schedRow['scheduleID'],
@@ -217,8 +232,9 @@ $allPatients = $patient->getAllPatients();
                                 }
                                 $schedQuery->close();
                             }
+
                             if (empty($patientsGrouped)) {
-                                echo "<tr><td colspan='6' style='padding:20px; text-align:center; color:gray; font-style:italic;'>No Schedule</td></tr>";
+                                echo "<tr><td colspan='8' style='padding:20px; text-align:center; color:gray; font-style:italic;'>No Schedule</td></tr>";
                             } else {
                                 foreach ($patientsGrouped as $pid => $info):
                                     $tests = $info['tests'];
@@ -226,8 +242,6 @@ $allPatients = $patient->getAllPatients();
                                     $allCompleted = count(array_unique($statuses)) === 1 && $statuses[0] === 'Completed';
                                     $testNames = array_column($tests, 'serviceName');
                                     $testList = implode(", ", $testNames);
-                                    $dates = array_column($tests, 'date');
-                                    $times = array_column($tests, 'time');
                                     $completedTimes = array_filter(array_column($tests, 'completed_at'));
 
                                     if (!empty($completedTimes)) {
@@ -236,6 +250,11 @@ $allPatients = $patient->getAllPatients();
                                     } else {
                                         $dateTimeDisplay = "N/A";
                                     }
+
+                                    // Placeholder AI impression (for modal)
+                                    $aiImpression = $allCompleted
+                                        ? "AI Impression: All results appear stable."
+                                        : "AI Impression: Awaiting completion of tests.";
                             ?>
                                     <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
                                         <td style="padding:12px;text-align:center;"><?= htmlspecialchars($pid) ?></td>
@@ -260,13 +279,31 @@ $allPatients = $patient->getAllPatients();
                                                 data-results='<?= json_encode($tests) ?>'>
                                                 View Result
                                             </button>
-                                            <form action="save_result.php" method="POST" style="display:inline;">
-                                                <input type="hidden" name="patientID" value="<?= htmlspecialchars($pid) ?>">
-                                                <input type="hidden" name="scheduleIDs" value='<?= json_encode(array_column($tests, "scheduleID")) ?>'>
-                                                <input type="hidden" name="result" value="<?= htmlspecialchars($testList) ?>">
-                                                <input type="hidden" name="status" value="<?= $allCompleted ? 'Completed' : 'Progressing' ?>">
-                                                <button type="submit" class="btn btn-primary">Save Result</button>
-                                            </form>
+                                        </td>
+                                        <td style="padding:12px; text-align:center;">
+                                            <button class="btn btn-warning ai-impression-btn"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#aiImpressionModal"
+                                                data-impression="<?= htmlspecialchars($aiImpression) ?>">
+                                                View Impression
+                                            </button>
+                                        </td>
+                                        <td style="padding:12px; text-align:center;">
+                                            <?php if ($allCompleted): ?>
+                                                <!-- Open remarks modal -->
+                                                <button class="btn btn-primary add-remarks-btn"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#remarksModal"
+                                                    data-patientid="<?= htmlspecialchars($pid) ?>"
+                                                    data-scheduleids='<?= json_encode(array_column($tests, "scheduleID")) ?>'
+                                                    data-testlist="<?= htmlspecialchars($testList) ?>">
+                                                    Save Result
+                                                </button>
+                                            <?php else: ?>
+                                                <span style="color:gray; font-style:italic; margin-left:8px;">
+                                                    Still Processing...
+                                                </span>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                             <?php endforeach;
@@ -294,105 +331,56 @@ $allPatients = $patient->getAllPatients();
                     </div>
                 </div>
             </div>
-            <!----- End of Main Content ----->
-            <script>
-                // Sidebar toggle
-                document.querySelector(".toggler-btn")?.addEventListener("click", function() {
-                    document.querySelector("#sidebar").classList.toggle("collapsed");
-                });
+            <div class="modal fade" id="aiImpressionModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header" style="background: linear-gradient(90deg, #4facfe, #00f2fe); color: #fff;">
+                            <h5 class="modal-title">AI Impression</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body" id="aiImpressionText" style="background:#f0f8ff; padding:20px; border-radius:8px; font-family: 'Arial', sans-serif; font-size:14px; color:#333;">
+                            Loading...
+                        </div>
+                        <div class="modal-footer d-flex justify-content-end">
+                            <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal fade" id="remarksModal" tabindex="-1" aria-labelledby="remarksModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form action="save_result.php" method="POST">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="remarksModalLabel">Add Remarks Before Saving</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <input type="hidden" name="patientID" id="remarksPatientID">
+                                <input type="hidden" name="scheduleIDs" id="remarksScheduleIDs">
+                                <input type="hidden" name="result" id="remarksTestList">
+                                <input type="hidden" name="status" value="Completed">
 
-                document.querySelectorAll('.edit-btn').forEach(button => {
-                    button.addEventListener('click', function() {
-                        document.getElementById('modalScheduleId').value = this.dataset.id;
-                        document.getElementById('modalScheduleDate').value = this.dataset.date;
-                        document.getElementById('modalScheduleTime').value = this.dataset.time;
-                        document.getElementById('modalStatus').value = this.dataset.status;
-                    });
-                });
-
-                function askCancelReason(scheduleID) {
-                    const reason = prompt("Please provide a reason for cancellation:");
-                    if (reason !== null && reason.trim() !== "") {
-                        document.getElementById("cancelReasonInput_" + scheduleID).value = reason;
-                        document.querySelector("input[name='scheduleID'][value='" + scheduleID + "']").form.submit();
-                    } else {
-                        alert("❌ Cancellation aborted. Reason is required.");
-                    }
-                }
-                let tests = [];
-                let currentIndex = 0;
-
-                function showResult(index) {
-                    let scheduleID = tests[index]?.scheduleID;
-                    let testType = tests[index]?.serviceName; // <- your DB column is serviceName
-
-                    if (!scheduleID || !testType) {
-                        document.getElementById("resultContent").innerHTML =
-                            "<p class='text-danger'>Unknown test type or missing data.</p>";
-                        return;
-                    }
-
-                    // Update modal title
-                    document.getElementById("modalTitle").innerText = testType + " Result";
-
-                    // Show loading
-                    document.getElementById("resultContent").innerHTML =
-                        "<p class='text-center text-muted'>Loading result...</p>";
-
-                    // Fetch result
-                    fetch("get_result.php?scheduleID=" + scheduleID + "&testType=" + encodeURIComponent(testType))
-                        .then(response => response.text())
-                        .then(data => {
-                            document.getElementById("resultContent").innerHTML = data;
-                        })
-                        .catch(err => {
-                            document.getElementById("resultContent").innerHTML =
-                                "<p class='text-danger'>Error loading result.</p>";
-                        });
-
-                    // Handle prev/next visibility
-                    const prevBtn = document.getElementById("prevResult");
-                    const nextBtn = document.getElementById("nextResult");
-
-                    if (tests.length <= 1) {
-                        prevBtn.style.display = "none";
-                        nextBtn.style.display = "none";
-                    } else {
-                        prevBtn.style.display = (index === 0) ? "none" : "inline-block";
-                        nextBtn.style.display = (index === tests.length - 1) ? "none" : "inline-block";
-                    }
-                }
-
-                // Prev / Next handlers
-                document.getElementById("prevResult").addEventListener("click", function() {
-                    if (currentIndex > 0) {
-                        currentIndex--;
-                        showResult(currentIndex);
-                    }
-                });
-
-                document.getElementById("nextResult").addEventListener("click", function() {
-                    if (currentIndex < tests.length - 1) {
-                        currentIndex++;
-                        showResult(currentIndex);
-                    }
-                });
-
-                // Click handler for each button
-                document.querySelectorAll(".view-result-btn").forEach((button) => {
-                    button.addEventListener("click", function() {
-                        // Parse JSON from button's data-results
-                        tests = JSON.parse(this.dataset.results || "[]");
-
-                        currentIndex = 0;
-                        showResult(currentIndex);
-                    });
-                });
-            </script>
-            <script src="../assets/Bootstrap/all.min.js"></script>
-            <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-            <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-            <script src="../assets/Bootstrap/jq.js"></script>
+                                <div class="mb-3">
+                                    <label for="remarksText" class="form-label">Remarks</label>
+                                    <textarea name="remarks" id="remarksText" class="form-control" rows="4" placeholder="Enter remarks..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Result</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!----- End of Main Content ----->
+        <script src="../assets/javascript/test_process.js"></script>
+        <script src="../assets/Bootstrap/all.min.js"></script>
+        <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+        <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+        <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

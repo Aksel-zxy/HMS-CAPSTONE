@@ -5,6 +5,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $patientID   = $_POST['patientID'] ?? null;
     $scheduleIDs = isset($_POST['scheduleIDs']) ? json_decode($_POST['scheduleIDs'], true) : [];
     $status      = $_POST['status'] ?? 'Processing';
+    $remarks     = $_POST['remarks'] ?? ''; // ✅ capture remarks from modal
 
     if (!$patientID || empty($scheduleIDs)) {
         die("Invalid data submitted.");
@@ -25,23 +26,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     while ($row = $result->fetch_assoc()) {
         $testNames[] = $row['serviceName'];
         if ($firstScheduleID === null) {
-            $firstScheduleID = $row['scheduleID']; // keep one valid scheduleID for dl_results
+            $firstScheduleID = $row['scheduleID'];
         }
     }
     $stmt->close();
 
-    $testList = implode(", ", $testNames); // e.g. "CBC, X-Ray"
-
-    // 2. Insert into dl_results (keep scheduleID)
+    $testList = implode(", ", $testNames);
     $sql = "INSERT INTO dl_results (scheduleID, patientID, status, resultDate, result, remarks) 
-            VALUES (?, ?, ?, NOW(), ?, '')";
+            VALUES (?, ?, ?, NOW(), ?, ?)";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iiss", $firstScheduleID, $patientID, $status, $testList);
+    $stmt->bind_param("iisss", $firstScheduleID, $patientID, $status, $testList, $remarks);
     $stmt->execute();
     $resultID = $stmt->insert_id;
     $stmt->close();
-
-    // 3. Insert into dl_result_schedules (junction table)
     $sql = "INSERT INTO dl_result_schedules (resultID, scheduleID) VALUES (?, ?)";
     $stmt = $conn->prepare($sql);
 

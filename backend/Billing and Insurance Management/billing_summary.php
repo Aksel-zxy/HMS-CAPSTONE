@@ -1,13 +1,10 @@
 <?php
-
 session_start();
 include '../../SQL/config.php';
-
-// Include the class files
 require_once 'classincludes/billing_records_class.php';
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: login.php');
     exit();
 }
 
@@ -28,32 +25,29 @@ if (!$user) {
     exit();
 }
 
-class Patient
-{
+// Classes (Patient + BillingRecords)
+class Patient {
     public $conn;
     public $appointmentsTable = "p_appointments";
     public $patientTable = "patientinfo";
 
-    public function __construct($db)
-    {
+    public function __construct($db) {
         $this->conn = $db;
     }
-    
-    public function getAllPatients()
-    {
+
+    public function getAllPatients() {
         $query = "
-        SELECT p.*, a.*
-        FROM {$this->patientTable} p
-        INNER JOIN {$this->appointmentsTable} a 
-            ON p.patient_id = a.patient_id
-        WHERE a.purpose = 'laboratory'
+            SELECT p.*, a.*
+            FROM {$this->patientTable} p
+            INNER JOIN {$this->appointmentsTable} a 
+                ON p.patient_id = a.patient_id
+            WHERE a.purpose = 'laboratory'
         ";
         $result = $this->conn->query($query);
         return $result->fetch_all(MYSQLI_ASSOC);
     }
 
-    public function getPatientById($id)
-    {
+    public function getPatientById($id) {
         $stmt = $this->conn->prepare("
             SELECT p.*, a.*
             FROM {$this->patientTable} p
@@ -74,47 +68,40 @@ class BillingRecords {
     public function __construct($db) {
         $this->conn = $db;
     }
-    
-    /**
-     * Fetch all billing records with related dl_results and insurance_request
-     */
-    public function getBillingSummary($patientID) {
-    $query = "
-        SELECT 
-            p.patient_id,
-            CONCAT(p.fname, ' ', COALESCE(p.mname, ''), ' ', p.lname) AS full_name,
-            p.phone_number,
-            p.address,
-            p.discount,
-            ba.assigned_date,
-            ba.released_date,
-            dr.result AS diagnostic_results,
-            ir.insurance_type,
-            ir.insurance_covered,
-            br.status,
-            br.billing_date,
-            ds.price,
-            (ds.price - (COALESCE(p.discount, 0) + COALESCE(ir.insurance_covered, 0))) AS out_of_pocket
-        FROM patientinfo p
-        LEFT JOIN p_bed_assignments ba ON p.patient_id = ba.patient_id
-        LEFT JOIN dl_results dr ON p.patient_id = dr.patientID
-        LEFT JOIN insurance_request ir ON p.patient_id = ir.patient_id
-        LEFT JOIN billing_records br ON p.patient_id = br.patient_id
-        LEFT JOIN dl_services ds ON dr.result = ds.servicename
-        WHERE p.patient_id = ?
-    ";
-    
-    $stmt = $this->conn->prepare($query);
-    $stmt->bind_param("i", $patientID);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result->fetch_all(MYSQLI_ASSOC);
-}
 
-    
-    /**
-     * Get all patients with laboratory appointments for selection
-     */
+    public function getBillingSummary($patientID) {
+        $query = "
+            SELECT 
+                p.patient_id,
+                CONCAT(p.fname, ' ', COALESCE(p.mname, ''), ' ', p.lname) AS full_name,
+                p.phone_number,
+                p.address,
+                p.discount,
+                ba.assigned_date,
+                ba.released_date,
+                GROUP_CONCAT(dr.result SEPARATOR ', ') AS diagnostic_results,
+                ir.insurance_type,
+                ir.insurance_covered,
+                br.status,
+                br.billing_date,
+                SUM(ds.price) AS price,
+                (SUM(ds.price) - (COALESCE(p.discount, 0) + COALESCE(ir.insurance_covered, 0))) AS out_of_pocket
+            FROM patientinfo p
+            LEFT JOIN p_bed_assignments ba ON p.patient_id = ba.patient_id
+            LEFT JOIN dl_results dr ON p.patient_id = dr.patientID
+            LEFT JOIN insurance_request ir ON p.patient_id = ir.patient_id
+            LEFT JOIN billing_records br ON p.patient_id = br.patient_id
+            LEFT JOIN dl_services ds ON dr.result = ds.serviceName
+            WHERE p.patient_id = ?
+            GROUP BY p.patient_id
+        ";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("i", $patientID);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
+    }
+
     public function getLabPatients() {
         $query = "
             SELECT DISTINCT p.patient_id, p.fname, p.lname 
@@ -130,21 +117,47 @@ class BillingRecords {
 $billing = new BillingRecords($conn);
 $getpatient = new Patient($conn);
 
-// Get patient ID from URL or form
+// Get patient ID
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
-
-// Get all lab patients for the dropdown
 $patients = $billing->getLabPatients();
 
-// Get billing summary if a patient is selected
 $services = [];
 $selected_patient = null;
+$insurance_covered = 0; // 🛑 Default to 0
 if ($patient_id > 0) {
     $services = $billing->getBillingSummary($patient_id);
     $selected_patient = $getpatient->getPatientById($patient_id);
+
+    // ✅ Set insurance covered if available
+    if (!empty($services) && isset($services[0]['insurance_covered'])) {
+        $insurance_covered = floatval($services[0]['insurance_covered']);
+    }
 }
 
+// Get completed diagnostic services
+$service_items = [];
+$subtotal = 0;
+if ($patient_id > 0) {
+    $sql = "
+        SELECT sch.serviceName, ds.description, ds.price
+        FROM dl_schedule sch
+        LEFT JOIN dl_services ds ON sch.serviceName = ds.serviceName
+        WHERE sch.patientID = ?
+          AND sch.status = 'Completed'
+        ORDER BY sch.scheduleDate DESC, sch.scheduleTime DESC
+        LIMIT 5
+    ";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $service_items[] = $row;
+        $subtotal += floatval($row['price']);
+    }
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -306,55 +319,55 @@ if ($patient_id > 0) {
         <thead>
             <tr>
                 <th style="border-bottom: 1px solid #ccc; text-align: left; padding-bottom: 8px;">Particulars</th>
+                <th style="border-bottom: 1px solid #ccc; text-align: left; padding-bottom: 8px;">Description</th>
                 <th style="border-bottom: 1px solid #ccc; text-align: right; padding-bottom: 8px;">Actual Charges</th>
-                <th style="border-bottom: 1px solid #ccc; text-align: right; padding-bottom: 8px;">Total</th>
             </tr>
         </thead>
         <tbody>
             <?php 
-                $subtotal = 0;
                 $insurance_covered = 0;
-                // Find insurance_covered only once (first non-zero value)
-                if (!empty($services)) {
-                    foreach ($services as $service) {
-                        $unit_price = $service['price'] ?? 0;
-                        $subtotal += $unit_price;
-                        if ($insurance_covered == 0 && !empty($service['insurance_covered'])) {
-                            $insurance_covered = $service['insurance_covered'];
-                        }
-                    }
-                    foreach ($services as $service):
+                if (!empty($service_items)) {
+                    foreach ($service_items as $item) {
             ?>
             <tr>
-                <td style="padding: 10px 0;"><?= htmlspecialchars($service['diagnostic_results']) ?></td>
-                <td style="padding: 10px 0; text-align: right;">₱<?= number_format($service['price'] ?? 0, 2) ?></td>
-                <td style="padding: 10px 0; text-align: right;">₱<?= number_format($service['price'] ?? 0, 2) ?></td>
+                <td style="padding: 10px 0;"><?php echo htmlspecialchars($item['serviceName']); ?></td>
+                <td style="padding: 10px 0;"><?php echo htmlspecialchars($item['description']); ?></td>
+                <td style="padding: 10px 0; text-align: right;">₱<?php echo number_format($item['price'], 2); ?></td>
             </tr>
-            <?php endforeach; ?>
-            <?php } else { ?>
+            <?php 
+                    }
+                } else { 
+            ?>
             <tr>
-                <td colspan="3" style="text-align: center; padding: 20px;">No services found.</td>
+                <td colspan="3" style="text-align: center; padding: 20px;">No completed services found.</td>
             </tr>
             <?php } ?>
         </tbody>
     </table>
 
     <!-- Totals -->
-    <?php if (!empty($services)): ?>
+    <?php if (!empty($service_items)): ?>
     <table style="width: 100%; font-size: 14px;">
-        <tr>
-            <td style="text-align: right; padding: 4px 0;">Insurance Covered:</td>
-            <td style="text-align: right; padding: 4px 0; color: red;">- ₱<?= number_format($insurance_covered, 2) ?></td>
-        </tr>
-        <tr>
-            <td style="text-align: right; padding: 4px 0;">Subtotal:</td>
-            <td style="text-align: right; padding: 4px 0;">₱<?= number_format($subtotal, 2) ?></td>
-        </tr>
-        <tr>
-            <td style="text-align: right; font-weight: bold; padding-top: 12px;">Total:</td>
-            <td style="text-align: right; font-weight: bold; padding-top: 12px;">₱<?= number_format($subtotal - $insurance_covered, 2) ?></td>
-        </tr>
-    </table>
+    <tr>
+        <td style="text-align: right; padding: 4px 0;">Insurance Covered:</td>
+        <td style="text-align: right; padding: 4px 0; color: red;">
+            - ₱<?= number_format($insurance_covered, 2) ?>
+        </td>
+    </tr>
+    <tr>
+        <td style="text-align: right; padding: 4px 0;">Subtotal:</td>
+        <td style="text-align: right; padding: 4px 0;">
+            ₱<?= number_format($subtotal, 2) ?>
+        </td>
+    </tr>
+    <tr>
+        <td style="text-align: right; font-weight: bold; padding-top: 12px;">Total:</td>
+        <td style="text-align: right; font-weight: bold; padding-top: 12px;">
+            ₱<?= number_format($subtotal - $insurance_covered, 2) ?>
+        </td>
+    </tr>
+</table>
+
     <?php endif; ?>
 
     <!-- Thank You -->
@@ -384,7 +397,7 @@ if ($patient_id > 0) {
                                 target="_blank" 
                                 class="btn btn-primary"
                             >
-                                Generate Receipt
+                                Generate Invoice
                             </a>
                         </div>
                     <?php endif; ?>

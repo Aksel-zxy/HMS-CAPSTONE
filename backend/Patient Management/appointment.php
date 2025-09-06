@@ -267,17 +267,8 @@ $user = $result->fetch_assoc();
                                 <!-- Purpose -->
                                 <div class="mb-3">
                                     <label for="purpose" class="form-label">Purpose</label>
-                                    <select class="form-select" id="purpose" name="purpose" required>
-                                        <option value="">-- Select Purpose --</option>
-                                        <option value="labor">Labor</option>
-                                        <option value="checkup">Check-up</option>
-                                        <option value="consultation">Consultation</option>
-                                        <option value="cardiology">Cardiology</option>
-                                        <option value="laboratory">laboratory</option>
-                                        <option value="ob-gyne">ob-gyne</option>
-                                        <option value="pediatric">pediatric</option>
-                                        <option value="physichiatric">physichiatric</option>
-                                    </select>
+                                    <input type="text" class="form-control" id="purpose" name="purpose"
+                                        value="Consultation" readonly>
                                 </div>
 
                                 <!-- Status -->

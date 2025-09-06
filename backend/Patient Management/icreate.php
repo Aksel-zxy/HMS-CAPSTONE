@@ -1,4 +1,5 @@
 <?php
+include '../../SQL/config.php';
 require_once 'class/patient.php';
 require_once 'class/caller.php';
 
@@ -25,7 +26,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
         aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
-                <form action="class/create.php" method="POST">
+                <form id="addPatientForm" action="class/create.php" method="POST">
                     <div class="modal-body">
                         <?php if (isset($error)): ?>
                         <div class="alert alert-danger"><?php echo $error; ?></div>
@@ -39,7 +40,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">First Name</label>
                                 <div class="col-sm-9">
-                                    <input type="text" class="form-control" name="fname" required minlength="2">
+                                    <input type="text" class="form-control" name="fname">
                                 </div>
                             </div>
 
@@ -53,7 +54,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Last Name</label>
                                 <div class="col-sm-9">
-                                    <input type="text" class="form-control" name="lname" required minlength="2">
+                                    <input type="text" class="form-control" name="lname">
                                 </div>
                             </div>
 
@@ -177,6 +178,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
 
 
 
+
                     <div class="modal-footer">
                         <button type="button" id="prevBtn" class="btn btn-secondary d-none">Back</button>
                         <button type="button" id="nextBtn" class="btn btn-primary">Next</button>
@@ -208,29 +210,85 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
         }
     });
 
-    let step = 1;
+    // ✅ Validation function
+    function validateForm(form) {
+        const fname = form.querySelector("input[name='fname']").value.trim();
+        const lname = form.querySelector("input[name='lname']").value.trim();
+        const mname = form.querySelector("input[name='mname']").value.trim();
+        const age = form.querySelector("input[name='age']").value;
 
-    document.getElementById("nextBtn").addEventListener("click", function() {
-        document.getElementById("step1").classList.add("d-none");
-        document.getElementById("step2").classList.remove("d-none");
-        document.getElementById("nextBtn").classList.add("d-none");
-        document.getElementById("prevBtn").classList.remove("d-none");
-        document.getElementById("submitBtn").classList.remove("d-none");
-    });
+        const nameRegex = /^[A-Za-z\s\-]+$/;
+        const vowelRegex = /[AEIOUaeiou]/;
 
-    document.getElementById("prevBtn").addEventListener("click", function() {
-        document.getElementById("step2").classList.add("d-none");
-        document.getElementById("step1").classList.remove("d-none");
-        document.getElementById("prevBtn").classList.add("d-none");
-        document.getElementById("submitBtn").classList.add("d-none");
-        document.getElementById("nextBtn").classList.remove("d-none");
-    });
+        if (fname.length < 2 || !nameRegex.test(fname) || !vowelRegex.test(fname)) {
+            alert(
+                "First name invalid. Only letters, spaces, and hyphens allowed, and must contain at least one vowel."
+            );
+            return false;
+        }
+
+        if (lname.length < 2 || !nameRegex.test(lname)) {
+            alert("Last name invalid. Only letters, spaces, and hyphens allowed.");
+            return false;
+        }
+
+        if (mname !== "" && !nameRegex.test(mname)) {
+            alert("Middle name invalid. Only letters, spaces, and hyphens allowed.");
+            return false;
+        }
 
 
-    document.getElementById("skipBtn").addEventListener("click", function() {
-        document.querySelector("#addPatientModal form").submit();
+        // ✅ Check if age is -1
+        if (parseInt(age, 10) < 0) {
+            alert("Invalid Date of Birth.");
+            return false;
+        }
+
+        return true; // ✅ All good
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const form = document.getElementById("addPatientForm");
+
+        // Handle main form submit
+        form.addEventListener("submit", function(e) {
+            e.preventDefault(); // always stop default first
+            console.log("Submit intercepted");
+
+            if (validateForm(form)) {
+                console.log("All good, submitting...");
+                form.submit(); // only submit if valid
+            }
+        });
+
+        // Handle next/prev buttons
+        document.getElementById("nextBtn").addEventListener("click", function() {
+            document.getElementById("step1").classList.add("d-none");
+            document.getElementById("step2").classList.remove("d-none");
+            document.getElementById("nextBtn").classList.add("d-none");
+            document.getElementById("prevBtn").classList.remove("d-none");
+            document.getElementById("submitBtn").classList.remove("d-none");
+        });
+
+        document.getElementById("prevBtn").addEventListener("click", function() {
+            document.getElementById("step2").classList.add("d-none");
+            document.getElementById("step1").classList.remove("d-none");
+            document.getElementById("prevBtn").classList.add("d-none");
+            document.getElementById("submitBtn").classList.add("d-none");
+            document.getElementById("nextBtn").classList.remove("d-none");
+        });
+
+        // ✅ Fix skip button (no bypass)
+        document.getElementById("skipBtn").addEventListener("click", function(e) {
+            e.preventDefault(); // stop instant submission
+            if (validateForm(form)) {
+                console.log("Skip pressed, form valid, submitting...");
+                form.submit();
+            }
+        });
     });
     </script>
+
 
 </body>
 

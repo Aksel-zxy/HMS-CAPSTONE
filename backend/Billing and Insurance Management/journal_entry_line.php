@@ -1,55 +1,111 @@
-<?php
-include '../../SQL/config.php';
-
-// Handle Add Line
-if (isset($_POST['add_line'])) {
-    $entryId = $_POST['entry_id'];
-    $accountId = $_POST['account_id'];
-    $debit = $_POST['debit'];
-    $credit = $_POST['credit'];
-
-    $sql = "INSERT INTO journal_entry_line (entry_id, account_id, debit, credit) VALUES (?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iidd", $entryId, $accountId, $debit, $credit);
-    $stmt->execute();
-}
-
-// Fetch lines
-$lines = $conn->query("SELECT l.line_id, l.entry_id, a.account_name, l.debit, l.credit 
-    FROM journal_entry_lines l
-    JOIN journal_account a ON l.account_id = a.account_id");
-?>
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Journal Entry Lines</title>
+    <link rel="stylesheet" href="../assets/CSS/journalentryline.css">
 </head>
 <body>
-    <h2>Journal Entry Lines</h2>
+    <div class="container">
+        <header>
+            <h1>Journal Entry Lines - Entry #001</h1>
+            <div class="entry-info">
+                <div class="info-item">
+                    <span class="label">Date</span>
+                    <span class="value">2023-10-15</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Status:</span>
+                    <span class="badge posted">Posted</span>
+                </div>
+            </div>
+        </header>
 
-    <form method="POST">
-        <input type="number" name="entry_id" placeholder="Entry ID" required>
-        <input type="number" name="account_id" placeholder="Account ID" required>
-        <input type="number" step="0.01" name="debit" placeholder="Debit">
-        <input type="number" step="0.01" name="credit" placeholder="Credit">
-        <button type="submit" name="add_line">Add Line</button>
-    </form>
+        <div class="table-container">
+            <table id="entry-table">
+                <thead>
+                    <tr>
+                        <th>Account</th>
+                        <th class="amount-col">Debit</th>
+                        <th class="amount-col">Credit</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Accounts Receivable</td>
+                        <td class="amount debit">5,000.00</td>
+                        <td class="amount"></td>
+                        <td>Invoice #1234 for consulting services</td>
+                    </tr>
+                    <tr>
+                        <td>Service Revenue</td>
+                        <td class="amount"></td>
+                        <td class="amount credit">5,000.00</td>
+                        <td>Revenue from consulting services</td>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th>TOTAL</th>
+                        <th class="amount total">5,000.00</th>
+                        <th class="amount total">5,000.00</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
 
-    <h3>Existing Lines</h3>
-    <table border="1">
-        <tr>
-            <th>ID</th><th>Entry</th><th>Account</th><th>Debit</th><th>Credit</th>
-        </tr>
-        <?php while($row = $lines->fetch_assoc()): ?>
-        <tr>
-            <td><?= $row['line_id'] ?></td>
-            <td><?= $row['entry_id'] ?></td>
-            <td><?= $row['account_name'] ?></td>
-            <td><?= $row['debit'] ?></td>
-            <td><?= $row['credit'] ?></td>
-        </tr>
-        <?php endwhile; ?>
-    </table>
+        <div class="actions">
+            <button id="add-line" class="btn-secondary">+ Add Line</button>
+            <button id="edit-entry" class="btn-primary">Edit Entry</button>
+            <button id="post-entry" class="btn-success">Post Entry</button>
+            <button id="print-entry" class="btn-secondary">Print</button>
+        </div>
+
+        <div class="entry-details">
+            <h2>Entry Details</h2>
+            <div class="details-grid">
+                <div class="detail-item">
+                    <span class="label">Created By:</span>
+                    <span class="value">John Smith</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Created Date:</span>
+                    <span class="value">2023-10-15 09:30:45</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Last Modified:</span>
+                    <span class="value">2023-10-15 09:30:45</span>
+                </div>
+                <div class="detail-item">
+                    <span class="label">Reference:</span>
+                    <span class="value">INV-1234</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Basic functionality for the UI
+        document.getElementById('add-line').addEventListener('click', function() {
+            alert('Add Line functionality would open a form here.');
+        });
+
+        document.getElementById('edit-entry').addEventListener('click', function() {
+            alert('Edit Entry functionality would open here.');
+        });
+
+        document.getElementById('post-entry').addEventListener('click', function() {
+            if(confirm('Are you sure you want to post this entry? This action cannot be undone.')) {
+                alert('Entry posted successfully.');
+            }
+        });
+
+        document.getElementById('print-entry').addEventListener('click', function() {
+            window.print();
+        });
+    </script>
 </body>
 </html>

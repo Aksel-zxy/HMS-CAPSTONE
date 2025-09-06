@@ -13,7 +13,7 @@ class Patient {
                    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
             FROM patientinfo p
             LEFT JOIN hr_employees e 
-                   ON p.attending_doctor = e.employee_id";
+                   ON p.attending_doctor = e.employee_id order by p.patient_id desc";
         $result = $this->conn->query($sql);
 
         if (!$result) {
@@ -29,7 +29,9 @@ class Patient {
             FROM patientinfo p
             LEFT JOIN hr_employees e 
                    ON p.attending_doctor = e.employee_id
-                   WHERE p.admission_type != 'Outpatient'";
+            WHERE p.admission_type != 'Outpatient'
+              AND p.admission_type != 'Registered Patient'
+            ORDER BY p.patient_id DESC";
         $result = $this->conn->query($sql);
 
         if (!$result) {
@@ -110,7 +112,7 @@ public function getPatientOrFail($patient_id) {
             FROM patientinfo p
             LEFT JOIN hr_employees e 
                    ON p.attending_doctor = e.employee_id
-            WHERE p.admission_type = 'Outpatient'";
+            WHERE p.admission_type = 'Outpatient' order by p.patient_id desc";
         $result = $this->conn->query($sql);
 
         if (!$result) {
