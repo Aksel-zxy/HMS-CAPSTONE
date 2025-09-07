@@ -1,5 +1,7 @@
 <?php
 include '../../../SQL/config.php';
+include '../class/patient.php';
+
 
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'patient') {
     header('Location: login.php');
@@ -10,6 +12,9 @@ if (!isset($_SESSION['user_id'])) {
     echo "User ID is not set in session.";
     exit();
 }
+
+$patientObj = new Patient($conn);
+
 
 // Fetch user details from database
 $query = "SELECT * FROM patient_user WHERE user_id = ?";
@@ -23,7 +28,28 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+try {
+    // Instead of $_GET, use the patient_id linked to this user
+    $patient_id = $user['patient_id'] ?? null;
+
+    if (!$patient_id) {
+        throw new Exception("Patient ID not found for this user.");
+    }
+
+    // Get a single patient
+    $patient = $patientObj->getPatientOrFail($patient_id);
+
+    // Get only this patient's records
+    $patients = $patientObj->getPatientsById($patient_id);
+
+} catch (Exception $e) {
+    echo $e->getMessage();
+    exit;
+}
+
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -196,23 +222,30 @@ if (!$user) {
                     <h3>Records</h3>
                 </div>
                 <div class="mt-4 border-3 border-bottom">
-                    <p class="fs-6"><strong>Patient ID:</strong></p>
-                    <p class="fs-6"><strong>Name:</strong></p>
-                    <p class="fs-6"><strong>Age:</strong></p>
-                    <p class="fs-6"><strong>Contact:</strong></p>
-                    <p class="fs-6"><strong>Gender:</strong></p>
+                    <p class="fs-6"><strong>Patient ID:</strong>
+                        <?= htmlspecialchars($patient['patient_id'] ) ?>
+                    </p>
+                    <p class="fs-6"><strong>Name:</strong>
+                        <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
+                    </p>
+                    <p class="fs-6"><strong>Age:</strong> <?= htmlspecialchars($patient['age'] ) ?></p>
+                    <p class="fs-6"><strong>Contact:</strong> <?= htmlspecialchars($patient['phone_number'] ) ?></p>
+                    <p class="fs-6"><strong>Gender:</strong> <?= htmlspecialchars($patient['gender'] ) ?></p>
 
                 </div>
 
                 <div class="mt-4 border-3 border-bottom">
+                    <div class="border-bottom border-2 pb-3">
+                        <h3>Medical History</h3>
+                    </div>
                     <table
-                        style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:200px;">
+                        style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:100px;">
                         <thead>
                             <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
-                                <th style="padding:12px; text-align:center;">Patient ID</th>
-                                <th style="padding:12px; text-align:center;">First Name</th>
-                                <th style="padding:12px; text-align:center;">Middle Name</th>
-                                <th style="padding:12px; text-align:center;">Last Name</th>
+                                <th style="padding:12px; text-align:center;">Date</th>
+                                <th style="padding:12px; text-align:center;">Diagnosis</th>
+                                <th style="padding:12px; text-align:center;">Doctor</th>
+                                <th style="padding:12px; text-align:center;">Notes</th>
                                 <th style="padding:12px; text-align:center;"></th>
 
                             </tr>
@@ -226,7 +259,7 @@ if (!$user) {
                                 </td>
                                 <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['fname']) ?></td>
                                 <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['mname']) ?></td>
-
+                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['mname']) ?></td>
 
                                 <td style="text-align:center;">
                                     <a class="btn btn-sm"
@@ -249,15 +282,18 @@ if (!$user) {
                     </table>
                 </div>
                 <div class="mt-4 border-3 border-bottom">
+                    <div class="border-bottom border-2 pb-3">
+                        <h3>Records</h3>
+                    </div>
                     <table
-                        style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:200px;">
+                        style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:100px;">
                         <thead>
                             <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
-                                <th style="padding:12px; text-align:center;">Patient ID</th>
-                                <th style="padding:12px; text-align:center;">First Name</th>
-                                <th style="padding:12px; text-align:center;">Middle Name</th>
-                                <th style="padding:12px; text-align:center;">Last Name</th>
-                                <th style="padding:12px; text-align:center;"></th>
+                                <th style="padding:12px; text-align:center;">Type</th>
+                                <th style="padding:12px; text-align:center;">Date</th>
+                                <th style="padding:12px; text-align:center;">Details</th>
+                                <th style="padding:12px; text-align:center;">Notes</th>
+                                <th style="padding:12px; text-align:center;"> </th>
 
                             </tr>
                         </thead>

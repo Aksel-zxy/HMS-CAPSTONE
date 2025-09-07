@@ -29,3 +29,24 @@
     padding: 5px 12px;
     border-radius: 6px;
 }
+
+        .admin-main {
+            margin-left: 250px; /* width of the sidebar */
+            padding: 20px;
+            transition: margin-left 0.3s ease-in-out;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .admin-main {
+                margin-left: 200px;
+                padding: 15px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .admin-main {
+                margin-left: 0;
+                padding: 10px;
+            }
+        }

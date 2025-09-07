@@ -22,6 +22,7 @@ class Patient {
 
         return $result;
     }
+    
     public function getinPatients() {
         $sql = "SELECT p.patient_id, p.fname, p.mname, p.lname, p.address, p.gender, 
                    p.civil_status, p.admission_type, 
@@ -41,7 +42,16 @@ class Patient {
         return $result;
     }
 
+    //for user panel
+    public function getPatientsById($patient_id) {
+        $query = "SELECT * FROM patient_user WHERE patient_id = ?";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bind_param("i", $patient_id);
+        $stmt->execute();
+        return $stmt->get_result();
+    }
 
+    //For Edit Patient
     public function getPatientById($id) {
         $stmt = $this->conn->prepare("
         SELECT p.*, 
@@ -67,7 +77,7 @@ class Patient {
         throw new Exception("Insert failed: " . $stmt->error);
     }
 
-    // ✅ Return the actual inserted patient ID
+   
     return $this->conn->insert_id;
     }
 
@@ -92,7 +102,7 @@ class Patient {
         return true;
     }
 
-public function getPatientOrFail($patient_id) {
+    public function getPatientOrFail($patient_id) {
         if (empty($patient_id)) {
             throw new Exception("Patient ID is missing.");
         }
@@ -105,7 +115,8 @@ public function getPatientOrFail($patient_id) {
 
         return $patient;
     }
- public function getOutPatients() {
+    
+     public function getOutPatients() {
         $sql = "SELECT p.patient_id, p.fname, p.mname, p.lname, p.address, p.gender, 
                    p.civil_status, p.admission_type, 
                    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
@@ -122,7 +133,7 @@ public function getPatientOrFail($patient_id) {
         return $result;
     }
     
-        public function insertAppointment($data) {
+    public function insertAppointment($data) {
         $stmt = $this->conn->prepare("
             INSERT INTO p_appointments (patient_id, doctor_id, appointment_date, purpose, notes)
             VALUES (?, ?, ?, ?, ?)
