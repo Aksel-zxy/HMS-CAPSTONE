@@ -21,9 +21,11 @@
                 
                 <li><a href="vendor_orders.php"><span class="text">Orders</span></a></li>
                 <li><a href="vendor_products.php"><span class="text">Product List</span></a></li>
+                <li><a href="vendor_return_request.php"><span class="text">Return Request</span></a></li>
                 <li><a href="vendor_documents.php"><span class="text">View Compliance Document</span></a></li>
                 <li><a href="vendorcontract.php"><span class="text">Contract & Agreement</span></a></li>
-                <li><a href="#"><span class="text">Rating</span></a></li>
+                <li><a href="v_rating.php"><span class="text">Rating</span></a></li>
+                
             </ul>
         </div>
 
@@ -32,7 +34,7 @@
             <ul>
                 <li><a href="vendorprofile.php"><span class="text">View Profile</span></a></li>
                 <li>
-                    <a href="logout.php" onclick="return confirm('Are you sure you want to log out?');" aria-label="Logout">
+                    <a href="vlogout.php" onclick="return confirm('Are you sure you want to log out?');" aria-label="Logout">
                         <i class="icon ph-bold ph-sign-out"></i>
                         <span class="text">Log Out</span>
                     </a>
