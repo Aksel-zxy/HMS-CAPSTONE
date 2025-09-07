@@ -24,8 +24,12 @@
                 <li><a href="vendor_return_request.php"><span class="text">Return Request</span></a></li>
                 <li><a href="vendor_documents.php"><span class="text">View Compliance Document</span></a></li>
                 <li><a href="vendorcontract.php"><span class="text">Contract & Agreement</span></a></li>
+<<<<<<< HEAD
                 <li><a href="v_rating.php"><span class="text">Rating</span></a></li>
                 
+=======
+                <li><a href="#"><span class="text">Rating</span></a></li>
+>>>>>>> 7ab136995fe418cd34e9ba8d376e54938bd34398
             </ul>
         </div>
 
