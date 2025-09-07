@@ -2,6 +2,22 @@
 session_start();
 require 'db.php';
 
+// Handle vendor rating submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_rating'])) {
+    $vendor_id = intval($_POST['vendor_id']);
+    $purchase_request_id = intval($_POST['purchase_request_id']);
+    $rating = intval($_POST['rating']);
+    $feedback = trim($_POST['feedback']);
+
+    $stmt = $pdo->prepare("INSERT INTO vendor_rating (vendor_id, purchase_request_id, rating, feedback) 
+                           VALUES (?, ?, ?, ?)
+                           ON DUPLICATE KEY UPDATE rating=?, feedback=?, created_at=NOW()");
+    $stmt->execute([$vendor_id, $purchase_request_id, $rating, $feedback, $rating, $feedback]);
+
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
 // Fetch vendors + purchase_request_id
 $stmt = $pdo->prepare("
     SELECT v.id AS vendor_id, v.company_name, vo.purchase_request_id,
@@ -17,11 +33,7 @@ $vendors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Function: status per vendor + request
 function getVendorStatus($pdo, $vendor_id, $request_id) {
-    $stmt = $pdo->prepare("
-        SELECT status 
-        FROM vendor_orders 
-        WHERE vendor_id = ? AND purchase_request_id = ?
-    ");
+    $stmt = $pdo->prepare("SELECT status FROM vendor_orders WHERE vendor_id = ? AND purchase_request_id = ?");
     $stmt->execute([$vendor_id, $request_id]);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -39,30 +51,23 @@ function getVendorStatus($pdo, $vendor_id, $request_id) {
     return ['text'=>'Processing','color'=>'secondary','type'=>'processing'];
 }
 
-// Helper: fetch the latest Paid receipt for a given purchase_request_id
+// Fetch receipt/payment
 function getDeliveredData($pdo, $purchase_request_id) {
     $stmt = $pdo->prepare("
-        SELECT id, paid_at, receipt_id
-        FROM receipt_payments 
-        WHERE receipt_id = ? AND status='Paid'
-        ORDER BY id DESC LIMIT 1
+        SELECT rp.id, rp.paid_at, r.id AS receipt_id
+        FROM receipts r
+        JOIN receipt_payments rp ON rp.receipt_id = r.id
+        WHERE r.order_id = ? AND rp.status = 'Paid'
+        ORDER BY rp.id DESC LIMIT 1
     ");
     $stmt->execute([$purchase_request_id]);
-    $data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    // fallback: if no match, get latest Paid receipt
-    if (!$data) {
-        $stmt = $pdo->query("
-            SELECT id, paid_at, receipt_id
-            FROM receipt_payments 
-            WHERE status='Paid'
-            ORDER BY id DESC LIMIT 1
-        ");
-        $data = $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-
-    return $data;
+    return $stmt->fetch(PDO::FETCH_ASSOC);
 }
+
+// Average ratings per vendor
+$stmt = $pdo->prepare("SELECT vendor_id, AVG(rating) AS avg_rating FROM vendor_rating GROUP BY vendor_id");
+$stmt->execute();
+$avgRatings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // vendor_id => avg_rating
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -81,43 +86,20 @@ function getDeliveredData($pdo, $purchase_request_id) {
 <div class="container py-5">
     <h2 class="mb-4">PO Status Tracking</h2>
 
-    <!-- Nav tabs -->
+    <!-- Tabs -->
     <ul class="nav nav-tabs mb-3" id="vendorTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="processing-tab" data-bs-toggle="tab" data-bs-target="#processing" type="button" role="tab" aria-controls="processing" aria-selected="true">Processing</button>
+        <li class="nav-item">
+            <button class="nav-link active" id="processing-tab" data-bs-toggle="tab" data-bs-target="#processing" type="button">Processing</button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed" type="button" role="tab" aria-controls="completed" aria-selected="false">Completed</button>
+        <li class="nav-item">
+            <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed" type="button">Completed</button>
         </li>
     </ul>
 
     <div class="tab-content">
         <!-- Processing Tab -->
-        <div class="tab-pane fade show active" id="processing" role="tabpanel" aria-labelledby="processing-tab">
-            <?php 
-            $hasProcessing = false;
-            foreach ($vendors as $v):
-                $vendorStatus = getVendorStatus($pdo, $v['vendor_id'], $v['purchase_request_id']);
-                if($vendorStatus['type'] !== 'processing') continue;
-                $hasProcessing = true;
-
-                $stmt = $pdo->prepare("
-                    SELECT vo.*, vp.item_name, vp.item_description, vp.price, vp.picture
-                    FROM vendor_orders vo
-                    JOIN vendor_products vp ON vo.item_id = vp.id
-                    WHERE vo.vendor_id = ? AND vo.purchase_request_id = ?
-                    ORDER BY vo.created_at DESC
-                ");
-                $stmt->execute([$v['vendor_id'], $v['purchase_request_id']]);
-                $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                $total_price = 0;
-                foreach($orders as $o) {
-                    if (!in_array($o['status'], ['Received','Completed'])) {
-                        $total_price += $o['quantity'] * $o['price'];
-                    }
-                }
-            ?>
+        <div class="tab-pane fade show active" id="processing" role="tabpanel">
+            <?php $hasProcessing = false; ?>
             <table class="table table-bordered table-hover bg-white mb-4">
                 <thead class="table-dark">
                     <tr>
@@ -127,85 +109,36 @@ function getDeliveredData($pdo, $purchase_request_id) {
                         <th>Total Quantity</th>
                         <th>Status</th>
                         <th>View Items</th>
+                        <th>Avg Rating</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php foreach ($vendors as $v): 
+                        $vendorStatus = getVendorStatus($pdo, $v['vendor_id'], $v['purchase_request_id']);
+                        if($vendorStatus['type'] !== 'processing') continue;
+                        $hasProcessing = true;
+                        $avgRating = isset($avgRatings[$v['vendor_id']]) ? number_format($avgRatings[$v['vendor_id']],1) : null;
+                    ?>
                     <tr>
                         <td><?= htmlspecialchars($v['company_name']) ?></td>
-                        <td>#<?= (int)$v['purchase_request_id'] ?></td>
+                        <td>#<?= $v['purchase_request_id'] ?></td>
                         <td><?= $v['last_order_date'] ? date("Y-m-d", strtotime($v['last_order_date'])) : '-' ?></td>
                         <td><?= (int)$v['total_quantity'] ?></td>
                         <td><span class="badge bg-<?= $vendorStatus['color'] ?>"><?= $vendorStatus['text'] ?></span></td>
-                        <td><button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#vendorModal<?= $v['vendor_id'] ?>_<?= $v['purchase_request_id'] ?>">View Items</button></td>
+                        <td>
+                            <a href="vendor_orders_view.php?vendor_id=<?= $v['vendor_id'] ?>&pr_id=<?= $v['purchase_request_id'] ?>" class="btn btn-primary btn-sm">View Items</a>
+                        </td>
+                        <td><?= $avgRating ? $avgRating.' ⭐' : '-' ?></td>
                     </tr>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
-
-            <!-- Modal -->
-            <div class="modal fade" id="vendorModal<?= $v['vendor_id'] ?>_<?= $v['purchase_request_id'] ?>" tabindex="-1">
-                <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Items from <?= htmlspecialchars($v['company_name']) ?> (Request #<?= $v['purchase_request_id'] ?>)</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="row g-3">
-                                <?php foreach ($orders as $o): ?>
-                                    <div class="col-md-4">
-                                        <div class="card item-card shadow-sm">
-                                            <?php if(!empty($o['picture'])): ?>
-                                                <img src="<?= htmlspecialchars($o['picture']) ?>" class="card-item-img" alt="Item">
-                                            <?php endif; ?>
-                                            <div class="card-body">
-                                                <h6 class="card-title"><?= htmlspecialchars($o['item_name']) ?></h6>
-                                                <p class="small"><?= htmlspecialchars($o['item_description']) ?></p>
-                                                <p><strong>Qty:</strong> <?= (int)$o['quantity'] ?> | <strong>Price:</strong> ₱<?= number_format($o['price'],2) ?></p>
-                                                <p><strong>Status:</strong> <span class="badge bg-<?= ($o['status']=='Shipped'?'success':($o['status']=='Completed'?'dark':'info')) ?>"><?= htmlspecialchars($o['status']) ?></span></p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                        <div class="modal-footer d-flex justify-content-between">
-                            <span><strong>Total: ₱<?= number_format($total_price,2) ?></strong></span>
-                            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <?php endforeach; ?>
-            <?php if(!$hasProcessing): ?><div class="alert alert-info">No processing orders.</div><?php endif; ?>
+            <?php if(!$hasProcessing) echo "<div class='alert alert-info'>No processing orders.</div>"; ?>
         </div>
 
         <!-- Completed Tab -->
-        <div class="tab-pane fade" id="completed" role="tabpanel" aria-labelledby="completed-tab">
-            <?php 
-            $hasCompleted = false;
-            foreach ($vendors as $v):
-                $vendorStatus = getVendorStatus($pdo, $v['vendor_id'], $v['purchase_request_id']);
-                if($vendorStatus['type'] !== 'completed') continue;
-                $hasCompleted = true;
-
-                $stmt = $pdo->prepare("
-                    SELECT vo.*, vp.item_name, vp.item_description, vp.price, vp.picture
-                    FROM vendor_orders vo
-                    JOIN vendor_products vp ON vo.item_id = vp.id
-                    WHERE vo.vendor_id = ? AND vo.purchase_request_id = ? AND vo.status IN ('Completed','Received')
-                    ORDER BY vo.created_at DESC
-                ");
-                $stmt->execute([$v['vendor_id'], $v['purchase_request_id']]);
-                $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                $total_price = 0;
-                foreach($orders as $o) {
-                    $total_price += $o['quantity'] * $o['price'];
-                }
-
-                $deliveredData = getDeliveredData($pdo, $v['purchase_request_id']);
-            ?>
+        <div class="tab-pane fade" id="completed" role="tabpanel">
+            <?php $hasCompleted = false; ?>
             <table class="table table-bordered table-hover bg-white mb-4">
                 <thead class="table-dark">
                     <tr>
@@ -216,18 +149,28 @@ function getDeliveredData($pdo, $purchase_request_id) {
                         <th>Status</th>
                         <th>Delivered Date</th>
                         <th>View Receipt</th>
+                        <th>Rating</th>
                     </tr>
                 </thead>
                 <tbody>
+                    <?php foreach ($vendors as $v):
+                        $vendorStatus = getVendorStatus($pdo, $v['vendor_id'], $v['purchase_request_id']);
+                        if($vendorStatus['type'] !== 'completed') continue;
+                        $hasCompleted = true;
+                        $deliveredData = getDeliveredData($pdo, $v['purchase_request_id']);
+
+                        // Check if already rated
+                        $stmt = $pdo->prepare("SELECT * FROM vendor_rating WHERE vendor_id=? AND purchase_request_id=?");
+                        $stmt->execute([$v['vendor_id'], $v['purchase_request_id']]);
+                        $ratingData = $stmt->fetch(PDO::FETCH_ASSOC);
+                    ?>
                     <tr>
                         <td><?= htmlspecialchars($v['company_name']) ?></td>
-                        <td>#<?= (int)$v['purchase_request_id'] ?></td>
+                        <td>#<?= $v['purchase_request_id'] ?></td>
                         <td><?= $v['last_order_date'] ? date("Y-m-d", strtotime($v['last_order_date'])) : '-' ?></td>
                         <td><?= (int)$v['total_quantity'] ?></td>
                         <td><span class="badge bg-dark">Completed</span></td>
-                        <td>
-                            <?= $deliveredData ? date("Y-m-d H:i", strtotime($deliveredData['paid_at'])) : 'N/A' ?>
-                        </td>
+                        <td><?= $deliveredData ? date("Y-m-d H:i", strtotime($deliveredData['paid_at'])) : 'N/A' ?></td>
                         <td>
                             <?php if($deliveredData): ?>
                                 <a href="receipt_view.php?id=<?= $deliveredData['id'] ?>" target="_blank" class="btn btn-success btn-sm">📄 View Receipt</a>
@@ -235,11 +178,56 @@ function getDeliveredData($pdo, $purchase_request_id) {
                                 <span class="text-muted">N/A</span>
                             <?php endif; ?>
                         </td>
+                        <td>
+                            <?php if($ratingData): ?>
+                                <span>⭐ <?= $ratingData['rating'] ?></span><br>
+                                <small><?= htmlspecialchars($ratingData['feedback']) ?></small>
+                            <?php else: ?>
+                                <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#rateModal<?= $v['vendor_id'] ?>_<?= $v['purchase_request_id'] ?>">Rate</button>
+
+                                <!-- Rating Modal -->
+                                <div class="modal fade" id="rateModal<?= $v['vendor_id'] ?>_<?= $v['purchase_request_id'] ?>" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="post">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Rate <?= htmlspecialchars($v['company_name']) ?> (Request #<?= $v['purchase_request_id'] ?>)</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="vendor_id" value="<?= $v['vendor_id'] ?>">
+                                                    <input type="hidden" name="purchase_request_id" value="<?= $v['purchase_request_id'] ?>">
+                                                    <div class="mb-3">
+                                                        <label>Rating (1-5)</label>
+                                                        <select name="rating" class="form-select" required>
+                                                            <option value="">Select rating</option>
+                                                            <option value="1">1</option>
+                                                            <option value="2">2</option>
+                                                            <option value="3">3</option>
+                                                            <option value="4">4</option>
+                                                            <option value="5">5</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label>Feedback</label>
+                                                        <textarea name="feedback" class="form-control" rows="3" placeholder="Enter feedback"></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                    <button type="submit" name="submit_rating" class="btn btn-primary">Submit</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+                        </td>
                     </tr>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
-            <?php endforeach; ?>
-            <?php if(!$hasCompleted): ?><div class="alert alert-info">No completed orders.</div><?php endif; ?>
+            <?php if(!$hasCompleted) echo "<div class='alert alert-info'>No completed orders.</div>"; ?>
         </div>
     </div>
 </div>

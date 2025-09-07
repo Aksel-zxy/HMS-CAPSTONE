@@ -73,7 +73,7 @@ if ($payment) {
     $receipt_id = null;
 }
 
-$status_order = ["Processing", "Packed", "Shipped"]; // ✅ no "Completed" here
+$status_order = ["Processing", "Packed", "Shipped"]; // 
 ?>
 
 <table class="table table-bordered align-middle">

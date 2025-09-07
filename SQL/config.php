@@ -29,9 +29,9 @@ $_SESSION['timeout'] = time();
 // -----------------------------
 // MySQL settings
 // -----------------------------
-$host     = "127.0.0.1";   // use IP instead of "localhost"
-$port     = "3307";        // adjust for your setup
-$dbname   = "hmscapstone"; // or hmscapstone1 for PDO
+$host     = "127.0.0.1";   
+$port     = "3307";        
+$dbname   = "hmscapstone"; 
 $username = "root";
 $password = "";
 

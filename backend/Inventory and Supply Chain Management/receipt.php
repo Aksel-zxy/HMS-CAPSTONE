@@ -55,6 +55,10 @@ $payment = $stmt->fetch(PDO::FETCH_ASSOC);
             <p><strong>TIN/VAT:</strong> <?= htmlspecialchars($receipt['tin_vat']) ?></p>
             <p><strong>Date Issued:</strong> <?= $receipt['created_at'] ?></p>
 
+            <!-- Purchase Request Info -->
+            <hr>
+            <p><strong>Purchase Request #:</strong> <?= htmlspecialchars($receipt['order_id']) ?></p>
+
             <!-- Items -->
             <table class="table table-bordered mt-4">
                 <thead class="table-dark">

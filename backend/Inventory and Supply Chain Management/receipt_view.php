@@ -2,24 +2,36 @@
 require 'db.php';
 
 $payment_id = $_GET['id'] ?? 0;
+$receipt_id = $_GET['receipt_id'] ?? 0;
 
-// ✅ Fetch payment info
-$stmt = $pdo->prepare("
-    SELECT rp.*, r.id AS receipt_id, r.subtotal, r.vat, r.total, r.created_at AS receipt_date,
-           v.company_name, v.company_address, v.contact_name, v.phone, v.email, v.tin_vat
-    FROM receipt_payments rp
-    JOIN receipts r ON rp.receipt_id = r.id
-    JOIN vendors v ON r.vendor_id = v.id
-    WHERE rp.id = ?
-");
-$stmt->execute([$payment_id]);
-$payment = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$payment) {
-    die("❌ Receipt not found for Payment ID: " . htmlspecialchars($payment_id));
+if ($payment_id) {
+    $stmt = $pdo->prepare("
+        SELECT rp.*, r.id AS receipt_id, r.subtotal, r.vat, r.total, r.created_at AS receipt_date,
+               v.company_name, v.company_address, v.contact_name, v.phone, v.email, v.tin_vat
+        FROM receipt_payments rp
+        JOIN receipts r ON rp.receipt_id = r.id
+        JOIN vendors v ON r.vendor_id = v.id
+        WHERE rp.id = ?
+    ");
+    $stmt->execute([$payment_id]);
+    $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+} elseif ($receipt_id) {
+    $stmt = $pdo->prepare("
+        SELECT NULL AS id, 'Pending' AS status, NULL AS paid_at,
+               r.id AS receipt_id, r.subtotal, r.vat, r.total, r.created_at AS receipt_date,
+               v.company_name, v.company_address, v.contact_name, v.phone, v.email, v.tin_vat
+        FROM receipts r
+        JOIN vendors v ON r.vendor_id = v.id
+        WHERE r.id = ?
+    ");
+    $stmt->execute([$receipt_id]);
+    $payment = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// ✅ Fetch items from receipt
+if (!$payment) {
+    die("❌ Receipt not found");
+}
+
 $stmt = $pdo->prepare("SELECT * FROM receipt_items WHERE receipt_id = ?");
 $stmt->execute([$payment['receipt_id']]);
 $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -30,7 +42,6 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <title>Receipt #<?= $payment['receipt_id'] ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/receipt.css">
 </head>
 <body class="bg-light">
 
@@ -38,7 +49,9 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="card shadow-lg">
         <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
             <h4>🧾 Receipt #<?= $payment['receipt_id'] ?></h4>
-            <span class="fw-bold">Payment Ref: <?= $payment['id'] ?></span>
+            <?php if ($payment['id']): ?>
+                <span class="fw-bold">Payment Ref: <?= $payment['id'] ?></span>
+            <?php endif; ?>
         </div>
         <div class="card-body">
 
