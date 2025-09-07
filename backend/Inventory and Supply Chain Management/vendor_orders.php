@@ -8,6 +8,24 @@ if (!isset($_SESSION['vendor_id'])) {
 }
 $vendor_id = $_SESSION['vendor_id'];
 
+// 🔹 Handle status update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'], $_POST['purchase_request_id'], $_POST['status'])) {
+    $request_id = (int)$_POST['purchase_request_id'];
+    $new_status = $_POST['status'];
+
+    // Update only for the logged-in vendor
+    $updateStmt = $pdo->prepare("
+        UPDATE vendor_orders 
+        SET status = ? 
+        WHERE purchase_request_id = ? AND vendor_id = ?
+    ");
+    $updateStmt->execute([$new_status, $request_id, $vendor_id]);
+
+    // Optionally redirect to avoid resubmission
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
 /**
  * PROCESSING ORDERS
  */
@@ -81,7 +99,7 @@ $completedOrders = $completedStmt->fetchAll(PDO::FETCH_ASSOC);
                         <th>Total Qty</th>
                         <th>Total Price</th>
                         <th>Status</th>
-                        <th>View</th>
+                        <th>View / Update</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -93,9 +111,11 @@ $completedOrders = $completedStmt->fetchAll(PDO::FETCH_ASSOC);
                             <td><?= $order['order_time'] ?></td>
                             <td><?= $order['total_qty'] ?></td>
                             <td>₱<?= number_format($order['total_price'], 2) ?></td>
-                            <td><span class="badge bg-warning"><?= $order['status'] ?></span></td>
                             <td>
-                                <button class="btn btn-sm btn-primary viewBtn" data-id="<?= $order['request_id'] ?>" data-bs-toggle="modal" data-bs-target="#orderModal">View</button>
+                                <span class="badge bg-warning"><?= $order['status'] ?></span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-primary viewBtn" data-id="<?= $order['request_id'] ?>" data-bs-toggle="modal" data-bs-target="#orderModal">View / Update</button>
                             </td>
                         </tr>
                         <?php endforeach; ?>
