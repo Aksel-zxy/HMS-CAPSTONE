@@ -30,16 +30,22 @@ $_SESSION['timeout'] = time();
 // MySQL settings
 // -----------------------------
 $host     = "127.0.0.1";   // use IP instead of "localhost"
-$port     = "3307";        // adjust for your setup
+$port     = "3306";        // adjust for your setup
 $dbname   = "hmscapstone"; // or hmscapstone1 for PDO
 $username = "root";
 $password = "";
 
+// -----------------------------
+// mysqli connection
+// -----------------------------
 $conn = new mysqli($host, $username, $password, $dbname, $port);
 if ($conn->connect_error) {
     die("Connection failed (MySQLi): " . $conn->connect_error);
 }
 
+// -----------------------------
+// PDO connection
+// -----------------------------
 try {
     $pdo = new PDO(
         "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4",
