@@ -17,7 +17,7 @@ RewriteRule ^purchase-request/?$ admin_purchase_requests.php [L]
 RewriteRule ^order-receive/?$ order_receive.php [L]
 RewriteRule ^po-status/?$ po_status_tracking.php [L]
 
-RewriteRule ^departments-budget/?$ departments_budget.php [L]
+RewriteRule ^departments-budget/?$ budget_request.php [L]
 RewriteRule ^department-assets/?$ department_asset_mapping.php [L]
 RewriteRule ^maintenance-schedule/?$ preventive_maintenance.php [L]
 RewriteRule ^repair-maintenance/?$ repair_maintenance.php [L]

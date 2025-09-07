@@ -2,12 +2,39 @@
 session_start();
 require 'db.php';
 
-// Initialize cart
+// Ensure user is logged in
+if (!isset($_SESSION['user_id'])) {
+    die("You must log in.");
+}
+
+$user_id = $_SESSION['user_id'];
+
+// Fetch user info
+$user_stmt = $pdo->prepare("SELECT * FROM users WHERE user_id=?");
+$user_stmt->execute([$user_id]);
+$user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+if (!$user) die("User not found.");
+
+// --- Fetch budget info ---
+$current_month = date('Y-m'); // keep YYYY-MM format
+$budget_stmt = $pdo->prepare("SELECT * FROM department_budgets WHERE user_id=? AND month=? AND status='Approved'");
+$budget_stmt->execute([$user_id, $current_month]);
+$budget = $budget_stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$budget) {
+    $budget = [
+        "allocated_budget" => 0,
+        "requested_amount" => 0,
+        "approved_amount" => 0
+    ];
+}
+
+// --- CART ---
 if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
 }
 
-// Handle AJAX Cart Actions
+// Handle AJAX
 if (isset($_POST['ajax'])) {
     if ($_POST['ajax'] === 'add') {
         $id = $_POST['id'];
@@ -34,19 +61,24 @@ if (isset($_POST['ajax'])) {
     }
 
     if ($_POST['ajax'] === 'remove') {
-        $id = $_POST['id'];
-        unset($_SESSION['cart'][$id]);
+        unset($_SESSION['cart'][$_POST['id']]);
     }
 
     if ($_POST['ajax'] === 'submit') {
         if (!empty($_SESSION['cart'])) {
-            $stmt = $pdo->prepare("INSERT INTO purchase_requests (user_id, items, status, created_at) VALUES (?, ?, 'Pending', NOW())");
-            $user_id = 1; // 🔹 Replace with logged-in user ID
             $items = json_encode($_SESSION['cart']);
-            $stmt->execute([$user_id, $items]);
+            $total_price = 0;
+            foreach ($_SESSION['cart'] as $it) {
+                $total_price += $it['price'] * $it['qty'];
+            }
+
+            // Insert purchase request
+            $stmt = $pdo->prepare("INSERT INTO purchase_requests (user_id, month, items, total_price, status, created_at) 
+                VALUES (?, ?, ?, ?, 'Pending', NOW())");
+            $stmt->execute([$user_id, $current_month, $items, $total_price]);
 
             $_SESSION['cart'] = [];
-            echo json_encode(["success" => true, "message" => "Purchase request sent to admin."]);
+            echo json_encode(["success" => true, "message" => "Purchase request sent to Admin."]);
             exit;
         } else {
             echo json_encode(["success" => false, "message" => "Cart is empty."]);
@@ -54,16 +86,16 @@ if (isset($_POST['ajax'])) {
         }
     }
 
-    // Compute grand total
+    // Grand total
     $grand = 0;
-    foreach ($_SESSION['cart'] as $item) {
-        $grand += $item['qty'] * $item['price'];
+    foreach ($_SESSION['cart'] as $it) {
+        $grand += $it['qty'] * $it['price'];
     }
 
-    // Return updated cart HTML
     ob_start();
     include "cart_table.php";
     $html = ob_get_clean();
+
     echo json_encode([
         "cart_html" => $html,
         "count" => count($_SESSION['cart']),
@@ -84,14 +116,12 @@ $categories = [
 $search = $_GET['search'] ?? '';
 $selected_category = $_GET['category'] ?? '';
 
-// Pagination
-$limit = 8; 
+$limit = 8;
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($page - 1) * $limit;
 
 $where = "WHERE 1";
 $params = [];
-
 if ($selected_category) {
     $where .= " AND item_type = ?";
     $params[] = $selected_category;
@@ -125,7 +155,15 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </div>
 
 <div class="container py-5">
-    <h2 class="mb-4">🛒 Purchase Request</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🛒 Purchase Request</h2>
+        <div class="text-end">
+            <h5 class="mb-1"><?= htmlspecialchars($user['department']) ?></h5>
+            <p class="mb-0">
+                Available Budget: ₱<?= number_format($budget['allocated_budget'], 2) ?>
+            </p>
+        </div>
+    </div>
 
     <!-- Filter Section -->
     <form method="get" class="mb-3">
@@ -226,27 +264,16 @@ $(document).on("click", ".addToCart", function() {
 
 // Remove item
 $(document).on("click", ".removeItem", function() {
-    $.post("purchase_order.php", {
-        ajax: "remove",
-        id: $(this).data("id")
-    }, function(res) {
+    $.post("purchase_order.php", {ajax:"remove", id:$(this).data("id")}, function(res) {
         let data = JSON.parse(res);
         $("#cartContent").html(data.cart_html);
         $("#cartCount").text(data.count);
     });
 });
 
-// Auto-update qty
+// Update qty
 $(document).on("input", ".qtyInput", function() {
     let formData = $("#updateCartForm").serialize();
-    let row = $(this).closest("tr");
-    let qty = parseInt($(this).val());
-    let price = parseFloat(row.find("td:nth-child(3)").text().replace("₱","").replace(/,/g,""));
-
-    if (!isNaN(qty) && qty > 0) {
-        row.find(".rowTotal").text((price * qty).toFixed(2));
-    }
-
     $.post("purchase_order.php", formData + "&ajax=update", function(res) {
         let data = JSON.parse(res);
         $("#cartTotal").text(data.total);
@@ -254,9 +281,9 @@ $(document).on("input", ".qtyInput", function() {
     });
 });
 
-// Submit cart
+// Submit (Request to Admin)
 $(document).on("click", "#submitRequest", function() {
-    $.post("purchase_order.php", {ajax: "submit"}, function(res) {
+    $.post("purchase_order.php", {ajax:"submit"}, function(res) {
         let data = JSON.parse(res);
         alert(data.message);
         if (data.success) {

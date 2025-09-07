@@ -6,30 +6,53 @@ if (isset($_POST['action'])) {
     $request_id = $_POST['id'];
 
     if ($_POST['action'] === 'approve') {
-        $stmt = $pdo->prepare("UPDATE purchase_requests SET status='Approved' WHERE id=?");
+        // Get purchase request info
+        $stmt = $pdo->prepare("SELECT user_id, items FROM purchase_requests WHERE id=?");
         $stmt->execute([$request_id]);
+        $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // fetch items
-        $stmt = $pdo->prepare("SELECT items FROM purchase_requests WHERE id=?");
-        $stmt->execute([$request_id]);
-        $items_json = $stmt->fetchColumn();
-        $items = json_decode($items_json, true);
+        if ($request) {
+            $items = json_decode($request['items'], true);
+            $grandTotal = 0;
 
-        if ($items) {
-            foreach ($items as $item_id => $item) {
-                $qty = $item['qty'];
+            if ($items) {
+                foreach ($items as $item) {
+                    $grandTotal += $item['price'] * $item['qty'];
+                }
+            }
 
-                $stmtVendor = $pdo->prepare("SELECT vendor_id FROM vendor_products WHERE id=?");
-                $stmtVendor->execute([$item_id]);
-                $vendor_id = $stmtVendor->fetchColumn();
+            // ✅ Deduct from department budget
+            $stmtBudget = $pdo->prepare("SELECT allocated_budget FROM department_budgets WHERE user_id=? ORDER BY budget_id DESC LIMIT 1");
+            $stmtBudget->execute([$request['user_id']]);
+            $allocated = $stmtBudget->fetchColumn();
 
-                if ($vendor_id) {
-                    $stmtInsert = $pdo->prepare("
-                        INSERT INTO vendor_orders 
-                        (purchase_request_id, vendor_id, item_id, quantity, status, checklist, created_at)
-                        VALUES (?, ?, ?, ?, 'Processing', '[]', NOW())
-                    ");
-                    $stmtInsert->execute([$request_id, $vendor_id, $item_id, $qty]);
+            if ($allocated !== false) {
+                $newBudget = max(0, $allocated - $grandTotal); // Prevent negative values
+                $stmtUpdate = $pdo->prepare("UPDATE department_budgets SET allocated_budget=? WHERE user_id=? ORDER BY budget_id DESC LIMIT 1");
+                $stmtUpdate->execute([$newBudget, $request['user_id']]);
+            }
+
+            // ✅ Update purchase request status
+            $stmt = $pdo->prepare("UPDATE purchase_requests SET status='Approved' WHERE id=?");
+            $stmt->execute([$request_id]);
+
+            // ✅ Insert vendor orders
+            if ($items) {
+                foreach ($items as $item_id => $item) {
+                    $qty = $item['qty'];
+
+                    $stmtVendor = $pdo->prepare("SELECT vendor_id FROM vendor_products WHERE id=?");
+                    $stmtVendor->execute([$item_id]);
+                    $vendor_id = $stmtVendor->fetchColumn();
+
+                    if ($vendor_id) {
+                        $stmtInsert = $pdo->prepare("
+                            INSERT INTO vendor_orders 
+                            (purchase_request_id, vendor_id, item_id, quantity, status, checklist, created_at)
+                            VALUES (?, ?, ?, ?, 'Processing', '[]', NOW())
+                        ");
+                        $stmtInsert->execute([$request_id, $vendor_id, $item_id, $qty]);
+                    }
                 }
             }
         }
