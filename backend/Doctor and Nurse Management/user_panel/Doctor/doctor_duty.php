@@ -900,38 +900,35 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                 <tbody>
                                     <?php
                                     $sql = "SELECT 
-            p.prescription_id,
-            CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
-            CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
-            GROUP_CONCAT(
-                CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
-                SEPARATOR '<br>'
-            ) AS medicines_list,
-            SUM(i.quantity_prescribed) AS total_quantity,
-            p.note,
-            DATE_FORMAT(p.prescription_date, '%b %e, %Y %l:%i%p') AS formatted_date,
-            p.status
-        FROM pharmacy_prescription p
-        JOIN patientinfo pi 
-            ON p.patient_id = pi.patient_id
-        JOIN hr_employees e 
-            ON p.doctor_id = e.employee_id 
-            AND LOWER(e.profession) = 'doctor'
-        JOIN pharmacy_prescription_items i 
-            ON p.prescription_id = i.prescription_id
-        JOIN pharmacy_inventory m 
-            ON i.med_id = m.med_id
-        GROUP BY p.prescription_id
-        ORDER BY p.prescription_date DESC";
-
+                                        p.prescription_id,
+                                        CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+                                        CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
+                                        GROUP_CONCAT(
+                                            CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
+                                            SEPARATOR '<br>'
+                                        ) AS medicines_list,
+                                        SUM(i.quantity_prescribed) AS total_quantity,
+                                        p.note,
+                                        DATE_FORMAT(p.prescription_date, '%b %e, %Y %l:%i%p') AS formatted_date,
+                                        p.status
+                                    FROM pharmacy_prescription p
+                                    JOIN patientinfo pi 
+                                        ON p.patient_id = pi.patient_id
+                                    JOIN hr_employees e 
+                                        ON p.doctor_id = e.employee_id 
+                                        AND LOWER(e.profession) = 'doctor'
+                                    JOIN pharmacy_prescription_items i 
+                                        ON p.prescription_id = i.prescription_id
+                                    JOIN pharmacy_inventory m 
+                                        ON i.med_id = m.med_id
+                                    GROUP BY p.prescription_id
+                                    ORDER BY p.prescription_date DESC";
                                     $result = $conn->query($sql);
-
                                     if ($result === false) {
                                         echo "<tr><td colspan='8' class='text-danger'>SQL Error: " . $conn->error . "</td></tr>";
                                     } elseif ($result->num_rows > 0) {
                                         while ($row = $result->fetch_assoc()) {
                                             $noteId = "noteModal" . $row['prescription_id'];
-
                                             // Determine badge class based on status
                                             $status = strtolower($row['status']);
                                             if ($status === 'dispensed') {
@@ -945,15 +942,15 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                             }
 
                                             echo "<tr>
-                    <td>{$row['prescription_id']}</td>
-                    <td>{$row['doctor_name']}</td>
-                    <td>{$row['patient_name']}</td>
-                    <td>{$row['medicines_list']}</td>
-                    <td>{$row['total_quantity']}</td>
-                    <td><button class='btn btn-info btn-sm' data-bs-toggle='modal' data-bs-target='#{$noteId}'>View Note</button></td>
-                    <td>{$row['formatted_date']}</td>
-                    <td><span class='badge {$badgeClass} text-uppercase fw-bold'>" . htmlspecialchars($row['status']) . "</span></td>
-                </tr>";
+                                                <td>{$row['prescription_id']}</td>
+                                                <td>{$row['doctor_name']}</td>
+                                                <td>{$row['patient_name']}</td>
+                                                <td>{$row['medicines_list']}</td>
+                                                <td>{$row['total_quantity']}</td>
+                                                <td><button class='btn btn-info btn-sm' data-bs-toggle='modal' data-bs-target='#{$noteId}'>View Note</button></td>
+                                                <td>{$row['formatted_date']}</td>
+                                                <td><span class='badge {$badgeClass} text-uppercase fw-bold'>" . htmlspecialchars($row['status']) . "</span></td>
+                                            </tr>";
 
                                             // Modal for each note
                                             echo "
