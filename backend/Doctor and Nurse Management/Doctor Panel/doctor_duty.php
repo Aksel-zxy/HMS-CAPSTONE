@@ -395,7 +395,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                 data-bs-target="#appointments"
                                 type="button" role="tab">
                                 <i class="fa-solid fa-calendar-check"></i>
-                                <span>Appointments</span>
+                                <span>Appointment</span>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
@@ -420,7 +420,6 @@ if ($result_pat && $result_pat->num_rows > 0) {
                         </li>
                     </ul>
                 </div>
-
 
                 <!-- Tabs Content -->
                 <div class="tab-content mt-3" id="doctorTabsContent">
