@@ -183,81 +183,97 @@ $allPatients = $patient->getAllPatients();
                     <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
                         <thead style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left; position:sticky; top:0; z-index:1;">
                             <tr>
-                                <th style="padding:12px;text-align:center;">Patient ID</th>
+                                <th style="padding:12px;text-align:center;">Result ID</th>
+                                <!-- <th style="padding:12px;text-align:center;">Patient ID // Removed Patient ID column</th> -->
                                 <th style="padding:12px;text-align:center;">Patient Name</th>
                                 <th style="padding:12px;text-align:center;">Test Name</th>
                                 <th style="padding:12px;text-align:center;">Status</th>
-                                <th style="padding:12px;text-align:center;">Result</th>
+                                <th style="padding:12px;text-align:center;">Received By</th>
                             </tr>
                         </thead>
                         <tbody>
-    <?php
-    $query = "
-        SELECT 
-            p.patient_id,
-            CONCAT(p.fname, ' ', p.lname) AS patient_name,
-            s.scheduleID,    
-            s.serviceName,
-            s.completed_at,
-            r.result,
-            r.received_by
-        FROM dl_results r
-        INNER JOIN dl_result_schedules rs ON r.resultID = rs.resultID
-        INNER JOIN dl_schedule s ON rs.scheduleID = s.scheduleID
-        INNER JOIN patientinfo p ON s.patientid = p.patient_id
-        ORDER BY p.patient_id, s.completed_at DESC
-    ";
-    $result = $conn->query($query);
+                            <?php
+                            $query = "
+                                SELECT 
+                                    r.resultID,
+                                    p.patient_id,
+                                    CONCAT(p.fname, ' ', p.lname) AS patient_name,
+                                    s.scheduleID,    
+                                    s.serviceName,
+                                    s.completed_at,
+                                    r.result,
+                                    r.status,
+                                    r.received_by
+                                FROM dl_results r
+                                INNER JOIN dl_result_schedules rs ON r.resultID = rs.resultID
+                                INNER JOIN dl_schedule s ON rs.scheduleID = s.scheduleID
+                                INNER JOIN patientinfo p ON s.patientid = p.patient_id
+                                ORDER BY p.patient_id, s.completed_at DESC
+                            ";
+                            $result = $conn->query($query);
+                            if ($result && $result->num_rows > 0):
+                                $patients = [];
+                                while ($row = $result->fetch_assoc()) {
+                                    $pid = $row['patient_id'];
 
-    if ($result && $result->num_rows > 0):
-        $patients = [];
-        while ($row = $result->fetch_assoc()) {
-            $pid = $row['patient_id'];
-            if (!isset($patients[$pid])) {
-                $patients[$pid] = [
-                    'name'  => $row['patient_name'],
-                    'tests' => []
-                ];
-            }
-            $patients[$pid]['tests'][] = $row;
-        }
+                                    if (!isset($patients[$pid])) {
+                                        $patients[$pid] = [
+                                            'name'  => $row['patient_name'],
+                                            'tests' => []
+                                        ];
+                                    }
+                                    $patients[$pid]['tests'][] = $row;
+                                }
 
-        foreach ($patients as $patientId => $pdata):
-            $rowspan = count($pdata['tests']);
-            $firstRow = true;
+                                foreach ($patients as $patientId => $pdata):
+                                    $rowspan = count($pdata['tests']);
+                                    $firstRow = true;
+                                    foreach ($pdata['tests'] as $test):
+                                        $status = strtolower($test['status']);
+                            ?>
+                                        <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
+                                            <?php if ($firstRow): ?>
+                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
+                                                    <?= htmlspecialchars($test['resultID']) ?>
+                                                </td>
+                                                <!-- <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
+                                                        <?= htmlspecialchars($patientId) ?> // THIS IS THE PATIENT ID COLUMN
+                                                    </td> -->
+                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
+                                                    <?= htmlspecialchars($pdata['name']) ?>
+                                                </td>
+                                            <?php $firstRow = false;
+                                            endif; ?>
 
-            foreach ($pdata['tests'] as $test):
-    ?>
-                <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
-                    <?php if ($firstRow): ?>
-                        <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
-                            <?= htmlspecialchars($patientId) ?>
-                        </td>
-                        <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
-                            <?= htmlspecialchars($pdata['name']) ?>
-                        </td>
-                    <?php $firstRow = false; endif; ?>
+                                            <td style="padding:12px;text-align:center;"><?= htmlspecialchars($test['serviceName']) ?></td>
+                                            <td style="padding:12px;text-align:center;">
+                                                <?php
+                                                if ($status === 'completed') {
+                                                    echo "Delivered";
+                                                } elseif ($status === 'processing') {
+                                                    echo "Not yet received";
+                                                } else {
+                                                    echo ucfirst($status);
+                                                }
+                                                ?>
+                                            </td>
+                                            <td style="padding:12px;text-align:center;">
+                                                <?php if ($status === 'completed'): ?>
+                                                    <?= $test['received_by'] ? " " . htmlspecialchars($test['received_by']) : "Delivered (no name)" ?>
+                                                <?php else: ?>
+                                                    -
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                            <?php
+                                    endforeach;
+                                endforeach;
+                            else:
+                                echo "<tr><td colspan='6' style='padding:20px; text-align:center; color:gray; font-style:italic;'>No Results Found</td></tr>";
+                            endif;
+                            ?>
+                        </tbody>
 
-                    <td style="padding:12px;text-align:center;"><?= htmlspecialchars($test['serviceName']) ?></td>
-                    <td style="padding:12px;text-align:center;">
-                        <?= $test['completed_at'] ? "Completed" : "Result not received" ?>
-                    </td>
-                    <td style="padding:12px;text-align:center;">
-                        <?php if ($test['completed_at']): ?>
-                            <?= $test['received_by'] ? "Received by: " . htmlspecialchars($test['received_by']) : "Received (no name)" ?>
-                        <?php else: ?>
-                            Not yet received
-                        <?php endif; ?>
-                    </td>
-                </tr>
-    <?php
-            endforeach;
-        endforeach;
-    else:
-        echo "<tr><td colspan='5' style='padding:20px; text-align:center; color:gray; font-style:italic;'>No Results Found</td></tr>";
-    endif;
-    ?>
-</tbody>
                     </table>
                 </div>
             </div>
