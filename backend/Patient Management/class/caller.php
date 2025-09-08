@@ -1,5 +1,5 @@
 <?php
-require_once 'class/patient.php';
+require_once 'patient.php';
 
 class Caller {
     private $conn;
@@ -105,6 +105,38 @@ public function getDoctors() {
         $result = $stmt->get_result();
         return $result->fetch_assoc(); // returns array or null
     
+}
+
+public function getRecords($patient_id) {
+    $stmt = $this->conn->prepare("
+                    SELECT 
+                        'Lab Result' AS TYPE,
+                        dl.resultDate AS DATE,
+                        dl.result AS Details
+                    FROM dl_results dl
+                    WHERE dl.patientID = ?
+
+                    UNION ALL
+
+                    SELECT 
+                        'Prescription' AS TYPE,
+                        pp.prescription_date AS DATE,
+                        pi.med_name AS Details
+                    FROM pharmacy_prescription pp
+                    JOIN pharmacy_prescription_items ppi 
+                    ON pp.prescription_id = ppi.prescription_id
+                    JOIN pharmacy_inventory PI 
+                    ON ppi.med_id = pi.med_id
+                    WHERE pp.patient_id = ?
+
+
+                ORDER BY Date DESC;
+                ");
+       $stmt->bind_param("ii", $patient_id, $patient_id);
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result;
 }
 
     public function getResults($patient_id) {
