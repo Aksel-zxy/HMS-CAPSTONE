@@ -213,7 +213,7 @@ try {
                                     <!-- Dosage -->
                                     <div class="mb-3">
                                         <label class="form-label">Dosage</label>
-                                        <input type="text" class="form-control" name="dosage" required>
+                                        <input type="text" class="form-control" name="dosage">
                                     </div>
 
                                     <!-- Stock Quantity -->
@@ -278,16 +278,16 @@ try {
 
 
                     <!-- Medicine Inventory Table -->
-                    <table id="medicineInventoryTable" class="table">
+                    <table id="medicineInventoryTable" class="table table-bordered table-hover">
                         <thead>
                             <tr>
-                                <th>Medicine ID</th>
-                                <th>Medicine Name</th>
-                                <th>Category</th>
+                                <th onclick="sortTable(0)">Medicine ID</th>
+                                <th onclick="sortTable(1)">Medicine Name</th>
+                                <th onclick="groupTable(2)">Category</th>
                                 <th>Dosage</th>
                                 <th>Stock Quantity</th>
-                                <th>Unit Price (₱)</th> <!-- NEW -->
-                                <th>Unit</th>
+                                <th>Unit Price (₱)</th>
+                                <th onclick="groupTable(6)">Unit</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -295,7 +295,7 @@ try {
                         <tbody>
                             <?php if (isset($error)): ?>
                                 <tr>
-                                    <td colspan="7"><?php echo $error; ?></td>
+                                    <td colspan="9"><?php echo $error; ?></td>
                                 </tr>
                             <?php elseif (!empty($medicines)): ?>
                                 <?php foreach ($medicines as $row): ?>
@@ -343,7 +343,7 @@ try {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="7">No medicine records found.</td>
+                                    <td colspan="9">No medicine records found.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -407,6 +407,46 @@ try {
         </div>
         <!----- End of Main Content ----->
     </div>
+    <script>
+        // Simple table sort function (works for numbers and text)
+        function sortTable(colIndex) {
+            let table = document.getElementById("medicineInventoryTable");
+            let rows = Array.from(table.rows).slice(1); // skip header
+            let asc = table.getAttribute("data-sort-col") == colIndex && table.getAttribute("data-sort-dir") == "asc" ? false : true;
+
+            rows.sort((a, b) => {
+                let x = a.cells[colIndex].innerText.trim().toLowerCase();
+                let y = b.cells[colIndex].innerText.trim().toLowerCase();
+
+                // If number, compare numerically
+                if (!isNaN(x) && !isNaN(y)) {
+                    return asc ? x - y : y - x;
+                }
+
+                return asc ? x.localeCompare(y) : y.localeCompare(x);
+            });
+
+            rows.forEach(row => table.tBodies[0].appendChild(row));
+
+            table.setAttribute("data-sort-col", colIndex);
+            table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
+        }
+
+        // Force grouping for Category & Unit
+        function groupTable(colIndex) {
+            let table = document.getElementById("medicineInventoryTable");
+            let rows = Array.from(table.rows).slice(1);
+
+            rows.sort((a, b) => {
+                let x = a.cells[colIndex].innerText.trim().toLowerCase();
+                let y = b.cells[colIndex].innerText.trim().toLowerCase();
+                return x.localeCompare(y);
+            });
+
+            rows.forEach(row => table.tBodies[0].appendChild(row));
+        }
+    </script>
+
     <script>
         document.querySelectorAll('.edit-btn').forEach(button => {
             button.addEventListener('click', function() {
