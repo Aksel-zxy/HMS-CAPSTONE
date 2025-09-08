@@ -1,10 +1,13 @@
 <?php
+session_start(); // Always start session
+
 include '../../../../SQL/config.php';
 require '../../../Pharmacy Management/classes/Prescription.php';
 require '../../../Pharmacy Management/classes/Medicine.php';
 
+// ✅ Authentication check
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
-    header('Location: login.php');
+    header('Location: ../../login.php'); // adjust path if needed
     exit();
 }
 
@@ -12,49 +15,25 @@ if (!isset($_SESSION['employee_id'])) {
     echo "User ID is not set in session.";
     exit();
 }
-class DoctorDashboard
-{
-    public $conn;
-    public $user;
 
-    public function __construct($conn)
-    {
-        $this->conn = $conn;
-        $this->authenticate();
-        $this->fetchUser();
-    }
+// ✅ Fetch logged-in doctor details
+$query = "SELECT * FROM hr_employees WHERE employee_id = ?";
+$stmt = $conn->prepare($query);
+$stmt->bind_param("i", $_SESSION['employee_id']);
+$stmt->execute();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
 
-    private function authenticate()
-    {
-        if (!isset($_SESSION['doctor']) || $_SESSION['doctor'] !== true) {
-            header('Location: login.php');
-            exit();
-        }
-        if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-            echo "User ID is not set in session.";
-            exit();
-        }
-    }
-
-    private function fetchUser()
-    {
-        $query = "SELECT * FROM users WHERE user_id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $_SESSION['user_id']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $this->user = $result->fetch_assoc();
-        if (!$this->user) {
-            echo "No user found.";
-            exit();
-        }
-    }
+if (!$user) {
+    echo "No user found.";
+    exit();
 }
 
-$dashboard = new DoctorDashboard($conn);
-$user = $dashboard->user;
+// -----------------------------------
+// Fetch appointments
+// -----------------------------------
 
-// Fetch all appointment_ids already assigned in duty_assignments
+// Already assigned appointments
 $assigned_appointments = [];
 $res = $conn->query("SELECT appointment_id FROM duty_assignments");
 if ($res && $res->num_rows > 0) {
@@ -63,13 +42,14 @@ if ($res && $res->num_rows > 0) {
     }
 }
 
-// Fetch all appointments, only show those not managed and not assigned in duty_assignments
+// All unassigned + not managed appointments
 $appointments = [];
 $sql = "SELECT appointment_id, patient_id, appointment_date, purpose, status, notes, doctor_id 
         FROM p_appointments 
         WHERE status != 'Managed'" .
     (!empty($assigned_appointments) ? " AND appointment_id NOT IN (" . implode(',', array_map('intval', $assigned_appointments)) . ")" : "") .
     " ORDER BY appointment_date DESC";
+
 $result = $conn->query($sql);
 if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
@@ -77,10 +57,8 @@ if ($result && $result->num_rows > 0) {
     }
 }
 
-// Get selected appointment_id from GET
+// Selected appointment doctor_id
 $appointment_id = $_GET['appointment_id'] ?? '';
-
-// Fetch doctor_id from appointment for duty assignment
 $selected_doctor_id = '';
 if ($appointment_id) {
     $stmt = $conn->prepare("SELECT doctor_id FROM p_appointments WHERE appointment_id = ?");
@@ -91,7 +69,9 @@ if ($appointment_id) {
     $stmt->close();
 }
 
-// Fetch beds for dropdown
+// -----------------------------------
+// Fetch beds and nurses
+// -----------------------------------
 $beds = [];
 $bed_res = $conn->query("SELECT bed_id, bed_number, ward, room_number, bed_type, status, notes FROM p_beds");
 if ($bed_res && $bed_res->num_rows > 0) {
@@ -100,7 +80,6 @@ if ($bed_res && $bed_res->num_rows > 0) {
     }
 }
 
-// Fetch nurses for dropdown (profession = 'Nurse')
 $nurses = [];
 $nurse_res = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse' AND status = 'active'");
 if ($nurse_res && $nurse_res->num_rows > 0) {
@@ -109,7 +88,9 @@ if ($nurse_res && $nurse_res->num_rows > 0) {
     }
 }
 
-// Fetch equipment types and names (example static, replace with DB if needed)
+// -----------------------------------
+// Equipment + Tools
+// -----------------------------------
 $equipment_types = [
     'PPE' => ['Surgical gloves', 'Examination gloves', 'Face masks', 'Surgical caps', 'Shoe covers', 'Gowns', 'Face shields'],
     'Patient Care Supplies' => ['Disposable bed sheets', 'Adult diapers', 'Underpads', 'Disposable towels', 'Paper gowns'],
@@ -118,7 +99,6 @@ $equipment_types = [
     'General Hospital Consumables' => ['Alcohol pads', 'Hand sanitizers', 'Disinfectant wipes', 'Disposable thermometers', 'Sharps containers', 'Biohazard bags']
 ];
 
-// Flatten tools for selection
 $tool_options = [];
 foreach ($equipment_types as $type => $names) {
     foreach ($names as $name) {
@@ -126,7 +106,7 @@ foreach ($equipment_types as $type => $names) {
     }
 }
 
-// Fetch machine equipments for equipment selection and listing
+// Machine equipments
 $machine_equipments = [];
 $machine_types = [];
 $machine_res = $conn->query("SELECT machine_id, machine_type, machine_name FROM machine_equipments");
@@ -137,7 +117,9 @@ if ($machine_res && $machine_res->num_rows > 0) {
     }
 }
 
-// Handle duty assignment form submission
+// -----------------------------------
+// Handle duty assignment submission
+// -----------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     $appointment_id = $_POST['appointment_id'];
     $doctor_id = $selected_doctor_id;
@@ -147,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     $notes = $_POST['notes'];
     $status = "Pending";
 
-    // Equipment array: collect selected machine type/name pairs
+    // Equipments
     $equipments = [];
     if (!empty($_POST['equipment_type']) && !empty($_POST['equipment_name'])) {
         foreach ($_POST['equipment_type'] as $idx => $type) {
@@ -157,9 +139,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
             }
         }
     }
-    $equipment = implode(', ', $equipments); // Save as comma-separated string
+    $equipment = implode(', ', $equipments);
 
-    // Tools array
+    // Tools
     $tools = [];
     if (!empty($_POST['tool_name']) && !empty($_POST['tool_qty'])) {
         foreach ($_POST['tool_name'] as $idx => $tool_name) {
@@ -171,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     }
     $tools_json = json_encode($tools);
 
-    // Save duty assignment
+    // Save duty
     $stmt = $conn->prepare("INSERT INTO duty_assignments (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
     $stmt->bind_param(
@@ -188,9 +170,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     );
     $stmt->execute();
 
-    // Insert purchase request for tools
+    // Save purchase request if tools exist
     if (!empty($tools)) {
-        $user_id = $doctor_id; // hr_employees.employee_id
+        $user_id = $doctor_id;
         $items = $tools_json;
         $pr_status = "Pending";
         $created_at = date('Y-m-d H:i:s');
@@ -203,10 +185,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     exit;
 }
 
-// Handle mark as completed action
+// -----------------------------------
+// Mark duty completed
+// -----------------------------------
 if (isset($_GET['complete_duty_id'])) {
     $complete_duty_id = intval($_GET['complete_duty_id']);
-    // Update status and updated_at timestamp
     $stmt = $conn->prepare("UPDATE duty_assignments SET status = 'Completed', updated_at = NOW() WHERE duty_id = ?");
     $stmt->bind_param("i", $complete_duty_id);
     $stmt->execute();
@@ -215,39 +198,27 @@ if (isset($_GET['complete_duty_id'])) {
     exit;
 }
 
-// Fetch all duty assignments for "My Duties" table, only show non-completed
+// -----------------------------------
+// Fetch doctor’s duties
+// -----------------------------------
 $duties = [];
-$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at FROM duty_assignments WHERE status != 'Completed' ORDER BY created_at DESC");
+$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at 
+                          FROM duty_assignments 
+                          WHERE status != 'Completed' 
+                          ORDER BY created_at DESC");
 if ($duty_res && $duty_res->num_rows > 0) {
     while ($row = $duty_res->fetch_assoc()) {
         $duties[] = $row;
     }
 }
 
-
-
-
+// -----------------------------------
+// Medicines + Prescriptions
+// -----------------------------------
 $medicineObj = new Medicine($conn);
 $medicines = $medicineObj->getAllMedicines();
 
-// Fetch user details from database
-$query = "SELECT * FROM hr_employees WHERE employee_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['employee_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
 $prescription = new Prescription($conn);
-$doctors = $prescription->getDoctors();
-$patients = $prescription->getPatients();
-// $medicines = $prescription->getMedicines();
-
 $doctors = [];
 $result_doc = $prescription->getDoctors();
 if ($result_doc && $result_doc->num_rows > 0) {
@@ -255,7 +226,6 @@ if ($result_doc && $result_doc->num_rows > 0) {
         $doctors[] = $row;
     }
 }
-
 
 $patients = [];
 $result_pat = $prescription->getPatients();
@@ -792,6 +762,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
 
 
                             <!-- Modal -->
+                            <!-- Prescription Modal -->
                             <div class="modal fade" id="prescriptionModal" tabindex="-1" aria-labelledby="prescriptionModalLabel" aria-hidden="true">
                                 <div class="modal-dialog modal-lg">
                                     <div class="modal-content">
@@ -804,17 +775,11 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                         <form action="process_prescription.php" method="POST">
                                             <div class="modal-body">
 
-                                                <!-- Doctor -->
+                                                <!-- Doctor (auto-filled from logged-in account) -->
                                                 <div class="mb-3">
-                                                    <label for="doctor_id" class="form-label">Doctor</label>
-                                                    <select class="form-select" id="doctor_id" name="doctor_id" required>
-                                                        <option value="">-- Select Doctor --</option>
-                                                        <?php foreach ($doctors as $doc): ?>
-                                                            <option value="<?= $doc['employee_id'] ?>">
-                                                                <?= $doc['first_name'] . ' ' . $doc['last_name'] ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
+                                                    <label class="form-label">Doctor</label>
+                                                    <input type="text" class="form-control" value="<?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?>" readonly>
+                                                    <input type="hidden" name="doctor_id" value="<?= $_SESSION['employee_id'] ?>">
                                                 </div>
 
                                                 <!-- Patient -->
@@ -883,6 +848,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                 </div>
                             </div>
 
+
                             <!-- Medicine Inventory Table -->
                             <table class="table">
                                 <thead class="table">
@@ -899,6 +865,8 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                 </thead>
                                 <tbody>
                                     <?php
+                                    $doctor_id = $_SESSION['employee_id']; // logged-in doctor
+
                                     $sql = "SELECT 
             p.prescription_id,
             CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
@@ -921,10 +889,14 @@ if ($result_pat && $result_pat->num_rows > 0) {
             ON p.prescription_id = i.prescription_id
         JOIN pharmacy_inventory m 
             ON i.med_id = m.med_id
+        WHERE p.doctor_id = ?  -- 👈 Only prescriptions by this doctor
         GROUP BY p.prescription_id
         ORDER BY p.prescription_date DESC";
 
-                                    $result = $conn->query($sql);
+                                    $stmt = $conn->prepare($sql);
+                                    $stmt->bind_param("i", $doctor_id);
+                                    $stmt->execute();
+                                    $result = $stmt->get_result();
 
                                     if ($result === false) {
                                         echo "<tr><td colspan='8' class='text-danger'>SQL Error: " . $conn->error . "</td></tr>";
@@ -945,40 +917,40 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                             }
 
                                             echo "<tr>
-                    <td>{$row['prescription_id']}</td>
-                    <td>{$row['doctor_name']}</td>
-                    <td>{$row['patient_name']}</td>
-                    <td>{$row['medicines_list']}</td>
-                    <td>{$row['total_quantity']}</td>
-                    <td><button class='btn btn-info btn-sm' data-bs-toggle='modal' data-bs-target='#{$noteId}'>View Note</button></td>
-                    <td>{$row['formatted_date']}</td>
-                    <td><span class='badge {$badgeClass} text-uppercase fw-bold'>" . htmlspecialchars($row['status']) . "</span></td>
-                </tr>";
+                <td>{$row['prescription_id']}</td>
+                <td>{$row['doctor_name']}</td>
+                <td>{$row['patient_name']}</td>
+                <td>{$row['medicines_list']}</td>
+                <td>{$row['total_quantity']}</td>
+                <td><button class='btn btn-info btn-sm' data-bs-toggle='modal' data-bs-target='#{$noteId}'>View Note</button></td>
+                <td>{$row['formatted_date']}</td>
+                <td><span class='badge {$badgeClass} text-uppercase fw-bold'>" . htmlspecialchars($row['status']) . "</span></td>
+            </tr>";
 
                                             // Modal for each note
                                             echo "
-                <div class='modal fade' id='{$noteId}' tabindex='-1'>
-                    <div class='modal-dialog'>
-                        <div class='modal-content'>
-                            <div class='modal-header'>
-                                <h5 class='modal-title'>Prescription Note</h5>
-                                <button type='button' class='btn-close' data-bs-dismiss='modal'></button>
-                            </div>
-                            <div class='modal-body'>
-                                <p>" . nl2br(htmlspecialchars($row['note'])) . "</p>
-                            </div>
-                            <div class='modal-footer'>
-                                <button type='button' class='btn btn-secondary' data-bs-dismiss='modal'>Close</button>
-                            </div>
-                        </div>
+        <div class='modal fade' id='{$noteId}' tabindex='-1'>
+            <div class='modal-dialog'>
+                <div class='modal-content'>
+                    <div class='modal-header'>
+                        <h5 class='modal-title'>Prescription Note</h5>
+                        <button type='button' class='btn-close' data-bs-dismiss='modal'></button>
+                    </div>
+                    <div class='modal-body'>
+                        <p>" . nl2br(htmlspecialchars($row['note'])) . "</p>
+                    </div>
+                    <div class='modal-footer'>
+                        <button type='button' class='btn btn-secondary' data-bs-dismiss='modal'>Close</button>
                     </div>
                 </div>
-                ";
+            </div>
+        </div>";
                                         }
                                     } else {
                                         echo "<tr><td colspan='8' class='text-center'>No prescriptions found</td></tr>";
                                     }
                                     ?>
+
                                 </tbody>
                             </table>
                         </div>
