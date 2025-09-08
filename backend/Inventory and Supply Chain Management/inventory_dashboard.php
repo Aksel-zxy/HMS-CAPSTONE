@@ -63,7 +63,7 @@
       <ul>
         <li><a href="#"><span class="text">View Profile</span></a></li>
         <li>
-          <a href="../logout.php" onclick="return confirm('Are you sure you want to log out?');">
+          <a href="logout.php" onclick="return confirm('Are you sure you want to log out?');">
             <span class="text">Log Out</span>
           </a>
         </li>
@@ -96,7 +96,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!isOpen) {
                 dropdown.style.display = 'block';
                 btn.classList.add('active');
-                btn.setAttribute('aria-expanded', 'true');
             }
         });
     });
