@@ -1,6 +1,6 @@
 <?php
 require 'db.php';
-// Get the current pretty URL path
+
 $requestUri = trim($_SERVER['REQUEST_URI'], '/'); // e.g., "inventory-stock"
 $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
 ?>
