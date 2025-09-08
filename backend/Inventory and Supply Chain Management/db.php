@@ -1,7 +1,7 @@
 <?php
 $host = "127.0.0.1";
 $port = "3306";
-$dbname = "hmscapstone1";
+$dbname = "hmscapstone";
 $username = "root";
 $password = "";
 
@@ -15,5 +15,6 @@ try {
 } catch (PDOException $e) {
     die("Database connection failed: " . $e->getMessage());
 }
+
 
 ?>
