@@ -1,51 +1,39 @@
 <?php
-include '../../../SQL/config.php';
-require '../../Pharmacy Management/classes/Prescription.php';
-require '../../Pharmacy Management/classes/Medicine.php';
+session_start(); // Always start session
 
-class DoctorDashboard
-{
-    public $conn;
-    public $user;
+include '../../../../SQL/config.php';
+require '../../../Pharmacy Management/classes/Prescription.php';
+require '../../../Pharmacy Management/classes/Medicine.php';
 
-    public function __construct($conn)
-    {
-        $this->conn = $conn;
-        $this->authenticate();
-        $this->fetchUser();
-    }
-
-    private function authenticate()
-    {
-        if (!isset($_SESSION['doctor']) || $_SESSION['doctor'] !== true) {
-            header('Location: login.php');
-            exit();
-        }
-        if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-            echo "User ID is not set in session.";
-            exit();
-        }
-    }
-
-    private function fetchUser()
-    {
-        $query = "SELECT * FROM users WHERE user_id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $_SESSION['user_id']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $this->user = $result->fetch_assoc();
-        if (!$this->user) {
-            echo "No user found.";
-            exit();
-        }
-    }
+// ✅ Authentication check
+if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
+    header('Location: ../../login.php'); // adjust path if needed
+    exit();
 }
 
-$dashboard = new DoctorDashboard($conn);
-$user = $dashboard->user;
+if (!isset($_SESSION['employee_id'])) {
+    echo "User ID is not set in session.";
+    exit();
+}
 
-// Fetch all appointment_ids already assigned in duty_assignments
+// ✅ Fetch logged-in doctor details
+$query = "SELECT * FROM hr_employees WHERE employee_id = ?";
+$stmt = $conn->prepare($query);
+$stmt->bind_param("i", $_SESSION['employee_id']);
+$stmt->execute();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
+
+if (!$user) {
+    echo "No user found.";
+    exit();
+}
+
+// -----------------------------------
+// Fetch appointments
+// -----------------------------------
+
+// Already assigned appointments
 $assigned_appointments = [];
 $res = $conn->query("SELECT appointment_id FROM duty_assignments");
 if ($res && $res->num_rows > 0) {
@@ -54,13 +42,14 @@ if ($res && $res->num_rows > 0) {
     }
 }
 
-// Fetch all appointments, only show those not managed and not assigned in duty_assignments
+// All unassigned + not managed appointments
 $appointments = [];
 $sql = "SELECT appointment_id, patient_id, appointment_date, purpose, status, notes, doctor_id 
         FROM p_appointments 
         WHERE status != 'Managed'" .
     (!empty($assigned_appointments) ? " AND appointment_id NOT IN (" . implode(',', array_map('intval', $assigned_appointments)) . ")" : "") .
     " ORDER BY appointment_date DESC";
+
 $result = $conn->query($sql);
 if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
@@ -68,10 +57,8 @@ if ($result && $result->num_rows > 0) {
     }
 }
 
-// Get selected appointment_id from GET
+// Selected appointment doctor_id
 $appointment_id = $_GET['appointment_id'] ?? '';
-
-// Fetch doctor_id from appointment for duty assignment
 $selected_doctor_id = '';
 if ($appointment_id) {
     $stmt = $conn->prepare("SELECT doctor_id FROM p_appointments WHERE appointment_id = ?");
@@ -82,7 +69,9 @@ if ($appointment_id) {
     $stmt->close();
 }
 
-// Fetch beds for dropdown
+// -----------------------------------
+// Fetch beds and nurses
+// -----------------------------------
 $beds = [];
 $bed_res = $conn->query("SELECT bed_id, bed_number, ward, room_number, bed_type, status, notes FROM p_beds");
 if ($bed_res && $bed_res->num_rows > 0) {
@@ -91,7 +80,6 @@ if ($bed_res && $bed_res->num_rows > 0) {
     }
 }
 
-// Fetch nurses for dropdown (profession = 'Nurse')
 $nurses = [];
 $nurse_res = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse' AND status = 'active'");
 if ($nurse_res && $nurse_res->num_rows > 0) {
@@ -100,7 +88,9 @@ if ($nurse_res && $nurse_res->num_rows > 0) {
     }
 }
 
-// Fetch equipment types and names (example static, replace with DB if needed)
+// -----------------------------------
+// Equipment + Tools
+// -----------------------------------
 $equipment_types = [
     'PPE' => ['Surgical gloves', 'Examination gloves', 'Face masks', 'Surgical caps', 'Shoe covers', 'Gowns', 'Face shields'],
     'Patient Care Supplies' => ['Disposable bed sheets', 'Adult diapers', 'Underpads', 'Disposable towels', 'Paper gowns'],
@@ -109,7 +99,6 @@ $equipment_types = [
     'General Hospital Consumables' => ['Alcohol pads', 'Hand sanitizers', 'Disinfectant wipes', 'Disposable thermometers', 'Sharps containers', 'Biohazard bags']
 ];
 
-// Flatten tools for selection
 $tool_options = [];
 foreach ($equipment_types as $type => $names) {
     foreach ($names as $name) {
@@ -117,7 +106,7 @@ foreach ($equipment_types as $type => $names) {
     }
 }
 
-// Fetch machine equipments for equipment selection and listing
+// Machine equipments
 $machine_equipments = [];
 $machine_types = [];
 $machine_res = $conn->query("SELECT machine_id, machine_type, machine_name FROM machine_equipments");
@@ -128,7 +117,9 @@ if ($machine_res && $machine_res->num_rows > 0) {
     }
 }
 
-// Handle duty assignment form submission
+// -----------------------------------
+// Handle duty assignment submission
+// -----------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     $appointment_id = $_POST['appointment_id'];
     $doctor_id = $selected_doctor_id;
@@ -138,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     $notes = $_POST['notes'];
     $status = "Pending";
 
-    // Equipment array: collect selected machine type/name pairs
+    // Equipments
     $equipments = [];
     if (!empty($_POST['equipment_type']) && !empty($_POST['equipment_name'])) {
         foreach ($_POST['equipment_type'] as $idx => $type) {
@@ -148,9 +139,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
             }
         }
     }
-    $equipment = implode(', ', $equipments); // Save as comma-separated string
+    $equipment = implode(', ', $equipments);
 
-    // Tools array
+    // Tools
     $tools = [];
     if (!empty($_POST['tool_name']) && !empty($_POST['tool_qty'])) {
         foreach ($_POST['tool_name'] as $idx => $tool_name) {
@@ -162,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     }
     $tools_json = json_encode($tools);
 
-    // Save duty assignment
+    // Save duty
     $stmt = $conn->prepare("INSERT INTO duty_assignments (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
     $stmt->bind_param(
@@ -179,9 +170,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     );
     $stmt->execute();
 
-    // Insert purchase request for tools
+    // Save purchase request if tools exist
     if (!empty($tools)) {
-        $user_id = $doctor_id; // hr_employees.employee_id
+        $user_id = $doctor_id;
         $items = $tools_json;
         $pr_status = "Pending";
         $created_at = date('Y-m-d H:i:s');
@@ -194,10 +185,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
     exit;
 }
 
-// Handle mark as completed action
+// -----------------------------------
+// Mark duty completed
+// -----------------------------------
 if (isset($_GET['complete_duty_id'])) {
     $complete_duty_id = intval($_GET['complete_duty_id']);
-    // Update status and updated_at timestamp
     $stmt = $conn->prepare("UPDATE duty_assignments SET status = 'Completed', updated_at = NOW() WHERE duty_id = ?");
     $stmt->bind_param("i", $complete_duty_id);
     $stmt->execute();
@@ -206,38 +198,27 @@ if (isset($_GET['complete_duty_id'])) {
     exit;
 }
 
-// Fetch all duty assignments for "My Duties" table, only show non-completed
+// -----------------------------------
+// Fetch doctor’s duties
+// -----------------------------------
 $duties = [];
-$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at FROM duty_assignments WHERE status != 'Completed' ORDER BY created_at DESC");
+$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at 
+                          FROM duty_assignments 
+                          WHERE status != 'Completed' 
+                          ORDER BY created_at DESC");
 if ($duty_res && $duty_res->num_rows > 0) {
     while ($row = $duty_res->fetch_assoc()) {
         $duties[] = $row;
     }
 }
 
-
-
-
+// -----------------------------------
+// Medicines + Prescriptions
+// -----------------------------------
 $medicineObj = new Medicine($conn);
 $medicines = $medicineObj->getAllMedicines();
 
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
 $prescription = new Prescription($conn);
-$doctors = $prescription->getDoctors();
-$patients = $prescription->getPatients();
-// $medicines = $prescription->getMedicines();
-
 $doctors = [];
 $result_doc = $prescription->getDoctors();
 if ($result_doc && $result_doc->num_rows > 0) {
@@ -245,7 +226,6 @@ if ($result_doc && $result_doc->num_rows > 0) {
         $doctors[] = $row;
     }
 }
-
 
 $patients = [];
 $result_pat = $prescription->getPatients();
@@ -256,18 +236,19 @@ if ($result_pat && $result_pat->num_rows > 0) {
 }
 
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HMS | Doctor and Nurse Management</title>
-    <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="../assets/CSS/user_duty.css">
-    <link rel="stylesheet" href="../../Pharmacy Management/assets/css/med_inventory.css">
+    <title>HMS | Doctor User Panel</title>
+    <link rel="shortcut icon" href="../../assets/image/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../../assets/CSS/bootstrap.min.css">
+    <link rel="stylesheet" href="../../assets/CSS/super.css">
+    <link rel="stylesheet" href="../../assets/CSS/user_duty.css">
+    <link rel="stylesheet" href="../../../Pharmacy Management/assets/css/med_inventory.css">
 
     <script>
         // Only validate prescription form, not the appointment assignment form
@@ -301,7 +282,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
-                <img src="../assets/image/logo-dark.png" width="90px" height="20px">
+                <img src="../../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
             <div class="menu-title">Navigation</div>
@@ -309,147 +290,65 @@ if ($result_pat && $result_pat->num_rows > 0) {
             <!----- Sidebar Navigation ----->
 
             <li class="sidebar-item">
-                <a href="../doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="my_doctor_schedule.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
-                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M224 64C241.7 64 256 78.3 256 96L256 128L384 128L384 96C384 78.3 398.3 64 416 64C433.7 64 448 78.3 448 96L448 128L480 128C515.3 128 544 156.7 544 192L544 480C544 515.3 515.3 544 480 544L160 544C124.7 544 96 515.3 96 480L96 192C96 156.7 124.7 128 160 128L192 128L192 96C192 78.3 206.3 64 224 64zM160 304L160 336C160 344.8 167.2 352 176 352L208 352C216.8 352 224 344.8 224 336L224 304C224 295.2 216.8 288 208 288L176 288C167.2 288 160 295.2 160 304zM288 304L288 336C288 344.8 295.2 352 304 352L336 352C344.8 352 352 344.8 352 336L352 304C352 295.2 344.8 288 336 288L304 288C295.2 288 288 295.2 288 304zM432 288C423.2 288 416 295.2 416 304L416 336C416 344.8 423.2 352 432 352L464 352C472.8 352 480 344.8 480 336L480 304C480 295.2 472.8 288 464 288L432 288zM160 432L160 464C160 472.8 167.2 480 176 480L208 480C216.8 480 224 472.8 224 464L224 432C224 423.2 216.8 416 208 416L176 416C167.2 416 160 423.2 160 432zM304 416C295.2 416 288 423.2 288 432L288 464C288 472.8 295.2 480 304 480L336 480C344.8 480 352 472.8 352 464L352 432C352 423.2 344.8 416 336 416L304 416zM416 432L416 464C416 472.8 423.2 480 432 480L464 480C472.8 480 480 472.8 480 464L480 432C480 423.2 472.8 416 464 416L432 416C423.2 416 416 423.2 416 432z" />
                     </svg>
-                    <span style="font-size: 18px;">Dashboard</span>
+                    <span style="font-size: 18px;">My Schedule</span>
                 </a>
             </li>
-
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#schedule"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 512"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
-                        <path d="M320 16a104 104 0 1 1 0 208 104 104 0 1 1 0-208zM96 88a72 72 0 1 1 0 144 72 72 0 1 1 0-144zM0 416c0-70.7 57.3-128 128-128 12.8 0 25.2 1.9 36.9 5.4-32.9 36.8-52.9 85.4-52.9 138.6l0 16c0 11.4 2.4 22.2 6.7 32L32 480c-17.7 0-32-14.3-32-32l0-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32l0-16c0-53.2-20-101.8-52.9-138.6 11.7-3.5 24.1-5.4 36.9-5.4 70.7 0 128 57.3 128 128l0 32c0 17.7-14.3 32-32 32l-86.7 0zM472 160a72 72 0 1 1 144 0 72 72 0 1 1 -144 0zM160 432c0-88.4 71.6-160 160-160s160 71.6 160 160l0 16c0 17.7-14.3 32-32 32l-256 0c-17.7 0-32-14.3-32-32l0-16z" />
-                    </svg>
-                    <span style="font-size: 18px;">Scheduling Shifts and Duties</span>
-                </a>
-
-                <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#license"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
-                        <path d="M80 480L80 224L560 224L560 480C560 488.8 552.8 496 544 496L352 496C352 451.8 316.2 416 272 416L208 416C163.8 416 128 451.8 128 496L96 496C87.2 496 80 488.8 80 480zM96 96C60.7 96 32 124.7 32 160L32 480C32 515.3 60.7 544 96 544L544 544C579.3 544 608 515.3 608 480L608 160C608 124.7 579.3 96 544 96L96 96zM240 376C270.9 376 296 350.9 296 320C296 289.1 270.9 264 240 264C209.1 264 184 289.1 184 320C184 350.9 209.1 376 240 376zM408 272C394.7 272 384 282.7 384 296C384 309.3 394.7 320 408 320L488 320C501.3 320 512 309.3 512 296C512 282.7 501.3 272 488 272L408 272zM408 368C394.7 368 384 378.7 384 392C384 405.3 394.7 416 408 416L488 416C501.3 416 512 405.3 512 392C512 378.7 501.3 368 488 368L408 368z" />
-                    </svg>
-                    <span style="font-size: 18px;">Doctor & Nurse Registration & Compliance Licensing</span>
-                </a>
-
-                <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notifications & Alerts</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Compliance Audit Log</a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="doctor_duty.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
-                        <path d="M96 96C113.7 96 128 110.3 128 128L128 464C128 472.8 135.2 480 144 480L544 480C561.7 480 576 494.3 576 512C576 529.7 561.7 544 544 544L144 544C99.8 544 64 508.2 64 464L64 128C64 110.3 78.3 96 96 96zM208 288C225.7 288 240 302.3 240 320L240 384C240 401.7 225.7 416 208 416C190.3 416 176 401.7 176 384L176 320C176 302.3 190.3 288 208 288zM352 224L352 384C352 401.7 337.7 416 320 416C302.3 416 288 401.7 288 384L288 224C288 206.3 302.3 192 320 192C337.7 192 352 206.3 352 224zM432 256C449.7 256 464 270.3 464 288L464 384C464 401.7 449.7 416 432 416C414.3 416 400 401.7 400 384L400 288C400 270.3 414.3 256 432 256zM576 160L576 384C576 401.7 561.7 416 544 416C526.3 416 512 401.7 512 384L512 160C512 142.3 526.3 128 544 128C561.7 128 576 142.3 576 160z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M160 96C160 78.3 174.3 64 192 64L448 64C465.7 64 480 78.3 480 96C480 113.7 465.7 128 448 128L418.5 128L428.8 262.1C465.9 283.3 494.6 318.5 507 361.8L510.8 375.2C513.6 384.9 511.6 395.2 505.6 403.3C499.6 411.4 490 416 480 416L160 416C150 416 140.5 411.3 134.5 403.3C128.5 395.3 126.5 384.9 129.3 375.2L133 361.8C145.4 318.5 174 283.3 211.2 262.1L221.5 128L192 128C174.3 128 160 113.7 160 96zM288 464L352 464L352 576C352 593.7 337.7 608 320 608C302.3 608 288 593.7 288 576L288 464z" />
                     </svg>
-                    <span style="font-size: 18px;">Performance and Evaluation</span>
+                    <span style="font-size: 18px;">Doctor Duty</span>
                 </a>
             </li>
-
-
-
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#doctor"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
-                        <path d="M320 72C253.7 72 200 125.7 200 192C200 258.3 253.7 312 320 312C386.3 312 440 258.3 440 192C440 125.7 386.3 72 320 72zM380 384.8C374.6 384.3 369 384 363.4 384L276.5 384C270.9 384 265.4 384.3 259.9 384.8L259.9 452.3C276.4 459.9 287.9 476.6 287.9 495.9C287.9 522.4 266.4 543.9 239.9 543.9C213.4 543.9 191.9 522.4 191.9 495.9C191.9 476.5 203.4 459.8 219.9 452.3L219.9 393.9C157 417 112 477.6 112 548.6C112 563.7 124.3 576 139.4 576L500.5 576C515.6 576 527.9 563.7 527.9 548.6C527.9 477.6 482.9 417.1 419.9 394L419.9 431.4C443.2 439.6 459.9 461.9 459.9 488L459.9 520C459.9 531 450.9 540 439.9 540C428.9 540 419.9 531 419.9 520L419.9 488C419.9 477 410.9 468 399.9 468C388.9 468 379.9 477 379.9 488L379.9 520C379.9 531 370.9 540 359.9 540C348.9 540 339.9 531 339.9 520L339.9 488C339.9 461.9 356.6 439.7 379.9 431.4L379.9 384.8z" />
+                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 448 512"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M224 8a120 120 0 1 0 0 240 120 120 0 1 0 0-240zm60 312.8c-5.4-.5-11-.8-16.6-.8l-86.9 0c-5.6 0-11.1 .3-16.6 .8l0 67.5c16.5 7.6 28 24.3 28 43.6 0 26.5-21.5 48-48 48s-48-21.5-48-48c0-19.4 11.5-36.1 28-43.6l0-58.4C61 353 16 413.6 16 484.6 16 499.7 28.3 512 43.4 512l361.1 0c15.1 0 27.4-12.3 27.4-27.4 0-71-45-131.5-108-154.6l0 37.4c23.3 8.2 40 30.5 40 56.6l0 32c0 11-9 20-20 20s-20-9-20-20l0-32c0-11-9-20-20-20s-20 9-20 20l0 32c0 11-9 20-20 20s-20-9-20-20l0-32c0-26.1 16.7-48.3 40-56.6l0-46.6z" />
                     </svg>
-                    <span style="font-size: 18px;">Doctor Panel</span>
+                    <span style="font-size: 18px;">View Clinical Profile</span>
                 </a>
-
-                <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="doctor_duty.php" class="sidebar-link">Doctor Duty</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">License & Compliance Viewer</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Upload Renewal Documents</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notification Alerts</a>
-                    </li>
-                </ul>
             </li>
-
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#nurse"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
-                        <path d="M192 108.9C192 96.2 199.5 84.7 211.2 79.6L307.2 37.6C315.4 34 324.7 34 332.9 37.6L428.9 79.6C440.5 84.7 448 96.2 448 108.9L448 208C448 278.7 390.7 336 320 336C249.3 336 192 278.7 192 208L192 108.9zM400 192L288.4 192L288 192L240 192L240 208C240 252.2 275.8 288 320 288C364.2 288 400 252.2 400 208L400 192zM304 80L304 96L288 96C283.6 96 280 99.6 280 104L280 120C280 124.4 283.6 128 288 128L304 128L304 144C304 148.4 307.6 152 312 152L328 152C332.4 152 336 148.4 336 144L336 128L352 128C356.4 128 360 124.4 360 120L360 104C360 99.6 356.4 96 352 96L336 96L336 80C336 75.6 332.4 72 328 72L312 72C307.6 72 304 75.6 304 80zM238.6 387C232.1 382.1 223.4 380.8 216 384.2C154.6 412.4 111.9 474.4 111.9 546.3C111.9 562.7 125.2 576 141.6 576L498.2 576C514.6 576 527.9 562.7 527.9 546.3C527.9 474.3 485.2 412.3 423.8 384.2C416.4 380.8 407.7 382.1 401.2 387L334.2 437.2C325.7 443.6 313.9 443.6 305.4 437.2L238.4 387z" />
+                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M32 160C32 124.7 60.7 96 96 96L544 96C579.3 96 608 124.7 608 160L32 160zM32 208L608 208L608 480C608 515.3 579.3 544 544 544L96 544C60.7 544 32 515.3 32 480L32 208zM279.3 480C299.5 480 314.6 460.6 301.7 445C287 427.3 264.8 416 240 416L176 416C151.2 416 129 427.3 114.3 445C101.4 460.6 116.5 480 136.7 480L279.2 480zM208 376C238.9 376 264 350.9 264 320C264 289.1 238.9 264 208 264C177.1 264 152 289.1 152 320C152 350.9 177.1 376 208 376zM392 272C378.7 272 368 282.7 368 296C368 309.3 378.7 320 392 320L504 320C517.3 320 528 309.3 528 296C528 282.7 517.3 272 504 272L392 272zM392 368C378.7 368 368 378.7 368 392C368 405.3 378.7 416 392 416L504 416C517.3 416 528 405.3 528 392C528 378.7 517.3 368 504 368L392 368z" />
                     </svg>
-                    <span style="font-size: 18px;">Nurse Panel</span>
+                    <span style="font-size: 18px;">License & Compliance Viewer</span>
                 </a>
-
-                <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Nurse Panel/nurse_duty.php" class="sidebar-link">Nurse Duty</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">License & Compliance Viewer</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Upload Renewal Documents</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notification Alerts</a>
-                    </li>
-                </ul>
             </li>
+            <li class="sidebar-item">
+                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M128 128C128 92.7 156.7 64 192 64L341.5 64C358.5 64 374.8 70.7 386.8 82.7L493.3 189.3C505.3 201.3 512 217.6 512 234.6L512 512C512 547.3 483.3 576 448 576L192 576C156.7 576 128 547.3 128 512L128 128zM336 122.5L336 216C336 229.3 346.7 240 360 240L453.5 240L336 122.5zM337 327C327.6 317.6 312.4 317.6 303.1 327L239.1 391C229.7 400.4 229.7 415.6 239.1 424.9C248.5 434.2 263.7 434.3 273 424.9L296 401.9L296 488C296 501.3 306.7 512 320 512C333.3 512 344 501.3 344 488L344 401.9L367 424.9C376.4 434.3 391.6 434.3 400.9 424.9C410.2 415.5 410.3 400.3 400.9 391L336.9 327z" />
+                    </svg>
+                    <span style="font-size: 18px;">Upload Renewal Documents</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M320 64C302.3 64 288 78.3 288 96L288 99.2C215 114 160 178.6 160 256L160 277.7C160 325.8 143.6 372.5 113.6 410.1L103.8 422.3C98.7 428.6 96 436.4 96 444.5C96 464.1 111.9 480 131.5 480L508.4 480C528 480 543.9 464.1 543.9 444.5C543.9 436.4 541.2 428.6 536.1 422.3L526.3 410.1C496.4 372.5 480 325.8 480 277.7L480 256C480 178.6 425 114 352 99.2L352 96C352 78.3 337.7 64 320 64zM258 528C265.1 555.6 290.2 576 320 576C349.8 576 374.9 555.6 382 528L258 528z" />
+                    </svg>
+                    <span style="font-size: 18px;">Notification Alerts</span>
+                </a>
+            </li>
+
+
+
+
 
         </aside>
-
-
-
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
         <div class="main">
@@ -465,16 +364,16 @@ if ($result_pat && $result_pat->num_rows > 0) {
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['first_name']; ?> <?php echo $user['last_name']; ?></span><!-- Display the logged-in user's name -->
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 200px; padding: 10px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background-color: #fff; color: #333;">
                             <li style="margin-bottom: 8px; font-size: 14px; color: #555;">
-                                <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
+                                <span>Welcome <strong style="color: #007bff;"><?php echo $user['last_name']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -483,13 +382,6 @@ if ($result_pat && $result_pat->num_rows > 0) {
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
-
-
-
-
-
-
             <!-- TAB -->
             <div class="container-fluid mt-3">
                 <!-- Tabs Navigation -->
@@ -738,28 +630,6 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                     }
                                 });
                             </script>
-                            <!-- Machine Equipments Table -->
-                            <div class="container-fluid mt-4">
-                                <h4 class="mb-3 text-primary">Machine Equipments List</h4>
-                                <table class="table table-bordered table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>Machine ID</th>
-                                            <th>Machine Type</th>
-                                            <th>Machine Name</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($machine_equipments as $equip): ?>
-                                            <tr>
-                                                <td><?= htmlspecialchars($equip['machine_id']) ?></td>
-                                                <td><?= htmlspecialchars($equip['machine_type']) ?></td>
-                                                <td><?= htmlspecialchars($equip['machine_name']) ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
                         <?php endif; ?>
                     </div>
 
@@ -892,6 +762,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
 
 
                             <!-- Modal -->
+                            <!-- Prescription Modal -->
                             <div class="modal fade" id="prescriptionModal" tabindex="-1" aria-labelledby="prescriptionModalLabel" aria-hidden="true">
                                 <div class="modal-dialog modal-lg">
                                     <div class="modal-content">
@@ -904,17 +775,11 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                         <form action="process_prescription.php" method="POST">
                                             <div class="modal-body">
 
-                                                <!-- Doctor -->
+                                                <!-- Doctor (auto-filled from logged-in account) -->
                                                 <div class="mb-3">
-                                                    <label for="doctor_id" class="form-label">Doctor</label>
-                                                    <select class="form-select" id="doctor_id" name="doctor_id" required>
-                                                        <option value="">-- Select Doctor --</option>
-                                                        <?php foreach ($doctors as $doc): ?>
-                                                            <option value="<?= $doc['employee_id'] ?>">
-                                                                <?= $doc['first_name'] . ' ' . $doc['last_name'] ?>
-                                                            </option>
-                                                        <?php endforeach; ?>
-                                                    </select>
+                                                    <label class="form-label">Doctor</label>
+                                                    <input type="text" class="form-control" value="<?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?>" readonly>
+                                                    <input type="hidden" name="doctor_id" value="<?= $_SESSION['employee_id'] ?>">
                                                 </div>
 
                                                 <!-- Patient -->
@@ -983,6 +848,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                 </div>
                             </div>
 
+
                             <!-- Medicine Inventory Table -->
                             <table class="table">
                                 <thead class="table">
@@ -999,6 +865,8 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                 </thead>
                                 <tbody>
                                     <?php
+                                    $doctor_id = $_SESSION['employee_id']; // logged-in doctor
+
                                     $sql = "SELECT 
             p.prescription_id,
             CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
@@ -1021,10 +889,14 @@ if ($result_pat && $result_pat->num_rows > 0) {
             ON p.prescription_id = i.prescription_id
         JOIN pharmacy_inventory m 
             ON i.med_id = m.med_id
+        WHERE p.doctor_id = ?  -- 👈 Only prescriptions by this doctor
         GROUP BY p.prescription_id
         ORDER BY p.prescription_date DESC";
 
-                                    $result = $conn->query($sql);
+                                    $stmt = $conn->prepare($sql);
+                                    $stmt->bind_param("i", $doctor_id);
+                                    $stmt->execute();
+                                    $result = $stmt->get_result();
 
                                     if ($result === false) {
                                         echo "<tr><td colspan='8' class='text-danger'>SQL Error: " . $conn->error . "</td></tr>";
@@ -1045,40 +917,40 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                             }
 
                                             echo "<tr>
-                    <td>{$row['prescription_id']}</td>
-                    <td>{$row['doctor_name']}</td>
-                    <td>{$row['patient_name']}</td>
-                    <td>{$row['medicines_list']}</td>
-                    <td>{$row['total_quantity']}</td>
-                    <td><button class='btn btn-info btn-sm' data-bs-toggle='modal' data-bs-target='#{$noteId}'>View Note</button></td>
-                    <td>{$row['formatted_date']}</td>
-                    <td><span class='badge {$badgeClass} text-uppercase fw-bold'>" . htmlspecialchars($row['status']) . "</span></td>
-                </tr>";
+                <td>{$row['prescription_id']}</td>
+                <td>{$row['doctor_name']}</td>
+                <td>{$row['patient_name']}</td>
+                <td>{$row['medicines_list']}</td>
+                <td>{$row['total_quantity']}</td>
+                <td><button class='btn btn-info btn-sm' data-bs-toggle='modal' data-bs-target='#{$noteId}'>View Note</button></td>
+                <td>{$row['formatted_date']}</td>
+                <td><span class='badge {$badgeClass} text-uppercase fw-bold'>" . htmlspecialchars($row['status']) . "</span></td>
+            </tr>";
 
                                             // Modal for each note
                                             echo "
-                <div class='modal fade' id='{$noteId}' tabindex='-1'>
-                    <div class='modal-dialog'>
-                        <div class='modal-content'>
-                            <div class='modal-header'>
-                                <h5 class='modal-title'>Prescription Note</h5>
-                                <button type='button' class='btn-close' data-bs-dismiss='modal'></button>
-                            </div>
-                            <div class='modal-body'>
-                                <p>" . nl2br(htmlspecialchars($row['note'])) . "</p>
-                            </div>
-                            <div class='modal-footer'>
-                                <button type='button' class='btn btn-secondary' data-bs-dismiss='modal'>Close</button>
-                            </div>
-                        </div>
+        <div class='modal fade' id='{$noteId}' tabindex='-1'>
+            <div class='modal-dialog'>
+                <div class='modal-content'>
+                    <div class='modal-header'>
+                        <h5 class='modal-title'>Prescription Note</h5>
+                        <button type='button' class='btn-close' data-bs-dismiss='modal'></button>
+                    </div>
+                    <div class='modal-body'>
+                        <p>" . nl2br(htmlspecialchars($row['note'])) . "</p>
+                    </div>
+                    <div class='modal-footer'>
+                        <button type='button' class='btn btn-secondary' data-bs-dismiss='modal'>Close</button>
                     </div>
                 </div>
-                ";
+            </div>
+        </div>";
                                         }
                                     } else {
                                         echo "<tr><td colspan='8' class='text-center'>No prescriptions found</td></tr>";
                                     }
                                     ?>
+
                                 </tbody>
                             </table>
                         </div>
@@ -1176,20 +1048,19 @@ if ($result_pat && $result_pat->num_rows > 0) {
 
 
             <!-- END CODING HERE -->
-
-
-            <!----- End of Main Content ----->
-
-            <script>
-                const toggler = document.querySelector(".toggler-btn");
-                toggler && toggler.addEventListener("click", function() {
-                    document.querySelector("#sidebar").classList.toggle("collapsed");
-                });
-            </script>
-            <script src="../assets/Bootstrap/all.min.js"></script>
-            <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-            <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-            <script src="../assets/Bootstrap/jq.js"></script>
+        </div>
+        <!----- End of Main Content ----->
+    </div>
+    <script>
+        const toggler = document.querySelector(".toggler-btn");
+        toggler.addEventListener("click", function() {
+            document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+    </script>
+    <script src="../../assets/Bootstrap/all.min.js"></script>
+    <script src="../../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../../assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="../../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
