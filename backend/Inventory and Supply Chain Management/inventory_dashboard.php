@@ -1,4 +1,5 @@
 <?php
+require 'db.php';
 // Get the current pretty URL path
 $requestUri = trim($_SERVER['REQUEST_URI'], '/'); // e.g., "inventory-stock"
 $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
@@ -77,10 +78,9 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
         <li>
           <button class="dropdown-btn <?= $isAssetActive ? 'active' : '' ?>">Asset Tracking</button>
           <div class="dropdown-container" style="<?= $isAssetActive ? 'display:block;' : 'display:none;' ?>">
-            <a href="#">Departments Budget Request</a>
+            <a href="departments-budget">Departments Budget Request</a>
             <a href="#">Department Asset Mapping</a>
-            <a href="#">Preventive Maintenance Schedule</a>
-            <a href="#">Repair & Maintenance Requests</a>
+            <a href="#">Preventive & Repair Maintenance</a>
             <a href="#">Asset Transfer & Disposal</a>
             <a href="#">Audit Logs & Usage History</a>
           </div>
@@ -94,7 +94,7 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
       <ul>
         <li><a href="#"><span class="text">View Profile</span></a></li>
         <li>
-          <a href="logout.php" onclick="return confirm('Are you sure you want to log out?');">
+          <a href="../logout.php" onclick="return confirm('Are you sure you want to log out?');">
             <span class="text">Log Out</span>
           </a>
         </li>
