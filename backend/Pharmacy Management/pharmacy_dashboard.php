@@ -106,6 +106,13 @@ if (!$user) {
                     <span style="font-size: 18px;">Drug Expiry Tracking</span>
                 </a>
             </li>
+            <li class="sidebar-item">
+                <a href="pharmacy_supply_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    <span style="font-size: 18px;">Supply Request</span>
+                </a>
+            </li>
 
         </aside>
         <!----- End of Sidebar ----->

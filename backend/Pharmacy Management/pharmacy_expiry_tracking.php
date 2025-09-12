@@ -53,7 +53,9 @@ foreach ($data as $batch) {
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
-            <div class="menu-title">Pharmacy Management | Dashboard</div>
+            <div class="menu-title">
+                Pharmacy Management | <span>Expiry Tracking</span>
+            </div>
 
             <!----- Sidebar Navigation ----->
 
@@ -114,6 +116,13 @@ foreach ($data as $batch) {
                     <span style="font-size: 18px;">Drug Expiry Tracking</span>
                 </a>
             </li>
+            <li class="sidebar-item">
+                <a href="pharmacy_supply_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    <span style="font-size: 18px;">Supply Request</span>
+                </a>
+            </li>
 
         </aside>
         <!----- End of Sidebar ----->
@@ -159,7 +168,7 @@ foreach ($data as $batch) {
                 <!-- Filter + Search -->
                 <div class="row mb-3 justify-content-end">
                     <!-- Search -->
-                    <div class="col-md-5">
+                    <div class="col-md-4">
                         <input type="text" id="searchInput" class="form-control" placeholder="Search medicine name...">
                     </div>
 
@@ -217,7 +226,7 @@ foreach ($data as $batch) {
 
                             <!-- Hidden Batch Rows -->
                             <?php foreach ($batches as $batch): ?>
-                                <tr class="batch-row batch-<?= htmlspecialchars($medName) ?>" style="display:none; background-color:#f9f9f9;">
+                                <tr class="batch-row" data-med="<?= htmlspecialchars($medName) ?>" style="display:none;">
                                     <td style="padding-left:30px;">— Batch <?= $batch['batch_no'] ?? 'N/A' ?></td>
                                     <td><?= $batch['stock_quantity'] ?></td>
                                     <td><?= formatMonthYear($batch['expiry_date']) ?></td>
@@ -232,50 +241,98 @@ foreach ($data as $batch) {
                     </tbody>
                 </table>
 
-
+                <!-- Bootstrap Pagination -->
+                <nav aria-label="Medicine table pagination">
+                    <ul class="pagination justify-content-center" id="pagination"></ul>
+                </nav>
 
                 <script>
-                    // Toggle batch rows only when no filter/search applied
+                    const rowsPerPage = 15;
+                    let currentPage = 1;
+
+                    function paginateTable() {
+                        const rows = document.querySelectorAll('#medicineExpiryTable tbody tr.medicine-main');
+                        const totalRows = rows.length;
+                        const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+                        // Hide all rows
+                        rows.forEach(row => {
+                            row.style.display = "none";
+                            document.querySelectorAll(`.batch-row[data-med="${row.dataset.medName}"]`)
+                                .forEach(batch => batch.style.display = "none");
+                        });
+
+                        // Show only rows for current page
+                        const start = (currentPage - 1) * rowsPerPage;
+                        const end = start + rowsPerPage;
+                        for (let i = start; i < end && i < totalRows; i++) {
+                            rows[i].style.display = "";
+                        }
+
+                        // Build pagination
+                        const pagination = document.getElementById("pagination");
+                        pagination.innerHTML = "";
+
+                        // Previous button
+                        const prevItem = document.createElement("li");
+                        prevItem.className = "page-item" + (currentPage === 1 ? " disabled" : "");
+                        prevItem.innerHTML = `
+            <a class="page-link" href="#" aria-label="Previous">
+                <span aria-hidden="true">&laquo;</span>
+            </a>`;
+                        prevItem.addEventListener("click", e => {
+                            e.preventDefault();
+                            if (currentPage > 1) {
+                                currentPage--;
+                                paginateTable();
+                            }
+                        });
+                        pagination.appendChild(prevItem);
+
+                        // Page numbers
+                        for (let i = 1; i <= totalPages; i++) {
+                            const li = document.createElement("li");
+                            li.className = "page-item" + (i === currentPage ? " active" : "");
+                            li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                            li.addEventListener("click", e => {
+                                e.preventDefault();
+                                currentPage = i;
+                                paginateTable();
+                            });
+                            pagination.appendChild(li);
+                        }
+
+                        // Next button
+                        const nextItem = document.createElement("li");
+                        nextItem.className = "page-item" + (currentPage === totalPages ? " disabled" : "");
+                        nextItem.innerHTML = `
+            <a class="page-link" href="#" aria-label="Next">
+                <span aria-hidden="true">&raquo;</span>
+            </a>`;
+                        nextItem.addEventListener("click", e => {
+                            e.preventDefault();
+                            if (currentPage < totalPages) {
+                                currentPage++;
+                                paginateTable();
+                            }
+                        });
+                        pagination.appendChild(nextItem);
+                    }
+
+                    // Initial load
+                    paginateTable();
+
+                    // Toggle batch rows
                     document.querySelectorAll('.medicine-main').forEach(row => {
                         row.addEventListener('click', () => {
                             const medName = row.dataset.medName;
-                            document.querySelectorAll('.batch-' + medName).forEach(batchRow => {
+                            document.querySelectorAll(`.batch-row[data-med="${medName}"]`).forEach(batchRow => {
                                 batchRow.style.display = batchRow.style.display === 'none' ? '' : 'none';
                             });
                         });
                     });
-
-                    // Hide batch rows when filtering/searching
-                    const searchInput = document.getElementById("searchInput");
-                    const statusFilter = document.getElementById("statusFilter");
-
-                    function filterTable() {
-                        const searchValue = searchInput.value.toLowerCase();
-                        const filterValue = statusFilter.value;
-
-                        document.querySelectorAll('#medicineExpiryTable tbody tr').forEach(row => {
-                            const cols = row.getElementsByTagName("td");
-                            if (cols.length === 0) return;
-
-                            const medName = cols[0].textContent.toLowerCase();
-                            const status = cols[3].textContent.trim();
-
-                            const matchesSearch = medName.includes(searchValue);
-                            const matchesFilter = filterValue === "All" || status === filterValue;
-
-                            // Show main row only if it matches search/filter
-                            if (!row.classList.contains('batch-row')) {
-                                row.style.display = (matchesSearch && matchesFilter) ? '' : 'none';
-                            } else {
-                                // Always hide batch rows when filtering
-                                row.style.display = 'none';
-                            }
-                        });
-                    }
-
-                    searchInput.addEventListener("keyup", filterTable);
-                    statusFilter.addEventListener("change", filterTable);
                 </script>
+
 
 
 
