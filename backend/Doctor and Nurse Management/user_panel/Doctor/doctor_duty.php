@@ -45,8 +45,9 @@ if ($res && $res->num_rows > 0) {
 // All unassigned + not managed appointments
 
 $appointments = [];
-$sql = "SELECT appointment_id, patient_id, appointment_date, purpose, status, notes, doctor_id 
-        FROM p_appointments 
+$sql = "SELECT pa.*, concat(p.fname, ' ', p.lname) AS patient_name
+        FROM p_appointments pa
+        join patientinfo p on pa.patient_id = p.patient_id
         WHERE status != 'Managed'" .
     (!empty($assigned_appointments) 
         ? " AND appointment_id NOT IN (" . implode(',', array_map('intval', $assigned_appointments)) . ")" 
@@ -484,7 +485,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
                             <thead class="table-primary">
                                 <tr>
                                     <th>Appointment ID</th>
-                                    <th>Patient ID</th>
+                                    <th>Patient </th>
                                     <th>Date</th>
                                     <th>Purpose</th>
                                     <th>Status</th>
@@ -498,7 +499,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                 <?php foreach ($appointments as $appt): ?>
                                 <tr>
                                     <td><?= htmlspecialchars($appt['appointment_id']); ?></td>
-                                    <td><?= htmlspecialchars($appt['patient_id']); ?></td>
+                                    <td><?= htmlspecialchars($appt['patient_name']); ?></td>
                                     <td><?= htmlspecialchars($appt['appointment_date']); ?></td>
                                     <td><?= htmlspecialchars($appt['purpose']); ?></td>
                                     <td><?= htmlspecialchars($appt['status']); ?></td>
