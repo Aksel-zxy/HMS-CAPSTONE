@@ -45,17 +45,31 @@ public function callResult($patient_id) {
     }
 }
 
-public function callBeddings ($patient_id) {
-    $stmt = $this->conn->prepare("SELECT * FROM p_bed_assignments WHERE patient_id = ?");
-    $stmt->bind_param("i", $patient_id);
+public function callBeddings() {
+    $stmt = $this->conn->prepare("
+        SELECT DISTINCT
+            b.room_number, 
+            b.bed_number, 
+            b.status, 
+            p.fname, 
+            p.lname
+        FROM p_beds b
+        LEFT JOIN p_bed_assignments ba ON b.bed_id = ba.bed_id
+        LEFT JOIN patientinfo p ON ba.patient_id = p.patient_id
+        ORDER BY b.room_number, b.bed_number 
+    ");
     $stmt->execute();
     $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        return $result->fetch_assoc();
-    } else {
-        throw new Exception("No beddings found for patient ID: " . $patient_id);
+
+    $rooms = [];
+    while ($row = $result->fetch_assoc()) {
+        $rooms[$row['room_number']][] = $row;
     }
+
+    return $rooms;
 }
+
+
 public function getAllDoctors() {
     $sql = "SELECT employee_id, first_name, last_name
             FROM hr_employees 

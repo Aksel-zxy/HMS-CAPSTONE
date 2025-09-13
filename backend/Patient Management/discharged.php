@@ -4,7 +4,7 @@ include '../../SQL/config.php';
 
 require_once 'class/caller.php';
 
-// ✅ Ensure patient_id is passed
+//  Ensure patient_id is passed
 if (!isset($_GET['patient_id']) || empty($_GET['patient_id'])) {
     echo "Invalid patient ID.";
     exit();
@@ -13,7 +13,7 @@ if (!isset($_GET['patient_id']) || empty($_GET['patient_id'])) {
 $patient_id = intval($_GET['patient_id']);
 $discharge = new PatientDischarge($conn);
 
-// ✅ Get active admission
+//  Get active admission
 $assignment = $discharge->getActiveAdmission($patient_id);
 if (!$assignment) {
     echo "This patient is not currently admitted.";
@@ -22,7 +22,7 @@ if (!$assignment) {
 
 $bed_id = $assignment['bed_id'];
 
-// ✅ Handle form submission
+//  Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $released_date = $_POST['released_date'];
     $discharge->discharge($assignment['assignment_id'], $bed_id, $patient_id, $released_date);

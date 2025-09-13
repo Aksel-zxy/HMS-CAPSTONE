@@ -125,7 +125,7 @@ $user = $result->fetch_assoc();
             </li>
 
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
+                <a href="pBilling.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
                     aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-solid fa-clock-rotate-left" viewBox="0 0 16 16">

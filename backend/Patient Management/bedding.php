@@ -1,6 +1,12 @@
 <?php
 include '../../SQL/config.php';
 
+include_once 'class/Caller.php';
+
+$callerobj = new Caller($conn);
+$rooms = $callerobj->callBeddings();
+
+
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
     header('Location: login.php'); 
     exit();
@@ -23,27 +29,8 @@ if (!$user) {
     exit();
 }
 
-// ✅ Fetch all rooms & beds from p_beds
-$rooms_query = "
-       SELECT 
-    b.room_number, 
-    b.bed_number, 
-    b.status, 
-    p.fname, 
-    p.lname
-FROM p_beds b
-LEFT JOIN p_bed_assignments ba ON b.bed_id = ba.bed_id
-LEFT JOIN patientinfo p ON ba.patient_id = p.patient_id
-GROUP BY b.room_number, b.bed_number
-ORDER BY b.room_number, b.bed_number;
 
-    ";
-$rooms_result = $conn->query($rooms_query);
 
-$rooms = [];
-while ($row = $rooms_result->fetch_assoc()) {
-    $rooms[$row['room_number']][] = $row; 
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -144,7 +131,7 @@ while ($row = $rooms_result->fetch_assoc()) {
             </li>
 
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
+                <a href="pBilling.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
                     aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-solid fa-clock-rotate-left" viewBox="0 0 16 16">
