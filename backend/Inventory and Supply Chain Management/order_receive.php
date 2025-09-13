@@ -15,9 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
     if ($order) {
         $vendor_id = $order['vendor_id'];
 
-        // Get all shipped items
+        // Get all shipped items with unit info
         $stmt = $pdo->prepare("
-            SELECT vo.*, vp.item_name, vp.item_type, vp.sub_type, vp.price
+            SELECT vo.*, vp.item_name, vp.item_type, vp.sub_type, vp.price, vp.unit_type, vp.pcs_per_box
             FROM vendor_orders vo
             JOIN vendor_products vp ON vo.item_id = vp.id
             WHERE vo.purchase_request_id=? AND vo.vendor_id=? AND vo.status='Shipped'
@@ -33,20 +33,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
 
                 if ($received > 0) {
-                    // ✅ Non-medicine → goes directly into inventory
+                    // ✅ Convert to pieces if Box
+                    $final_qty = ($o['unit_type'] === "Box" && $o['pcs_per_box'])
+                        ? $received * (int)$o['pcs_per_box']
+                        : $received;
+
+                    // ✅ Update inventory
                     $stmt2 = $pdo->prepare("SELECT * FROM inventory WHERE item_id=?");
                     $stmt2->execute([$item_id]);
                     $inv = $stmt2->fetch(PDO::FETCH_ASSOC);
 
                     if ($inv) {
-                        $stmt2 = $pdo->prepare("UPDATE inventory SET quantity = quantity + ?, received_at = NOW() WHERE item_id=?");
-                        $stmt2->execute([$received, $item_id]);
+                        $stmt2 = $pdo->prepare("UPDATE inventory 
+                            SET quantity = quantity + ?, received_at = NOW() 
+                            WHERE item_id=?");
+                        $stmt2->execute([$final_qty, $item_id]);
                     } else {
-                        $stmt2 = $pdo->prepare("INSERT INTO inventory (item_id, item_name, item_type, sub_type, quantity, price) VALUES (?, ?, ?, ?, ?, ?)");
-                        $stmt2->execute([$item_id, $o['item_name'], $o['item_type'], $o['sub_type'], $received, $o['price']]);
+                        $stmt2 = $pdo->prepare("INSERT INTO inventory 
+                            (item_id, item_name, item_type, sub_type, quantity, price, unit_type, pcs_per_box) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmt2->execute([
+                            $item_id, 
+                            $o['item_name'], 
+                            $o['item_type'], 
+                            $o['sub_type'], 
+                            $final_qty, 
+                            $o['price'], 
+                            $o['unit_type'], 
+                            $o['pcs_per_box']
+                        ]);
                     }
 
-                    $subtotal += $received * $o['price'];
+                    $subtotal += $received * $o['price']; // keep price per unit_type (Box or Piece)
 
                     // ✅ Mark vendor order completed
                     $stmt = $pdo->prepare("UPDATE vendor_orders SET status='Completed' WHERE id=?");
@@ -64,13 +82,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 $existing_receipt = $stmt->fetch(PDO::FETCH_ASSOC);
 
                 if ($existing_receipt) {
-                    // If same purchase request, update it
                     $receipt_id = $existing_receipt['id'];
-                    $stmt = $pdo->prepare("UPDATE receipts SET subtotal=subtotal+?, vat=vat+?, total=total+? WHERE id=?");
+                    $stmt = $pdo->prepare("UPDATE receipts 
+                        SET subtotal=subtotal+?, vat=vat+?, total=total+? 
+                        WHERE id=?");
                     $stmt->execute([$subtotal, $vat, $total, $receipt_id]);
                 } else {
-                    // Otherwise always create a new receipt
-                    $stmt = $pdo->prepare("INSERT INTO receipts (order_id, vendor_id, subtotal, vat, total) VALUES (?, ?, ?, ?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO receipts 
+                        (order_id, vendor_id, subtotal, vat, total) 
+                        VALUES (?, ?, ?, ?, ?)");
                     $stmt->execute([$purchase_request_id, $vendor_id, $subtotal, $vat, $total]);
                     $receipt_id = $pdo->lastInsertId();
 
@@ -83,10 +103,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                     $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
                     if ($received > 0) {
                         $stmt = $pdo->prepare("
-                            INSERT INTO receipt_items (receipt_id, item_id, item_name, quantity_received, price, subtotal)
-                            VALUES (?, ?, ?, ?, ?, ?)
+                            INSERT INTO receipt_items 
+                            (receipt_id, item_id, item_name, quantity_received, price, subtotal, unit_type, pcs_per_box)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ");
-                        $stmt->execute([$receipt_id, $o['item_id'], $o['item_name'], $received, $o['price'], $received * $o['price']]);
+                        $stmt->execute([
+                            $receipt_id, 
+                            $o['item_id'], 
+                            $o['item_name'], 
+                            $received, // keep same unit as ordered
+                            $o['price'], 
+                            $received * $o['price'], 
+                            $o['unit_type'], 
+                            $o['pcs_per_box']
+                        ]);
                     }
                 }
 
@@ -126,10 +156,6 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="container py-5">
     <h2 class="mb-4">Orders Ready to Receive</h2>
 
-    <?php if (isset($_SESSION['error_message'])): ?>
-        <div class="alert alert-danger"><?= $_SESSION['error_message']; unset($_SESSION['error_message']); ?></div>
-    <?php endif; ?>
-
     <?php if (count($orders) > 0): ?>
         <table class="table table-bordered bg-white shadow">
             <thead class="table-dark">
@@ -149,7 +175,6 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <td>₱<?= number_format($o['total_price'], 2) ?></td>
                     <td><span class="badge bg-info">Shipped</span></td>
                     <td>
-                        <!-- Button only -->
                         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#viewModal<?= $o['purchase_request_id'] ?>">
                             View
                         </button>
@@ -163,7 +188,7 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php endif; ?>
 </div>
 
-<!-- ✅ Modals rendered OUTSIDE the table -->
+<!-- ✅ Modals -->
 <?php foreach ($orders as $o): ?>
 <div class="modal fade" id="viewModal<?= $o['purchase_request_id'] ?>" tabindex="-1">
     <div class="modal-dialog modal-xl">
@@ -176,7 +201,7 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="modal-body">
                     <?php
                     $stmt2 = $pdo->prepare("
-                        SELECT vo.*, vp.item_name, vp.price, vp.item_type
+                        SELECT vo.*, vp.item_name, vp.price, vp.unit_type, vp.pcs_per_box
                         FROM vendor_orders vo
                         JOIN vendor_products vp ON vo.item_id = vp.id
                         WHERE vo.purchase_request_id=? AND vo.status='Shipped'
@@ -190,7 +215,8 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <tr>
                                 <th>Item</th>
                                 <th>Ordered Qty</th>
-                                <th>Price per Item</th>
+                                <th>Unit</th>
+                                <th>Price</th>
                                 <th>Status</th>
                                 <th>Qty Received</th>
                                 <th>Subtotal</th>
@@ -204,6 +230,12 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <tr>
                                 <td><?= htmlspecialchars($it['item_name']) ?></td>
                                 <td><?= $it['quantity'] ?></td>
+                                <td>
+                                    <?= htmlspecialchars($it['unit_type']) ?>
+                                    <?php if ($it['unit_type'] === "Box" && $it['pcs_per_box']): ?>
+                                        (<?= (int)$it['pcs_per_box'] ?> pcs)
+                                    <?php endif; ?>
+                                </td>
                                 <td>₱<?= number_format($it['price'], 2) ?></td>
                                 <td><span class="badge bg-info"><?= $it['status'] ?></span></td>
                                 <td>

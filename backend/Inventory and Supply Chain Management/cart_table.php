@@ -16,7 +16,15 @@
             $grand += $total;
         ?>
         <tr>
-            <td><?= htmlspecialchars($item['name']) ?></td>
+            <td>
+                <?= htmlspecialchars($item['name']) ?><br>
+                <small>
+                    <?= htmlspecialchars($item['unit_type'] ?? 'Piece') ?>
+                    <?php if (($item['unit_type'] ?? '') === "Box" && !empty($item['pcs_per_box'])): ?>
+                        (<?= (int)$item['pcs_per_box'] ?> pcs)
+                    <?php endif; ?>
+                </small>
+            </td>
             <td>
                 <input type="number" 
                        name="qty[<?= $id ?>]" 

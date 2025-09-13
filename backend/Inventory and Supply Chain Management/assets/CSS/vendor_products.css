@@ -52,6 +52,28 @@
     margin-right: 5px;
 }
 
+/* Product Images - Uniform Size */
+.vendor-main table img {
+    width: 80px;         
+    height: 80px;        
+    object-fit: cover;    
+    border-radius: 6px;   
+}
+        .product-thumb {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+        .table td { vertical-align: middle; }
+        /* small responsive tweak for the search row */
+        @media (max-width: 576px) {
+            .vendor-main .row.g-2 > .col-md-6,
+            .vendor-main .row.g-2 > .col-md-4,
+            .vendor-main .row.g-2 > .col-md-2 { width: 100%; }
+        }
+
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
     .vendor-sidebar {

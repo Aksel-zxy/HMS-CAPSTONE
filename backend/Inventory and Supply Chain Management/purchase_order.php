@@ -40,6 +40,8 @@ if (isset($_POST['ajax'])) {
         $id = $_POST['id'];
         $name = $_POST['name'];
         $price = $_POST['price'];
+        $unit_type = $_POST['unit_type'] ?? 'Piece';
+        $pcs_per_box = $_POST['pcs_per_box'] ?? null;
 
         if (isset($_SESSION['cart'][$id])) {
             $_SESSION['cart'][$id]['qty'] += 1;
@@ -47,6 +49,8 @@ if (isset($_POST['ajax'])) {
             $_SESSION['cart'][$id] = [
                 "name" => $name,
                 "price" => $price,
+                "unit_type" => $unit_type,
+                "pcs_per_box" => $pcs_per_box,
                 "qty" => 1
             ];
         }
@@ -160,7 +164,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="text-end">
             <h5 class="mb-1"><?= htmlspecialchars($user['department']) ?></h5>
             <p class="mb-0">
-                Available Budget: ₱<?= number_format($budget['allocated_budget'], 2) ?>
+                Allocated Budget: ₱<?= number_format($budget['allocated_budget'], 2) ?>
             </p>
         </div>
     </div>
@@ -203,11 +207,23 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="card-body text-center">
                         <h6 class="card-title"><?= htmlspecialchars($p['item_name']) ?></h6>
                         <p class="small"><?= htmlspecialchars($p['item_description']) ?></p>
-                        <p><strong>₱<?= number_format($p['price'], 2) ?></strong></p>
+
+                        <!-- ✅ Price + Unit Display -->
+                        <p>
+                            <strong>
+                                ₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?>
+                                <?php if (($p['unit_type'] ?? '') === "Box" && $p['pcs_per_box']): ?>
+                                    (<?= (int)$p['pcs_per_box'] ?> pcs)
+                                <?php endif; ?>
+                            </strong>
+                        </p>
+
                         <button class="btn btn-success btn-sm w-100 addToCart" 
                             data-id="<?= $p['id'] ?>" 
                             data-name="<?= htmlspecialchars($p['item_name']) ?>" 
-                            data-price="<?= $p['price'] ?>">
+                            data-price="<?= $p['price'] ?>"
+                            data-unit_type="<?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?>"
+                            data-pcs_per_box="<?= htmlspecialchars($p['pcs_per_box'] ?? '') ?>">
                             Add to Cart
                         </button>
                     </div>
@@ -250,11 +266,13 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <script>
 // Add item
 $(document).on("click", ".addToCart", function() {
-    $.post("purchase_order.php", {
+    $.post("department_request.php", {
         ajax: "add",
         id: $(this).data("id"),
         name: $(this).data("name"),
-        price: $(this).data("price")
+        price: $(this).data("price"),
+        unit_type: $(this).data("unit_type"),
+        pcs_per_box: $(this).data("pcs_per_box")
     }, function(res) {
         let data = JSON.parse(res);
         $("#cartContent").html(data.cart_html);
@@ -264,7 +282,7 @@ $(document).on("click", ".addToCart", function() {
 
 // Remove item
 $(document).on("click", ".removeItem", function() {
-    $.post("purchase_order.php", {ajax:"remove", id:$(this).data("id")}, function(res) {
+    $.post("department_request.php", {ajax:"remove", id:$(this).data("id")}, function(res) {
         let data = JSON.parse(res);
         $("#cartContent").html(data.cart_html);
         $("#cartCount").text(data.count);
@@ -274,7 +292,7 @@ $(document).on("click", ".removeItem", function() {
 // Update qty
 $(document).on("input", ".qtyInput", function() {
     let formData = $("#updateCartForm").serialize();
-    $.post("purchase_order.php", formData + "&ajax=update", function(res) {
+    $.post("department_request.php", formData + "&ajax=update", function(res) {
         let data = JSON.parse(res);
         $("#cartTotal").text(data.total);
         $("#cartCount").text(data.count);
@@ -283,7 +301,7 @@ $(document).on("input", ".qtyInput", function() {
 
 // Submit (Request to Admin)
 $(document).on("click", "#submitRequest", function() {
-    $.post("purchase_order.php", {ajax:"submit"}, function(res) {
+    $.post("department_request.php", {ajax:"submit"}, function(res) {
         let data = JSON.parse(res);
         alert(data.message);
         if (data.success) {
