@@ -167,27 +167,44 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <th>Item</th>
                                             <th>Price</th>
                                             <th>Qty</th>
+                                            <th>Unit</th>
+                                            <th>Total Pieces</th>
                                             <th>Total</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                     <?php 
                                     $modalTotal = 0;
-                                    foreach ($items as $item): 
+                                    foreach ($items as $item_id => $item): 
                                         $lineTotal = $item['price'] * $item['qty'];
                                         $modalTotal += $lineTotal;
+
+                                        // ✅ Fetch latest unit_type & pcs_per_box from vendor_products
+                                        $stmtProd = $pdo->prepare("SELECT unit_type, pcs_per_box FROM vendor_products WHERE id=?");
+                                        $stmtProd->execute([$item_id]);
+                                        $prod = $stmtProd->fetch(PDO::FETCH_ASSOC);
+
+                                        $unit = $prod['unit_type'] ?? 'Piece';
+                                        $pcsPerBox = $prod['pcs_per_box'] ?? null;
+
+                                        $totalPieces = $item['qty'];
+                                        if (strtolower($unit) === 'box' && $pcsPerBox) {
+                                            $totalPieces = $item['qty'] * $pcsPerBox;
+                                        }
                                     ?>
                                         <tr>
                                             <td><?= htmlspecialchars($item['name']) ?></td>
                                             <td>₱<?= number_format($item['price'], 2) ?></td>
                                             <td><?= $item['qty'] ?></td>
+                                            <td><?= htmlspecialchars($unit) ?></td>
+                                            <td><?= $totalPieces ?></td>
                                             <td>₱<?= number_format($lineTotal, 2) ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                     </tbody>
                                     <tfoot>
                                         <tr class="table-dark">
-                                            <td colspan="3" class="text-end"><strong>Grand Total:</strong></td>
+                                            <td colspan="5" class="text-end"><strong>Grand Total:</strong></td>
                                             <td><strong>₱<?= number_format($modalTotal, 2) ?></strong></td>
                                         </tr>
                                     </tfoot>

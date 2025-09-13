@@ -17,9 +17,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receipt_id'])) {
         $stmt->execute([$receipt_id]);
     }
 
-    // ✅ Fetch items from this receipt
+    // ✅ Fetch items with unit_type & pcs_per_box
     $stmt = $pdo->prepare("
-        SELECT ri.item_id, ri.item_name, ri.quantity_received, ri.price, vp.item_type
+        SELECT 
+            ri.item_id, 
+            ri.item_name, 
+            ri.quantity_received, 
+            ri.price, 
+            vp.item_type,
+            vp.unit_type,
+            vp.pcs_per_box
         FROM receipt_items ri
         JOIN vendor_products vp ON ri.item_id = vp.id
         WHERE ri.receipt_id = ?
@@ -29,28 +36,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receipt_id'])) {
 
     // ✅ Save medicines into medicine_batches, others into inventory
     foreach ($items as $item) {
+        // Convert quantity to pieces if unit is Box
+        $final_quantity = $item['unit_type'] === 'Box' && !empty($item['pcs_per_box'])
+            ? $item['quantity_received'] * $item['pcs_per_box']
+            : $item['quantity_received'];
+
         if (strtolower(trim($item['item_type'])) === 'medications and pharmacy supplies') {
-            // Save into medicine_batches (no expiry yet)
+            // Save into medicine_batches
             $stmt = $pdo->prepare("
-                INSERT INTO medicine_batches (item_id, batch_no, quantity, expiration_date, received_at)
-                VALUES (?, CONCAT('BATCH-', UUID()), ?, NULL, NOW())
+                INSERT INTO medicine_batches (
+                    item_id, batch_no, quantity, expiration_date, received_at, unit_type, pcs_per_box
+                ) VALUES (?, CONCAT('BATCH-', UUID()), ?, NULL, NOW(), ?, ?)
             ");
             $stmt->execute([
                 $item['item_id'],
-                $item['quantity_received']
+                $final_quantity,
+                $item['unit_type'],
+                $item['pcs_per_box']
             ]);
         } else {
             // Non-medicine items go directly to inventory
             $stmt = $pdo->prepare("
-                INSERT INTO inventory (item_id, item_name, quantity, price, item_type, expiration_date, received_at)
-                VALUES (?, ?, ?, ?, ?, NULL, NOW())
+                INSERT INTO inventory (
+                    item_id, item_name, quantity, price, item_type, unit_type, pcs_per_box, received_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE 
+                    quantity = quantity + VALUES(quantity),
+                    price = VALUES(price),
+                    unit_type = VALUES(unit_type),
+                    pcs_per_box = VALUES(pcs_per_box)
             ");
             $stmt->execute([
                 $item['item_id'],
                 $item['item_name'],
-                $item['quantity_received'],
+                $final_quantity,
                 $item['price'],
-                $item['item_type']
+                $item['item_type'],
+                $item['unit_type'],
+                $item['pcs_per_box']
             ]);
         }
     }

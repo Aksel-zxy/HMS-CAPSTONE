@@ -18,7 +18,7 @@ if (!$receipt) {
     die("❌ Receipt not found for ID: " . htmlspecialchars($receipt_id));
 }
 
-// Fetch receipt items
+// Fetch receipt items (with unit type + pcs_per_box)
 $stmt = $pdo->prepare("SELECT * FROM receipt_items WHERE receipt_id = ?");
 $stmt->execute([$receipt_id]);
 $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -65,6 +65,7 @@ $payment = $stmt->fetch(PDO::FETCH_ASSOC);
                     <tr>
                         <th>Item</th>
                         <th>Quantity</th>
+                        <th>Unit</th>
                         <th>Price</th>
                         <th>Subtotal</th>
                     </tr>
@@ -74,6 +75,12 @@ $payment = $stmt->fetch(PDO::FETCH_ASSOC);
                         <tr>
                             <td><?= htmlspecialchars($it['item_name']) ?></td>
                             <td><?= $it['quantity_received'] ?></td>
+                            <td>
+                                <?= htmlspecialchars($it['unit_type']) ?>
+                                <?php if ($it['unit_type'] === "Box" && $it['pcs_per_box']): ?>
+                                    (<?= (int)$it['pcs_per_box'] ?> pcs)
+                                <?php endif; ?>
+                            </td>
                             <td>₱<?= number_format($it['price'], 2) ?></td>
                             <td>₱<?= number_format($it['subtotal'], 2) ?></td>
                         </tr>

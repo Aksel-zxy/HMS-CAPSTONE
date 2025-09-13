@@ -71,6 +71,7 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <tr>
                         <th>Item</th>
                         <th>Quantity</th>
+                        <th>Unit</th>
                         <th>Price</th>
                         <th>Subtotal</th>
                     </tr>
@@ -80,6 +81,12 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <tr>
                             <td><?= htmlspecialchars($it['item_name']) ?></td>
                             <td><?= $it['quantity_received'] ?></td>
+                            <td>
+                                <?= htmlspecialchars($it['unit_type']) ?>
+                                <?php if ($it['unit_type'] === "Box" && $it['pcs_per_box']): ?>
+                                    (<?= (int)$it['pcs_per_box'] ?> pcs)
+                                <?php endif; ?>
+                            </td>
                             <td>₱<?= number_format($it['price'], 2) ?></td>
                             <td>₱<?= number_format($it['subtotal'], 2) ?></td>
                         </tr>

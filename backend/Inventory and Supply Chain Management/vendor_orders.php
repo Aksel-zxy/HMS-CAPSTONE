@@ -13,15 +13,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'], $_PO
     $request_id = (int)$_POST['purchase_request_id'];
     $new_status = $_POST['status'];
 
-    // Update only for the logged-in vendor
-    $updateStmt = $pdo->prepare("
-        UPDATE vendor_orders 
-        SET status = ? 
-        WHERE purchase_request_id = ? AND vendor_id = ?
-    ");
-    $updateStmt->execute([$new_status, $request_id, $vendor_id]);
+    $status_order = ["Processing", "Packed", "Shipped"];
 
-    // Optionally redirect to avoid resubmission
+    // Fetch all items for this request belonging to logged-in vendor
+    $stmt = $pdo->prepare("SELECT id, status FROM vendor_orders WHERE purchase_request_id = ? AND vendor_id = ?");
+    $stmt->execute([$request_id, $vendor_id]);
+    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($orders as $order) {
+        $current_index = array_search($order['status'], $status_order);
+        $new_index = array_search($new_status, $status_order);
+
+        // ✅ Only allow forward movement
+        if ($new_index > $current_index) {
+            $updateStmt = $pdo->prepare("UPDATE vendor_orders SET status = ? WHERE id = ?");
+            $updateStmt->execute([$new_status, $order['id']]);
+        }
+    }
+
+    // Redirect to avoid resubmission and reload modal
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
@@ -32,12 +42,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'], $_PO
 $ongoingStmt = $pdo->prepare("
     SELECT pr.id AS request_id, pr.created_at AS order_time,
            SUM(vo.quantity) AS total_qty, SUM(vo.quantity * vp.price) AS total_price,
-           vo.status
+           MAX(vo.status) AS status
     FROM purchase_requests pr
     JOIN vendor_orders vo ON pr.id = vo.purchase_request_id
     JOIN vendor_products vp ON vo.item_id = vp.id
     WHERE vo.vendor_id = ? AND vo.status != 'Completed'
-    GROUP BY pr.id, vo.status
+    GROUP BY pr.id
 ");
 $ongoingStmt->execute([$vendor_id]);
 $ongoingOrders = $ongoingStmt->fetchAll(PDO::FETCH_ASSOC);

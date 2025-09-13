@@ -2,13 +2,14 @@
 session_start();
 require 'db.php';
 
-// ✅ Assume vendor login is stored in session
+// ✅ Vendor login check
 $logged_vendor_id = $_SESSION['vendor_id'] ?? 0;
 if (!$logged_vendor_id) {
     echo "Please login first.";
     exit;
 }
 
+// ✅ Validate request ID
 if (!isset($_GET['request_id'])) {
     echo "Invalid request.";
     exit;
@@ -38,17 +39,20 @@ if (!$items) {
     exit;
 }
 
-// 🔹 Get receipt_id for this purchase request
-$receiptStmt = $pdo->prepare("
-    SELECT id 
-    FROM receipts 
-    WHERE order_id = ? 
-    LIMIT 1
-");
+// 🔹 Ensure status is at least "Processing"
+foreach ($items as $item) {
+    if (empty($item['status'])) {
+        $updateStmt = $pdo->prepare("UPDATE vendor_orders SET status = 'Processing' WHERE id = ?");
+        $updateStmt->execute([$item['id']]);
+        $item['status'] = 'Processing';
+    }
+}
+
+// 🔹 Get receipt info
+$receiptStmt = $pdo->prepare("SELECT id FROM receipts WHERE order_id = ? LIMIT 1");
 $receiptStmt->execute([$request_id]);
 $receipt = $receiptStmt->fetch(PDO::FETCH_ASSOC);
 
-// 🔹 Get paid_at from receipt_payments
 $payment = null;
 if ($receipt) {
     $payStmt = $pdo->prepare("
@@ -62,18 +66,13 @@ if ($receipt) {
     $payment = $payStmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// 🔹 Decide status & delivered date
-if ($payment) {
-    $current_status = "Completed";
-    $delivered_date = $payment['paid_at'] ? date("F d, Y h:i A", strtotime($payment['paid_at'])) : "N/A";
-    $receipt_id = $receipt['id'];
-} else {
-    $current_status = $items[0]['status']; // fallback from vendor_orders
-    $delivered_date = "N/A";
-    $receipt_id = null;
-}
+// 🔹 Determine current status
+$current_status = $payment ? "Completed" : $items[0]['status'];
+$delivered_date = $payment ? date("F d, Y h:i A", strtotime($payment['paid_at'])) : "N/A";
+$receipt_id = $receipt['id'] ?? null;
 
-$status_order = ["Processing", "Packed", "Shipped"]; // 
+// 🔹 Status workflow
+$status_order = ["Processing", "Packed", "Shipped"];
 ?>
 
 <table class="table table-bordered align-middle">
@@ -118,7 +117,7 @@ $status_order = ["Processing", "Packed", "Shipped"]; //
     </tbody>
 </table>
 
-<!-- 🔹 Status update form (hidden if Completed) -->
+<!-- 🔹 Status update form -->
 <?php if ($current_status !== "Completed"): ?>
 <form method="post" action="vendor_orders.php" class="mt-3">
     <input type="hidden" name="purchase_request_id" value="<?= $request_id ?>">
@@ -127,7 +126,8 @@ $status_order = ["Processing", "Packed", "Shipped"]; //
         <?php 
         $current_index = array_search($current_status, $status_order);
         foreach ($status_order as $i => $status): 
-            $disabled = ($i < $current_index) ? "disabled" : "";
+            // Only allow current status and next status
+            $disabled = ($i < $current_index || $i > $current_index + 1) ? "disabled" : "";
             $selected = ($status === $current_status) ? "selected" : "";
         ?>
             <option value="<?= $status ?>" <?= $disabled ?> <?= $selected ?>>

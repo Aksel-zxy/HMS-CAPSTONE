@@ -34,9 +34,11 @@ if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
 }
 
-// Handle AJAX
+// Handle AJAX requests
 if (isset($_POST['ajax'])) {
-    if ($_POST['ajax'] === 'add') {
+    $action = $_POST['ajax'];
+
+    if ($action === 'add') {
         $id = $_POST['id'];
         $name = $_POST['name'];
         $price = $_POST['price'];
@@ -56,20 +58,31 @@ if (isset($_POST['ajax'])) {
         }
     }
 
-    if ($_POST['ajax'] === 'update') {
-        foreach ($_POST['qty'] as $id => $qty) {
-            if ($qty > 0) {
-                $_SESSION['cart'][$id]['qty'] = $qty;
+    if ($action === 'update') {
+        if (isset($_POST['qty']) && is_array($_POST['qty'])) {
+            foreach ($_POST['qty'] as $id => $qty) {
+                if (isset($_SESSION['cart'][$id])) {
+                    $_SESSION['cart'][$id]['qty'] = intval($qty);
+                }
             }
         }
     }
 
-    if ($_POST['ajax'] === 'remove') {
+    if ($action === 'remove') {
         unset($_SESSION['cart'][$_POST['id']]);
     }
 
-    if ($_POST['ajax'] === 'submit') {
+    if ($action === 'submit') {
         if (!empty($_SESSION['cart'])) {
+            // Update cart quantities from POST
+            if (isset($_POST['qty']) && is_array($_POST['qty'])) {
+                foreach ($_POST['qty'] as $id => $qty) {
+                    if (isset($_SESSION['cart'][$id])) {
+                        $_SESSION['cart'][$id]['qty'] = intval($qty);
+                    }
+                }
+            }
+
             $items = json_encode($_SESSION['cart']);
             $total_price = 0;
             foreach ($_SESSION['cart'] as $it) {
@@ -90,7 +103,7 @@ if (isset($_POST['ajax'])) {
         }
     }
 
-    // Grand total
+    // Generate cart HTML
     $grand = 0;
     foreach ($_SESSION['cart'] as $it) {
         $grand += $it['qty'] * $it['price'];
@@ -208,7 +221,6 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <h6 class="card-title"><?= htmlspecialchars($p['item_name']) ?></h6>
                         <p class="small"><?= htmlspecialchars($p['item_description']) ?></p>
 
-                        <!-- ✅ Price + Unit Display -->
                         <p>
                             <strong>
                                 ₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?>
@@ -257,6 +269,9 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
       <div class="modal-body" id="cartContent">
           <?php include "cart_table.php"; ?>
       </div>
+      <div class="modal-footer">
+        <button class="btn btn-success" id="submitRequest">Submit Purchase Request</button>
+      </div>
     </div>
   </div>
 </div>
@@ -291,25 +306,17 @@ $(document).on("click", ".removeItem", function() {
 
 // Update qty
 $(document).on("input", ".qtyInput", function() {
-    let formData = $("#updateCartForm").serialize();
-    $.post("department_request.php", formData + "&ajax=update", function(res) {
+    let formData = {};
+    $(".qtyInput").each(function() {
+        formData[$(this).data("id")] = $(this).val();
+    });
+    $.post("department_request.php", {ajax:"update", qty: formData}, function(res) {
         let data = JSON.parse(res);
-        $("#cartTotal").text(data.total);
+        $("#cartContent").html(data.cart_html);
         $("#cartCount").text(data.count);
     });
 });
 
-// Submit (Request to Admin)
-$(document).on("click", "#submitRequest", function() {
-    $.post("department_request.php", {ajax:"submit"}, function(res) {
-        let data = JSON.parse(res);
-        alert(data.message);
-        if (data.success) {
-            $("#cartContent").html("<p>Your cart is empty.</p>");
-            $("#cartCount").text("0");
-        }
-    });
-});
 </script>
 </body>
 </html>

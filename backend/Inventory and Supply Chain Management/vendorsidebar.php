@@ -10,7 +10,7 @@
 
 <div class="sidebar">
     <div class="logo-container">
-        <img src="hospitallogo.jpg" alt="Logo"> 
+        <img src="assets/image/logo-dark.png" alt="Logo"> 
         <h2>Supplier Portal</h2>
     </div>
 

@@ -64,6 +64,16 @@ function getDeliveredData($pdo, $purchase_request_id) {
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+// Fetch order items from purchase_requests table
+function getOrderItems($pdo, $purchase_request_id) {
+    $stmt = $pdo->prepare("SELECT items FROM purchase_requests WHERE id = ?");
+    $stmt->execute([$purchase_request_id]);
+    $request = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$request || empty($request['items'])) return [];
+    $items = json_decode($request['items'], true);
+    return $items ?: [];
+}
+
 // Average ratings per vendor
 $stmt = $pdo->prepare("SELECT vendor_id, AVG(rating) AS avg_rating FROM vendor_rating GROUP BY vendor_id");
 $stmt->execute();
@@ -118,6 +128,7 @@ $avgRatings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // vendor_id => avg_rating
                         if($vendorStatus['type'] !== 'processing') continue;
                         $hasProcessing = true;
                         $avgRating = isset($avgRatings[$v['vendor_id']]) ? number_format($avgRatings[$v['vendor_id']],1) : null;
+                        $items = getOrderItems($pdo, $v['purchase_request_id']);
                     ?>
                     <tr>
                         <td><?= htmlspecialchars($v['company_name']) ?></td>
@@ -126,7 +137,66 @@ $avgRatings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // vendor_id => avg_rating
                         <td><?= (int)$v['total_quantity'] ?></td>
                         <td><span class="badge bg-<?= $vendorStatus['color'] ?>"><?= $vendorStatus['text'] ?></span></td>
                         <td>
-                            <a href="vendor_orders_view.php?vendor_id=<?= $v['vendor_id'] ?>&pr_id=<?= $v['purchase_request_id'] ?>" class="btn btn-primary btn-sm">View Items</a>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#itemsModal<?= $v['vendor_id'] ?>_<?= $v['purchase_request_id'] ?>">View Items</button>
+
+                            <!-- Items Modal -->
+                            <div class="modal fade" id="itemsModal<?= $v['vendor_id'] ?>_<?= $v['purchase_request_id'] ?>" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Items for <?= htmlspecialchars($v['company_name']) ?> (Request #<?= $v['purchase_request_id'] ?>)</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <?php if($items): ?>
+                                                <table class="table table-bordered">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Item</th>
+                                                            <th>Unit</th>
+                                                            <th>Quantity</th>
+                                                            <th>Price</th>
+                                                            <th>Subtotal</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php 
+                                                        $total_qty = 0;
+                                                        $total_price = 0;
+                                                        foreach($items as $item): 
+                                                            $qty = isset($item['qty']) ? (int)$item['qty'] : 1;
+                                                            $subtotal = $qty * (float)$item['price'];
+                                                            $total_qty += $qty;
+                                                            $total_price += $subtotal;
+                                                        ?>
+                                                        <tr>
+                                                            <td><?= htmlspecialchars($item['name']) ?></td>
+                                                            <td><?= htmlspecialchars($item['unit_type'] ?? 'Piece') ?></td>
+                                                            <td><?= $qty ?></td>
+                                                            <td>₱<?= number_format((float)$item['price'],2) ?></td>
+                                                            <td>₱<?= number_format($subtotal,2) ?></td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                    <tfoot class="table-dark">
+                                                        <tr>
+                                                            <th colspan="2">Total</th>
+                                                            <th><?= $total_qty ?></th>
+                                                            <th></th>
+                                                            <th>₱<?= number_format($total_price,2) ?></th>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            <?php else: ?>
+                                                <div class="alert alert-info">No items found.</div>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </td>
                         <td><?= $avgRating ? $avgRating.' ⭐' : '-' ?></td>
                     </tr>
@@ -163,6 +233,7 @@ $avgRatings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // vendor_id => avg_rating
                         $stmt = $pdo->prepare("SELECT * FROM vendor_rating WHERE vendor_id=? AND purchase_request_id=?");
                         $stmt->execute([$v['vendor_id'], $v['purchase_request_id']]);
                         $ratingData = $stmt->fetch(PDO::FETCH_ASSOC);
+                        $items = getOrderItems($pdo, $v['purchase_request_id']);
                     ?>
                     <tr>
                         <td><?= htmlspecialchars($v['company_name']) ?></td>
@@ -218,6 +289,65 @@ $avgRatings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // vendor_id => avg_rating
                                                     <button type="submit" name="submit_rating" class="btn btn-primary">Submit</button>
                                                 </div>
                                             </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
+                            <!-- Completed Items Modal (Optional) -->
+                            <?php if($items): ?>
+                                <button class="btn btn-info btn-sm mt-1" data-bs-toggle="modal" data-bs-target="#itemsModal<?= $v['vendor_id'] ?>_<?= $v['purchase_request_id'] ?>">View Items</button>
+
+                                <div class="modal fade" id="itemsModal<?= $v['vendor_id'] ?>_<?= $v['purchase_request_id'] ?>" tabindex="-1">
+                                    <div class="modal-dialog modal-lg">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Items for <?= htmlspecialchars($v['company_name']) ?> (Request #<?= $v['purchase_request_id'] ?>)</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <table class="table table-bordered">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Item</th>
+                                                            <th>Unit</th>
+                                                            <th>Quantity</th>
+                                                            <th>Price</th>
+                                                            <th>Subtotal</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <?php 
+                                                        $total_qty = 0;
+                                                        $total_price = 0;
+                                                        foreach($items as $item): 
+                                                            $qty = isset($item['qty']) ? (int)$item['qty'] : 1;
+                                                            $subtotal = $qty * (float)$item['price'];
+                                                            $total_qty += $qty;
+                                                            $total_price += $subtotal;
+                                                        ?>
+                                                        <tr>
+                                                            <td><?= htmlspecialchars($item['name']) ?></td>
+                                                            <td><?= htmlspecialchars($item['unit_type'] ?? 'Piece') ?></td>
+                                                            <td><?= $qty ?></td>
+                                                            <td>₱<?= number_format((float)$item['price'],2) ?></td>
+                                                            <td>₱<?= number_format($subtotal,2) ?></td>
+                                                        </tr>
+                                                        <?php endforeach; ?>
+                                                    </tbody>
+                                                    <tfoot class="table-dark">
+                                                        <tr>
+                                                            <th colspan="2">Total</th>
+                                                            <th><?= $total_qty ?></th>
+                                                            <th></th>
+                                                            <th>₱<?= number_format($total_price,2) ?></th>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
