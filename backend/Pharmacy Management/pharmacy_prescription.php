@@ -50,7 +50,7 @@ if (!$user) {
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
-            <div class="menu-title">Pharmacy Management | Dashboard</div>
+            <div class="menu-title">Pharmacy Management | Prescription Records</div>
 
             <!----- Sidebar Navigation ----->
 
@@ -112,7 +112,13 @@ if (!$user) {
                     <span style="font-size: 18px;">Drug Expiry Tracking</span>
                 </a>
             </li>
-
+            <li class="sidebar-item">
+                <a href="pharmacy_supply_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    <span style="font-size: 18px;">Supply Request</span>
+                </a>
+            </li>
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -183,7 +189,7 @@ if (!$user) {
 
                     <!-- Prescription Tab -->
                     <div class="tab-pane fade show active" id="prescription" role="tabpanel">
-                        <table class="table">
+                        <table class="table" id="prescriptionTable">
                             <thead>
                                 <tr>
                                     <th>Prescription ID</th>
@@ -291,12 +297,23 @@ if (!$user) {
                                 ?>
                             </tbody>
                         </table>
+                        <!-- Pagination -->
+                        <nav aria-label="Prescription pagination">
+                            <ul class="pagination justify-content-center" id="prescriptionPagination"></ul>
+                        </nav>
                     </div>
+
 
 
                     <!-- Record Tab -->
                     <div class="tab-pane fade" id="record" role="tabpanel">
-                        <table class="table">
+
+                        <!-- 🔍 Search Bar -->
+                        <div class="d-flex justify-content-end mb-3">
+                            <input type="text" id="recordSearchInput" class="form-control w-25" placeholder="Search by Patient Name...">
+                        </div>
+
+                        <table class="table" id="recordTable">
                             <thead>
                                 <tr>
                                     <th>Prescription ID</th>
@@ -306,7 +323,7 @@ if (!$user) {
                                     <th>Total Quantity</th>
                                     <th>Quantity Dispensed</th>
                                     <th>Status</th>
-                                    <th>Payment Type</th> <!-- Added -->
+                                    <th>Payment Type</th>
                                     <th>Note</th>
                                     <th>Dispensed Date</th>
                                     <th>Download</th>
@@ -314,7 +331,6 @@ if (!$user) {
                             </thead>
                             <tbody>
                                 <?php
-                                // Dispensed / Cancelled prescriptions
                                 $sql_records = "
                 SELECT 
                     p.prescription_id,
@@ -327,7 +343,7 @@ if (!$user) {
                     SUM(i.quantity_prescribed) AS total_quantity,
                     SUM(i.quantity_dispensed) AS total_dispensed,
                     p.status,
-                    p.payment_type, -- fetch payment type
+                    p.payment_type,
                     p.note,
                     DATE_FORMAT(MAX(i.dispensed_date), '%b %e, %Y %l:%i%p') AS dispensed_date
                 FROM pharmacy_prescription p
@@ -335,7 +351,8 @@ if (!$user) {
                 JOIN hr_employees e ON p.doctor_id = e.employee_id
                 JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
                 JOIN pharmacy_inventory m ON i.med_id = m.med_id
-                WHERE p.status IN ('Dispensed', 'Cancelled') AND LOWER(e.profession) = 'doctor'
+                WHERE p.status IN ('Dispensed', 'Cancelled') 
+                  AND LOWER(e.profession) = 'doctor'
                 GROUP BY p.prescription_id
                 ORDER BY MAX(i.dispensed_date) DESC
             ";
@@ -393,7 +410,97 @@ if (!$user) {
                                 ?>
                             </tbody>
                         </table>
+                        <!-- Pagination -->
+                        <nav aria-label="Record pagination">
+                            <ul class="pagination justify-content-center" id="recordPagination"></ul>
+                        </nav>
                     </div>
+
+                    <!-- 🔎 Search Script -->
+                    <script>
+                        document.getElementById("recordSearchInput").addEventListener("keyup", function() {
+                            const searchValue = this.value.toLowerCase();
+                            const rows = document.querySelectorAll("#recordTable tbody tr");
+
+                            rows.forEach(row => {
+                                const patientName = row.cells[2].textContent.toLowerCase(); // Patient column
+                                row.style.display = patientName.includes(searchValue) ? "" : "none";
+                            });
+                        });
+
+                        function setupPagination(tableId, paginationId, rowsPerPage = 15) {
+                            let currentPage = 1;
+
+                            function paginate() {
+                                const table = document.getElementById(tableId);
+                                const rows = table.querySelectorAll("tbody tr");
+                                const totalRows = rows.length;
+                                const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+                                // Hide all rows
+                                rows.forEach(row => row.style.display = "none");
+
+                                // Show only rows for current page
+                                const start = (currentPage - 1) * rowsPerPage;
+                                const end = start + rowsPerPage;
+                                for (let i = start; i < end && i < totalRows; i++) {
+                                    rows[i].style.display = "";
+                                }
+
+                                // Build pagination
+                                const pagination = document.getElementById(paginationId);
+                                pagination.innerHTML = "";
+
+                                // Prev button
+                                const prev = document.createElement("li");
+                                prev.className = "page-item" + (currentPage === 1 ? " disabled" : "");
+                                prev.innerHTML = `<a class="page-link" href="#">&laquo;</a>`;
+                                prev.addEventListener("click", e => {
+                                    e.preventDefault();
+                                    if (currentPage > 1) {
+                                        currentPage--;
+                                        paginate();
+                                    }
+                                });
+                                pagination.appendChild(prev);
+
+                                // Page numbers
+                                for (let i = 1; i <= totalPages; i++) {
+                                    const li = document.createElement("li");
+                                    li.className = "page-item" + (i === currentPage ? " active" : "");
+                                    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                                    li.addEventListener("click", e => {
+                                        e.preventDefault();
+                                        currentPage = i;
+                                        paginate();
+                                    });
+                                    pagination.appendChild(li);
+                                }
+
+                                // Next button
+                                const next = document.createElement("li");
+                                next.className = "page-item" + (currentPage === totalPages ? " disabled" : "");
+                                next.innerHTML = `<a class="page-link" href="#">&raquo;</a>`;
+                                next.addEventListener("click", e => {
+                                    e.preventDefault();
+                                    if (currentPage < totalPages) {
+                                        currentPage++;
+                                        paginate();
+                                    }
+                                });
+                                pagination.appendChild(next);
+                            }
+
+                            paginate();
+                        }
+
+                        // Initialize for both tabs
+                        document.addEventListener("DOMContentLoaded", function() {
+                            setupPagination("prescriptionTable", "prescriptionPagination", 15);
+                            setupPagination("recordTable", "recordPagination", 15);
+                        });
+                    </script>
+
 
 
                 </div>

@@ -126,7 +126,13 @@ try {
                     <span style="font-size: 18px;">Drug Expiry Tracking</span>
                 </a>
             </li>
-
+            <li class="sidebar-item">
+                <a href="pharmacy_supply_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    <span style="font-size: 18px;">Supply Request</span>
+                </a>
+            </li>
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -348,6 +354,88 @@ try {
                             <?php endif; ?>
                         </tbody>
                     </table>
+
+                    <!-- Pagination -->
+                    <nav aria-label="Medicine Inventory pagination">
+                        <ul class="pagination justify-content-center" id="medicineInventoryPagination"></ul>
+                    </nav>
+
+
+                    <script>
+                        function setupPagination(tableId, paginationId, rowsPerPage) {
+                            const table = document.getElementById(tableId);
+                            const tbody = table.querySelector("tbody");
+                            const rows = tbody.querySelectorAll("tr");
+                            const pagination = document.getElementById(paginationId);
+
+                            let currentPage = 1;
+                            const totalPages = Math.ceil(rows.length / rowsPerPage);
+
+                            function displayRows() {
+                                rows.forEach((row, index) => {
+                                    row.style.display =
+                                        (index >= (currentPage - 1) * rowsPerPage && index < currentPage * rowsPerPage) ?
+                                        "" : "none";
+                                });
+                            }
+
+                            function updatePagination() {
+                                pagination.innerHTML = "";
+
+                                // Previous button
+                                const prevItem = document.createElement("li");
+                                prevItem.className = `page-item ${currentPage === 1 ? "disabled" : ""}`;
+                                prevItem.innerHTML = `<a class="page-link" href="#">&laquo;</a>`;
+                                prevItem.onclick = (e) => {
+                                    e.preventDefault();
+                                    if (currentPage > 1) {
+                                        currentPage--;
+                                        displayRows();
+                                        updatePagination();
+                                    }
+                                };
+                                pagination.appendChild(prevItem);
+
+                                // Page numbers
+                                for (let i = 1; i <= totalPages; i++) {
+                                    const li = document.createElement("li");
+                                    li.className = `page-item ${i === currentPage ? "active" : ""}`;
+                                    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                                    li.onclick = (e) => {
+                                        e.preventDefault();
+                                        currentPage = i;
+                                        displayRows();
+                                        updatePagination();
+                                    };
+                                    pagination.appendChild(li);
+                                }
+
+                                // Next button
+                                const nextItem = document.createElement("li");
+                                nextItem.className = `page-item ${currentPage === totalPages ? "disabled" : ""}`;
+                                nextItem.innerHTML = `<a class="page-link" href="#">&raquo;</a>`;
+                                nextItem.onclick = (e) => {
+                                    e.preventDefault();
+                                    if (currentPage < totalPages) {
+                                        currentPage++;
+                                        displayRows();
+                                        updatePagination();
+                                    }
+                                };
+                                pagination.appendChild(nextItem);
+                            }
+
+                            if (rows.length > 0) {
+                                displayRows();
+                                updatePagination();
+                            }
+                        }
+
+                        // Initialize pagination when page loads
+                        document.addEventListener("DOMContentLoaded", function() {
+                            setupPagination("medicineInventoryTable", "medicineInventoryPagination", 15); // Show 10 rows per page
+                        });
+                    </script>
 
 
 

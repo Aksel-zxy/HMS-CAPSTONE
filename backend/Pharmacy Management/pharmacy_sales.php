@@ -90,7 +90,7 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
-            <div class="menu-title">Pharmacy Management | Dashboard</div>
+            <div class="menu-title">Pharmacy Management | <span>Sales</span></div>
 
             <!----- Sidebar Navigation ----->
 
@@ -151,7 +151,13 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                     <span style="font-size: 18px;">Drug Expiry Tracking</span>
                 </a>
             </li>
-
+            <li class="sidebar-item">
+                <a href="pharmacy_supply_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    <span style="font-size: 18px;">Supply Request</span>
+                </a>
+            </li>
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -198,7 +204,7 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                         <div class="col-md-6 col-lg-4">
                             <div class="card shadow-sm p-3 rounded-3">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 class="mb-0">Total Sale</h6>
+                                    <h6 class="mb-0" style="font-weight: 700;">Total Sale</h6>
                                     <div class="d-flex align-items-center">
                                         <!-- Period selector -->
                                         <form method="get" class="d-flex align-items-center mb-0 me-2">
@@ -218,7 +224,7 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
 
                         <div class="col-md-6 col-lg-4">
                             <div class="card shadow-sm p-3 rounded-3">
-                                <h6>Total Orders</h6>
+                                <h6 style="font-weight: 700;">Total Orders</h6>
                                 <h3><?= $totalOrders ?></h3>
                             </div>
                         </div>
@@ -240,7 +246,7 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                         <!-- Revenue by Category Chart -->
                         <div class="col-md-6">
                             <div class="card shadow-sm p-3 rounded-3">
-                                <h6>Revenue By Category</h6>
+                                <h6 style="font-weight: 700;">Revenue By Category</h6>
                                 <div style="position: relative; height: 300px; width: 100%;">
                                     <canvas id="categoryChart"></canvas>
                                 </div>
@@ -251,7 +257,7 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                         <div class="col-md-6 col-lg-4">
                             <div class="card shadow-sm p-3 rounded-3">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <h6>Sales Performance</h6>
+                                    <h6 style="font-weight: 700;">Sales Performance</h6>
                                     <form method="get" class="mb-0 d-flex align-items-center">
                                         <i class="fa-solid fa-calendar-days me-2"></i>
                                         <select name="sales_period" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -278,7 +284,7 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                     <div class="row">
                         <div class="col-12">
                             <div class="card shadow-sm p-3 rounded-3">
-                                <h6>Top Selling Products</h6>
+                                <h6 style="font-weight: 700;">Top Selling Products</h6>
                                 <table class="table table-hover">
                                     <thead>
                                         <tr>
