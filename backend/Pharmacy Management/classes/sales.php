@@ -190,4 +190,29 @@ class Sales
 
         return $data;
     }
+    // Dispensed Medicines Today (all payment types)
+    public function getDispensedToday()
+    {
+        $sql = "SELECT SUM(i.quantity_dispensed) AS total
+                FROM pharmacy_prescription_items i
+                JOIN pharmacy_prescription p ON i.prescription_id = p.prescription_id
+                WHERE DATE(i.dispensed_date) = CURDATE()
+                  AND i.quantity_dispensed > 0";
+        $result = $this->conn->query($sql);
+        if (!$result) die("Query failed in getDispensedToday(): " . $this->conn->error);
+
+        $row = $result->fetch_assoc();
+        return $row['total'] ?? 0;
+    }
+
+    // Total Stocks (from inventory)
+    public function getTotalStocks()
+    {
+        $sql = "SELECT SUM(stock_quantity) AS total FROM pharmacy_inventory";
+        $result = $this->conn->query($sql);
+        if (!$result) die("Query failed in getTotalStocks(): " . $this->conn->error);
+
+        $row = $result->fetch_assoc();
+        return $row['total'] ?? 0;
+    }
 }

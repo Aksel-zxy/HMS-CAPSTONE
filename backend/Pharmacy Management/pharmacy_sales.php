@@ -32,6 +32,8 @@ $period = $_GET['period'] ?? 'all';
 // Fetch data based on selected period
 $totalSales      = $sales->getTotalSales($period);
 $totalOrders     = $sales->getTotalOrders($period);
+$dispensedToday  = $sales->getDispensedToday();
+$totalStocks     = $sales->getTotalStocks();
 $categoryDataRaw = $sales->getRevenueByCategory($period);
 $topProducts     = $sales->getTopProducts($period);
 
@@ -64,8 +66,32 @@ foreach ($yearlyLabels as $i => $monthName) {
 $salesPeriod = $_GET['sales_period'] ?? 'week';
 
 
+// Query all medicines
+$query = "SELECT med_name, stock_quantity FROM pharmacy_inventory ORDER BY med_name ASC";
+$result = $conn->query($query);
 
+// Group medicines by stock thresholds
+$noStock = [];
+$lowStock = [];
+$nearLowStock = [];
+$highStock = [];
+
+while ($row = $result->fetch_assoc()) {
+    $qty = (int)$row['stock_quantity'];
+    if ($qty == 0) {
+        $noStock[] = $row;
+    } elseif ($qty >= 1 && $qty <= 10) {
+        $lowStock[] = $row;
+    } elseif ($qty >= 11 && $qty <= 50) {
+        $nearLowStock[] = $row;
+    } else {
+        $highStock[] = $row;
+    }
+}
 ?>
+
+
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -201,7 +227,7 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                 <div id="dashboardContent">
                     <!-- Row 1: Sales Summary -->
                     <div class="row mb-4 align-items-center">
-                        <div class="col-md-6 col-lg-4">
+                        <div class="col-md-6 col-lg-3">
                             <div class="card shadow-sm p-3 rounded-3">
                                 <div class="d-flex align-items-center justify-content-between mb-2">
                                     <h6 class="mb-0" style="font-weight: 700;">Total Sale</h6>
@@ -222,22 +248,37 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                             </div>
                         </div>
 
-                        <div class="col-md-6 col-lg-4">
+                        <div class="col-md-6 col-lg-3">
                             <div class="card shadow-sm p-3 rounded-3">
                                 <h6 style="font-weight: 700;">Total Orders</h6>
                                 <h3><?= $totalOrders ?></h3>
                             </div>
                         </div>
 
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm p-3 rounded-3">
+                                <h6 style="font-weight: 700;">Dispensed Medicines Today</h6>
+                                <h3><?= $dispensedToday ?></h3>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm p-3 rounded-3">
+                                <h6 style="font-weight: 700;">Total Stocks</h6>
+                                <h3><?= $totalStocks ?></h3>
+                            </div>
+                        </div>
+
                         <!-- Download Button -->
-                        <div class="col-md-12 col-lg-4 d-flex justify mt-3 mt-lg-0" style="padding-left: 85px;">
-                            <button id="downloadPDFBtn" class="btn btn-primary">
+                        <div class="col-md-12 d-flex justify-content-end mt-3">
+                            <button id="downloadPDFBtn" class="btn btn-primary" style="margin-right: 100px;">
                                 <i class="fa-solid fa-download me-2"></i>Download Report
                             </button>
                         </div>
 
 
                     </div>
+
 
 
 
@@ -272,10 +313,97 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
                                 </div>
                             </div>
                         </div>
+                    </div>
 
+                    <!-- Stock Thresholds -->
+                    <div class="row mb-4">
+                        <!-- High Stock -->
+                        <div class="col-md-6">
+                            <div class="card shadow-sm p-3 rounded-3">
+                                <h6 style="font-weight: 700; color: green;">High Stock</h6>
 
+                                <div style="max-height: 300px; overflow-y: auto;">
+                                    <ul class="mt-2 mb-0 text-start">
+                                        <?php if (!empty($highStock)): ?>
+                                            <?php foreach ($highStock as $med): ?>
+                                                <li>
+                                                    <?= htmlspecialchars($med['med_name']) ?>
+                                                    <span class="badge bg-success"><?= $med['stock_quantity'] ?></span>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <li>None</li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
 
+                        <!-- Near Low Stock -->
+                        <div class="col-md-6">
+                            <div class="card shadow-sm p-3 rounded-3">
+                                <h6 style="font-weight: 700; color: #ffc107;">Near Low Stock</h6>
 
+                                <div style="max-height: 300px; overflow-y: auto;">
+                                    <ul class="mt-2 mb-0 text-start">
+                                        <?php if (!empty($nearLowStock)): ?>
+                                            <?php foreach ($nearLowStock as $med): ?>
+                                                <li>
+                                                    <?= htmlspecialchars($med['med_name']) ?>
+                                                    <span class="badge bg-warning text-dark"><?= $med['stock_quantity'] ?></span>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <li>None</li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <!-- Low Stock -->
+                        <div class="col-md-6">
+                            <div class="card shadow-sm p-3 rounded-3">
+                                <h6 style="font-weight: 700; color: orange;">Low Stock</h6>
+                                <div style="max-height: 300px; overflow-y: auto;">
+                                    <ul class="mt-2 mb-0 text-start">
+                                        <?php if (!empty($lowStock)): ?>
+                                            <?php foreach ($lowStock as $med): ?>
+                                                <li>
+                                                    <?= htmlspecialchars($med['med_name']) ?>
+                                                    <span class="badge bg-danger"><?= $med['stock_quantity'] ?></span>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <li>None</li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- No Stock -->
+                        <div class="col-md-6">
+                            <div class="card shadow-sm p-3 rounded-3">
+                                <h6 style="font-weight: 700; color: red;">No Stock</h6>
+                                <div style="max-height: 300px; overflow-y: auto;">
+                                    <ul class="mt-2 mb-0 text-start">
+                                        <?php if (!empty($noStock)): ?>
+                                            <?php foreach ($noStock as $med): ?>
+                                                <li>
+                                                    <?= htmlspecialchars($med['med_name']) ?>
+                                                    <span class="badge bg-secondary"><?= $med['stock_quantity'] ?></span>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <li>None</li>
+                                        <?php endif; ?>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
 

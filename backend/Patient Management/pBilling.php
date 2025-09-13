@@ -1,21 +1,8 @@
 <?php
-session_start();
-
 include '../../SQL/config.php';
-require_once 'class/patient.php';
-require_once 'class/caller.php';
-
-$appointmentObj = new caller($conn);
-$appointments = $appointmentObj->getAllAppointments();
-
-$getDoctors = new Caller($conn);
-$doctors = $getDoctors->getDoctors();
-
-$patientObj = new Patient($conn);
-$patients = $patientObj->getAllPatients();
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
-    header('Location: login.php');
+    header('Location: login.php'); // Redirect to login if not logged in
     exit();
 }
 
@@ -24,15 +11,18 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     exit();
 }
 
-
 $query = "SELECT * FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
-?>
 
+if (!$user) {
+    echo "No user found.";
+    exit();
+}
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -40,11 +30,11 @@ $user = $result->fetch_assoc();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Appointment</title>
+    <title>HMS | Patient Management</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="assets/CSS/list.css">
+    <link rel="stylesheet" href="assets/CSS/dashboard.css">
 </head>
 
 <body>
@@ -74,7 +64,6 @@ $user = $result->fetch_assoc();
                 </a>
             </li>
 
-
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse"
                     data-bs-target="#gerald" aria-expanded="true" aria-controls="auth">
@@ -102,8 +91,8 @@ $user = $result->fetch_assoc();
             </li>
 
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
-                    aria-controls="auth">
+                <a href="appointment.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-regular fa-calendar" viewBox="0 0 16 16">
 
@@ -132,8 +121,8 @@ $user = $result->fetch_assoc();
             </li>
 
             <li class="sidebar-item">
-                <a href="pBilling.php   " class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
+                <a href="pBilling.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
+                    aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-solid fa-clock-rotate-left" viewBox="0 0 16 16">
 
@@ -149,6 +138,7 @@ $user = $result->fetch_assoc();
                     aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-regular fa-folder-closed" viewBox="0 0 16 16">
+
                         <path d=" M512 464L128 464C119.2 464 112 456.8 112 448L112 304L528 304L528 448C528 456.8 520.8
                         464 512 464zM528 256L112 256L112 160C112 151.2 119.2 144 128 144L266.7 144C270.2 144 273.5 145.1
                         276.3 147.2L314.7 176C328.5 186.4 345.4 192 362.7 192L512 192C520.8 192 528 199.2 528 208L528
@@ -159,9 +149,6 @@ $user = $result->fetch_assoc();
                     <span style="font-size: 18px;">Summary</span>
                 </a>
             </li>
-
-
-
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -176,13 +163,12 @@ $user = $result->fetch_assoc();
                         </svg>
                     </button>
                 </div>
-
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
                         <span class="username ml-1 me-2"><?php echo $user['fname']; ?>
                             <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton"
-                            data-bs-toggle="dropdown" aria-expanded="true">
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton"
@@ -198,181 +184,20 @@ $user = $result->fetch_assoc();
                                 </a>
                             </li>
                         </ul>
+
                     </div>
                 </div>
             </div>
+
             <!-- START CODING HERE -->
-            <!-- Button to trigger modal -->
-
-            <!-- Modal -->
-            <div class="modal fade" id="appointmentModal" tabindex="-1" aria-labelledby="appointmentModalLabel"
-                aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-
-                        <!-- Modal Header -->
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="appointmentModalLabel">Book Appointment</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-
-                        <!-- Modal Form -->
-                        <form action="class/pcreate.php" method="POST">
-                            <div class="modal-body">
-
-                                <!-- Patient ID -->
-                                <div class="mb-3">
-                                    <label for="patient_search" class="form-label">Patient</label>
-                                    <input class="form-control" list="patientsList" id="patient_search"
-                                        name="patient_search" placeholder="Search patient..." autocomplete="off"
-                                        required>
-                                    <datalist id="patientsList">
-                                        <?php
-                                        if ($patients && $patients->num_rows > 0) {
-                                            while ($patient = $patients->fetch_assoc()) {
-                                                $displayName = "{$patient['fname']} {$patient['mname']} {$patient['lname']}";
-                                                echo "<option value=\"{$displayName}\" data-id=\"{$patient['patient_id']}\"></option>";
-                                            }
-                                        }
-                                        ?>
-                                    </datalist>
-                                    <input type="hidden" id="patient_id" name="patient_id">
-                                </div>
-
-                                <!-- Purpose -->
-                                <div class="mb-3">
-                                    <label for="doctor" class="form-label">Doctor</label>
-                                    <select class="form-select" id="doctor" name="doctor" required>
-                                        <option value="">-- Select Doctor --</option>
-                                        <?php 
-                                        if ($doctors && $doctors->num_rows > 0) {
-                                            while ($doctor = $doctors->fetch_assoc()) {
-                                                $doctorName = "{$doctor['first_name']} {$doctor['last_name']}";
-                                                // The value is employee_id
-                                                echo "<option value=\"{$doctor['employee_id']}\">{$doctorName} - {$doctor['specialization']}</option>";
-                                            }
-                                        } else {
-                                            echo "<option value=\"\">No doctors available</option>";
-                                        }
-                                        ?>
-                                    </select>
-                                </div>
-                                <!-- Appointment Date & Time -->
-                                <div class="mb-3">
-                                    <label for="appointment_date" class="form-label">Appointment Date & Time</label>
-                                    <input type="datetime-local" class="form-control" id="appointment_date"
-                                        name="appointment_date" required>
-                                </div>
-
-                                <!-- Purpose -->
-                                <div class="mb-3">
-                                    <label for="purpose" class="form-label">Purpose</label>
-                                    <input type="text" class="form-control" id="purpose" name="purpose"
-                                        value="Consultation" readonly>
-                                </div>
-
-                                <!-- Status -->
-                                <div class="mb-3">
-                                    <label for="status" class="form-label">Status</label>
-                                    <select class="form-select" id="status" name="status" required>
-                                        <option value="Scheduled" selected>Scheduled</option>
-                                        <option value="Completed">Completed</option>
-                                        <option value="Cancelled">Cancelled</option>
-                                    </select>
-                                </div>
-
-                                <!-- Notes -->
-                                <div class="mb-3">
-
-                                    <label for="notes" class="form-label">Notes</label>
-                                    <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
-                                    <p>Please Indicate what test is taken</p>
-                                </div>
-
-                            </div>
-
-                            <!-- Modal Footer -->
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="submit" class="btn btn-primary">Save Appointment</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
 
 
-
-
-            <div class="container mt-4">
-                <h2 class="mb-4" style="border-bottom:2px solid">All Appointments</h2>
-
-                <div class="container mt-4 mb-4 justify-content-end d-flex">
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal"
-                        data-bs-target="#appointmentModal">
-                        Add Appointment
-                    </button>
-                </div>
-                <!-- Appointment Table -->
-                <table class="table table-hover align-middle overflow-x-auto">
-                    <thead class="text-center">
-                        <tr>
-                            <th class="text-center">Appointment ID</th>
-                            <th class="text-center">Patient </th>
-                            <th class="text-center">Attending Doctor</th>
-                            <th class="text-center">Date & Time</th>
-                            <th class="text-center">Purpose</th>
-                            <th class="text-center">Status</th>
-                            <th class="text-center">Notes</th>
-                            <th class="text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        if ($appointments && $appointments->num_rows > 0) {
-                            while ($row = $appointments->fetch_assoc()) {
-                                echo "<tr>
-                                    <td class='text-center'>{$row['appointment_id']}</td>
-                                    <td class='text-center'>{$row['patient_name']}</td>
-                                    <td class='text-center'>{$row['doctor_name']}</td>
-                                    <td class='text-center'>{$row['appointment_date']}</td>
-                                    <td class='text-center'>{$row['purpose']}</td>
-                                    <td class='text-center'>{$row['status']}</td>
-                                    <td class='text-center'>{$row['notes']}</td>
-                                    <td class='text-center'>
-                                        <a class='btn btn-primary btn-sm' href='edit_appointment.php?appointment_id={$row['appointment_id']}'>Edit</a>
-                                       
-                                    </td>
-                                </tr>";
-                            }
-                        } else {
-                            echo "<tr><td colspan='7' class='text-center'>No appointments found.</td></tr>";
-                        }
-                        ?>
-
-                    </tbody>
-                </table>
-            </div>
-
+            <!-- END CODING HERE -->
         </div>
+        <!----- End of Main Content ----->
+    </div>
 
-        <!-- END CODING HERE -->
-    </div>
-    <!----- End of Main Content ----->
-    </div>
     <script>
-    document.getElementById('patient_search').addEventListener('input', function() {
-        var input = this.value;
-        var options = document.getElementById('patientsList').options;
-        var patientId = '';
-        for (var i = 0; i < options.length; i++) {
-            if (options[i].value === input) {
-                patientId = options[i].getAttribute('data-id');
-                break;
-            }
-        }
-        document.getElementById('patient_id').value = patientId;
-    });
     const toggler = document.querySelector(".toggler-btn");
     toggler.addEventListener("click", function() {
         document.querySelector("#sidebar").classList.toggle("collapsed");
