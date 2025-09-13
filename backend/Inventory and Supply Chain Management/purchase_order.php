@@ -2,6 +2,10 @@
 session_start();
 require 'db.php';
 
+// Show errors for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Ensure user is logged in
 if (!isset($_SESSION['user_id'])) {
     die("You must log in.");
@@ -10,13 +14,18 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 
 // Fetch user info
-$user_stmt = $pdo->prepare("SELECT * FROM users WHERE user_id=?");
+$user_stmt = $pdo->prepare("SELECT * FROM users WHERE user_id=? LIMIT 1");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
 if (!$user) die("User not found.");
 
+// Fallback for department and department_id
+$department = !empty($user['department']) ? $user['department'] : 'N/A';
+$department_id = $user['role'] ?? null;
+
 // --- Fetch budget info ---
-$current_month = date('Y-m'); // keep YYYY-MM format
+$current_month = date('Y-m'); // YYYY-MM
 $budget_stmt = $pdo->prepare("SELECT * FROM department_budgets WHERE user_id=? AND month=? AND status='Approved'");
 $budget_stmt->execute([$user_id, $current_month]);
 $budget = $budget_stmt->fetch(PDO::FETCH_ASSOC);
@@ -34,9 +43,12 @@ if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
 }
 
-// Handle AJAX
+// Handle AJAX requests
 if (isset($_POST['ajax'])) {
-    if ($_POST['ajax'] === 'add') {
+    $action = $_POST['ajax'];
+
+    // Add item to cart
+    if ($action === 'add') {
         $id = $_POST['id'];
         $name = $_POST['name'];
         $price = $_POST['price'];
@@ -56,7 +68,8 @@ if (isset($_POST['ajax'])) {
         }
     }
 
-    if ($_POST['ajax'] === 'update') {
+    // Update quantities
+    if ($action === 'update') {
         foreach ($_POST['qty'] as $id => $qty) {
             if ($qty > 0) {
                 $_SESSION['cart'][$id]['qty'] = $qty;
@@ -64,11 +77,13 @@ if (isset($_POST['ajax'])) {
         }
     }
 
-    if ($_POST['ajax'] === 'remove') {
+    // Remove item
+    if ($action === 'remove') {
         unset($_SESSION['cart'][$_POST['id']]);
     }
 
-    if ($_POST['ajax'] === 'submit') {
+    // Submit purchase request
+    if ($action === 'submit') {
         if (!empty($_SESSION['cart'])) {
             $items = json_encode($_SESSION['cart']);
             $total_price = 0;
@@ -76,13 +91,18 @@ if (isset($_POST['ajax'])) {
                 $total_price += $it['price'] * $it['qty'];
             }
 
-            // Insert purchase request
-            $stmt = $pdo->prepare("INSERT INTO purchase_requests (user_id, month, items, total_price, status, created_at) 
-                VALUES (?, ?, ?, ?, 'Pending', NOW())");
-            $stmt->execute([$user_id, $current_month, $items, $total_price]);
+            // Insert into database
+            $stmt = $pdo->prepare("INSERT INTO purchase_requests 
+                (user_id, department, department_id, month, items, total_price, status, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW())");
 
-            $_SESSION['cart'] = [];
-            echo json_encode(["success" => true, "message" => "Purchase request sent to Admin."]);
+            try {
+                $stmt->execute([$user_id, $department, $department_id, $current_month, $items, $total_price]);
+                $_SESSION['cart'] = [];
+                echo json_encode(["success" => true, "message" => "Purchase request sent to Admin."]);
+            } catch (PDOException $e) {
+                echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
+            }
             exit;
         } else {
             echo json_encode(["success" => false, "message" => "Cart is empty."]);
@@ -90,7 +110,7 @@ if (isset($_POST['ajax'])) {
         }
     }
 
-    // Grand total
+    // Grand total for cart display
     $grand = 0;
     foreach ($_SESSION['cart'] as $it) {
         $grand += $it['qty'] * $it['price'];
@@ -144,6 +164,7 @@ $stmt = $pdo->prepare("SELECT * FROM vendor_products $where ORDER BY item_name A
 $stmt->execute($params);
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -162,7 +183,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>🛒 Purchase Request</h2>
         <div class="text-end">
-            <h5 class="mb-1"><?= htmlspecialchars($user['department']) ?></h5>
+            <h5 class="mb-1"><?= htmlspecialchars($department) ?></h5>
             <p class="mb-0">
                 Allocated Budget: ₱<?= number_format($budget['allocated_budget'], 2) ?>
             </p>
@@ -207,17 +228,9 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="card-body text-center">
                         <h6 class="card-title"><?= htmlspecialchars($p['item_name']) ?></h6>
                         <p class="small"><?= htmlspecialchars($p['item_description']) ?></p>
-
-                        <!-- ✅ Price + Unit Display -->
                         <p>
-                            <strong>
-                                ₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?>
-                                <?php if (($p['unit_type'] ?? '') === "Box" && $p['pcs_per_box']): ?>
-                                    (<?= (int)$p['pcs_per_box'] ?> pcs)
-                                <?php endif; ?>
-                            </strong>
+                            <strong>₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?></strong>
                         </p>
-
                         <button class="btn btn-success btn-sm w-100 addToCart" 
                             data-id="<?= $p['id'] ?>" 
                             data-name="<?= htmlspecialchars($p['item_name']) ?>" 
@@ -266,7 +279,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <script>
 // Add item
 $(document).on("click", ".addToCart", function() {
-    $.post("department_request.php", {
+    $.post("purchase_order.php", {
         ajax: "add",
         id: $(this).data("id"),
         name: $(this).data("name"),
@@ -282,7 +295,7 @@ $(document).on("click", ".addToCart", function() {
 
 // Remove item
 $(document).on("click", ".removeItem", function() {
-    $.post("department_request.php", {ajax:"remove", id:$(this).data("id")}, function(res) {
+    $.post("purchase_order.php", {ajax:"remove", id:$(this).data("id")}, function(res) {
         let data = JSON.parse(res);
         $("#cartContent").html(data.cart_html);
         $("#cartCount").text(data.count);
@@ -292,24 +305,13 @@ $(document).on("click", ".removeItem", function() {
 // Update qty
 $(document).on("input", ".qtyInput", function() {
     let formData = $("#updateCartForm").serialize();
-    $.post("department_request.php", formData + "&ajax=update", function(res) {
+    $.post("purchase_order.php", formData + "&ajax=update", function(res) {
         let data = JSON.parse(res);
         $("#cartTotal").text(data.total);
         $("#cartCount").text(data.count);
     });
 });
 
-// Submit (Request to Admin)
-$(document).on("click", "#submitRequest", function() {
-    $.post("department_request.php", {ajax:"submit"}, function(res) {
-        let data = JSON.parse(res);
-        alert(data.message);
-        if (data.success) {
-            $("#cartContent").html("<p>Your cart is empty.</p>");
-            $("#cartCount").text("0");
-        }
-    });
-});
 </script>
 </body>
 </html>

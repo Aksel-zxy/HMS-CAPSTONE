@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
 
                 if ($received > 0) {
-                    // Convert to pieces if Box
+                    // Determine total pieces for inventory only
                     $final_qty = ($o['unit_type'] === "Box" && $o['pcs_per_box'])
                         ? $received * (int)$o['pcs_per_box']
                         : $received;
@@ -79,7 +79,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                         $stmt2->execute([$item_id, $batch_no, $batch_qty, $now]);
                     }
 
-                    $subtotal += $final_qty * $o['price'];
+                    // ---------------- Subtotal ----------------
+                    // For Box items, subtotal = price per box × received boxes
+                    // For Piece items, subtotal = price per piece × quantity received
+                    if ($o['unit_type'] === "Box") {
+                        $subtotal += $o['price'] * $received;
+                    } else {
+                        $subtotal += $o['price'] * $received;
+                    }
 
                     // Update Vendor Order Status
                     $stmt = $pdo->prepare("UPDATE vendor_orders SET status='Completed' WHERE id=?");
@@ -121,6 +128,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                             ? $received * (int)$o['pcs_per_box']
                             : $received;
 
+                        // Subtotal for this line: price per box or per piece × received quantity
+                        $lineSubtotal = ($o['unit_type'] === "Box") ? $o['price'] * $received : $o['price'] * $received;
+
                         $stmt = $pdo->prepare("
                             INSERT INTO receipt_items 
                             (receipt_id, item_id, item_name, quantity_received, price, subtotal, unit_type, pcs_per_box)
@@ -132,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                             $o['item_name'], 
                             $received,
                             $o['price'], 
-                            $total_pcs * $o['price'],
+                            $lineSubtotal,
                             $o['unit_type'], 
                             $o['pcs_per_box']
                         ]);
@@ -247,10 +257,13 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </thead>
                         <tbody>
                         <?php foreach ($items as $it):
-                            $totalPcs = ($it['unit_type'] === "Box" && $it['pcs_per_box'])
-                                ? $it['quantity'] * (int)$it['pcs_per_box']
-                                : $it['quantity'];
-                            $lineTotal = $totalPcs * $it['price'];
+                            if ($it['unit_type'] === "Box") {
+                                $lineTotal = $it['price'] * $it['quantity'];
+                                $totalPcs = $it['quantity'] * ($it['pcs_per_box'] ?? 0);
+                            } else {
+                                $lineTotal = $it['price'] * $it['quantity'];
+                                $totalPcs = $it['quantity'];
+                            }
                         ?>
                             <tr>
                                 <td><?= htmlspecialchars($it['item_name']) ?></td>
@@ -267,9 +280,10 @@ $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                            min="1" max="<?= $it['quantity'] ?>"
                                            class="form-control qty-input"
                                            data-price="<?= $it['price'] ?>"
+                                           data-unit="<?= $it['unit_type'] ?>"
                                            data-pcs="<?= $it['pcs_per_box'] ?>">
                                 </td>
-                                <td class="subtotal">₱<?= number_format($lineTotal, 2) ?></td>
+                                <td class="subtotal">₱<?= number_format($lineTotal,2) ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
@@ -295,12 +309,21 @@ document.querySelectorAll('.order-form').forEach(form => {
                 if(!qtyInput) return;
 
                 let qty = parseInt(qtyInput.value) || 0;
-                let pcs = parseInt(qtyInput.dataset.pcs) || 1;
                 let price = parseFloat(qtyInput.dataset.price) || 0;
-                let totalPcs = (pcs > 1) ? qty * pcs : qty;
+                let unit = qtyInput.dataset.unit;
+                let pcs = parseInt(qtyInput.dataset.pcs) || 0;
+
+                let subtotal, totalPcs;
+                if (unit === "Box") {
+                    subtotal = price * qty; // price per box × boxes
+                    totalPcs = qty * pcs;   // display only
+                } else {
+                    subtotal = price * qty; // price per piece × qty
+                    totalPcs = qty;
+                }
 
                 row.querySelector('.total-pcs').innerText = totalPcs;
-                row.querySelector('.subtotal').innerText = "₱" + (price * totalPcs).toLocaleString(undefined, {minimumFractionDigits:2});
+                row.querySelector('.subtotal').innerText = "₱" + subtotal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
             });
         });
     });

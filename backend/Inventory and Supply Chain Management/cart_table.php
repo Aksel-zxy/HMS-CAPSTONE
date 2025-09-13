@@ -1,53 +1,9 @@
 <?php
-
-require 'db.php'; // only if you want to save requests to DB
-
-// ✅ Handle Request to Admin
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submitRequest'])) {
-    if (!empty($_SESSION['cart'])) {
-        // Example: save request in DB (optional)
-        /*
-        $stmt = $pdo->prepare("INSERT INTO purchase_requests (user_id, created_at) VALUES (?, NOW())");
-        $stmt->execute([$_SESSION['user_id']]); 
-        $request_id = $pdo->lastInsertId();
-
-        foreach ($_SESSION['cart'] as $id => $item) {
-            $stmt = $pdo->prepare("INSERT INTO purchase_request_items 
-                (request_id, item_id, item_name, qty, price, unit_type, pcs_per_box) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([
-                $request_id,
-                $id,
-                $item['name'],
-                $item['qty'],
-                $item['price'],
-                $item['unit_type'] ?? 'Piece',
-                $item['pcs_per_box'] ?? null
-            ]);
-        }
-        */
-
-        // ✅ Clear cart
-        unset($_SESSION['cart']);
-
-        // ✅ Redirect with success message
-        echo "<script>
-            alert('✅ Request successfully sent to admin!');
-            window.location.href='purchase_order.php';
-        </script>";
-        exit;
-    } else {
-        echo "<script>
-            alert('⚠️ Your cart is empty.');
-            window.location.href='purchase_order.php';
-        </script>";
-        exit;
-    }
-}
+require 'db.php';
 ?>
 
 <?php if (!empty($_SESSION['cart'])): ?>
-<form id="updateCartForm" method="post">
+<form id="updateCartForm">
 <table class="table table-bordered">
     <thead class="table-dark">
         <tr>
@@ -64,23 +20,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submitRequest'])) {
         foreach ($_SESSION['cart'] as $id => $item): 
             $unitType = $item['unit_type'] ?? 'Piece';
             $pcsPerBox = !empty($item['pcs_per_box']) ? (int)$item['pcs_per_box'] : 0;
-
             $total = $item['qty'] * $item['price'];
             $grand += $total;
-
-            if ($unitType === "Box" && $pcsPerBox > 0) {
-                $qtyLabel = "{$item['qty']} Boxes (" . ($item['qty'] * $pcsPerBox) . " pcs)";
-            } else {
-                $qtyLabel = "{$item['qty']} pcs";
-            }
+            $qtyLabel = ($unitType === 'Box' && $pcsPerBox > 0) 
+                        ? "{$item['qty']} Boxes (" . ($item['qty'] * $pcsPerBox) . " pcs)" 
+                        : "{$item['qty']} pcs";
         ?>
-        <tr data-id="<?= $id ?>" 
-            data-unit="<?= htmlspecialchars($unitType) ?>" 
-            data-pcs="<?= $pcsPerBox ?>" 
-            data-price="<?= $item['price'] ?>">
-            
-            <td>
-                <?= htmlspecialchars($item['name']) ?><br>
+        <tr data-id="<?= $id ?>" data-unit="<?= htmlspecialchars($unitType) ?>" data-pcs="<?= $pcsPerBox ?>" data-price="<?= $item['price'] ?>">
+            <td><?= htmlspecialchars($item['name']) ?><br>
                 <small>
                     <?= htmlspecialchars($unitType) ?>
                     <?php if ($unitType === "Box" && $pcsPerBox > 0): ?>
@@ -96,17 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submitRequest'])) {
                        class="form-control qtyInput">
                 <small class="text-muted qtyLabel"><?= $qtyLabel ?></small>
             </td>
-            <td>
-                ₱<?= number_format($item['price'], 2) ?> 
-                <small class="text-muted">/ <?= $unitType ?></small>
-            </td>
+            <td>₱<?= number_format($item['price'], 2) ?></td>
             <td>₱<span class="rowTotal"><?= number_format($total, 2) ?></span></td>
             <td>
-                <button type="button" 
-                        class="btn btn-danger btn-sm removeItem" 
-                        data-id="<?= $id ?>">
-                    Remove
-                </button>
+                <button type="button" class="btn btn-danger btn-sm removeItem" data-id="<?= $id ?>">Remove</button>
             </td>
         </tr>
         <?php endforeach; ?>
@@ -117,43 +57,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submitRequest'])) {
     </tbody>
 </table>
 <div class="d-flex justify-content-between">
-    <button type="submit" name="submitRequest" class="btn btn-primary">Request to Admin</button>
+    <button type="button" id="submitRequest" class="btn btn-primary">Request to Admin</button>
 </div>
 </form>
+<?php else: ?>
+<p class="text-center">🛒 Your cart is empty.</p>
+<?php endif; ?>
 
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-// ✅ Auto-update totals & qty labels
-document.querySelectorAll(".qtyInput").forEach(input => {
-    input.addEventListener("input", function() {
-        const row = this.closest("tr");
-        const unit = row.dataset.unit;
-        const pcsPerBox = parseInt(row.dataset.pcs) || 0;
-        const price = parseFloat(row.dataset.price);
-        const qty = parseInt(this.value) || 1;
-
-        // Update label
-        let label = qty + " pcs";
-        if (unit === "Box" && pcsPerBox > 0) {
-            label = qty + " Boxes (" + (qty * pcsPerBox) + " pcs)";
-        }
-        row.querySelector(".qtyLabel").textContent = label;
-
-        // Update row total
-        const rowTotal = qty * price;
-        row.querySelector(".rowTotal").textContent = rowTotal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-
-        // Update grand total
-        let grand = 0;
-        document.querySelectorAll(".qtyInput").forEach(i => {
-            const r = i.closest("tr");
-            const p = parseFloat(r.dataset.price);
-            const q = parseInt(i.value) || 1;
-            grand += p * q;
-        });
-        document.getElementById("cartTotal").textContent = grand.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+// Remove item
+$(document).on("click", ".removeItem", function() {
+    $.post("purchase_order.php", {ajax:"remove", id:$(this).data("id")}, function(res) {
+        let data = JSON.parse(res);
+        $("#cartContent").html(data.cart_html);
+        $("#cartCount").text(data.count);
     });
 });
+
+// Update qty
+$(document).on("input", ".qtyInput", function() {
+    let formData = $("#updateCartForm").serialize();
+    $.post("purchase_order.php", formData + "&ajax=update", function(res) {
+        let data = JSON.parse(res);
+        $("#cartContent").html(data.cart_html);
+        $("#cartCount").text(data.count);
+    });
+});
+
+
+// Submit request
+$(document).on("click", "#submitRequest", function() {
+    $.post("purchase_order.php", {ajax: "submit"}, function(res) {
+        let data = JSON.parse(res);
+
+        if(data.success) {
+            alert("✅ " + data.message);
+            location.reload();
+        } else if(data.message) {
+            alert("⚠️ " + data.message);
+        }
+    });
+});
+
 </script>
-<?php else: ?>
-    <p>Your cart is empty.</p>
-<?php endif; ?>
