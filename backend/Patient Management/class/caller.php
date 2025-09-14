@@ -201,7 +201,57 @@ public function getRecords($patient_id) {
 
 
 }
+class Apppointment {
+    private $conn;
 
+    public function __construct($conn) {
+        $this->conn = $conn;
+
+  
+       
+    }
+
+    public function book($patient_id, $doctor_id, $appointment_date, $purpose, $status, $notes) {
+        $insert = "INSERT INTO p_appointments (patient_id, doctor_id, appointment_date, purpose, status, notes) 
+                   VALUES (?, ?, ?, ?, ?, ?)";
+        $stmt = $this->conn->prepare($insert);
+        $stmt->bind_param("iissss", $patient_id, $doctor_id, $appointment_date, $purpose, $status, $notes);
+
+        if ($stmt->execute()) {
+            echo "<script>alert('Appointment booked successfully!'); window.location='user_appointment.php';</script>";
+        } else {
+            echo "Error: " . $this->conn->error;
+        }
+    }
+
+    public function getAppointments($patient_id) {
+        $sql = "SELECT a.appointment_id, a.doctor_id, a.patient_id, a.appointment_date, a.purpose, a.status, a.notes,
+                concat(d.first_name, ' ', d.last_name) AS doctor_name
+                FROM p_appointments a 
+                LEFT JOIN hr_employees d ON a.doctor_id = d.employee_id
+                WHERE a.patient_id = ? AND a.status = 'Scheduled'
+                ORDER BY a.appointment_date DESC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param("i", $patient_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result;
+    }
+
+     public function getpastAppointments($patient_id) {
+        $sql = "SELECT a.appointment_id, a.doctor_id, a.patient_id, a.appointment_date, a.purpose, a.status, a.notes,
+                concat(d.first_name, ' ', d.last_name) AS doctor_name
+                FROM p_appointments a 
+                LEFT JOIN hr_employees d ON a.doctor_id = d.employee_id
+                WHERE a.patient_id = ? AND a.status != 'Scheduled'
+                ORDER BY a.appointment_date DESC";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param("i", $patient_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result;
+    }
+}
 
 class PatientAdmission {
     private $conn;
