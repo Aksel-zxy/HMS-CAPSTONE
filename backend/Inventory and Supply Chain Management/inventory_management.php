@@ -119,7 +119,7 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
                         <th>Category</th>
                         <th>Type</th>
                         <th>Sub-Type</th>
-                        <th>Quantity</th>
+                        <th>Total Quantity (pcs)</th>
                         <th>Price</th>
                         <th>Received At</th>
                         <th>Location</th>
@@ -134,7 +134,7 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
                             <td><?= htmlspecialchars($item['category']) ?></td>
                             <td><?= htmlspecialchars($item['item_type']) ?></td>
                             <td><?= htmlspecialchars($item['sub_type']) ?></td>
-                            <td><span class="badge bg-primary"><?= (int)$item['quantity'] ?></span></td>
+                            <td><span class="badge bg-primary"><?= (int)$item['total_qty'] ?></span></td>
                             <td>₱<?= number_format($item['price'],2) ?></td>
                             <td><?= htmlspecialchars($item['received_at']) ?></td>
                             <td><?= htmlspecialchars($item['location']) ?></td>
@@ -154,14 +154,14 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
                                         </div>
                                         <div class="modal-body">
                                             <input type="hidden" name="inventory_id" value="<?= $item['id'] ?>">
-                                            <input type="hidden" name="old_quantity" value="<?= $item['quantity'] ?>">
+                                            <input type="hidden" name="old_quantity" value="<?= $item['total_qty'] ?>">
 
                                             <div class="mb-3">
-                                                <label class="form-label">Current Quantity</label>
-                                                <input type="text" class="form-control" value="<?= $item['quantity'] ?>" disabled>
+                                                <label class="form-label">Current Quantity (pcs)</label>
+                                                <input type="text" class="form-control" value="<?= $item['total_qty'] ?>" disabled>
                                             </div>
                                             <div class="mb-3">
-                                                <label class="form-label">New Quantity</label>
+                                                <label class="form-label">New Quantity (pcs)</label>
                                                 <input type="number" name="new_quantity" class="form-control" required>
                                             </div>
                                             <div class="mb-3">
@@ -215,8 +215,8 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
                         <th>ID</th>
                         <th>Item Name</th>
                         <th>Category</th>
-                        <th>Old Qty</th>
-                        <th>New Qty</th>
+                        <th>Old Qty (pcs)</th>
+                        <th>New Qty (pcs)</th>
                         <th>Reason</th>
                         <th>Adjusted At</th>
                     </tr>

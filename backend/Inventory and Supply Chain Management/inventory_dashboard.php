@@ -58,7 +58,7 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
                             <a href="vendor-application"
                                 class="<?= $currentPage=='vendor-application'?'active-link':'' ?>">Vendor Registration
                                 Approval</a>
-                            <a href="vendor-list"
+                            <a href="vendors"
                                 class="<?= $currentPage=='vendor-list'?'active-link':'' ?>">Vendors</a>
                             <a href="vendor-rating" class="<?= $currentPage=='vendor-rating'?'active-link':'' ?>">Vendor
                                 Rating & Feedback</a>

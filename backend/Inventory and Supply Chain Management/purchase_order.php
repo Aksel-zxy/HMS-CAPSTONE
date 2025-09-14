@@ -2,7 +2,7 @@
 session_start();
 require 'db.php';
 
-// Show errors for debugging
+// Show errors for debugging (remove in production)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -88,7 +88,12 @@ if (isset($_POST['ajax'])) {
             $items = json_encode($_SESSION['cart']);
             $total_price = 0;
             foreach ($_SESSION['cart'] as $it) {
-                $total_price += $it['price'] * $it['qty'];
+                // ✅ Fix: If Box, don't multiply by qty for price
+                if (($it['unit_type'] ?? 'Piece') === 'Box') {
+                    $total_price += $it['price'];
+                } else {
+                    $total_price += $it['price'] * $it['qty'];
+                }
             }
 
             // Insert into database
@@ -100,20 +105,25 @@ if (isset($_POST['ajax'])) {
                 $stmt->execute([$user_id, $department, $department_id, $current_month, $items, $total_price]);
                 $_SESSION['cart'] = [];
                 echo json_encode(["success" => true, "message" => "Purchase request sent to Admin."]);
+                exit; // ✅ prevent extra response
             } catch (PDOException $e) {
                 echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
+                exit; // ✅ prevent extra response
             }
-            exit;
         } else {
             echo json_encode(["success" => false, "message" => "Cart is empty."]);
-            exit;
+            exit; // ✅ prevent extra response
         }
     }
 
     // Grand total for cart display
     $grand = 0;
     foreach ($_SESSION['cart'] as $it) {
-        $grand += $it['qty'] * $it['price'];
+        if (($it['unit_type'] ?? 'Piece') === 'Box') {
+            $grand += $it['price'];
+        } else {
+            $grand += $it['qty'] * $it['price'];
+        }
     }
 
     ob_start();
@@ -311,7 +321,6 @@ $(document).on("input", ".qtyInput", function() {
         $("#cartCount").text(data.count);
     });
 });
-
 </script>
 </body>
 </html>

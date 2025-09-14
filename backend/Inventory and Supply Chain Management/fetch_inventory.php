@@ -2,7 +2,7 @@
 require 'db.php';
 
 $category = $_GET['category'] ?? '';
-$search = $_GET['search'] ?? '';
+$search   = $_GET['search'] ?? '';
 
 $query = "SELECT * FROM inventory WHERE 1=1";
 $params = [];
@@ -18,54 +18,50 @@ if (!empty($search)) {
     $params[] = "%$search%";
 }
 
-$query .= " ORDER BY received_at DESC";
+$query .= " ORDER BY item_name ASC";
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
-$inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
 
-if (empty($inventory)) {
-    echo '<div class="alert alert-warning">No items found.</div>';
-} else {
-    echo '<table class="table table-bordered bg-white table-hover">
-            <thead class="table-dark">
+<table class="table table-bordered table-hover bg-white shadow-sm">
+    <thead class="table-dark">
+        <tr>
+            <th>Item Name</th>
+            <th>Category</th>
+            <th>Unit</th>
+            <th>Qty (Boxes/Pcs)</th>
+            <th>Pcs per Box</th>
+            <th><strong>Total Qty (pcs)</strong></th>
+            <th>Price</th>
+            <th>Last Updated</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php if ($items): ?>
+            <?php foreach ($items as $item): 
+                // ✅ Calculate total qty
+                if ($item['unit_type'] === "Box" && !empty($item['pcs_per_box'])) {
+                    $total_qty = $item['quantity'] * $item['pcs_per_box'];
+                } else {
+                    $total_qty = $item['quantity'];
+                }
+            ?>
                 <tr>
-                    <th>ID</th>
-                    <th>Item Name</th>
-                    <th>Type</th>
-                    <th>Sub Type</th>
-                    <th>Quantity</th>
-                    <th>Price per Unit</th>
-                    <th>Total Value</th>
-                    <th>Unit Type</th>
-                    <th>Pcs per Box</th>
-                    <th>Location</th>
-                    <th>Received Date</th>
+                    <td><?= htmlspecialchars($item['item_name']) ?></td>
+                    <td><?= htmlspecialchars($item['item_type']) ?></td>
+                    <td><?= htmlspecialchars($item['unit_type']) ?></td>
+                    <td><?= (int)$item['quantity'] ?></td>
+                    <td><?= $item['pcs_per_box'] ? (int)$item['pcs_per_box'] : '-' ?></td>
+                    <td><strong><?= $total_qty ?></strong></td>
+                    <td>₱<?= number_format($item['price'], 2) ?></td>
+                    <td><?= $item['updated_at'] ?? $item['received_at'] ?></td>
                 </tr>
-            </thead>
-            <tbody>';
-    foreach ($inventory as $i) {
-        $totalValue = $i['quantity'] * $i['price'];
-
-        // Smarter quantity display
-        if ($i['unit_type'] === 'Box' && !empty($i['pcs_per_box'])) {
-            $qtyDisplay = "{$i['quantity']} Boxes (" . ($i['quantity'] * $i['pcs_per_box']) . " pcs)";
-        } else {
-            $qtyDisplay = "{$i['quantity']} pcs";
-        }
-
-        echo "<tr>
-                <td>{$i['id']}</td>
-                <td>" . htmlspecialchars($i['item_name']) . "</td>
-                <td>" . htmlspecialchars($i['item_type']) . "</td>
-                <td>" . htmlspecialchars($i['sub_type']) . "</td>
-                <td>{$qtyDisplay}</td>
-                <td>₱" . number_format($i['price'], 2) . "</td>
-                <td>₱" . number_format($totalValue, 2) . "</td>
-                <td>" . htmlspecialchars($i['unit_type'] ?? '-') . "</td>
-                <td>" . (!empty($i['pcs_per_box']) ? (int)$i['pcs_per_box'] : '-') . "</td>
-                <td>" . htmlspecialchars($i['location'] ?? 'Main Storage') . "</td>
-                <td>{$i['received_at']}</td>
-              </tr>";
-    }
-    echo "</tbody></table>";
-}
+            <?php endforeach; ?>
+        <?php else: ?>
+            <tr>
+                <td colspan="8" class="text-center">No items found.</td>
+            </tr>
+        <?php endif; ?>
+    </tbody>
+</table>

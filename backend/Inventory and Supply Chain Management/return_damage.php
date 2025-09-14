@@ -2,6 +2,13 @@
 session_start();
 require 'db.php';
 
+// ✅ Ensure user is logged in
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit;
+}
+$user_id = $_SESSION['user_id'];
+
 // Fetch inventory items with their actual vendors (only items with quantity > 0)
 $inventoryStmt = $pdo->query("
     SELECT i.*, vp.id AS product_id, v.id AS vendor_id, v.company_name 
@@ -15,25 +22,38 @@ $items = $inventoryStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $inventory_id = $_POST['inventory_id'];
-    $vendor_id = $_POST['vendor_id'];
-    $quantity = $_POST['quantity'];
-    $reason = $_POST['reason'];
+    $inventory_id = (int)$_POST['inventory_id'];
+    $vendor_id = (int)$_POST['vendor_id'];
+    $quantity = (int)$_POST['quantity'];
+    $reason = trim($_POST['reason']);
 
-    $photoPath = null;
-    if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-        $ext = pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION);
-        $photoPath = 'uploads/returns/' . uniqid() . '.' . $ext;
-        move_uploaded_file($_FILES['photo']['tmp_name'], $photoPath);
+    // ✅ Fetch available stock from DB
+    $checkStmt = $pdo->prepare("SELECT quantity FROM inventory WHERE id = ?");
+    $checkStmt->execute([$inventory_id]);
+    $itemData = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$itemData) {
+        $error = "Invalid item selected.";
+    } elseif ($quantity < 1) {
+        $error = "Quantity must be at least 1.";
+    } elseif ($quantity > $itemData['quantity']) {
+        $error = "Quantity cannot exceed available stock ({$itemData['quantity']}).";
+    } else {
+        $photoPath = null;
+        if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+            $ext = pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION);
+            $photoPath = 'uploads/returns/' . uniqid() . '.' . $ext;
+            move_uploaded_file($_FILES['photo']['tmp_name'], $photoPath);
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO return_requests (inventory_id, vendor_id, requested_by, quantity, reason, photo, status, requested_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW(), NOW())
+        ");
+        $stmt->execute([$inventory_id, $vendor_id, $user_id, $quantity, $reason, $photoPath]);
+
+        $success = "Return/Damage request submitted successfully.";
     }
-
-    $stmt = $pdo->prepare("
-        INSERT INTO return_requests (inventory_id, vendor_id, requested_by, quantity, reason, photo, status, requested_at, updated_at) 
-        VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW(), NOW())
-    ");
-    $stmt->execute([$inventory_id, $vendor_id, $user_id, $quantity, $reason, $photoPath]);
-
-    $success = "Return/Damage request submitted successfully.";
 }
 
 // Fetch all return requests
@@ -74,6 +94,8 @@ body { font-family: Arial, sans-serif; }
 
     <?php if (isset($success)): ?>
         <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
+    <?php elseif (isset($error)): ?>
+        <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
     <!-- Tabs -->
@@ -123,9 +145,10 @@ body { font-family: Arial, sans-serif; }
                 </div>
 
                 <div class="mb-3">
-                    <label for="photo" class="form-label">Upload Photo (optional)</label>
-                    <input type="file" name="photo" id="photo" class="form-control" accept="image/*">
-                </div>
+    <label for="photo" class="form-label">Upload Photo</label>
+    <input type="file" name="photo" id="photo" class="form-control" accept="image/*" required>
+</div>
+
 
                 <button type="submit" class="btn btn-danger">Submit Return Request</button>
             </form>
@@ -203,9 +226,19 @@ $(function(){
 
         $('#vendor_name').val(vendorName);
         $('#vendor_id').val(vendorId);
-        $('#quantity').val(available);
+        $('#quantity').val('');
         $('#quantity').attr('max', available);
         $('#availableQty').text('Available quantity: ' + available);
+    });
+
+    // ✅ Prevent user from entering more than available
+    $('#quantity').on('input', function(){
+        var max = parseInt($(this).attr('max')) || 0;
+        var val = parseInt($(this).val()) || 0;
+        if (val > max) {
+            alert("Quantity cannot exceed available stock (" + max + ").");
+            $(this).val(max);
+        }
     });
 });
 </script>

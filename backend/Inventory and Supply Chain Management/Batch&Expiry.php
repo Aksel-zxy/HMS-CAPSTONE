@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_id'], $_POST['e
     $batch = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($batch) {
-        // If unit is BOX → create separate batch entries for each box
+        // If unit is BOX → create separate batch entries for each box with expiry per box
         if ($batch['unit_type'] === 'Box' && $batch['quantity'] > 1 && is_array($_POST['expiry_date'])) {
             foreach ($_POST['expiry_date'] as $exp) {
                 $stmt = $pdo->prepare("INSERT INTO medicine_batches 
@@ -25,21 +25,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_id'], $_POST['e
                 $stmt->execute([
                     $batch['item_id'],
                     "BATCH-" . uniqid(),
-                    $batch['pcs_per_box'], // store pieces per box
+                    $batch['pcs_per_box'], // pieces per box stored as quantity
                     $exp
                 ]);
             }
-            // Delete placeholder batch
+            // Remove placeholder batch
             $stmt = $pdo->prepare("DELETE FROM medicine_batches WHERE id = ?");
             $stmt->execute([$batch_id]);
         } else {
-            // Single piece/box → update expiry directly
+            // Single box or piece → set expiry directly
             $expiry_date = is_array($_POST['expiry_date']) ? $_POST['expiry_date'][0] : $_POST['expiry_date'];
             $stmt = $pdo->prepare("UPDATE medicine_batches SET expiration_date = ? WHERE id = ?");
             $stmt->execute([$expiry_date, $batch_id]);
         }
 
-        // Update inventory (sum of all valid batches)
+        // Update inventory stock
         $stmt = $pdo->prepare("SELECT SUM(quantity) as total_qty FROM medicine_batches WHERE item_id = ?");
         $stmt->execute([$batch['item_id']]);
         $total_qty = (int)$stmt->fetchColumn();
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_id'], $_POST['e
 }
 
 // ===============================
-// Handle partial dispose expired (loop across batches)
+// Handle disposal of expired meds
 // ===============================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST['dispose_qty'])) {
     $dispose_id = intval($_POST['dispose_id']);
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
 
     if ($item && $dispose_qty > 0 && $dispose_qty <= $item['quantity']) {
         while($dispose_qty > 0) {
-            // Find the first expired batch
+            // Find expired batch
             $stmt = $pdo->prepare("SELECT * FROM medicine_batches 
                                    WHERE item_id = ? AND expiration_date < CURDATE()
                                    ORDER BY id ASC LIMIT 1");
@@ -97,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
             $batch_qty = $batch['quantity'];
             $qty_to_dispose = min($dispose_qty, $batch_qty);
 
-            // Insert into disposed_medicines
+            // Log into disposed_medicines
             $stmt = $pdo->prepare("INSERT INTO disposed_medicines 
                 (batch_id, batch_no, item_name, quantity, price, expiration_date) 
                 VALUES (?, ?, ?, ?, ?, ?)");
@@ -110,11 +110,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
                 $batch['expiration_date']
             ]);
 
-            // Update batch quantity
+            // Update or delete batch
             $stmt = $pdo->prepare("UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ?");
             $stmt->execute([$qty_to_dispose, $batch['id']]);
-
-            // Delete batch if quantity becomes 0
             if ($batch_qty - $qty_to_dispose <= 0) {
                 $stmt = $pdo->prepare("DELETE FROM medicine_batches WHERE id = ?");
                 $stmt->execute([$batch['id']]);
@@ -137,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
 }
 
 // ===============================
-// Fetch newly delivered medicines (without expiry)
+// Fetch new deliveries without expiry
 // ===============================
 $stmt = $pdo->prepare("SELECT mb.*, vp.item_name, vp.price, vp.unit_type, vp.pcs_per_box
                        FROM medicine_batches mb
@@ -148,7 +146,7 @@ $stmt->execute();
 $new_delivered = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===============================
-// Fetch inventory medicines with batch info
+// Fetch inventory with batch info
 // ===============================
 $stmt = $pdo->prepare("
     SELECT i.*, mb.batch_no, mb.expiration_date 
@@ -162,7 +160,7 @@ $stmt->execute();
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ===============================
-// Fetch disposed medicines
+// Fetch disposed meds
 // ===============================
 $stmt = $pdo->prepare("SELECT * FROM disposed_medicines ORDER BY disposed_at DESC");
 $stmt->execute();
@@ -222,7 +220,7 @@ foreach ($rows as $row) {
 <div class="container">
     <h2 class="mb-4">Batch & Expiry Tracking - Medicines</h2>
 
-    <!-- Alert if any expiring in 7 days -->
+    <!-- Alert -->
     <?php if (!empty($seven_days_alert)): ?>
         <div class="alert alert-warning">
             <h6><strong>⚠️ Expiry Alerts</strong></h6>
@@ -243,17 +241,17 @@ foreach ($rows as $row) {
     <?php endif; ?>
 
     <!-- Tabs -->
-    <ul class="nav nav-tabs mb-3" id="medicineTabs" role="tablist">
-        <li class="nav-item"><button class="nav-link" id="new-tab" data-bs-toggle="tab" data-bs-target="#newDelivered" type="button">New Delivered</button></li>
-        <li class="nav-item"><button class="nav-link active" id="stock-tab" data-bs-toggle="tab" data-bs-target="#medicineStocks" type="button">Medicine Stocks</button></li>
-        <li class="nav-item"><button class="nav-link" id="disposed-tab" data-bs-toggle="tab" data-bs-target="#disposedMedicines" type="button">Disposed Medicines</button></li>
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#newDelivered">New Delivered</button></li>
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#medicineStocks">Medicine Stocks</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#disposedMedicines">Disposed Medicines</button></li>
     </ul>
 
     <div class="tab-content border p-3 bg-white rounded-bottom">
         <!-- New Delivered -->
-        <div class="tab-pane fade" id="newDelivered" role="tabpanel">
+        <div class="tab-pane fade" id="newDelivered">
             <?php if (empty($new_delivered)): ?>
-                <p class="text-muted">No newly delivered medicines.</p>
+                <p class="text-muted">No new medicines.</p>
             <?php else: ?>
                 <table class="table table-bordered">
                     <thead class="table-light">
@@ -293,10 +291,10 @@ foreach ($rows as $row) {
         </div>
 
         <!-- Medicine Stocks -->
-        <div class="tab-pane fade show active" id="medicineStocks" role="tabpanel">
+        <div class="tab-pane fade show active" id="medicineStocks">
             <h5>Medicine Stocks</h5>
             <?php if (empty($expired) && empty($near_expiry) && empty($safe)): ?>
-                <p class="text-muted">No medicines available.</p>
+                <p class="text-muted">No medicines in stock.</p>
             <?php else: ?>
                 <table class="table table-bordered">
                     <thead class="table-light">
@@ -336,10 +334,10 @@ foreach ($rows as $row) {
         </div>
 
         <!-- Disposed Medicines -->
-        <div class="tab-pane fade" id="disposedMedicines" role="tabpanel">
+        <div class="tab-pane fade" id="disposedMedicines">
             <h5>Disposed Medicines</h5>
             <?php if (empty($disposed)): ?>
-                <p class="text-muted">No disposed medicines yet.</p>
+                <p class="text-muted">No disposed medicines.</p>
             <?php else: ?>
                 <table class="table table-bordered">
                     <thead class="table-light">
@@ -369,12 +367,11 @@ foreach ($rows as $row) {
                 </table>
             <?php endif; ?>
         </div>
-
     </div>
 </div>
 
 <!-- Dispose Confirmation Modal -->
-<div class="modal fade" id="disposeModal" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="disposeModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header bg-danger text-white">

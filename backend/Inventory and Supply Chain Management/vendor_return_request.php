@@ -16,11 +16,26 @@ if (isset($_GET['action']) && isset($_GET['id'])) {
     $request_id = intval($_GET['id']);
 
     if (in_array($action, ['Approved','Rejected'])) {
-        $stmt = $pdo->prepare("UPDATE return_requests 
-                               SET status = ?, updated_at = NOW() 
-                               WHERE id = ? AND vendor_id = ?");
-        $stmt->execute([$action, $request_id, $vendor_id]);
-        $msg = "Request #$request_id has been marked as $action.";
+        // Fetch the request first
+        $stmt = $pdo->prepare("SELECT * FROM return_requests WHERE id = ? AND vendor_id = ?");
+        $stmt->execute([$request_id, $vendor_id]);
+        $request = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($request) {
+            if ($action === 'Approved') {
+                // ✅ Reduce inventory when approved
+                $updateInv = $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE id = ?");
+                $updateInv->execute([$request['quantity'], $request['inventory_id']]);
+            }
+
+            // Update request status
+            $stmt = $pdo->prepare("UPDATE return_requests 
+                                   SET status = ?, updated_at = NOW() 
+                                   WHERE id = ? AND vendor_id = ?");
+            $stmt->execute([$action, $request_id, $vendor_id]);
+
+            $msg = "Request #$request_id has been marked as $action.";
+        }
     }
 }
 
@@ -36,6 +51,7 @@ $stmt = $pdo->prepare("
 $stmt->execute([$vendor_id]);
 $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">

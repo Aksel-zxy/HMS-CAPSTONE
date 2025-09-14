@@ -94,7 +94,7 @@ $(document).on("click", "#submitRequest", function() {
         if(data.success) {
             alert("✅ " + data.message);
             location.reload();
-        } else if(data.message) {
+        } else if(data.failed) {
             alert("⚠️ " + data.message);
         }
     });
