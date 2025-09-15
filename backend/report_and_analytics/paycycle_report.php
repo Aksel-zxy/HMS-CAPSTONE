@@ -328,7 +328,6 @@ if ($payrollData === null) {
                     </li>
                 </ul>
             </li>
-
             <li class="sidebar-item">
                 <a href="report_dashboard.php" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
                     aria-expanded="true" aria-controls="auth">
@@ -339,13 +338,14 @@ if ($payrollData === null) {
                         <path
                             d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
                     </svg>
-                    <span style="font-size: 18px;">Report and Analytics</span>
+                    <span style="font-size: 18px;">Reporting and Analytics</span>
                 </a>
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
                         <a href="paycycle_report.php" class="sidebar-link">Employee Paycycle Report</a>
                         <a href="annualPayroll_Report.php" class="sidebar-link">Employee Annual Payroll Report</a>
+                        <a href="hospital_income_report.php" class="sidebar-link">Hospital month income statement</a>
                     </li>
                 </ul>
             </li>

@@ -109,6 +109,7 @@ $user = [
                     <li class="sidebar-item">
                         <a href="paycycle_report.php" class="sidebar-link">Employee Paycycle Report</a>
                         <a href="annualPayroll_Report.php" class="sidebar-link">Employee Annual Payroll Report</a>
+                        <a href="hospital_income_report.php" class="sidebar-link">Hospital month income statement</a>
                     </li>
                 </ul>
             </li>

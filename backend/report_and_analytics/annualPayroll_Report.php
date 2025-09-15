@@ -279,7 +279,6 @@
             <header class="header">
                 <div>
                     <h1 class="title">PAYROLL ANNUAL SUMMARY REPORT
-                        <span>Name of Employee: <strong>Becca J. Reed</strong></span>
                     </h1>
                 </div>
             </header>
@@ -296,10 +295,6 @@
                 <div class="kpi">
                     <h4>Total Wage</h4>
                     <p>$13,242</p>
-                </div>
-                <div class="kpi">
-                    <h4>Status</h4>
-                    <p><span class="badge">Active</span></p>
                 </div>
             </section>
 
@@ -387,14 +382,6 @@
                             <td style="text-align:right">$1,083</td>
                         </tr>
                     </tbody>
-                    <tfoot>
-                        <tr>
-                            <td>TOTAL</td>
-                            <td>89h 16m</td>
-                            <td>1938h 23m</td>
-                            <td style="text-align:right">$11,643</td>
-                        </tr>
-                    </tfoot>
                 </table>
             </section>
         </div>
