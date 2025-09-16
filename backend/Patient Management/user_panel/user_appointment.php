@@ -17,8 +17,11 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+
+$appointmentObj = new Apppointment($conn);
 $patientObj = new Patient($conn);
 $callerObj = new Caller($conn);
+$doctors = $callerObj->getDoctors();
 
 // Fetch user details from database
 $query = "SELECT * FROM patient_user WHERE user_id = ?";
@@ -47,10 +50,9 @@ try {
     // Get only this patient's records
     $patients = $patientObj->getPatientsById($patient_id);
 
-    $history = $callerObj->callHistory($patient_id);
-    
-    $records = $callerObj->getRecords($patient_id);
+    $appointments = $appointmentObj -> getAppointments($patient_id);
 
+    $appt = $appointmentObj -> getpastAppointments($patient_id);
 } catch (Exception $e) {
     echo $e->getMessage();
     exit;
@@ -172,7 +174,180 @@ try {
             </div>
 
             <!-- START CODING HERE -->
-            <h1>Under Construction ng DPWH!</h1>
+
+            <div class="modal fade" id="appointmentModal" tabindex="-1" aria-labelledby="appointmentModalLabel"
+                aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+
+                        <!-- Modal Header -->
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="appointmentModalLabel">Book Appointment</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+
+                        <!-- Modal Form -->
+                        <form action="../class/pcreate.php" method="POST">
+                            <div class="modal-body">
+
+                                <!-- Patient ID -->
+                                <!-- Patient (auto-filled from logged-in user) -->
+                                <div class="mb-3">
+                                    <label for="patient_name" class="form-label">Patient</label>
+                                    <input type="text" class="form-control" id="patient_name"
+                                        value="<?php echo $user['fname'] . ' ' . $user['lname']; ?>" readonly>
+                                    <input type="hidden" id="patient_id" name="patient_id"
+                                        value="<?php echo $patient_id; ?>">
+                                </div>
+
+
+                                <!-- Purpose -->
+                                <div class="mb-3">
+                                    <label for="doctor" class="form-label">Doctor</label>
+                                    <select class="form-select" id="doctor" name="doctor" required>
+                                        <option value="">-- Select Doctor --</option>
+                                        <?php 
+                                        if ($doctors && $doctors->num_rows > 0) {
+                                            while ($doctor = $doctors->fetch_assoc()) {
+                                                $doctorName = "{$doctor['first_name']} {$doctor['last_name']}";
+                                                // The value is employee_id
+                                                echo "<option value=\"{$doctor['employee_id']}\">{$doctorName} - {$doctor['specialization']}</option>";
+                                            }
+                                        } else {
+                                            echo "<option value=\"\">No doctors available</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                <!-- Appointment Date & Time -->
+                                <div class="mb-3">
+                                    <label for="appointment_date" class="form-label">Appointment Date & Time</label>
+                                    <input type="datetime-local" class="form-control" id="appointment_date"
+                                        name="appointment_date" required>
+                                </div>
+
+                                <!-- Purpose -->
+                                <div class="mb-3">
+                                    <label for="purpose" class="form-label">Purpose</label>
+                                    <input type="text" class="form-control" id="purpose" name="purpose"
+                                        value="consultation" readonly>
+                                </div>
+
+                                <!-- Status -->
+                                <div class="mb-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <input type="text" class="form-control" id="status" name="status" value="Scheduled"
+                                        readonly>
+                                </div>
+
+
+                                <!-- Notes -->
+                                <div class="mb-3">
+
+                                    <label for="notes" class="form-label">Notes (Optional)</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                                    <p>Please Indicate what you feel</p>
+                                </div>
+
+                            </div>
+
+                            <!-- Modal Footer -->
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="submit" class="btn btn-primary">Save Appointment</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="container mt-4">
+                <h2 class="mb-4" style="border-bottom:2px solid">Pending Appointment</h2>
+
+                <div class="container mt-4 mb-4 justify-content-end d-flex">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                        data-bs-target="#appointmentModal">
+                        Add Appointment
+                    </button>
+                </div>
+                <!-- Appointment Table -->
+                <table class="table table-hover align-middle overflow-x-auto">
+                    <thead class="text-center">
+                        <tr>
+                            <th class="text-center">Appointment ID</th>
+
+                            <th class="text-center">Attending Doctor</th>
+                            <th class="text-center">Date & Time</th>
+                            <th class="text-center">Purpose</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Notes</th>
+
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        if ($appointments && $appointments->num_rows > 0) {
+                            while ($row = $appointments->fetch_assoc()) {
+                                echo "<tr>
+                                    <td class='text-center'>{$row['appointment_id']}</td>
+                                   
+                                    <td class='text-center'>{$row['doctor_name']}</td>
+                                    <td class='text-center'>{$row['appointment_date']}</td>
+                                    <td class='text-center'>{$row['purpose']}</td>
+                                    <td class='text-center'>{$row['status']}</td>
+                                    <td class='text-center'>{$row['notes']}</td>
+                                    
+                                </tr>";
+                            }
+                        } else {
+                            echo "<tr><td colspan='7' class='text-center'>No appointments found.</td></tr>";
+                        }
+                        ?>
+
+                    </tbody>
+                </table>
+            </div>
+
+
+            <!-- Past Appointment-->
+            <div class="container mt-4">
+                <h2 class="mb-4" style="border-bottom:2px solid">Past Appointment</h2>
+
+
+                <!-- Appointment Table -->
+                <table class="table table-hover align-middle overflow-x-auto">
+                    <thead class="text-center">
+                        <tr>
+                            <th class="text-center">Appointment ID</th>
+                            <th class="text-center">Attending Doctor</th>
+                            <th class="text-center">Date & Time</th>
+                            <th class="text-center">Purpose</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-center">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php 
+                        if ($appt && $appt->num_rows > 0) {
+                            while ($row = $appt->fetch_assoc()) {
+                                echo "<tr>
+                                    <td class='text-center'>{$row['appointment_id']}</td>
+                                    <td class='text-center'>{$row['doctor_name']}</td>
+                                    <td class='text-center'>{$row['appointment_date']}</td>
+                                    <td class='text-center'>{$row['purpose']}</td>
+                                    <td class='text-center'>{$row['status']}</td>
+                                    <td class='text-center'>{$row['notes']}</td>
+                                </tr>";
+                            }
+                        } else {
+                            echo "<tr><td colspan='7' class='text-center'>No appointments found.</td></tr>";
+                        }
+                        ?>
+
+                    </tbody>
+                </table>
+            </div>
+
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->

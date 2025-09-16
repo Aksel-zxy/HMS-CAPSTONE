@@ -268,17 +268,14 @@ $user = $result->fetch_assoc();
                                 <div class="mb-3">
                                     <label for="purpose" class="form-label">Purpose</label>
                                     <input type="text" class="form-control" id="purpose" name="purpose"
-                                        value="Consultation" readonly>
+                                        value="consultation" readonly>
                                 </div>
 
                                 <!-- Status -->
                                 <div class="mb-3">
                                     <label for="status" class="form-label">Status</label>
-                                    <select class="form-select" id="status" name="status" required>
-                                        <option value="Scheduled" selected>Scheduled</option>
-                                        <option value="Completed">Completed</option>
-                                        <option value="Cancelled">Cancelled</option>
-                                    </select>
+                                    <input type="text" class="form-control" id="status" name="status" value="Scheduled"
+                                        readonly>
                                 </div>
 
                                 <!-- Notes -->
