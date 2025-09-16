@@ -65,6 +65,7 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
 <link href="assets/css/inventory_management.css" rel="stylesheet">
 </head>
 <body class="bg-light">
+    
 
 <div class="main-sidebar">
     <?php include 'Inventory_dashboard.php'; ?>
@@ -238,6 +239,11 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </div>
 </div>
+
+<div class="main-chatbox">
+    <?php include 'chatbox.php'; ?>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

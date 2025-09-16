@@ -1,6 +1,7 @@
 {
     "require": {
         "dompdf/dompdf": "^3.1",
-        "phpmailer/phpmailer": "*"
+        "phpmailer/phpmailer": "*",
+        "orhanerday/open-ai": "*"
     }
 }
