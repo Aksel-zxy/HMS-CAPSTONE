@@ -250,6 +250,7 @@ try {
                                 </div>
 
                             </div>
+                            <input type="hidden" name="submitted_by" value="patient">
 
                             <!-- Modal Footer -->
                             <div class="modal-footer">

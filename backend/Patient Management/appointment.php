@@ -287,6 +287,7 @@ $user = $result->fetch_assoc();
                                 </div>
 
                             </div>
+                            <input type="hidden" name="submitted_by" value="admin">
 
                             <!-- Modal Footer -->
                             <div class="modal-footer">

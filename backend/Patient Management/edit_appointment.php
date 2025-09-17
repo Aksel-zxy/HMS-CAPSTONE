@@ -103,7 +103,7 @@ $patients = $patientObj->getAllPatients();
             <label for="purpose" class="form-label">Purpose</label>
             <select class="form-select" id="purpose" name="purpose" required>
                 <?php
-                $purposes = ["Labor","Check-up","Consultation","Cardiology","Laboratory","OB-Gyne","Pediatric","Psychiatric"];
+                $purposes = ["Labor","Check-up","consultation","Cardiology","Laboratory","OB-Gyne","Pediatric","Psychiatric"];
                 foreach ($purposes as $p) {
                     $selected = ($p == $appointment['purpose']) ? "selected" : "";
                     echo "<option value='{$p}' $selected>{$p}</option>";
