@@ -1,424 +1,379 @@
 <?php
+require_once 'db.php';
 session_start();
-include '../../SQL/config.php';
-require_once 'classincludes/billing_records_class.php';
 
-if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
-    header('Location: login.php');
-    exit();
+// QR setup
+$vendorAutoload = __DIR__ . '/vendor/autoload.php';
+$qrLocalAvailable = false;
+if (file_exists($vendorAutoload)) {
+    require_once $vendorAutoload;
+    $qrLocalAvailable = class_exists('chillerlan\\QRCode\\QRCode') && class_exists('chillerlan\\QRCode\\QROptions');
 }
 
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
+$gcash_number = "09123456789";
+$payment_text = "GCash Payment to Hospital - Number: $gcash_number";
 
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
-// Classes (Patient + BillingRecords)
-class Patient {
-    public $conn;
-    public $appointmentsTable = "p_appointments";
-    public $patientTable = "patientinfo";
-
-    public function __construct($db) {
-        $this->conn = $db;
-    }
-
-    public function getAllPatients() {
-        $query = "
-            SELECT p.*, a.*
-            FROM {$this->patientTable} p
-            INNER JOIN {$this->appointmentsTable} a 
-                ON p.patient_id = a.patient_id
-            WHERE a.purpose = 'laboratory'
-        ";
-        $result = $this->conn->query($query);
-        return $result->fetch_all(MYSQLI_ASSOC);
-    }
-
-    public function getPatientById($id) {
-        $stmt = $this->conn->prepare("
-            SELECT p.*, a.*
-            FROM {$this->patientTable} p
-            INNER JOIN {$this->appointmentsTable} a 
-                ON p.patient_id = a.patient_id
-            WHERE p.patient_id = ?
-        ");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        return $result->fetch_assoc();
+$qrImageSrc = null;
+if ($qrLocalAvailable) {
+    try {
+        $optsClass = 'chillerlan\\QRCode\\QROptions';
+        $qrClass   = 'chillerlan\\QRCode\\QRCode';
+        $options = new $optsClass([
+            'version'    => 5,
+            'outputType' => $qrClass::OUTPUT_IMAGE_PNG,
+            'eccLevel'   => $qrClass::ECC_L,
+            'scale'      => 5,
+        ]);
+        $png = (new $qrClass($options))->render($payment_text);
+        $qrImageSrc = 'data:image/png;base64,' . base64_encode($png);
+    } catch (Throwable $e) {
+        $qrImageSrc = null;
     }
 }
-
-class BillingRecords {
-    private $conn;
-
-    public function __construct($db) {
-        $this->conn = $db;
-    }
-
-    public function getBillingSummary($patientID) {
-        $query = "
-            SELECT 
-                p.patient_id,
-                CONCAT(p.fname, ' ', COALESCE(p.mname, ''), ' ', p.lname) AS full_name,
-                p.phone_number,
-                p.address,
-                p.discount,
-                ba.assigned_date,
-                ba.released_date,
-                GROUP_CONCAT(dr.result SEPARATOR ', ') AS diagnostic_results,
-                ir.insurance_type,
-                ir.insurance_covered,
-                br.status,
-                br.billing_date,
-                SUM(ds.price) AS price,
-                (SUM(ds.price) - (COALESCE(p.discount, 0) + COALESCE(ir.insurance_covered, 0))) AS out_of_pocket
-            FROM patientinfo p
-            LEFT JOIN p_bed_assignments ba ON p.patient_id = ba.patient_id
-            LEFT JOIN dl_results dr ON p.patient_id = dr.patientID
-            LEFT JOIN insurance_request ir ON p.patient_id = ir.patient_id
-            LEFT JOIN billing_records br ON p.patient_id = br.patient_id
-            LEFT JOIN dl_services ds ON dr.result = ds.serviceName
-            WHERE p.patient_id = ?
-            GROUP BY p.patient_id
-        ";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $patientID);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        return $result->fetch_all(MYSQLI_ASSOC);
-    }
-
-    public function getLabPatients() {
-        $query = "
-            SELECT DISTINCT p.patient_id, p.fname, p.lname 
-            FROM patientinfo p
-            INNER JOIN p_appointments a ON p.patient_id = a.patient_id
-            WHERE a.purpose = 'laboratory'
-        ";
-        $result = $this->conn->query($query);
-        return $result->fetch_all(MYSQLI_ASSOC);
-    }
+if (!$qrImageSrc) {
+    $qrImageSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=png&data=' . urlencode($payment_text);
 }
 
-$billing = new BillingRecords($conn);
-$getpatient = new Patient($conn);
-
-// Get patient ID
+// Get patient_id
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
-$patients = $billing->getLabPatients();
-
-$services = [];
+$billing_id = null;
+$insurance_covered = 0;
+$insurance_company = null;
 $selected_patient = null;
-$insurance_covered = 0; // 🛑 Default to 0
-if ($patient_id > 0) {
-    $services = $billing->getBillingSummary($patient_id);
-    $selected_patient = $getpatient->getPatientById($patient_id);
 
-    // ✅ Set insurance covered if available
-    if (!empty($services) && isset($services[0]['insurance_covered'])) {
-        $insurance_covered = floatval($services[0]['insurance_covered']);
-    }
-}
-
-// Get completed diagnostic services
-$service_items = [];
-$subtotal = 0;
 if ($patient_id > 0) {
-    $sql = "
-        SELECT sch.serviceName, ds.description, ds.price
-        FROM dl_schedule sch
-        LEFT JOIN dl_services ds ON sch.serviceName = ds.serviceName
-        WHERE sch.patientID = ?
-          AND sch.status = 'Completed'
-        ORDER BY sch.scheduleDate DESC, sch.scheduleTime DESC
-        LIMIT 5
-    ";
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $service_items[] = $row;
-        $subtotal += floatval($row['price']);
+    $selected_patient = $stmt->get_result()->fetch_assoc();
+}
+
+// Get latest finalized billing_id
+if ($patient_id > 0) {
+    $stmt = $conn->prepare("SELECT MAX(billing_id) AS latest_billing_id FROM billing_items WHERE patient_id = ? AND finalized=1");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $res = $stmt->get_result()->fetch_assoc();
+    $billing_id = $res['latest_billing_id'] ?? null;
+}
+
+// Fetch insurance coverage & company
+if ($patient_id > 0 && $billing_id) {
+    $stmt = $conn->prepare("
+        SELECT insurance_company, SUM(covered_amount) AS total_covered
+        FROM insurance_requests
+        WHERE patient_id = ? AND status='Approved'
+        GROUP BY insurance_company
+        ORDER BY total_covered DESC
+        LIMIT 1
+    ");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $insurance_covered = floatval($row['total_covered'] ?? 0);
+    $insurance_company = $row['insurance_company'] ?? null;
+}
+
+// Fetch billing items
+$billing_items = [];
+$total_charges = 0;
+$total_discount = 0;
+
+if ($patient_id > 0 && $billing_id) {
+    $stmt = $conn->prepare("
+        SELECT bi.*, ds.description
+        FROM billing_items bi
+        LEFT JOIN dl_services ds ON bi.service_id = ds.serviceID
+        WHERE bi.patient_id = ? AND bi.billing_id = ?
+    ");
+    $stmt->bind_param("ii", $patient_id, $billing_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $billing_items[] = $row;
+        $total_charges += floatval($row['total_price']);
+        $total_discount += floatval($row['discount']);
+    }
+}
+
+// Calculate totals
+$grand_total = $total_charges - $total_discount;
+$total_out_of_pocket = max($grand_total - $insurance_covered, 0);
+
+// Handle payments
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $payment_method = null;
+    $txn_id = 'TXN' . uniqid();
+    $ref = 'N/A';
+
+    if (isset($_POST['confirm_paid']) && $total_out_of_pocket == 0) {
+        // Fully covered by insurance
+        $payment_method = $insurance_company ?: "Insurance";
+        $ref = "Covered by Insurance";
+    } elseif (isset($_POST['make_payment'])) {
+        $payment_method = trim($_POST['payment_method'] ?? '');
+        $ref = $_POST['payment_reference'] ?? 'N/A';
+
+        // Normalize casing
+        $payment_method = ucfirst(strtolower($payment_method));
+
+        if ($payment_method === 'Cash') {
+            $ref = "Cash Payment";
+        }
+    }
+
+    if (!empty($payment_method)) {
+        // Mixed payments
+        if ($insurance_covered > 0 && $total_out_of_pocket > 0) {
+            $payment_method = ($insurance_company ?: "Insurance") . " / " . $payment_method;
+        }
+
+        $is_pwd = $selected_patient['is_pwd'] ?? 0;
+        $stmt = $conn->prepare("INSERT INTO patient_receipt 
+            (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
+            VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, ?, 'Paid', ?, ?, ?)
+        ");
+        $stmt->bind_param(
+            "iidddddsssi",
+            $patient_id,
+            $billing_id,
+            $total_charges,
+            $total_discount,
+            $total_out_of_pocket,
+            $grand_total,
+            $insurance_covered,
+            $payment_method,
+            $txn_id,
+            $ref,
+            $is_pwd
+        );
+
+        if ($stmt->execute()) {
+            $receipt_id = $stmt->insert_id;
+
+            // Journal Entry
+            $reference = "RCPT-" . $receipt_id;
+            $description = "Receipt for Patient #" . $patient_id . " (" . $payment_method . ")";
+            $status = "Posted"; 
+            $created_by = $_SESSION['username'] ?? 'System';
+
+            $stmt2 = $conn->prepare("INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by) 
+                                     VALUES (NOW(), 'billing', ?, ?, ?, ?)");
+            $stmt2->bind_param("ssss", $description, $reference, $status, $created_by);
+            $stmt2->execute();
+            $entry_id = $stmt2->insert_id;
+
+            // Journal Entry Lines
+            if ($insurance_covered >= $grand_total) {
+                // Fully Insurance
+                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
+                                         VALUES (?, 'Accounts Receivable - Insurance', ?, 0, ?)");
+                $stmt3->bind_param("ids", $entry_id, $grand_total, $description);
+                $stmt3->execute();
+
+                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
+                                         VALUES (?, 'Service Revenue', 0, ?, ?)");
+                $stmt3->bind_param("ids", $entry_id, $grand_total, $description);
+                $stmt3->execute();
+            } else {
+                // Mixed or Cash/GCash/Bank/Card
+                if ($insurance_covered > 0) {
+                    $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
+                                             VALUES (?, 'Accounts Receivable - Insurance', ?, 0, ?)");
+                    $stmt3->bind_param("ids", $entry_id, $insurance_covered, $description);
+                    $stmt3->execute();
+                }
+
+                $method = strtolower($_POST['payment_method'] ?? '');
+                $account = match($method) {
+                    'cash' => "Cash on Hand",
+                    'gcash' => "Cash in Bank - GCash",
+                    'bank' => "Cash in Bank",
+                    'card' => "Card Payments",
+                    default => "Cash/Bank"
+                };
+
+                if ($total_out_of_pocket > 0) {
+                    $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
+                                             VALUES (?, ?, ?, 0, ?)");
+                    $stmt3->bind_param("isds", $entry_id, $account, $total_out_of_pocket, $description);
+                    $stmt3->execute();
+                }
+
+                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
+                                         VALUES (?, 'Service Revenue', 0, ?, ?)");
+                $stmt3->bind_param("ids", $entry_id, $grand_total, $description);
+                $stmt3->execute();
+            }
+
+            echo "<script>alert('Payment recorded & Journal Entry created successfully!'); window.location='billing_records.php';</script>";
+            exit;
+        } else {
+            echo "<script>alert('Error saving receipt.');</script>";
+        }
     }
 }
 ?>
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HMS | Billing and Insurance Management</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/billingsummary.css">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
-
+<meta charset="utf-8">
+<title>Billing Summary</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="assets/CSS/billing_summary.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>
+<body class="bg-light p-4">
 
-<body>
-    <div class="d-flex">
-        <!----- Sidebar ----->
-        <aside id="sidebar" class="sidebar-toggle">
-
-            <div class="sidebar-logo mt-3">
-                <img src="assets/image/logo-dark.png" width="90px" height="20px">
-            </div>
-
-            <div class="menu-title">Navigation</div>
-
-            <!----- Sidebar Navigation ----->
-        
-            <li class="sidebar-item">
-                <a href="billing_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
-                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
-                    </svg>
-                    <span style="font-size: 18px;">Dashboard</span>
-                </a>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
-                        viewBox="0 0 16 16" style="margin-bottom: 6px;">
-                        <path
-                            d="M5 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4m4-2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5M9 8a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4A.5.5 0 0 1 9 8m1 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5" />
-                        <path
-                            d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
-                    </svg>
-                    <span style="font-size: 18px;">Billing Management</span>
-                </a>
-
-                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="billing_records.php" class="sidebar-link">Billing Records</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="billing_items.php" class="sidebar-link">Billing Items</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="expense_logs.php" class="sidebar-link">Expense Logs</a>
-                    </li>
-                </ul>
-            </li>
-        </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
-        <div class="main">
-            <div class="topbar">
-                <div class="toggle">
-                    <button class="toggler-btn" type="button">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="30px" height="30px" fill="currentColor" class="bi bi-list-ul"
-                            viewBox="0 0 16 16">
-                            <path fill-rule="evenodd"
-                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m-3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2" />
-                        </svg>
-                    </button>
-                </div>
-                <div class="logo">
-                    <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
-                        <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-person-circle"></i>
-                        </button>
-                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 200px; padding: 10px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background-color: #fff; color: #333;">
-                            <li style="margin-bottom: 8px; font-size: 14px; color: #555;">
-                                <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
-                                    Logout
-                                </a>
-                            </li>
-                        </ul>
-
-                    </div>
-                </div>
-            </div>
-            <!-- START CODING HERE -->
-            <div class="container-fluid billing-summary-container">
-        <div class="row justify-content-center">
-            <div class="col-lg-8">
-                <div>
-    
-    <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
-        <div>
-            <h1 style="margin: 0; font-size: 32px;">Billing Summary</h1>
-        </div>
-        <div style="text-align: right; font-size: 14px;">
-    <strong>Date:</strong> 
-    <?php 
-        if (!empty($services) && isset($services[0]['billing_date'])) {
-            echo date('d F Y', strtotime($services[0]['billing_date']));
-        } else {
-            echo date('d F Y');
-        }
-    ?>
+<div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
 </div>
 
+<div class="receipt-box">
+    <div class="d-flex justify-content-between mb-3">
+        <h4>Billing Summary</h4>
+        <div><?= date('F j, Y') ?></div>
     </div>
 
-    <!-- Patient Info -->
-    <div style="margin-bottom: 40px; font-size: 14px;">
-        <strong>BILLED TO:</strong>
-        <br>
-        <?php 
-            if (!empty($services) && isset($services[0]['full_name'])) {
-                echo htmlspecialchars(trim($services[0]['full_name']));
-            } elseif (!empty($selected_patient)) {
-                $fullName = $selected_patient['fname'] . ' ' . 
-                            (!empty($selected_patient['mname']) ? $selected_patient['mname'] . ' ' : '') . 
-                            $selected_patient['lname'];
-                echo htmlspecialchars($fullName);
-            } else {
-                echo "N/A";
-            }
-        ?><br>
-        <?php 
-            if (!empty($services) && isset($services[0]['phone_number'])) {
-                echo htmlspecialchars($services[0]['phone_number']);
-            } elseif (!empty($selected_patient['phone_number'])) {
-                echo htmlspecialchars($selected_patient['phone_number']);
-            } else {
-                echo "N/A";
-            }
-        ?><br>
-        <?php 
-            if (!empty($services) && isset($services[0]['address'])) {
-                echo htmlspecialchars($services[0]['address']);
-            } elseif (!empty($selected_patient['address'])) {
-                echo htmlspecialchars($selected_patient['address']);
-            } else {
-                echo "N/A";
-            }
-        ?>
+    <div class="mb-2">
+        <strong>BILLED TO:</strong><br>
+        <?= htmlspecialchars($selected_patient ? $selected_patient['fname'].' '.(!empty($selected_patient['mname'])?$selected_patient['mname'].' ':'').$selected_patient['lname'] : 'N/A') ?><br>
+        Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?><br>
+        Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?>
     </div>
 
-    <!-- Billing Table -->
-    <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 40px;">
+    <table class="table table-sm table-bordered mb-3">
         <thead>
             <tr>
-                <th style="border-bottom: 1px solid #ccc; text-align: left; padding-bottom: 8px;">Particulars</th>
-                <th style="border-bottom: 1px solid #ccc; text-align: left; padding-bottom: 8px;">Description</th>
-                <th style="border-bottom: 1px solid #ccc; text-align: right; padding-bottom: 8px;">Actual Charges</th>
+                <th>Service</th>
+                <th>Description</th>
+                <th class="text-end">Amount</th>
             </tr>
         </thead>
         <tbody>
-            <?php 
-                $insurance_covered = 0;
-                if (!empty($service_items)) {
-                    foreach ($service_items as $item) {
-            ?>
-            <tr>
-                <td style="padding: 10px 0;"><?php echo htmlspecialchars($item['serviceName']); ?></td>
-                <td style="padding: 10px 0;"><?php echo htmlspecialchars($item['description']); ?></td>
-                <td style="padding: 10px 0; text-align: right;">₱<?php echo number_format($item['price'], 2); ?></td>
-            </tr>
-            <?php 
-                    }
-                } else { 
-            ?>
-            <tr>
-                <td colspan="3" style="text-align: center; padding: 20px;">No completed services found.</td>
-            </tr>
-            <?php } ?>
+            <?php if (!empty($billing_items)): foreach ($billing_items as $it): ?>
+                <tr>
+                    <td><?= htmlspecialchars($it['service_name']) ?></td>
+                    <td><?= htmlspecialchars($it['description']) ?></td>
+                    <td class="text-end">₱<?= number_format($it['total_price'],2) ?></td>
+                </tr>
+            <?php endforeach; else: ?>
+                <tr><td colspan="3" class="text-center">No billed services found.</td></tr>
+            <?php endif; ?>
         </tbody>
     </table>
 
-    <!-- Totals -->
-    <?php if (!empty($service_items)): ?>
-    <table style="width: 100%; font-size: 14px;">
-    <tr>
-        <td style="text-align: right; padding: 4px 0;">Insurance Covered:</td>
-        <td style="text-align: right; padding: 4px 0; color: red;">
-            - ₱<?= number_format($insurance_covered, 2) ?>
-        </td>
-    </tr>
-    <tr>
-        <td style="text-align: right; padding: 4px 0;">Subtotal:</td>
-        <td style="text-align: right; padding: 4px 0;">
-            ₱<?= number_format($subtotal, 2) ?>
-        </td>
-    </tr>
-    <tr>
-        <td style="text-align: right; font-weight: bold; padding-top: 12px;">Total:</td>
-        <td style="text-align: right; font-weight: bold; padding-top: 12px;">
-            ₱<?= number_format($subtotal - $insurance_covered, 2) ?>
-        </td>
-    </tr>
-</table>
-
-    <?php endif; ?>
-
-    <!-- Thank You -->
-    <p style="margin-top: 60px; font-size: 16px;">Thank you!</p>
-
-    <!-- Optional Payment Info -->
-    <div style="margin-top: 30px; font-size: 12px;">
-        <strong>PAYMENT INFORMATION</strong><br>
-        Bank: N/A<br>
-        Account Name: N/A<br>
-        Account No: N/A<br>
-        Pay by: N/A
+    <div class="text-end mb-3">
+        <strong>Total Charges: ₱<?= number_format($total_charges,2) ?></strong><br>
+        <strong>PWD/Senior Discount: ₱<?= number_format($total_discount,2) ?></strong><br>
+        <strong>Insurance Covered: ₱<?= number_format($insurance_covered,2) ?></strong><br>
+        <strong>Total: ₱<?= number_format($total_out_of_pocket,2) ?></strong>
     </div>
 
-    <!-- Footer Signature -->
-    <div style="margin-top: 40px; font-size: 12px; text-align: right;">
-        <strong>N/A</strong><br>
-        N/A
-    </div>
-</div>
-
-
-                    <?php if (!empty($services) && $patient_id > 0): ?>
-                        <div class="text-end mt-3">
-                            <a 
-                                href="pdf.php?billing_id=<?= isset($services[0]['patient_id']) ? htmlspecialchars($services[0]['patient_id']) : $patient_id ?>" 
-                                target="_blank" 
-                                class="btn btn-primary"
-                            >
-                                Generate Invoice
-                            </a>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
+    <?php if ($total_out_of_pocket > 0): ?>
+        <div class="text-end">
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">Proceed to Payment</button>
         </div>
-    </div>
-    <!-- END CODING HERE -->
+    <?php else: ?>
+        <form method="POST" class="text-end">
+            <button type="submit" name="confirm_paid" class="btn btn-primary">Confirm & Mark as Paid</button>
+        </form>
+    <?php endif; ?>
 </div>
-        <!----- End of Main Content ----->
-    </div>
-    <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    </script>
-    <script src="assets/Bootstrap/all.min.js"></script>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
-</body>
 
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="POST" class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-wallet2 me-2"></i> Payment</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="mb-2 fw-bold">Choose a Payment Method</label>
+          <div class="payment-methods d-flex flex-wrap gap-3">
+            <div class="payment-card" data-value="GCash">
+              <img src="assets/image/gcash.jpg" alt="GCash Logo" width="80">
+              <div>GCash</div>
+            </div>
+            <div class="payment-card" data-value="Bank">
+              <img src="https://cdn-icons-png.flaticon.com/512/2721/2721227.png" alt="Bank" width="60">
+              <div>Bank</div>
+            </div>
+            <div class="payment-card" data-value="Card">
+              <img src="https://cdn-icons-png.flaticon.com/512/196/196561.png" alt="Card" width="60">
+              <div>Card</div>
+            </div>
+            <div class="payment-card" data-value="Cash">
+              <img src="https://cdn-icons-png.flaticon.com/512/2331/2331970.png" alt="Cash" width="60">
+              <div>Cash</div>
+            </div>
+          </div>
+          <input type="hidden" id="payment_method" name="payment_method" required>
+        </div>
+
+        <!-- GCash -->
+        <div id="gcash_box" class="payment-extra text-center">
+          <p class="fw-bold">Hospital Management System</p>
+          <p>Send to GCash: <strong><?= htmlspecialchars($gcash_number) ?></strong></p>
+          <input type="text" name="payment_reference" class="form-control mb-2" placeholder="Enter GCash Reference Number">
+          <img src="<?= htmlspecialchars($qrImageSrc) ?>" alt="GCash QR" width="220" class="border rounded">
+        </div>
+
+        <!-- Bank -->
+        <div id="bank_box" class="payment-extra">
+          <label class="form-label">Bank Transaction Reference</label>
+          <input type="text" name="payment_reference" class="form-control" placeholder="Enter bank reference">
+        </div>
+
+        <!-- Card -->
+        <div id="card_box" class="payment-extra">
+          <label class="form-label">Card Number</label>
+          <input type="text" name="card_number" class="form-control mb-2" placeholder="1234 5678 9012 3456">
+          <div class="d-flex gap-2">
+            <input type="text" name="expiry" class="form-control" placeholder="MM/YY">
+            <input type="text" name="cvv" class="form-control" placeholder="CVV">
+          </div>
+          <input type="text" name="payment_reference" class="form-control mt-2" placeholder="Card Authorization Code">
+        </div>
+
+        <!-- Cash -->
+        <div id="cash_box" class="payment-extra">
+          <p class="fw-bold text-success">
+            <i class="bi bi-cash-stack me-2"></i> Cash Payment Selected
+          </p>
+          <input type="hidden" name="payment_reference" value="Cash">
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="submit" name="make_payment" class="btn btn-success">
+          <i class="bi bi-check-circle me-1"></i> Confirm & Save
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.querySelectorAll('.payment-card').forEach(card => {
+  card.addEventListener('click', function(){
+    document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('payment_method').value = this.dataset.value;
+
+    document.querySelectorAll('.payment-extra').forEach(el => el.style.display = 'none');
+    if(this.dataset.value === 'GCash') document.getElementById('gcash_box').style.display = 'block';
+    if(this.dataset.value === 'Bank') document.getElementById('bank_box').style.display = 'block';
+    if(this.dataset.value === 'Card') document.getElementById('card_box').style.display = 'block';
+    if(this.dataset.value === 'Cash') document.getElementById('cash_box').style.display = 'block';
+  });
+});
+</script>
+</body>
 </html>

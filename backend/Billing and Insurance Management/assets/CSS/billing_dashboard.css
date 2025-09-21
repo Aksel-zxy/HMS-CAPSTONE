@@ -1,0 +1,37 @@
+.dashboard-wrapper {
+    display: flex;
+    transition: all 0.3s ease;
+}
+
+/* Main Content Wrapper */
+.main-content-wrapper {
+    flex-grow: 1;
+    padding: 2rem;
+    transition: margin-left 0.3s ease;
+    margin-left: 250px; /* same as sidebar width */
+}
+
+/* Shift main content when sidebar closed */
+.main-content-wrapper.shifted {
+    margin-left: 0;
+}
+
+/* Cards, table, chart styles remain unchanged from your original CSS */
+.card { border-radius: 1rem; transition: transform 0.2s, box-shadow 0.2s; }
+.card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); }
+.card-title { font-weight: 600; font-size: 1.1rem; }
+.text-bg-primary { background-color: #007bff !important; }
+.text-bg-success { background-color: #28a745 !important; }
+.text-bg-info { background-color: #17a2b8 !important; }
+.text-bg-danger { background-color: #dc3545 !important; }
+.chart-container { position: relative; height: 300px; }
+.table { background-color: #fff; border-radius: 0.5rem; overflow: hidden; }
+.table-hover tbody tr:hover { background-color: rgba(0, 123, 255, 0.1); }
+.table th, .table td { vertical-align: middle !important; }
+.badge { font-size: 0.85rem; padding: 0.5em 0.75em; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    .main-content-wrapper { margin-left: 0; padding: 1rem; }
+    .chart-container { height: 250px; }
+}

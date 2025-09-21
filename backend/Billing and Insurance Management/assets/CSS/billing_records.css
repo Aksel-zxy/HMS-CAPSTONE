@@ -1,0 +1,80 @@
+/* Wrapper to hold sidebar and content */
+.wrapper {
+    display: flex;
+}
+
+/* Sidebar */
+.main-sidebar {
+    width: 260px; /* adjust width as needed */
+    min-height: 100vh;
+    background-color: #ffffff;
+    color: #fff;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+}
+
+/* Main Content */
+.main-content {
+    margin-left: 260px; /* same as sidebar width */
+    padding: 30px 20px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+
+/* Page title */
+.page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #343a40;
+    margin-bottom: 20px;
+}
+
+/* Left aligned button */
+.action-buttons-left {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 20px;
+}
+
+.minimal-btn {
+    padding: 8px 15px;
+    background-color: #007bff;
+    color: #fff;
+    border-radius: 5px;
+    text-decoration: none;
+    transition: background 0.3s ease;
+}
+
+.minimal-btn:hover {
+    background-color: #0056b3;
+}
+
+/* Table styling */
+.billing-records-table {
+    background-color: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(250, 247, 247, 0.1);
+}
+
+.billing-records-table th, .billing-records-table td {
+    text-align: center;
+    padding: 12px;
+}
+
+/* Badge styles */
+.minimal-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: #fff;
+    font-weight: 600;
+}
+
+.bg-success { background-color: #28a745; }
+.bg-warning { background-color: #ffc107; }
+.bg-info { background-color: #17a2b8; }
+.bg-secondary { background-color: #6c757d; }
+
+.bg-warning.text-dark { color: #212529; }
