@@ -1,5 +1,5 @@
 <?php
-require_once 'db.php';
+include '../../SQL/config.php';
 
 // Fetch patients with finalized billing items not yet paid
 $sql = "

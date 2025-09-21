@@ -1,5 +1,5 @@
 <?php
-require_once 'db.php';
+include '../../SQL/config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $patient_id = intval($_POST['patient_id']);

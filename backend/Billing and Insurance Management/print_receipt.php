@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'db.php';
+include '../../SQL/config.php';
 
 // Get billing ID (from receipt)
 $billing_id = isset($_GET['receipt_id']) ? intval($_GET['receipt_id']) : 0;

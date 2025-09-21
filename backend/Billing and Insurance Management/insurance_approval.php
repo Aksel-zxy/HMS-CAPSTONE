@@ -1,5 +1,5 @@
 <?php
-require_once 'db.php';
+include '../../SQL/config.php';
 
 // Handle approve/decline form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['request_id'])) {

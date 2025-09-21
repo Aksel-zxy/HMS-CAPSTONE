@@ -1,6 +1,6 @@
 <?php
-// billing_records.php
-require_once 'db.php';
+
+include '../../SQL/config.php';
 
 // Handle marking payment as Paid
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_paid'])) {

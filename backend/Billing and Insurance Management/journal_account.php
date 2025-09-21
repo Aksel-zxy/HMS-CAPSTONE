@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'db.php';
+include '../../SQL/config.php';
 
 // Fetch billing items (income side)
 $sqlBilling = "SELECT item_id, service_name, total_price, created_at 

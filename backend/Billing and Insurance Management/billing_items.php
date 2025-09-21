@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'db.php';
+include '../../SQL/config.php';
 
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 

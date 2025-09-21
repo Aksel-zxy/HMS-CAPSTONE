@@ -1,5 +1,5 @@
 <?php
-require_once 'db.php';
+include '../../SQL/config.php';
 session_start();
 
 // QR setup

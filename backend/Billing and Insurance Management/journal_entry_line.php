@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'db.php';
+include '../../SQL/config.php';
 
 // ✅ Validate entry_id
 $entry_id = isset($_GET['entry_id']) ? intval($_GET['entry_id']) : 0;

@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'db.php';
+include '../../SQL/config.php';
 
 // Fetch all expenses
 $sql = "SELECT * FROM expense_logs ORDER BY expense_date DESC";

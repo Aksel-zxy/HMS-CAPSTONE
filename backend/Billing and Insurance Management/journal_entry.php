@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once 'db.php';
+include '../../SQL/config.php';
 
 // ✅ Handle Add Journal Entry submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_entry'])) {

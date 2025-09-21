@@ -1,5 +1,5 @@
 <?php
-require_once 'db.php';
+include '../../SQL/config.php';
 require_once 'classincludes/billing_records_class.php';
 
 $vendorAutoload = __DIR__ . '/vendor/autoload.php';
