@@ -75,16 +75,12 @@ if ($appointmentTime < $shift['shift_start'] || $appointmentTime > $shift['shift
     $stmt->bind_param("is", $doctor_id, $appointment_date);
     $stmt->execute();
     $apptResult = $stmt->get_result();
+$submitted_by = $_POST['submitted_by'] ?? 'patient';  // default to patient if not set
 
-    if ($apptResult->num_rows > 0) {
-        header("Location: ../appointment.php?error=Doctor already has an appointment at this time");
-        exit();
-    }
-
-    // --- 3. Insert appointment if valid ---
-    $result = $patient->insertAppointment($data);
-
+if ($submitted_by === 'admin') {
     header("Location: ../appointment.php?success=" . ($result ? "1" : "0"));
-    exit();
+} else {
+    header("Location: ../user_panel/user_appointment.php?success=" . ($result ? "1" : "0"));
+}
 }
 ?>

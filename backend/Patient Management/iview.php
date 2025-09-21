@@ -13,7 +13,8 @@ try {
     $patient_id = $_GET['patient_id'] ?? null;
   
     $patient = $patientObj->getPatientOrFail($patient_id);
-$wtf = $callerObj->getResults($patient_id);
+    
+    $wtf = $callerObj->getResults($patient_id);
     //  Fetch admission/EMR details
     try {
    
@@ -65,6 +66,9 @@ $wtf = $callerObj->getResults($patient_id);
                         <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
                         <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
                         <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['doctor_name']) ?></p>
+                        <p><strong>Weight:</strong> <?= htmlspecialchars($patient['weight']) ?></p>
+                        <p><strong>Height:</strong> <?= htmlspecialchars($patient['height']) ?></p>
+                        <p><strong>Color of eyes:</strong> <?= htmlspecialchars($patient['color_of_eyes']) ?></p>
 
                         <h4 class="mb-0 p-3">Previous Medical History</h4>
                         <div class="card-body">

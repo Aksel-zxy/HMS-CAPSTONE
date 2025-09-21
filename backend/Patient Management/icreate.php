@@ -119,6 +119,30 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             </div>
 
                             <div class="row mb-3">
+                                <!-- Height -->
+                                <label class="col-sm-2 col-form-label">Height</label>
+                                <div class="col-sm-4">
+                                    <input type="text" class="form-control" name="height">
+                                </div>
+
+                                <!-- Weight -->
+                                <label class="col-sm-2 col-form-label">Weight</label>
+                                <div class="col-sm-4">
+                                    <input type="text" class="form-control" name="weight">
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <!-- Color of the Eyes -->
+                                <label class="col-sm-3 col-form-label">Color of the Eyes</label>
+                                <div class="col-sm-9">
+                                    <input type="text" class="form-control" name="Coe">
+                                </div>
+
+                            </div>
+
+
+                            <div class="row mb-3">
                                 <label class="col-sm-3 col-form-label">Admission Type</label>
                                 <div class="col-sm-9">
                                     <input class="form-control" name="admission_type" value="Registered Patient"
