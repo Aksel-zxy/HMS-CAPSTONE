@@ -1,5 +1,7 @@
 <?php
-
+if (!isset($user) || !is_array($user)) {
+    $user = ['fname' => 'Guest', 'lname' => 'User'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
