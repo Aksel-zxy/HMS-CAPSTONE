@@ -1,4 +1,6 @@
 <?php
+include '../../SQL/config.php';
+
 if (!isset($user) || !is_array($user)) {
     $user = ['fname' => 'Guest', 'lname' => 'User'];
 }
