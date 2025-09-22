@@ -1,10 +1,19 @@
 <?php
+
 include '../../SQL/config.php';
 
-if (!isset($user) || !is_array($user)) {
-    $user = ['fname' => 'Guest', 'lname' => 'User'];
+if (isset($_SESSION['user_id'])) {
+    $stmt = $conn->prepare("SELECT fname, lname, username FROM users WHERE user_id = ?");
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
+} else {
+    header('Location: login.php');
+    exit();
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
