@@ -35,13 +35,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 if ($received > 0) {
                     $now = date('Y-m-d H:i:s');
 
-                    // ✅ If Box → convert to total pieces
+                    // ✅ If Box → convert to total pieces for inventory, but subtotal stays per box
                     if ($o['unit_type'] === "Box" && $o['pcs_per_box']) {
-                        $box_qty   = $received; // number of boxes
-                        $total_qty = $box_qty * (int)$o['pcs_per_box']; // convert to pieces
+                        $box_qty   = $received; 
+                        $total_qty = $box_qty * (int)$o['pcs_per_box']; 
+                        $lineSubtotal = $o['price'] * $box_qty; // Price per box
                     } else {
                         $box_qty   = 0;
-                        $total_qty = $received; // already in pieces
+                        $total_qty = $received;
+                        $lineSubtotal = $o['price'] * $received; // Price per piece
                     }
 
                     // ---------------- Inventory Update ----------------
@@ -52,14 +54,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                     if ($inv) {
                         // Update existing inventory
                         $stmt2 = $pdo->prepare("UPDATE inventory 
-                            SET total_qty = total_qty + ?, 
+                            SET quantity = quantity + ?, 
+                                total_qty = total_qty + ?, 
                                 price = ?, 
                                 unit_type = ?, 
                                 pcs_per_box = ?, 
                                 received_at = ? 
                             WHERE item_id=?");
                         $stmt2->execute([
-                            $total_qty,      // always pieces ✅
+                            $received,      
+                            $total_qty,      
                             $o['price'],
                             $o['unit_type'],
                             $o['pcs_per_box'],
@@ -77,8 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                             $o['item_type'],
                             null,
                             $o['sub_type'],
-                            $received,      // as entered (boxes or pcs)
-                            $total_qty,     // always pcs ✅
+                            $received,      
+                            $total_qty,     
                             $o['price'],
                             $o['unit_type'],
                             $o['pcs_per_box'],
@@ -90,13 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                     if (strtolower($o['item_type']) === 'medications and pharmacy supplies') {
                         $batch_no = 'BATCH-' . uniqid();
                         $stmt2 = $pdo->prepare("INSERT INTO medicine_batches 
-                            (item_id, batch_no, quantity, received_at, unit_type, pcs_per_box) 
-                            VALUES (?, ?, ?, ?, ?, ?)");
-                        $stmt2->execute([$item_id, $batch_no, $total_qty, $now, $o['unit_type'], $o['pcs_per_box']]);
+                            (item_id, batch_no, quantity, received_at) 
+                            VALUES (?, ?, ?, ?)");
+                        $stmt2->execute([$item_id, $batch_no, $total_qty, $now]);
                     }
 
                     // ---------------- Subtotal ----------------
-                    $subtotal += $o['price'] * $received;
+                    $subtotal += $lineSubtotal;
 
                     // Mark as completed
                     $stmt = $pdo->prepare("UPDATE vendor_orders SET status='Completed' WHERE id=?");
@@ -133,7 +137,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 foreach ($orders_to_receive as $o) {
                     $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
                     if ($received > 0) {
-                        $lineSubtotal = $o['price'] * $received;
+                        if ($o['unit_type'] === "Box" && $o['pcs_per_box']) {
+                            $lineSubtotal = $o['price'] * $received; // per box
+                        } else {
+                            $lineSubtotal = $o['price'] * $received; // per piece
+                        }
+
                         $stmt = $pdo->prepare("
                             INSERT INTO receipt_items 
                             (receipt_id, item_id, item_name, quantity_received, price, subtotal, unit_type, pcs_per_box)
@@ -161,13 +170,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
 
 // ---------------- Fetch Orders ----------------
 $stmt = $pdo->query("
-    SELECT purchase_request_id, vendor_id, SUM(quantity) AS total_qty, SUM(price*quantity) AS total_price, GROUP_CONCAT(item_id) AS items
-    FROM vendor_orders
-    WHERE status='Shipped'
-    GROUP BY purchase_request_id, vendor_id
+    SELECT vo.purchase_request_id, vo.vendor_id,
+           SUM(vo.quantity) AS total_qty,
+           SUM(vp.price * vo.quantity) AS total_price,
+           GROUP_CONCAT(vo.item_id) AS items
+    FROM vendor_orders vo
+    JOIN vendor_products vp ON vo.item_id = vp.id
+    WHERE vo.status='Shipped'
+    GROUP BY vo.purchase_request_id, vo.vendor_id
 ");
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
