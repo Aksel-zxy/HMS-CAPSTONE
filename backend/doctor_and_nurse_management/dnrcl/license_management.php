@@ -39,15 +39,36 @@ class DoctorDashboard {
 $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
 
-// Fetch all duty assignments
-$duties = [];
-$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at, updated_at FROM duty_assignments");
-if ($duty_res && $duty_res->num_rows > 0) {
-    while ($row = $duty_res->fetch_assoc()) {
-        $duties[] = $row;
+// Fetch unique employees (Doctor/Nurse) who have documents
+$emp_query = "
+    SELECT DISTINCT e.employee_id, e.first_name, e.last_name, e.profession
+    FROM hr_employees_documents d
+    INNER JOIN hr_employees e ON d.employee_id = e.employee_id
+    WHERE e.profession IN ('Doctor', 'Nurse')
+    ORDER BY e.last_name ASC
+";
+$employees = $conn->query($emp_query);
+
+// If modal is triggered, fetch all documents for that employee
+$modal_docs = [];
+$modal_emp_id = $_GET['view_docs'] ?? null;
+if ($modal_emp_id) {
+    $doc_query = "
+        SELECT d.document_id, d.document_type, d.file_path, d.uploaded_at
+        FROM hr_employees_documents d
+        WHERE d.employee_id = ?
+        ORDER BY d.uploaded_at DESC
+    ";
+    $stmt = $conn->prepare($doc_query);
+    $stmt->bind_param("i", $modal_emp_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $modal_docs[] = $row;
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -58,13 +79,14 @@ if ($duty_res && $duty_res->num_rows > 0) {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="../assets/CSS/user_duty.css">
+     <link rel="stylesheet" href="../assets/CSS/license_management.css">
+     
 </head>
 
 <body>
     <div class="d-flex">
         <!----- Sidebar ----->
-        <aside id="sidebar" class="sidebar-toggle">
+       <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
@@ -94,16 +116,16 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="../scheduling_shifts_and_duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="../scheduling_shifts_and_duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="../scheduling_shifts_and_duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="../scheduling_shifts_and_duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -117,10 +139,10 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
+                        <a href="license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
@@ -153,13 +175,10 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                   <li class="sidebar-item">
-                        <a href="Doctor Panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
+                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
-                        <a href="Doctor Panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
-                    </li>
-                        <li class="sidebar-item">
-                        <a href="../Doctor Panel/prescription.php" class="sidebar-link">Prescription</a>
+                        <a href="../Employee/admin.php" class="sidebar-link">Doctor Duty</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -185,10 +204,10 @@ if ($duty_res && $duty_res->num_rows > 0) {
 
                 <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="my_nurse_schedule.php" class="sidebar-link">My Schedule</a>
+                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="nurse_duty.php" class="sidebar-link">Nurse Duty</a>
+                        <a href="../Employee/admin.php" class="sidebar-link">Nurse Duty</a>
                     </li>
                       <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -243,53 +262,82 @@ if ($duty_res && $duty_res->num_rows > 0) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-        <div class="container-fluid">
-            <h2 class="mb-3">📋My Duties</h2>
-            <table class="table table-bordered table-hover duty-table">
-                <thead class="table-info">
-                    <tr>
-                        <th>Duty ID</th>
-                        <th>Doctor ID</th>
-                        <th>Bed ID</th>
-                        <th>Nurse Assistant</th>
-                        <th>Procedure</th>
-                        <th>Equipment</th>
-                        <th>Tools</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($duties)): ?>
-                        <?php foreach ($duties as $duty): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($duty['duty_id']) ?></td>
-                                <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
-                                <td><?= htmlspecialchars($duty['bed_id']) ?></td>
-                                <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
-                                <td><?= htmlspecialchars($duty['procedure']) ?></td>
-                                <td><?= htmlspecialchars($duty['equipment']) ?></td>
-                                <td>
-                                    <?php
-                                    $tools = $duty['tools'];
-                                    if ($tools && ($decoded = json_decode($tools, true))) {
-                                        foreach ($decoded as $tool) {
-                                            echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")<br>";
-                                        }
-                                    } else {
-                                        echo htmlspecialchars($tools);
-                                    }
-                                    ?>
-                                </td>
-                                <td><?= htmlspecialchars($duty['notes']) ?></td>
-                            </tr>
+             <div class="container-fluid">
+
+
+
+             <h2  style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🪪Doctor & Nurse Documents</h2>
+<table>
+    <tr>
+        <th>Employee ID</th>
+        <th>Name</th>
+        <th>Profession</th>
+        <th>View Documents</th>
+    </tr>
+    <?php while ($row = $employees->fetch_assoc()): ?>
+    <tr>
+        <td><?= htmlspecialchars($row['employee_id']); ?></td>
+        <td><?= htmlspecialchars($row['first_name'] . " " . $row['last_name']); ?></td>
+        <td><?= htmlspecialchars($row['profession']); ?></td>
+        <td>
+            <a href="?view_docs=<?= htmlspecialchars($row['employee_id']); ?>" class="btn btn-primary btn-sm">View Documents</a>
+        </td>
+    </tr>
+    <?php endwhile; ?>
+</table>
+
+<?php if ($modal_emp_id): ?>
+<!-- Modal for documents -->
+<div class="modal fade show" id="docsModal" tabindex="-1" aria-modal="true" role="dialog" style="display:block; background:rgba(0,0,0,0.3);">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content rounded shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Documents for Employee ID: <?= htmlspecialchars($modal_emp_id) ?></h5>
+                <a href="license_management.php" class="btn-close"></a>
+            </div>
+            <div class="modal-body">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Document ID</th>
+                            <th>Document Type</th>
+                            <th>View File</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($modal_docs as $doc): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($doc['document_id']); ?></td>
+                            <td><?= htmlspecialchars($doc['document_type']); ?></td>
+                            <td>
+                             <td>
+    <?php if (!empty($doc['file_path'])): ?>
+        <a href="../../HR Management/Recruitment & Onboarding Module/applicants document"<?= urlencode($doc['file_path']); ?>
+           target="_blank" 
+           class="btn btn-info btn-sm">View File</a>
+    <?php else: ?>
+        No File
+    <?php endif; ?>
+</td>
+
+                            </td>
+                        </tr>
                         <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="8">No duty assignments found.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <a href="license_management.php" class="btn btn-secondary">Close</a>
+            </div>
         </div>
-        <!-- END CODING HERE -->
+    </div>
+    <script>document.body.classList.add('modal-open');</script>
+</div>
+<?php endif; ?>
+
+</div>
+
+            <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
     </div>
@@ -298,14 +346,6 @@ if ($duty_res && $duty_res->num_rows > 0) {
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
-    </script>
-    <script src="../assets/Bootstrap/all.min.js"></script>
-    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="../assets/Bootstrap/jq.js"></script>
-</body>
-
-</html>
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

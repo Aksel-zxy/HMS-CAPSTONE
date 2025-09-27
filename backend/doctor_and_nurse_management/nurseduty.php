@@ -39,55 +39,15 @@ class DoctorDashboard {
 $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
 
-// Get filter value for profession
-$filter_profession = $_GET['profession'] ?? '';
-
-// Build WHERE clause for profession filter
-$where = "WHERE profession IN ('Doctor', 'Nurse')";
-if ($filter_profession !== '') {
-    $where .= " AND profession = '" . $conn->real_escape_string($filter_profession) . "'";
-}
-
-// Fetch filtered employees
-$employees = $conn->query("
-    SELECT employee_id, first_name, middle_name, last_name, role, department, specialization, profession, status
-    FROM hr_employees
-    $where
-");
-
-// Handle Create/Update Clinical Profile
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $employee_id = $_POST['employee_id'];
-    $clinical_status = $_POST['clinical_status'];
-    $preferred_shift = $_POST['preferred_shift'];
-    $max_hours = $_POST['max_hours_per_week'];
-
-    // Check if profile exists
-    $check = $conn->query("SELECT * FROM clinical_profiles WHERE employee_id = '$employee_id' ");
-    if ($check->num_rows > 0) {
-        // Update existing profile
-        $conn->query("
-            UPDATE clinical_profiles 
-            SET clinical_status='$clinical_status',
-                preferred_shift='$preferred_shift',
-                max_hours_per_week='$max_hours',
-                last_updated=NOW()
-            WHERE employee_id='$employee_id'
-        ");
-    } else {
-        // Insert new profile
-        $conn->query("
-            INSERT INTO clinical_profiles (employee_id, clinical_status, preferred_shift, max_hours_per_week, onboarding_date, last_updated)
-            VALUES ('$employee_id', '$clinical_status', '$preferred_shift', '$max_hours', NOW(), NOW())
-        ");
+// Fetch all duty assignments
+$duties = [];
+$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at, updated_at FROM duty_assignments");
+if ($duty_res && $duty_res->num_rows > 0) {
+    while ($row = $duty_res->fetch_assoc()) {
+        $duties[] = $row;
     }
-
-    // After save, redirect to this page (not clinical_profiles_admin.php)
-    header("Location: registration_clinical_profile.php?success=1");
-    exit;
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -98,13 +58,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-     <link rel="stylesheet" href="../assets/CSS/clinical_profile.css">
+    <link rel="stylesheet" href="../assets/CSS/user_duty.css">
 </head>
 
 <body>
     <div class="d-flex">
         <!----- Sidebar ----->
-         <aside id="sidebar" class="sidebar-toggle">
+        <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
@@ -134,16 +94,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="scheduling_shifts_and_duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="scheduling_shifts_and_duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="scheduling_shifts_and_duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="scheduling_shifts_and_duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -157,10 +117,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="dnrcl/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="license_management.php" class="sidebar-link">License Management</a>
+                        <a href="dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
@@ -193,10 +153,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                   <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="doctor_panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Doctor Duty</a>
+                        <a href="doctor_panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                    </li>
+                        <li class="sidebar-item">
+                        <a href="../doctor_panel/prescription.php" class="sidebar-link">Prescription</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -222,10 +185,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="my_nurse_schedule.php" class="sidebar-link">My Schedule</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Nurse Duty</a>
+                        <a href="nurse_duty.php" class="sidebar-link">Nurse Duty</a>
                     </li>
                       <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -280,115 +243,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </div>
             <!-- START CODING HERE -->
-
-            <div class="container-fluid">
-
-             <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🧑‍💻Doctor & Nurse Clinical Profile Management</h2>
-            <?php if (isset($_GET['success'])): ?>
-                <div class="alert alert-success">Profile saved successfully!</div>
-            <?php endif; ?>
-
-            <!-- Filter/Search Form for Profession -->
-            <form method="GET" class="mb-3 d-flex gap-3 align-items-end">
-                <div>
-                    <label for="profession" class="form-label mb-0">Profession:</label>
-                    <select name="profession" id="profession" class="form-select">
-                        <option value="">All</option>
-                        <option value="Doctor" <?= $filter_profession=='Doctor'?'selected':'' ?>>Doctor</option>
-                        <option value="Nurse" <?= $filter_profession=='Nurse'?'selected':'' ?>>Nurse</option>
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary">Filter</button>
-                <?php if ($filter_profession): ?>
-                    <a href="registration_clinical_profile.php" class="btn btn-secondary">Reset</a>
-                <?php endif; ?>
-            </form>
-
-            <table class="table table-bordered table-striped">
-                <thead>
+        <div class="container-fluid">
+            <h2 class="mb-3">📋My Duties</h2>
+            <table class="table table-bordered table-hover duty-table">
+                <thead class="table-info">
                     <tr>
-                        <th>Employee</th>
-                        <th>Role</th>
-                        <th>Department</th>
-                        <th>Specialization</th>
-                        <th>Clinical Status</th>
-                        <th>Preferred Shift</th>
-                        <th>Max Hours/Week</th>
-                        <th>Action</th>
+                        <th>Duty ID</th>
+                        <th>Doctor ID</th>
+                        <th>Bed ID</th>
+                        <th>Nurse Assistant</th>
+                        <th>Procedure</th>
+                        <th>Equipment</th>
+                        <th>Tools</th>
+                        <th>Notes</th>
                     </tr>
                 </thead>
                 <tbody>
-                <?php while($row = $employees->fetch_assoc()): 
-                    $empId = $row['employee_id'];
-                    $profile = $conn->query("SELECT * FROM clinical_profiles WHERE employee_id='$empId'")->fetch_assoc();
-                ?>
-                    <tr>
-                        <td><?= $row['first_name']." ".$row['last_name']; ?></td>
-                        <td><?= $row['role']; ?></td>
-                        <td><?= $row['department']; ?></td>
-                        <td><?= $row['specialization']; ?></td>
-                        <td><?= $profile['clinical_status'] ?? 'Not Registered'; ?></td>
-                        <td><?= $profile['preferred_shift'] ?? '-'; ?></td>
-                        <td><?= $profile['max_hours_per_week'] ?? '-'; ?></td>
-                        <td>
-                            <!-- Button trigger modal -->
-                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal<?= $empId ?>">Manage</button>
-                        </td>
-                    </tr>
-
-                    <!-- Modal -->
-                    <div class="modal fade" id="editModal<?= $empId ?>" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <form method="POST">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Manage Profile - <?= $row['first_name']." ".$row['last_name']; ?></h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <input type="hidden" name="employee_id" value="<?= $empId ?>">
-
-                                        <div class="mb-3">
-                                            <label>Clinical Status</label>
-                                            <select name="clinical_status" class="form-select" required>
-                                                <option value="Active" <?= ($profile['clinical_status'] ?? '')=='Active'?'selected':'' ?>>Active</option>
-                                                <option value="Inactive" <?= ($profile['clinical_status'] ?? '')=='Inactive'?'selected':'' ?>>Inactive</option>
-                                                <option value="Suspended" <?= ($profile['clinical_status'] ?? '')=='Suspended'?'selected':'' ?>>Suspended</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label>Preferred Shift</label>
-                                            <select name="preferred_shift" class="form-select">
-                                                <option value="">-- Select --</option>
-                                                <option value="Day" <?= ($profile['preferred_shift'] ?? '')=='Day'?'selected':'' ?>>Day</option>
-                                                <option value="Night" <?= ($profile['preferred_shift'] ?? '')=='Night'?'selected':'' ?>>Night</option>
-                                                <option value="Rotating" <?= ($profile['preferred_shift'] ?? '')=='Rotating'?'selected':'' ?>>Rotating</option>
-                                                <option value="Flexible" <?= ($profile['preferred_shift'] ?? '')=='Flexible'?'selected':'' ?>>Flexible</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="mb-3">
-                                            <label>Max Hours/Week</label>
-                                            <input type="number" name="max_hours_per_week" class="form-control" value="<?= $profile['max_hours_per_week'] ?? '' ?>">
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="submit" class="btn btn-success">Save</button>
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                <?php endwhile; ?>
+                    <?php if (!empty($duties)): ?>
+                        <?php foreach ($duties as $duty): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($duty['duty_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['bed_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
+                                <td><?= htmlspecialchars($duty['procedure']) ?></td>
+                                <td><?= htmlspecialchars($duty['equipment']) ?></td>
+                                <td>
+                                    <?php
+                                    $tools = $duty['tools'];
+                                    if ($tools && ($decoded = json_decode($tools, true))) {
+                                        foreach ($decoded as $tool) {
+                                            echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")<br>";
+                                        }
+                                    } else {
+                                        echo htmlspecialchars($tools);
+                                    }
+                                    ?>
+                                </td>
+                                <td><?= htmlspecialchars($duty['notes']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="8">No duty assignments found.</td></tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
-  
-</div>
-           
-            <!-- END CODING HERE -->
+        </div>
+        <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
     </div>
@@ -397,6 +298,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+    </script>
+    <script src="../assets/Bootstrap/all.min.js"></script>
+    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="../assets/Bootstrap/jq.js"></script>
+</body>
+
+</html>
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

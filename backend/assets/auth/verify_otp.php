@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php");
                 break;
             case '2':
-                header("Location: " . BASE_URL . "backend/Doctor and Nurse Management/doctor_dashboard.php");
+                header("Location: " . BASE_URL . "backend/doctor_and_nurse_management/doctor_dashboard.php");
                 break;
             case '3':
                 header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php");

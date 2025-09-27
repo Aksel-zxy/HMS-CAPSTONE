@@ -119,16 +119,16 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="../scheduling_shifts_and_duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="../scheduling_shifts_and_duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="../scheduling_shifts_and_duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="../scheduling_shifts_and_duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -142,10 +142,10 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="../dnrcl/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
+                        <a href="../dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>

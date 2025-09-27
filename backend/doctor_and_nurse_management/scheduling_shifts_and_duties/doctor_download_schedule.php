@@ -1,5 +1,5 @@
 <?php
-require_once('../../pharmacy_management/tcpdf/tcpdf.php');
+require_once('../../Pharmacy Management/tcpdf/tcpdf.php');
 include '../../../SQL/config.php';
 
 if (!isset($_GET['employee_id']) || empty(trim($_GET['employee_id']))) {
@@ -9,7 +9,7 @@ if (!isset($_GET['employee_id']) || empty(trim($_GET['employee_id']))) {
 
 $emp_id = trim($_GET['employee_id']);
 
-// 1. Fetch nurse info
+// 1. Fetch doctor info
 $stmt = $conn->prepare("
     SELECT employee_id, first_name, middle_name, last_name, profession, department 
     FROM hr_employees 
@@ -18,11 +18,11 @@ $stmt = $conn->prepare("
 $stmt->bind_param("s", $emp_id);
 $stmt->execute();
 $result = $stmt->get_result();
-$nurse = $result->fetch_assoc();
+$doctor = $result->fetch_assoc();
 $stmt->close();
 
-if (!$nurse) {
-    echo "Nurse not found.";
+if (!$doctor) {
+    echo "Doctor not found.";
     exit;
 }
 
@@ -40,7 +40,7 @@ $schedules = $sched_result->fetch_all(MYSQLI_ASSOC);
 $sched_stmt->close();
 
 if (!$schedules || count($schedules) === 0) {
-    echo "No schedules found for this nurse.";
+    echo "No schedules found for this doctor.";
     exit;
 }
 
@@ -48,21 +48,21 @@ if (!$schedules || count($schedules) === 0) {
 $pdf = new TCPDF();
 $pdf->SetCreator(PDF_CREATOR);
 $pdf->SetAuthor('Hospital MIS');
-$pdf->SetTitle('Nurse Schedule');
+$pdf->SetTitle('Doctor Schedule');
 $pdf->AddPage();
 $pdf->SetFont('helvetica', '', 12);
 
-// Nurse info
+// Doctor info
 $full_name = trim(
-    ($nurse['first_name'] ?? '') . ' ' .
-        ($nurse['middle_name'] ?? '') . ' ' .
-        ($nurse['last_name'] ?? '')
+    ($doctor['first_name'] ?? '') . ' ' .
+    ($doctor['middle_name'] ?? '') . ' ' .
+    ($doctor['last_name'] ?? '')
 );
-$employee_id = htmlspecialchars($nurse['employee_id'] ?? '');
-$profession = htmlspecialchars($nurse['profession'] ?? '');
-$department = htmlspecialchars($nurse['department'] ?? '');
+$employee_id = htmlspecialchars($doctor['employee_id'] ?? '');
+$profession = htmlspecialchars($doctor['profession'] ?? '');
+$department = htmlspecialchars($doctor['department'] ?? '');
 
-$html = "<h2>Nurse Schedule</h2>
+$html = "<h2>Doctor Schedule</h2>
     <p><strong>Name:</strong> {$full_name}</p>
     <p><strong>Employee ID:</strong> {$employee_id}</p>
     <p><strong>Profession:</strong> {$profession}</p>
@@ -70,12 +70,12 @@ $html = "<h2>Nurse Schedule</h2>
 
 // Days mapping (adjust based on DB column names)
 $days = [
-    'Monday' => 'mon',
-    'Tuesday' => 'tue',
-    'Wednesday' => 'wed',
-    'Thursday' => 'thu',
-    'Friday' => 'fri',
-    'Saturday' => 'sat',
+    'Monday' => 'mon', 
+    'Tuesday' => 'tue', 
+    'Wednesday' => 'wed', 
+    'Thursday' => 'thu', 
+    'Friday' => 'fri', 
+    'Saturday' => 'sat', 
     'Sunday' => 'sun'
 ];
 
@@ -115,4 +115,5 @@ foreach ($schedules as $sched) {
 }
 
 $pdf->writeHTML($html, true, false, true, false, '');
-$pdf->Output("nurse_schedule_{$employee_id}.pdf", 'D');
+$pdf->Output("doctor_schedule_{$employee_id}.pdf", 'D');
+?>

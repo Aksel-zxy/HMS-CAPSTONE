@@ -1,13 +1,13 @@
 <?php
 include '../../../SQL/config.php';
-require_once '../class/DoctorShiftScheduling.php';
+require_once '../class/NurseShiftScheduling.php';
 
-$doctorSched = new DoctorShiftScheduling($conn);
-$user = $doctorSched->user;
-$days = $doctorSched->days;
-$doctors = $doctorSched->doctors;
-$professions = $doctorSched->professions;
-$departments = $doctorSched->departments;
+$nurseSched = new NurseShiftScheduling($conn);
+$user = $nurseSched->user;
+$days = $nurseSched->days;
+$nurses = $nurseSched->nurses;
+$professions = $nurseSched->professions;
+$departments = $nurseSched->departments;
 
 // Handle schedule form submission (CREATE)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
     $check_result = $check_stmt->get_result();
 
     if (empty($employee_id) || $check_result->num_rows === 0) {
-        $error = "Selected employee ID does not exist or is empty. Please choose a valid Doctor.";
+        $error = "Selected employee ID does not exist or is empty. Please choose a valid Nurse.";
     } else {
         // Collect start, end, and status for each day
         $mon_start = $_POST['mon_start'] ?? null;
@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
         );
 
         if ($stmt->execute()) {
-            header("Location: doctor_shift_scheduling.php?success=1");
+            header("Location: nurse_shift_scheduling.php?success=1");
             exit();
         } else {
             $error = "Error saving schedule: " . $stmt->error;
@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_schedule'])) {
     $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $success = "Schedule updated successfully!";
-    header("Location: doctor_shift_scheduling.php?view_sched_id=" . urlencode($employee_id));
+    header("Location: nurse_shift_scheduling.php?view_sched_id=" . urlencode($employee_id));
     exit();
 }
 
@@ -231,10 +231,10 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="../dnrcl/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
+                        <a href="../dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
@@ -352,7 +352,7 @@ if (isset($_GET['view_sched_id'])) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🧑‍⚕️Doctor Shift Scheduling</h2>
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">👩‍⚕️Nurse Shift Scheduling</h2>
                 <div class="card shadow-sm rounded mb-4">
                     <div class="card-body bg-white rounded">
                         <?php if (isset($_GET['success'])): ?>
@@ -363,12 +363,12 @@ if (isset($_GET['view_sched_id'])) {
                         <form method="POST" class="mb-4">
                             <div class="row g-3 mb-4">
                                 <div class="col-md-4">
-                                    <label for="employee_id" class="form-label">Select Doctor</label>
+                                    <label for="employee_id" class="form-label">Select Nurse</label>
                                     <select name="employee_id" id="employee_id" class="form-select" required>
-                                        <option value="">-- Choose a Doctor --</option>
-                                        <?php foreach ($doctors as $doc): ?>
-                                            <option value="<?= htmlspecialchars($doc['employee_id']) ?>">
-                                                <?= htmlspecialchars($doc['employee_id'] . ' - ' . $doc['first_name'] . ' ' . $doc['last_name']) ?>
+                                        <option value="">-- Choose a Nurse --</option>
+                                        <?php foreach ($nurses as $nur): ?>
+                                            <option value="<?= htmlspecialchars($nur['employee_id']) ?>">
+                                                <?= htmlspecialchars($nur['employee_id'] . ' - ' . $nur['first_name'] . ' ' . $nur['last_name']) ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -417,17 +417,16 @@ if (isset($_GET['view_sched_id'])) {
 
 
              <div class="container-fluid ">
-                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">📃List of Doctors</h2>
-               
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">📃List of Nurses</h2>
                 <?php if (!empty($success)): ?>
                     <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
                 <?php elseif (!empty($error)): ?>
                     <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
                 <div class="card shadow-sm rounded mb-4">
-                    <div class="card-header">Doctors List</div>
+                    <div class="card-header">Nurses List</div>
                     <div class="card-body bg-white rounded">
-                        <table class="table table-bordered table-striped doctors-list-table rounded shadow-sm">
+                        <table class="table table-bordered table-striped nurses-list-table rounded shadow-sm">
                             <thead>
                                 <tr>
                                     <th>Employee ID</th>
@@ -442,24 +441,24 @@ if (isset($_GET['view_sched_id'])) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($doctors as $doc): ?>
+                                <?php foreach ($nurses as $nur): ?>
                                     <tr>
-                                        <td><?= htmlspecialchars($doc['employee_id']) ?></td>
-                                        <td><?= htmlspecialchars($doc['first_name']) ?></td>
-                                        <td><?= htmlspecialchars($doc['middle_name']) ?></td>
-                                        <td><?= htmlspecialchars($doc['last_name']) ?></td>
-                                        <td><?= htmlspecialchars($doc['role']) ?></td>
-                                        <td><?= htmlspecialchars($doc['profession']) ?></td>
-                                        <td><?= htmlspecialchars($doc['department']) ?></td>
+                                        <td><?= htmlspecialchars($nur['employee_id']) ?></td>
+                                        <td><?= htmlspecialchars($nur['first_name']) ?></td>
+                                        <td><?= htmlspecialchars($nur['middle_name']) ?></td>
+                                        <td><?= htmlspecialchars($nur['last_name']) ?></td>
+                                        <td><?= htmlspecialchars($nur['role']) ?></td>
+                                        <td><?= htmlspecialchars($nur['profession']) ?></td>
+                                        <td><?= htmlspecialchars($nur['department']) ?></td>
                                         <td>
                                             <form method="get" style="display:inline;">
-                                                <input type="hidden" name="view_sched_id" value="<?= htmlspecialchars($doc['employee_id']) ?>">
+                                                <input type="hidden" name="view_sched_id" value="<?= htmlspecialchars($nur['employee_id']) ?>">
                                                 <button type="submit" class="btn btn-sm btn-info">View Schedule</button>
                                             </form>
                                         </td>
                                         <td>
-    <form action="doctor_download_schedule.php" method="get" target="_blank">
-        <input type="hidden" name="employee_id" value="<?= htmlspecialchars($doc['employee_id']) ?>">
+    <form action="Nurse_download_schedule.php" method="get" target="_blank">
+        <input type="hidden" name="employee_id" value="<?= htmlspecialchars($nur['employee_id']) ?>">
         <button type="submit" class="btn btn-success">Download as PDF</button>
     </form>
 </td>
@@ -475,8 +474,8 @@ if (isset($_GET['view_sched_id'])) {
                     <div class="modal-dialog modal-xl">
                         <div class="modal-content rounded shadow">
                             <div class="modal-header bg-primary text-white">
-                                <h5 class="modal-title">Schedules for Doctor ID: <?= htmlspecialchars($modal_schedules[0]['employee_id']) ?></h5>
-                                <a href="doctor_shift_scheduling.php" class="btn-close"></a>
+                                <h5 class="modal-title">Schedules for Nurse ID: <?= htmlspecialchars($modal_schedules[0]['employee_id']) ?></h5>
+                                <a href="Nurse_shift_scheduling.php" class="btn-close"></a>
                             </div>
                             <div class="modal-body">
                                 <?php foreach ($modal_schedules as $modal_schedule): ?>
@@ -560,7 +559,7 @@ if (isset($_GET['view_sched_id'])) {
                                 <?php endforeach; ?>
                             </div>
                             <div class="modal-footer">
-                                <a href="doctor_shift_scheduling.php" class="btn btn-secondary">Close</a>
+                                <a href="nurse_shift_scheduling.php" class="btn btn-secondary">Close</a>
                             </div>
                         </div>
                     </div>

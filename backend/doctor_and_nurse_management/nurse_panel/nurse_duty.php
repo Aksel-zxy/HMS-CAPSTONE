@@ -1,7 +1,6 @@
 <?php
 include '../../../SQL/config.php';
 
-// Add user authentication and fetching
 class DoctorDashboard {
     public $conn;
     public $user;
@@ -40,96 +39,18 @@ class DoctorDashboard {
 $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
 
-// Fetch doctors and nurses for filter dropdowns
-$doctor_options = [];
-$nurse_options = [];
-$dept_options = [];
-
-$doctor_result = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession='Doctor'");
-while ($row = $doctor_result->fetch_assoc()) {
-    $doctor_options[] = $row;
-}
-$nurse_result = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession='Nurse'");
-while ($row = $nurse_result->fetch_assoc()) {
-    $nurse_options[] = $row;
-}
-$dept_result = $conn->query("SELECT DISTINCT department FROM hr_employees WHERE department IS NOT NULL AND department != ''");
-while ($row = $dept_result->fetch_assoc()) {
-    $dept_options[] = $row['department'];
-}
-
-// Filters
-$doctor_id = $_GET['doctor_id'] ?? '';
-$nurse_id = $_GET['nurse_id'] ?? '';
-$department = $_GET['department'] ?? '';
-$view = $_GET['view'] ?? 'week'; // 'week' or 'day'
-
-// Build query with filters
-$query = "SELECT s.schedule_id, s.employee_id, s.week_start, 
-                 s.mon_start, s.mon_end, s.mon_status,
-                 s.tue_start, s.tue_end, s.tue_status,
-                 s.wed_start, s.wed_end, s.wed_status,
-                 s.thu_start, s.thu_end, s.thu_status,
-                 s.fri_start, s.fri_end, s.fri_status,
-                 s.sat_start, s.sat_end, s.sat_status,
-                 s.sun_start, s.sun_end, s.sun_status,
-                 e.first_name, e.last_name, e.role, e.profession, e.department
-          FROM shift_scheduling s
-          JOIN hr_employees e ON s.employee_id = e.employee_id
-          WHERE 1=1";
-
-if ($doctor_id !== '') {
-    $query .= " AND e.employee_id = '" . $conn->real_escape_string($doctor_id) . "' AND e.profession = 'Doctor'";
-}
-if ($nurse_id !== '') {
-    $query .= " AND e.employee_id = '" . $conn->real_escape_string($nurse_id) . "' AND e.profession = 'Nurse'";
-}
-if ($department !== '') {
-    $query .= " AND e.department = '" . $conn->real_escape_string($department) . "'";
-}
-
-$result = $conn->query($query);
-
-$events = [];
-$days = [
-    'Monday'    => ['col_start' => 'mon_start', 'col_end' => 'mon_end', 'col_status' => 'mon_status', 'date' => '2025-08-18'],
-    'Tuesday'   => ['col_start' => 'tue_start', 'col_end' => 'tue_end', 'col_status' => 'tue_status', 'date' => '2025-08-19'],
-    'Wednesday' => ['col_start' => 'wed_start', 'col_end' => 'wed_end', 'col_status' => 'wed_status', 'date' => '2025-08-20'],
-    'Thursday'  => ['col_start' => 'thu_start', 'col_end' => 'thu_end', 'col_status' => 'thu_status', 'date' => '2025-08-21'],
-    'Friday'    => ['col_start' => 'fri_start', 'col_end' => 'fri_end', 'col_status' => 'fri_status', 'date' => '2025-08-22'],
-    'Saturday'  => ['col_start' => 'sat_start', 'col_end' => 'sat_end', 'col_status' => 'sat_status', 'date' => '2025-08-23'],
-    'Sunday'    => ['col_start' => 'sun_start', 'col_end' => 'sun_end', 'col_status' => 'sun_status', 'date' => '2025-08-24'],
-];
-
-// When building events, only set 'title' to staff name
-while ($row = $result->fetch_assoc()) {
-    $full_name = $row['first_name'] . ' ' . $row['last_name'];
-    foreach ($days as $day => $info) {
-        $start = $row[$info['col_start']];
-        $end = $row[$info['col_end']];
-        $status = $row[$info['col_status']];
-        if ($start && $end && $status) {
-            $events[] = [
-                'title' => $full_name,
-                'start' => $info['date'] . "T" . $start,
-                'end'   => $info['date'] . "T" . $end,
-                'groupId' => $row['department'],
-                'extendedProps' => [
-                    'department' => $row['department'],
-                    'role' => $row['role'],
-                    'profession' => $row['profession'],
-                    'status' => $status,
-                    'staff' => $full_name,
-                    'start' => $info['date'] . "T" . $start,
-                    'end' => $info['date'] . "T" . $end
-                ]
-            ];
-        }
+// Fetch all duty assignments
+$duties = [];
+$duty_res = $conn->query("SELECT duty_id, appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes, status, created_at, updated_at FROM duty_assignments");
+if ($duty_res && $duty_res->num_rows > 0) {
+    while ($row = $duty_res->fetch_assoc()) {
+        $duties[] = $row;
     }
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -137,12 +58,11 @@ while ($row = $result->fetch_assoc()) {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="../assets/CSS/schedule_calendar.css">
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+    <link rel="stylesheet" href="../assets/CSS/user_duty.css">
 </head>
+
 <body>
-     <div class="d-flex">
+    <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
 
@@ -154,10 +74,10 @@ while ($row = $result->fetch_assoc()) {
 
             <!----- Sidebar Navigation ----->
         
-           <li class="sidebar-item">
+            <li class="sidebar-item">
                 <a href="../doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg x..mlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
                         <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
@@ -174,16 +94,16 @@ while ($row = $result->fetch_assoc()) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="scheduling_shifts_and_duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="scheduling_shifts_and_duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="scheduling_shifts_and_duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="scheduling_shifts_and_duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -197,10 +117,10 @@ while ($row = $result->fetch_assoc()) {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="dnrcl/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
+                        <a href="dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
@@ -233,10 +153,13 @@ while ($row = $result->fetch_assoc()) {
 
                 <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                   <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="doctor_panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Doctor Duty</a>
+                        <a href="doctor_panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                    </li>
+                        <li class="sidebar-item">
+                        <a href="../doctor_panel/prescription.php" class="sidebar-link">Prescription</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -262,10 +185,10 @@ while ($row = $result->fetch_assoc()) {
 
                 <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="my_nurse_schedule.php" class="sidebar-link">My Schedule</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Nurse Duty</a>
+                        <a href="nurse_duty.php" class="sidebar-link">Nurse Duty</a>
                     </li>
                       <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -283,9 +206,11 @@ while ($row = $result->fetch_assoc()) {
             </li>
 
         </aside>
-        <!----- End of Sidebar ----->
 
-        <!----- Main Content -----> 
+        
+
+        <!----- End of Sidebar ----->
+        <!----- Main Content ----->
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -299,102 +224,74 @@ while ($row = $result->fetch_assoc()) {
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
-                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                            <li>
+                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 200px; padding: 10px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background-color: #fff; color: #333;">
+                            <li style="margin-bottom: 8px; font-size: 14px; color: #555;">
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php">
+                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
                         </ul>
+
                     </div>
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🗓️Doctor & Nurse Calendar</h2>
-                <form method="GET" class="filters mb-4 shadow-sm p-2 rounded bg-white">
-                    <div class="d-flex flex-wrap align-items-end gap-3 justify-content-between" style="flex-wrap: wrap;">
-                        <div>
-                            <label for="doctor_id" class="form-label mb-1">Doctor</label>
-                            <select name="doctor_id" id="doctor_id" class="form-select form-select-sm" style="width: 160px;">
-                                <option value="">All</option>
-                                <?php foreach ($doctor_options as $doc): ?>
-                                    <option value="<?= htmlspecialchars($doc['employee_id']) ?>" <?= $doctor_id==$doc['employee_id']?'selected':'' ?>>
-                                        <?= htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="nurse_id" class="form-label mb-1">Nurse</label>
-                            <select name="nurse_id" id="nurse_id" class="form-select form-select-sm" style="width: 160px;">
-                                <option value="">All</option>
-                                <?php foreach ($nurse_options as $nurse): ?>
-                                    <option value="<?= htmlspecialchars($nurse['employee_id']) ?>" <?= $nurse_id==$nurse['employee_id']?'selected':'' ?>>
-                                        <?= htmlspecialchars($nurse['first_name'] . ' ' . $nurse['last_name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="department" class="form-label mb-1">Department</label>
-                            <select name="department" id="department" class="form-select form-select-sm" style="width: 160px;">
-                                <option value="">All</option>
-                                <?php foreach ($dept_options as $dept): ?>
-                                    <option value="<?= htmlspecialchars($dept) ?>" <?= $department==$dept?'selected':'' ?>><?= htmlspecialchars($dept) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="form-label mb-1">View</label>
-                            <div class="d-flex gap-2">
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="view" value="week" id="viewWeek" <?= $view=='week'?'checked':'' ?>>
-                                    <label class="form-check-label" for="viewWeek">Weekly</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                    <input class="form-check-input" type="radio" name="view" value="day" id="viewDay" <?= $view=='day'?'checked':'' ?>>
-                                    <label class="form-check-label" for="viewDay">Daily</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary btn-sm px-3">Apply</button>
-                            <a href="schedule_calendar.php" class="btn btn-outline-secondary btn-sm px-3">Reset</a>
-                        </div>
-                    </div>
-                </form>
-                <div id="calendar"></div>
-            </div>
-            <!-- Modal for event details -->
-            <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title" id="eventModalLabel">Schedule Details</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            <ul class="list-group list-group-flush" id="eventDetails">
-                                <!-- Details will be injected by JS -->
-                            </ul>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- END CODING HERE -->
+        <div class="container-fluid">
+            <h2   style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">📋My Duties</h2>
+            <table class="table table-bordered table-hover duty-table">
+                <thead class="table-info">
+                    <tr>
+                        <th>Duty ID</th>
+                        <th>Doctor ID</th>
+                        <th>Bed ID</th>
+                        <th>Nurse Assistant</th>
+                        <th>Procedure</th>
+                        <th>Equipment</th>
+                        <th>Tools</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($duties)): ?>
+                        <?php foreach ($duties as $duty): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($duty['duty_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['bed_id']) ?></td>
+                                <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
+                                <td><?= htmlspecialchars($duty['procedure']) ?></td>
+                                <td><?= htmlspecialchars($duty['equipment']) ?></td>
+                                <td>
+                                    <?php
+                                    $tools = $duty['tools'];
+                                    if ($tools && ($decoded = json_decode($tools, true))) {
+                                        foreach ($decoded as $tool) {
+                                            echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")<br>";
+                                        }
+                                    } else {
+                                        echo htmlspecialchars($tools);
+                                    }
+                                    ?>
+                                </td>
+                                <td><?= htmlspecialchars($duty['notes']) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="8">No duty assignments found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
-        <!----- End of Main Content -----> 
+        <!-- END CODING HERE -->
+        </div>
+        <!----- End of Main Content ----->
     </div>
     <script>
         const toggler = document.querySelector(".toggler-btn");
@@ -402,72 +299,20 @@ while ($row = $result->fetch_assoc()) {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
     </script>
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        var calendarEl = document.getElementById('calendar');
-        var initialView = 'timeGridWeek';
-        <?php if ($view == 'day'): ?>
-            initialView = 'timeGridDay';
-        <?php endif; ?>
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: initialView,
-            height: 'auto',
-            contentHeight: 600,
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            },
-            events: <?php echo json_encode($events); ?>,
-            eventDidMount: function(info) {
-                // Highlight today's events
-                var today = new Date();
-                var eventStart = info.event.start;
-                if (eventStart.getDate() === today.getDate() &&
-                    eventStart.getMonth() === today.getMonth() &&
-                    eventStart.getFullYear() === today.getFullYear()) {
-                    info.el.style.backgroundColor = '#ffe066';
-                    info.el.style.borderColor = '#ffc107';
-                }
-                // Make event text bold and larger
-                info.el.style.fontWeight = '600';
-                info.el.style.fontSize = '1.05rem';
-            },
-            eventClick: function(info) {
-                var props = info.event.extendedProps;
-                var details = `
-                    <li class="list-group-item"><strong>Name:</strong> ${props.staff}</li>
-                    <li class="list-group-item"><strong>Role:</strong> ${props.role}</li>
-                    <li class="list-group-item"><strong>Profession:</strong> ${props.profession}</li>
-                    <li class="list-group-item"><strong>Department:</strong> ${props.department}</li>
-                    <li class="list-group-item"><strong>Status:</strong> ${props.status}</li>
-                    <li class="list-group-item"><strong>Start:</strong> ${new Date(props.start).toLocaleString()}</li>
-                    <li class="list-group-item"><strong>End:</strong> ${new Date(props.end).toLocaleString()}</li>
-                `;
-                document.getElementById('eventDetails').innerHTML = details;
-                var modal = new bootstrap.Modal(document.getElementById('eventModal'));
-                modal.show();
-            }
-        });
-        calendar.render();
-    });
-    </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="../assets/Bootstrap/fontawesome.min.js"></script>
     <script src="../assets/Bootstrap/jq.js"></script>
 </body>
+
 </html>
-            }
-        });
-        calendar.render();
-    });
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="../assets/Bootstrap/fontawesome.min.js"></script>
     <script src="../assets/Bootstrap/jq.js"></script>
 </body>
+
 </html>
 
 

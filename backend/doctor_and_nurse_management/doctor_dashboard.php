@@ -1,17 +1,14 @@
 <?php
-include '../../../SQL/config.php';
+include '../../SQL/config.php';
 
 class DoctorDashboard {
     public $conn;
     public $user;
-    public $doctors = [];
-    public $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     public function __construct($conn) {
         $this->conn = $conn;
         $this->authenticate();
         $this->fetchUser();
-        $this->fetchDoctors();
     }
 
     private function authenticate() {
@@ -37,40 +34,10 @@ class DoctorDashboard {
             exit();
         }
     }
-
-    private function fetchDoctors() {
-        $doctor_query = "
-            SELECT e.employee_id, e.first_name, e.middle_name, e.last_name, e.role, e.profession, e.department
-            FROM hr_employees e
-            INNER JOIN clinical_profiles cp ON e.employee_id = cp.employee_id
-            WHERE e.profession = 'Doctor' AND cp.clinical_status = 'Active'
-        ";
-        $doctor_result = $this->conn->query($doctor_query);
-        if ($doctor_result && $doctor_result->num_rows > 0) {
-            while ($row = $doctor_result->fetch_assoc()) {
-                $this->doctors[] = $row;
-            }
-        }
-    }
 }
 
 $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
-$doctors = $dashboard->doctors;
-$days = $dashboard->days;
-
-// Fetch schedules for selected doctor
-$modal_schedules = [];
-if (isset($_GET['view_sched_id'])) {
-    $view_id = $_GET['view_sched_id'];
-    $stmt = $conn->prepare("SELECT * FROM shift_scheduling WHERE employee_id = ? ORDER BY week_start DESC");
-    $stmt->bind_param("i", $view_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $modal_schedules[] = $row;
-    }
-}
 ?>
 
 <!DOCTYPE html>
@@ -80,10 +47,9 @@ if (isset($_GET['view_sched_id'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Doctor and Nurse Management</title>
-    <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="../assets/CSS/my_schedule.css">
+    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/CSS/super.css">
 </head>
 
 <body>
@@ -92,7 +58,7 @@ if (isset($_GET['view_sched_id'])) {
         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
-                <img src="../assets/image/logo-dark.png" width="90px" height="20px">
+                <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
             <div class="menu-title">Navigation</div>
@@ -100,7 +66,7 @@ if (isset($_GET['view_sched_id'])) {
             <!----- Sidebar Navigation ----->
         
             <li class="sidebar-item">
-                <a href="../doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
@@ -119,16 +85,16 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="scheduling_shifts_and_duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="scheduling_shifts_and_duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="scheduling_shifts_and_duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="scheduling_shifts_and_duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -142,10 +108,10 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="dnrcl/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Doctor & Nurse Registration & Compliance  Licensing/license_management.php" class="sidebar-link">License Management</a>
+                        <a href="dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
@@ -178,10 +144,13 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                   <li class="sidebar-item">
-                        <a href="my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
+                        <a href="doctor_panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
-                        <a href="doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                        <a href="doctor_panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                    </li>
+                        <li class="sidebar-item">
+                        <a href="doctor_panel/prescription.php" class="sidebar-link">Prescription</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -207,10 +176,10 @@ if (isset($_GET['view_sched_id'])) {
 
                 <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
+                        <a href="nurse_panel/my_nurse_schedule.php" class="sidebar-link">My Schedule</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Nurse Panel/nurse_duty.php" class="sidebar-link">Nurse Duty</a>
+                        <a href="nurse_panel/nurse_duty.php" class="sidebar-link">Nurse Duty</a>
                     </li>
                       <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
@@ -255,7 +224,7 @@ if (isset($_GET['view_sched_id'])) {
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -266,107 +235,12 @@ if (isset($_GET['view_sched_id'])) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h2 class="schedule-title">🧑‍⚕️Doctor List</h2>
-                <div class="card shadow-sm rounded mb-4 schedule-card">
-                    <div class="card-header">Doctors List</div>
-                    <div class="card-body bg-white rounded">
-                        <table class="table table-bordered table-striped doctors-list-table rounded shadow-sm">
-                            <thead>
-                                <tr>
-                                    <th>Employee ID</th>
-                                    <th>First Name</th>
-                                    <th>Middle Name</th>
-                                    <th>Last Name</th>
-                                    <th>Role</th>
-                                    <th>Profession</th>
-                                    <th>Department</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($doctors as $doc): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($doc['employee_id']) ?></td>
-                                        <td><?= htmlspecialchars($doc['first_name']) ?></td>
-                                        <td><?= htmlspecialchars($doc['middle_name']) ?></td>
-                                        <td><?= htmlspecialchars($doc['last_name']) ?></td>
-                                        <td><?= htmlspecialchars($doc['role']) ?></td>
-                                        <td><?= htmlspecialchars($doc['profession']) ?></td>
-                                        <td><?= htmlspecialchars($doc['department']) ?></td>
-                                        <td>
-                                            <form method="get" style="display:inline;">
-                                                <input type="hidden" name="view_sched_id" value="<?= htmlspecialchars($doc['employee_id']) ?>">
-                                                <button type="submit" class="btn btn-sm btn-info">View Schedule</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                <h1>BASAHIN PO YUNG MGA COMMENT SDE PARA DI MALIGAW</h1> <br>
+                <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
+                <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
+                <H1>CHAT LANG PO KAY ROBERT</H1>
             </div>
-
-            <?php if (!empty($modal_schedules)): ?>
-                <div class="modal fade show schedule-modal" id="scheduleModal" tabindex="-1" aria-modal="true" role="dialog" style="display:block;">
-                    <div class="modal-dialog modal-xl">
-                        <div class="modal-content rounded shadow schedule-card">
-                            <div class="modal-header bg-primary text-white">
-                                <h5 class="modal-title">Schedules for Doctor ID: <?= htmlspecialchars($modal_schedules[0]['employee_id']) ?></h5>
-                                <a href="my_doctor_schedule.php" class="btn-close"></a>
-                            </div>
-                            <div class="modal-body">
-                                <?php foreach ($modal_schedules as $modal_schedule): ?>
-                                    <div class="mb-4 border rounded p-3 schedule-list-view">
-                                        <h6 class="schedule-date">Week: <?= htmlspecialchars($modal_schedule['week_start']) ?></h6>
-                                        <table class="table table-bordered bg-white schedule-calendar-table">
-                                            <thead>
-                                                <tr class="schedule-table-header">
-                                                    <th>Day</th>
-                                                    <th>Start Time</th>
-                                                    <th>End Time</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($days as $day): ?>
-                                                    <?php $prefix = strtolower(substr($day, 0, 3)); ?>
-                                                    <tr>
-                                                        <td><?= $day ?></td>
-                                                        <td>
-                                                            <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
-                                                                ---
-                                                            <?php else: ?>
-                                                                <?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?>
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td>
-                                                            <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
-                                                                ---
-                                                            <?php else: ?>
-                                                                <?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?>
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td>
-                                                            <?= htmlspecialchars($modal_schedule[$prefix . '_status'] ?? '') ?>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                            <div class="modal-footer">
-                                <a href="my_doctor_schedule.php" class="btn btn-secondary">Close</a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <script>
-                    document.body.classList.add('modal-open');
-                </script>
-            <?php endif; ?>
+            <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
     </div>
@@ -376,10 +250,10 @@ if (isset($_GET['view_sched_id'])) {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
     </script>
-    <script src="../assets/Bootstrap/all.min.js"></script>
-    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="..//assets/Bootstrap/jq.js"></script>
+    <script src="assets/Bootstrap/all.min.js"></script>
+    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

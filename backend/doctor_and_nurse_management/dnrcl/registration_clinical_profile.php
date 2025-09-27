@@ -39,33 +39,52 @@ class DoctorDashboard {
 $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
 
-// Fetch unique employees (Doctor/Nurse) who have documents
-$emp_query = "
-    SELECT DISTINCT e.employee_id, e.first_name, e.last_name, e.profession
-    FROM hr_employees_documents d
-    INNER JOIN hr_employees e ON d.employee_id = e.employee_id
-    WHERE e.profession IN ('Doctor', 'Nurse')
-    ORDER BY e.last_name ASC
-";
-$employees = $conn->query($emp_query);
+// Get filter value for profession
+$filter_profession = $_GET['profession'] ?? '';
 
-// If modal is triggered, fetch all documents for that employee
-$modal_docs = [];
-$modal_emp_id = $_GET['view_docs'] ?? null;
-if ($modal_emp_id) {
-    $doc_query = "
-        SELECT d.document_id, d.document_type, d.file_path, d.uploaded_at
-        FROM hr_employees_documents d
-        WHERE d.employee_id = ?
-        ORDER BY d.uploaded_at DESC
-    ";
-    $stmt = $conn->prepare($doc_query);
-    $stmt->bind_param("i", $modal_emp_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $modal_docs[] = $row;
+// Build WHERE clause for profession filter
+$where = "WHERE profession IN ('Doctor', 'Nurse')";
+if ($filter_profession !== '') {
+    $where .= " AND profession = '" . $conn->real_escape_string($filter_profession) . "'";
+}
+
+// Fetch filtered employees
+$employees = $conn->query("
+    SELECT employee_id, first_name, middle_name, last_name, role, department, specialization, profession, status
+    FROM hr_employees
+    $where
+");
+
+// Handle Create/Update Clinical Profile
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $employee_id = $_POST['employee_id'];
+    $clinical_status = $_POST['clinical_status'];
+    $preferred_shift = $_POST['preferred_shift'];
+    $max_hours = $_POST['max_hours_per_week'];
+
+    // Check if profile exists
+    $check = $conn->query("SELECT * FROM clinical_profiles WHERE employee_id = '$employee_id' ");
+    if ($check->num_rows > 0) {
+        // Update existing profile
+        $conn->query("
+            UPDATE clinical_profiles 
+            SET clinical_status='$clinical_status',
+                preferred_shift='$preferred_shift',
+                max_hours_per_week='$max_hours',
+                last_updated=NOW()
+            WHERE employee_id='$employee_id'
+        ");
+    } else {
+        // Insert new profile
+        $conn->query("
+            INSERT INTO clinical_profiles (employee_id, clinical_status, preferred_shift, max_hours_per_week, onboarding_date, last_updated)
+            VALUES ('$employee_id', '$clinical_status', '$preferred_shift', '$max_hours', NOW(), NOW())
+        ");
     }
+
+    // After save, redirect to this page (not clinical_profiles_admin.php)
+    header("Location: registration_clinical_profile.php?success=1");
+    exit;
 }
 ?>
 
@@ -79,14 +98,13 @@ if ($modal_emp_id) {
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-     <link rel="stylesheet" href="../assets/CSS/license_management.css">
-     
+     <link rel="stylesheet" href="../assets/CSS/clinical_profile.css">
 </head>
 
 <body>
     <div class="d-flex">
         <!----- Sidebar ----->
-       <aside id="sidebar" class="sidebar-toggle">
+         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
@@ -116,16 +134,16 @@ if ($modal_emp_id) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="../scheduling_shifts_and_duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="../scheduling_shifts_and_duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="../scheduling_shifts_and_duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="../Scheduling Shifts & Duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="../scheduling_shifts_and_duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -262,81 +280,114 @@ if ($modal_emp_id) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-             <div class="container-fluid">
 
+            <div class="container-fluid">
 
+             <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🧑‍💻Doctor & Nurse Clinical Profile Management</h2>
+            <?php if (isset($_GET['success'])): ?>
+                <div class="alert alert-success">Profile saved successfully!</div>
+            <?php endif; ?>
 
-             <h2  style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">🪪Doctor & Nurse Documents</h2>
-<table>
-    <tr>
-        <th>Employee ID</th>
-        <th>Name</th>
-        <th>Profession</th>
-        <th>View Documents</th>
-    </tr>
-    <?php while ($row = $employees->fetch_assoc()): ?>
-    <tr>
-        <td><?= htmlspecialchars($row['employee_id']); ?></td>
-        <td><?= htmlspecialchars($row['first_name'] . " " . $row['last_name']); ?></td>
-        <td><?= htmlspecialchars($row['profession']); ?></td>
-        <td>
-            <a href="?view_docs=<?= htmlspecialchars($row['employee_id']); ?>" class="btn btn-primary btn-sm">View Documents</a>
-        </td>
-    </tr>
-    <?php endwhile; ?>
-</table>
+            <!-- Filter/Search Form for Profession -->
+            <form method="GET" class="mb-3 d-flex gap-3 align-items-end">
+                <div>
+                    <label for="profession" class="form-label mb-0">Profession:</label>
+                    <select name="profession" id="profession" class="form-select">
+                        <option value="">All</option>
+                        <option value="Doctor" <?= $filter_profession=='Doctor'?'selected':'' ?>>Doctor</option>
+                        <option value="Nurse" <?= $filter_profession=='Nurse'?'selected':'' ?>>Nurse</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Filter</button>
+                <?php if ($filter_profession): ?>
+                    <a href="registration_clinical_profile.php" class="btn btn-secondary">Reset</a>
+                <?php endif; ?>
+            </form>
 
-<?php if ($modal_emp_id): ?>
-<!-- Modal for documents -->
-<div class="modal fade show" id="docsModal" tabindex="-1" aria-modal="true" role="dialog" style="display:block; background:rgba(0,0,0,0.3);">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content rounded shadow">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Documents for Employee ID: <?= htmlspecialchars($modal_emp_id) ?></h5>
-                <a href="license_management.php" class="btn-close"></a>
-            </div>
-            <div class="modal-body">
-                <table class="table table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Document ID</th>
-                            <th>Document Type</th>
-                            <th>View File</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($modal_docs as $doc): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($doc['document_id']); ?></td>
-                            <td><?= htmlspecialchars($doc['document_type']); ?></td>
-                            <td>
-                             <td>
-    <?php if (!empty($doc['file_path'])): ?>
-        <a href="../../HR Management/Recruitment & Onboarding Module/applicants document"<?= urlencode($doc['file_path']); ?>
-           target="_blank" 
-           class="btn btn-info btn-sm">View File</a>
-    <?php else: ?>
-        No File
-    <?php endif; ?>
-</td>
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Role</th>
+                        <th>Department</th>
+                        <th>Specialization</th>
+                        <th>Clinical Status</th>
+                        <th>Preferred Shift</th>
+                        <th>Max Hours/Week</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php while($row = $employees->fetch_assoc()): 
+                    $empId = $row['employee_id'];
+                    $profile = $conn->query("SELECT * FROM clinical_profiles WHERE employee_id='$empId'")->fetch_assoc();
+                ?>
+                    <tr>
+                        <td><?= $row['first_name']." ".$row['last_name']; ?></td>
+                        <td><?= $row['role']; ?></td>
+                        <td><?= $row['department']; ?></td>
+                        <td><?= $row['specialization']; ?></td>
+                        <td><?= $profile['clinical_status'] ?? 'Not Registered'; ?></td>
+                        <td><?= $profile['preferred_shift'] ?? '-'; ?></td>
+                        <td><?= $profile['max_hours_per_week'] ?? '-'; ?></td>
+                        <td>
+                            <!-- Button trigger modal -->
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal<?= $empId ?>">Manage</button>
+                        </td>
+                    </tr>
 
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-            <div class="modal-footer">
-                <a href="license_management.php" class="btn btn-secondary">Close</a>
-            </div>
-        </div>
-    </div>
-    <script>document.body.classList.add('modal-open');</script>
+                    <!-- Modal -->
+                    <div class="modal fade" id="editModal<?= $empId ?>" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Manage Profile - <?= $row['first_name']." ".$row['last_name']; ?></h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <input type="hidden" name="employee_id" value="<?= $empId ?>">
+
+                                        <div class="mb-3">
+                                            <label>Clinical Status</label>
+                                            <select name="clinical_status" class="form-select" required>
+                                                <option value="Active" <?= ($profile['clinical_status'] ?? '')=='Active'?'selected':'' ?>>Active</option>
+                                                <option value="Inactive" <?= ($profile['clinical_status'] ?? '')=='Inactive'?'selected':'' ?>>Inactive</option>
+                                                <option value="Suspended" <?= ($profile['clinical_status'] ?? '')=='Suspended'?'selected':'' ?>>Suspended</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label>Preferred Shift</label>
+                                            <select name="preferred_shift" class="form-select">
+                                                <option value="">-- Select --</option>
+                                                <option value="Day" <?= ($profile['preferred_shift'] ?? '')=='Day'?'selected':'' ?>>Day</option>
+                                                <option value="Night" <?= ($profile['preferred_shift'] ?? '')=='Night'?'selected':'' ?>>Night</option>
+                                                <option value="Rotating" <?= ($profile['preferred_shift'] ?? '')=='Rotating'?'selected':'' ?>>Rotating</option>
+                                                <option value="Flexible" <?= ($profile['preferred_shift'] ?? '')=='Flexible'?'selected':'' ?>>Flexible</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label>Max Hours/Week</label>
+                                            <input type="number" name="max_hours_per_week" class="form-control" value="<?= $profile['max_hours_per_week'] ?? '' ?>">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="submit" class="btn btn-success">Save</button>
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                <?php endwhile; ?>
+                </tbody>
+            </table>
+  
 </div>
-<?php endif; ?>
-
-</div>
-
+           
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
