@@ -1,6 +1,6 @@
 <?php
 if (!defined("BASE_URL")) {
-    define("BASE_URL", "/hms-capstone/");
+    define("BASE_URL", getenv('APP_URL') ?: "/hms-capstone/");
 }
 
 if (session_status() == PHP_SESSION_NONE) {
@@ -24,11 +24,11 @@ $_SESSION['timeout'] = time();
 
 // MySQL settings
 
-$host     = "127.0.0.1";   
-$port     = "3306";        
-$dbname   = "hmscapstone"; 
-$username = "root";
-$password = "";
+$host     = getenv('DB_HOST') ?: "127.0.0.1";   
+$port     = getenv('DB_PORT') ?: "3306";        
+$dbname   = getenv('DB_NAME') ?: "hmscapstone"; 
+$username = getenv('DB_USERNAME') ?: "root";
+$password = getenv('DB_PASSWORD') ?: "";
 
 
 // mysqli connection
