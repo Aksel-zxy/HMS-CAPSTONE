@@ -3,7 +3,7 @@ require 'db.php';
 $today = date("Y-m-d");
 
 // =============================
-// Schedule New Maintenance
+// Handle New Schedule
 // =============================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'schedule') {
     $inventory_id = intval($_POST['inventory_id']);
@@ -11,71 +11,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'schedule') {
     $maintenance_type = $_POST['maintenance_type'];
     $remarks = trim($_POST['remarks']);
 
+    if ($inventory_id > 0 && $maintenance_date >= $today) {
+        $stmt = $pdo->prepare("
+            INSERT INTO maintenance_records (inventory_id, maintenance_date, maintenance_type, remarks, created_at) 
+            VALUES (?, ?, ?, ?, NOW())
+        ");
+        $stmt->execute([$inventory_id, $maintenance_date, $maintenance_type, $remarks]);
+    }
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+// =============================
+// Edit Schedule
+// =============================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'edit_schedule') {
+    $id = intval($_POST['schedule_id']);
+    $maintenance_date = $_POST['maintenance_date'];
+    $maintenance_type = $_POST['maintenance_type'];
+    $remarks = trim($_POST['remarks']);
+
     $stmt = $pdo->prepare("
-        INSERT INTO maintenance_records (inventory_id, maintenance_date, maintenance_type, remarks, status, created_at) 
-        VALUES (?, ?, ?, ?, 'Scheduled', NOW())
+        UPDATE maintenance_records 
+        SET maintenance_date = ?, maintenance_type = ?, remarks = ? 
+        WHERE id = ?
     ");
-    $stmt->execute([$inventory_id, $maintenance_date, $maintenance_type, $remarks]);
+    $stmt->execute([$maintenance_date, $maintenance_type, $remarks, $id]);
 
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
 
 // =============================
-// Update Repair Request
+// Delete Schedule
+// =============================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'delete_schedule') {
+    $id = intval($_POST['schedule_id']);
+    $pdo->prepare("DELETE FROM maintenance_records WHERE id = ?")->execute([$id]);
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+// =============================
+// Update Repair Request Status
 // =============================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'update_request') {
     $id = intval($_POST['request_id']);
     $status = $_POST['status'];
     $remarks = $_POST['remarks'];
 
-    // Update repair request
-    $stmt = $pdo->prepare("UPDATE repair_requests SET status=?, issue=CONCAT(issue, '\n[Update: ', ?, ']') WHERE id=?");
+    $stmt = $pdo->prepare("UPDATE repair_requests SET status = ?, issue = ? WHERE id = ?");
     $stmt->execute([$status, $remarks, $id]);
 
-    // If completed, move to history
-    if ($status === 'Completed') {
-        $req = $pdo->prepare("SELECT * FROM repair_requests WHERE id=?");
-        $req->execute([$id]);
-        $row = $req->fetch(PDO::FETCH_ASSOC);
+    if ($status === "Completed") {
+        $stmt = $pdo->prepare("SELECT * FROM repair_requests WHERE id = ?");
+        $stmt->execute([$id]);
+        $req = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $ins = $pdo->prepare("INSERT INTO maintenance_history (equipment, type, remarks, completed_at) VALUES (?, 'Repair', ?, NOW())");
-        $ins->execute([$row['equipment'], $row['issue']]);
+        if ($req) {
+            $ins = $pdo->prepare("
+                INSERT INTO maintenance_history (source, equipment, maintenance_type, remarks, status, location, created_at, completed_at) 
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ");
+            $ins->execute([
+                "Repair Request",
+                $req['equipment'],
+                "Repair Request",
+                $remarks,
+                $status,
+                $req['location']
+            ]);
 
-        $del = $pdo->prepare("DELETE FROM repair_requests WHERE id=?");
-        $del->execute([$id]);
+            $pdo->prepare("DELETE FROM repair_requests WHERE id = ?")->execute([$id]);
+        }
     }
-
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
 
 // =============================
-// Auto-generate repair requests from today's maintenance
-// =============================
-$stmt = $pdo->prepare("
-    SELECT mr.*, i.item_name, i.location 
-    FROM maintenance_records mr
-    JOIN inventory i ON mr.inventory_id = i.id
-    WHERE mr.maintenance_date = ? AND mr.status='Scheduled'
-");
-$stmt->execute([$today]);
-$dueToday = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-foreach ($dueToday as $due) {
-    $check = $pdo->prepare("SELECT id FROM repair_requests WHERE ticket_no=?");
-    $check->execute(["MAINT-" . $due['id']]);
-    if (!$check->fetch()) {
-        $ins = $pdo->prepare("
-            INSERT INTO repair_requests (ticket_no, user_name, equipment, issue, location, priority, status, created_at) 
-            VALUES (?, 'System', ?, 'MAINTENANCE', ?, 'Medium', 'Open', NOW())
-        ");
-        $ins->execute(["MAINT-" . $due['id'], $due['item_name'], $due['location'] ?? "Unknown"]);
-    }
-}
-
-// =============================
-// Fetch Diagnostic Equipment
+// Fetch Equipment
 // =============================
 $stmt = $pdo->prepare("SELECT * FROM inventory WHERE item_type = 'Diagnostic Equipment'");
 $stmt->execute();
@@ -88,11 +103,44 @@ $stmt = $pdo->prepare("
     SELECT mr.*, i.item_name 
     FROM maintenance_records mr
     JOIN inventory i ON mr.inventory_id = i.id
-    WHERE mr.maintenance_date > ? AND mr.status='Scheduled'
+    WHERE mr.maintenance_date >= ?
     ORDER BY mr.maintenance_date ASC
 ");
 $stmt->execute([$today]);
 $schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// =============================
+// Auto-Create Repair Requests for Due Today
+// =============================
+$stmt = $pdo->prepare("
+    SELECT mr.*, i.item_name, i.item_id
+    FROM maintenance_records mr
+    JOIN inventory i ON mr.inventory_id = i.id
+    WHERE mr.maintenance_date = ?
+");
+$stmt->execute([$today]);
+$dueToday = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($dueToday as $due) {
+    $locStmt = $pdo->prepare("SELECT department FROM department_assets WHERE item_id = ? LIMIT 1");
+    $locStmt->execute([$due['item_id']]);
+    $dept = $locStmt->fetchColumn() ?: "Unknown";
+
+    $check = $pdo->prepare("SELECT id FROM repair_requests WHERE ticket_no = ?");
+    $check->execute(["MAINT-" . $due['id']]);
+    if (!$check->fetch()) {
+        $ins = $pdo->prepare("INSERT INTO repair_requests (ticket_no, user_name, equipment, issue, location, priority, status, created_at) 
+                               VALUES (?, ?, ?, ?, ?, ?, 'Open', NOW())");
+        $ins->execute([
+            "MAINT-" . $due['id'],
+            "System",
+            $due['item_name'],
+            "MAINTENANCE",
+            $dept,
+            "Medium"
+        ]);
+    }
+}
 
 // =============================
 // Fetch Repair Requests
@@ -104,9 +152,18 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // =============================
 // Fetch Maintenance History
 // =============================
-$stmt = $pdo->prepare("SELECT * FROM maintenance_history ORDER BY completed_at DESC");
+$filter = $_GET['filter'] ?? 'all';
+$query = "SELECT * FROM maintenance_history";
+if ($filter === "Repair Request") {
+    $query .= " WHERE maintenance_type = 'Repair Request'";
+} elseif ($filter === "Preventive") {
+    $query .= " WHERE maintenance_type = 'Preventive'";
+}
+$query .= " ORDER BY completed_at DESC";
+$stmt = $pdo->prepare($query);
 $stmt->execute();
 $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 ?>
 <!DOCTYPE html>
 <html>
@@ -133,7 +190,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="tab-content border p-3 bg-white rounded-bottom">
         <!-- Repair Requests -->
         <div class="tab-pane fade show active" id="requests">
-            <h5>Repair Requests (Including Today’s Scheduled Maintenance)</h5>
+            <h5>Repair Requests</h5>
             <table class="table table-bordered">
                 <thead class="table-light">
                     <tr>
@@ -182,7 +239,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="tab-pane fade" id="schedule">
             <ul class="nav nav-pills mb-3">
                 <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#setSchedule">Set Schedule</button></li>
-                <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#listSchedule">Upcoming Schedules</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#listSchedule">Scheduled List</button></li>
             </ul>
 
             <div class="tab-content">
@@ -200,7 +257,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Maintenance Date</label>
-                            <input type="date" name="maintenance_date" class="form-control" required>
+                            <input type="date" name="maintenance_date" class="form-control" required min="<?= $today ?>">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Type</label>
@@ -219,7 +276,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </form>
                 </div>
 
-                <!-- Upcoming Schedules -->
+                <!-- Scheduled List -->
                 <div class="tab-pane fade" id="listSchedule">
                     <h5>Upcoming Schedules</h5>
                     <table class="table table-bordered">
@@ -229,11 +286,12 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <th>Date</th>
                                 <th>Type</th>
                                 <th>Remarks</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($schedules)): ?>
-                                <tr><td colspan="4" class="text-muted text-center">No schedules found.</td></tr>
+                                <tr><td colspan="5" class="text-muted text-center">No schedules found.</td></tr>
                             <?php else: ?>
                                 <?php foreach ($schedules as $s): ?>
                                     <tr>
@@ -241,7 +299,75 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <td><?= htmlspecialchars($s['maintenance_date']) ?></td>
                                         <td><?= htmlspecialchars($s['maintenance_type']) ?></td>
                                         <td><?= htmlspecialchars($s['remarks']) ?></td>
+                                        <td>
+                                            <!-- Edit Button -->
+                                            <button class="btn btn-sm btn-primary" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#editModal<?= $s['id'] ?>">Edit</button>
+
+                                            <!-- Delete Button -->
+                                            <button class="btn btn-sm btn-danger" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteModal<?= $s['id'] ?>">Delete</button>
+                                        </td>
                                     </tr>
+
+                                    <!-- Edit Modal -->
+                                    <div class="modal fade" id="editModal<?= $s['id'] ?>" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <form method="post" class="modal-content">
+                                                <input type="hidden" name="action" value="edit_schedule">
+                                                <input type="hidden" name="schedule_id" value="<?= $s['id'] ?>">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Edit Schedule</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label>Date</label>
+                                                        <input type="date" name="maintenance_date" class="form-control" value="<?= $s['maintenance_date'] ?>" min="<?= $today ?>" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label>Type</label>
+                                                        <select name="maintenance_type" class="form-select">
+                                                            <option <?= $s['maintenance_type']=="Preventive"?"selected":"" ?>>Preventive</option>
+                                                            <option <?= $s['maintenance_type']=="Repair"?"selected":"" ?>>Repair</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label>Remarks</label>
+                                                        <textarea name="remarks" class="form-control"><?= htmlspecialchars($s['remarks']) ?></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="submit" class="btn btn-success">Save Changes</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+
+                                    <!-- Delete Modal -->
+                                    <div class="modal fade" id="deleteModal<?= $s['id'] ?>" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <form method="post" class="modal-content">
+                                                <input type="hidden" name="action" value="delete_schedule">
+                                                <input type="hidden" name="schedule_id" value="<?= $s['id'] ?>">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Confirm Deletion</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    Are you sure you want to delete this schedule for 
+                                                    <b><?= htmlspecialchars($s['item_name']) ?></b>?
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+
                                 <?php endforeach; ?>
                             <?php endif; ?>
                         </tbody>
@@ -252,24 +378,34 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         <!-- Maintenance History -->
         <div class="tab-pane fade" id="history">
-            <h5>Maintenance History</h5>
+            <h5>Past Maintenance</h5>
+            <form method="get" class="mb-3">
+                <label class="form-label">Filter:</label>
+                <select name="filter" class="form-select w-auto d-inline" onchange="this.form.submit()">
+                    <option value="all" <?= $filter=="all"?"selected":"" ?>>All</option>
+                    <option value="Repair Request" <?= $filter=="Repair Request"?"selected":"" ?>>Repair Request</option>
+                    <option value="Preventive" <?= $filter=="Preventive"?"selected":"" ?>>Preventive</option>
+                </select>
+            </form>
             <table class="table table-bordered">
                 <thead class="table-light">
                     <tr>
                         <th>Equipment</th>
                         <th>Type</th>
+                        <th>Status</th>
                         <th>Remarks</th>
                         <th>Completed At</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($history)): ?>
-                        <tr><td colspan="4" class="text-muted text-center">No history found.</td></tr>
+                        <tr><td colspan="5" class="text-muted text-center">No history found.</td></tr>
                     <?php else: ?>
                         <?php foreach ($history as $h): ?>
                             <tr>
                                 <td><?= htmlspecialchars($h['equipment']) ?></td>
-                                <td><?= htmlspecialchars($h['type']) ?></td>
+                                <td><?= htmlspecialchars($h['maintenance_type']) ?></td>
+                                <td><?= htmlspecialchars($h['status']) ?></td>
                                 <td><?= htmlspecialchars($h['remarks']) ?></td>
                                 <td><?= htmlspecialchars($h['completed_at']) ?></td>
                             </tr>
