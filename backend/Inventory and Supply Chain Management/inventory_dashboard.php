@@ -98,7 +98,7 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
                             style="<?= $isAssetActive ? 'display:block;' : 'display:none;' ?>">
                             <a href="departments-budget">Departments Budget Request</a>
                             <a href="department-assets">Department Asset Mapping</a>
-                            <a href="#">Preventive & Repair Maintenance</a>
+                            <a href="repair-maintenance">Preventive & Repair Maintenance</a>
                             <a href="#">Asset Transfer & Disposal</a>
                             <a href="#">Audit Logs & Usage History</a>
                         </div>
