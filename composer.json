@@ -1,14 +1,29 @@
 {
-    "name": "4101/hms",
+    "name": "hms/hospital-management-system",
+    "description": "Hospital Management System - A comprehensive PHP-based HMS solution",
+    "type": "project",
+    "license": "MIT",
     "authors": [
         {
-            "name": "4101"
+            "name": "HMS Development Team",
+            "email": "dev@hms.com"
         }
     ],
-    "php": ">=8.1",
+    "minimum-stability": "stable",
+    "prefer-stable": true,
     "require": {
+        "php": ">=8.1",
         "dompdf/dompdf": "^3.1",
-        "phpmailer/phpmailer": "*",
-        "orhanerday/open-ai": "*"
+        "phpmailer/phpmailer": "^6.8",
+        "orhanerday/open-ai": "^4.7"
+    },
+    "autoload": {
+        "psr-4": {
+            "HMS\\": "backend/classes/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
     }
 }
