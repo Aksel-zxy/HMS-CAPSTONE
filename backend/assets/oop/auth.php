@@ -133,7 +133,7 @@ class Login
                 case '3': $_SESSION['patient'] = true; header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php"); break;
                 case '4': $_SESSION['billing'] = true; header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php"); break;
                 case '5': $_SESSION['pharmacy'] = true; header("Location: " . BASE_URL . "backend/Pharmacy Management/pharmacy_dashboard.php"); break;
-                case '6': $_SESSION['labtech'] = true; header("Location: " . BASE_URL . "backend/Laboratory and Diagnostic Management/labtech_dashboard.php"); break;
+                case '6': $_SESSION['labtech'] = true; header("Location: " . BASE_URL . "backend/laboratory_and_diagnostic_management/labtech_dashboard.php"); break;
                 case '7': $_SESSION['inventory'] = true; header("Location: " . BASE_URL . "backend/Inventory and Supply Chain Management/inventory_dashboard.php"); break;
                 case '8': $_SESSION['report'] = true; header("Location: " . BASE_URL . "backend/Report and Analytics/report_dashboard.php"); break;
                 default: header("Location: " . BASE_URL . "backend/login.php?error=Invalid role."); break;
@@ -183,7 +183,7 @@ class Login
                     header("Location: Billing and Insurance Management/user_panel/user_accountant.php");
                     break;
                 case 'Laboratorist':
-                    header("Location: Laboratory and Diagnostic Management/user_panel/user_lab.php");
+                    header("Location: laboratory_and_diagnostic_management/user_panel/user_lab.php");
                     break;
                 default:
                     $this->error = "Unknown profession.";

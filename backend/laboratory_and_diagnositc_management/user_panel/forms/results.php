@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $targetPath = $uploadDir . $fileName;
 
             if (move_uploaded_file($_FILES['xray_image']['tmp_name'], $targetPath)) {
-                $imagePath = "/HMS-CAPSTONE/backend/Laboratory and Diagnostic Management/user_panel/uploads/xray/" . $fileName;
+                $imagePath = "/HMS-CAPSTONE/backend/laboratory_and_diagnostic_management/user_panel/uploads/xray/" . $fileName;
             } else {
                 die("Failed to upload X-ray image. PHP Error: " . $_FILES['xray_image']['error']);
             }
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $targetPath = $uploadDir . $fileName;
 
             if (move_uploaded_file($_FILES['mri_image']['tmp_name'], $targetPath)) {
-                $imagePath = "/HMS-CAPSTONE/backend/Laboratory and Diagnostic Management/user_panel/uploads/mri/" . $fileName;
+                $imagePath = "/HMS-CAPSTONE/backend/laboratory_and_diagnostic_management/user_panel/uploads/mri/" . $fileName;
             } else {
                 die("Failed to upload MRI image. PHP Error: " . $_FILES['mri_image']['error']);
             }
@@ -160,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $targetPath = $uploadDir . $fileName;
 
             if (move_uploaded_file($_FILES['ct_image']['tmp_name'], $targetPath)) {
-                $imagePath = "/HMS-CAPSTONE/backend/Laboratory and Diagnostic Management/user_panel/uploads/ct/" . $fileName;
+                $imagePath = "/HMS-CAPSTONE/backend/laboratory_and_diagnostic_management/user_panel/uploads/ct/" . $fileName;
             } else {
                 die("Failed to upload CT image. PHP Error: " . $_FILES['ct_image']['error']);
             }

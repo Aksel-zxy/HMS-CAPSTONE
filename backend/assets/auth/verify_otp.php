@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case '3': header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php"); break;
             case '4': header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php"); break;
             case '5': header("Location: " . BASE_URL . "backend/Pharmacy Management/pharmacy_dashboard.php"); break;
-            case '6': header("Location: " . BASE_URL . "backend/Laboratory and Diagnostic Management/labtech_dashboard.php"); break;
+            case '6': header("Location: " . BASE_URL . "backend/laboratory_and_diagnostic_management/labtech_dashboard.php"); break;
             case '7': header("Location: " . BASE_URL . "backend/Inventory and Supply Chain Management/inventory_dashboard.php"); break;
             case '8': header("Location: " . BASE_URL . "backend/Report and Analytics/report_dashboard.php"); break;
             default: header("Location: " . BASE_URL . "backend/login.php?error=Invalid role."); break;
