@@ -55,7 +55,7 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
                         <button class="dropdown-btn <?= $isVendorActive ? 'active' : '' ?>">Vendor Management</button>
                         <div class="dropdown-container"
                             style="<?= $isVendorActive ? 'display:block;' : 'display:none;' ?>">
-                            <a href="vendor-application"
+                            <a href="vendor-registration"
                                 class="<?= $currentPage=='vendor-application'?'active-link':'' ?>">Vendor Registration
                                 Approval</a>
                             <a href="vendors"
@@ -97,7 +97,7 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
                         <div class="dropdown-container"
                             style="<?= $isAssetActive ? 'display:block;' : 'display:none;' ?>">
                             <a href="departments-budget">Departments Budget Request</a>
-                            <a href="#">Department Asset Mapping</a>
+                            <a href="department-assets">Department Asset Mapping</a>
                             <a href="#">Preventive & Repair Maintenance</a>
                             <a href="#">Asset Transfer & Disposal</a>
                             <a href="#">Audit Logs & Usage History</a>
