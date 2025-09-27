@@ -2,13 +2,6 @@
 session_start();
 require 'db.php';
 
-// ✅ Ensure user is logged in
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
-}
-$user_id = $_SESSION['user_id'];
-
 // Fetch inventory items with their actual vendors (only items with quantity > 0)
 $inventoryStmt = $pdo->query("
     SELECT i.*, vp.id AS product_id, v.id AS vendor_id, v.company_name 

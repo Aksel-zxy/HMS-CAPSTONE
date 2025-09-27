@@ -3,17 +3,17 @@ require 'db.php';
 $today = date("Y-m-d");
 
 // =============================
-// Handle maintenance scheduling
+// Schedule New Maintenance
 // =============================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'schedule') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'schedule') {
     $inventory_id = intval($_POST['inventory_id']);
     $maintenance_date = $_POST['maintenance_date'];
     $maintenance_type = $_POST['maintenance_type'];
     $remarks = trim($_POST['remarks']);
 
     $stmt = $pdo->prepare("
-        INSERT INTO maintenance_records (inventory_id, maintenance_date, maintenance_type, remarks, created_at) 
-        VALUES (?, ?, ?, ?, NOW())
+        INSERT INTO maintenance_records (inventory_id, maintenance_date, maintenance_type, remarks, status, created_at) 
+        VALUES (?, ?, ?, ?, 'Scheduled', NOW())
     ");
     $stmt->execute([$inventory_id, $maintenance_date, $maintenance_type, $remarks]);
 
@@ -22,89 +22,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 // =============================
-// Handle repair request updates
+// Update Repair Request
 // =============================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_request') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'update_request') {
     $id = intval($_POST['request_id']);
     $status = $_POST['status'];
     $remarks = $_POST['remarks'];
 
-    $stmt = $pdo->prepare("UPDATE repair_requests SET status = ?, issue = CONCAT(issue, '\n[Update: ', ?, ']') WHERE id = ?");
+    // Update repair request
+    $stmt = $pdo->prepare("UPDATE repair_requests SET status=?, issue=CONCAT(issue, '\n[Update: ', ?, ']') WHERE id=?");
     $stmt->execute([$status, $remarks, $id]);
+
+    // If completed, move to history
+    if ($status === 'Completed') {
+        $req = $pdo->prepare("SELECT * FROM repair_requests WHERE id=?");
+        $req->execute([$id]);
+        $row = $req->fetch(PDO::FETCH_ASSOC);
+
+        $ins = $pdo->prepare("INSERT INTO maintenance_history (equipment, type, remarks, completed_at) VALUES (?, 'Repair', ?, NOW())");
+        $ins->execute([$row['equipment'], $row['issue']]);
+
+        $del = $pdo->prepare("DELETE FROM repair_requests WHERE id=?");
+        $del->execute([$id]);
+    }
 
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
 
 // =============================
-// Fetch diagnostic equipment
+// Auto-generate repair requests from today's maintenance
+// =============================
+$stmt = $pdo->prepare("
+    SELECT mr.*, i.item_name, i.location 
+    FROM maintenance_records mr
+    JOIN inventory i ON mr.inventory_id = i.id
+    WHERE mr.maintenance_date = ? AND mr.status='Scheduled'
+");
+$stmt->execute([$today]);
+$dueToday = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($dueToday as $due) {
+    $check = $pdo->prepare("SELECT id FROM repair_requests WHERE ticket_no=?");
+    $check->execute(["MAINT-" . $due['id']]);
+    if (!$check->fetch()) {
+        $ins = $pdo->prepare("
+            INSERT INTO repair_requests (ticket_no, user_name, equipment, issue, location, priority, status, created_at) 
+            VALUES (?, 'System', ?, 'MAINTENANCE', ?, 'Medium', 'Open', NOW())
+        ");
+        $ins->execute(["MAINT-" . $due['id'], $due['item_name'], $due['location'] ?? "Unknown"]);
+    }
+}
+
+// =============================
+// Fetch Diagnostic Equipment
 // =============================
 $stmt = $pdo->prepare("SELECT * FROM inventory WHERE item_type = 'Diagnostic Equipment'");
 $stmt->execute();
 $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // =============================
-// Fetch maintenance schedules
+// Fetch Upcoming Schedules
 // =============================
 $stmt = $pdo->prepare("
     SELECT mr.*, i.item_name 
     FROM maintenance_records mr
     JOIN inventory i ON mr.inventory_id = i.id
-    WHERE mr.maintenance_date >= ?
+    WHERE mr.maintenance_date > ? AND mr.status='Scheduled'
     ORDER BY mr.maintenance_date ASC
 ");
 $stmt->execute([$today]);
 $schedules = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // =============================
-// Fetch maintenance history
+// Fetch Repair Requests
 // =============================
-$stmt = $pdo->prepare("
-    SELECT mr.*, i.item_name 
-    FROM maintenance_records mr
-    JOIN inventory i ON mr.inventory_id = i.id
-    WHERE mr.maintenance_date < ?
-    ORDER BY mr.maintenance_date DESC
-");
-$stmt->execute([$today]);
-$history = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// =============================
-// Fetch repair requests (including auto-added from schedules)
-// =============================
-
-// Insert scheduled maintenance (today) into repair_requests if not already there
-$stmt = $pdo->prepare("
-    SELECT mr.*, i.item_name, i.location 
-    FROM maintenance_records mr
-    JOIN inventory i ON mr.inventory_id = i.id
-    WHERE mr.maintenance_date = ?
-");
-$stmt->execute([$today]);
-$dueToday = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-foreach ($dueToday as $due) {
-    $check = $pdo->prepare("SELECT id FROM repair_requests WHERE ticket_no = ?");
-    $check->execute(["MAINT-" . $due['id']]);
-    if (!$check->fetch()) {
-        $ins = $pdo->prepare("INSERT INTO repair_requests (ticket_no, user_name, equipment, issue, location, priority, status, created_at) 
-                               VALUES (?, ?, ?, ?, ?, ?, 'Open', NOW())");
-        $ins->execute([
-            "MAINT-" . $due['id'],
-            "System",
-            $due['item_name'],
-            "Scheduled " . $due['maintenance_type'] . " Maintenance",
-            $due['location'] ?? "Unknown",
-            "Medium"
-        ]);
-    }
-}
-
-// Now fetch all repair requests
 $stmt = $pdo->prepare("SELECT * FROM repair_requests ORDER BY created_at DESC");
 $stmt->execute();
 $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+// =============================
+// Fetch Maintenance History
+// =============================
+$stmt = $pdo->prepare("SELECT * FROM maintenance_history ORDER BY completed_at DESC");
+$stmt->execute();
+$history = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html>
@@ -117,7 +119,6 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="main-sidebar">
     <?php include 'Inventory_dashboard.php'; ?>
 </div>
-
 
 <div class="container">
     <h2 class="mb-4">Preventive & Repair Maintenance</h2>
@@ -132,7 +133,7 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="tab-content border p-3 bg-white rounded-bottom">
         <!-- Repair Requests -->
         <div class="tab-pane fade show active" id="requests">
-            <h5>Repair Requests</h5>
+            <h5>Repair Requests (Including Today’s Scheduled Maintenance)</h5>
             <table class="table table-bordered">
                 <thead class="table-light">
                     <tr>
@@ -181,7 +182,7 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <div class="tab-pane fade" id="schedule">
             <ul class="nav nav-pills mb-3">
                 <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#setSchedule">Set Schedule</button></li>
-                <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#listSchedule">Scheduled List</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#listSchedule">Upcoming Schedules</button></li>
             </ul>
 
             <div class="tab-content">
@@ -218,7 +219,7 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </form>
                 </div>
 
-                <!-- Scheduled List -->
+                <!-- Upcoming Schedules -->
                 <div class="tab-pane fade" id="listSchedule">
                     <h5>Upcoming Schedules</h5>
                     <table class="table table-bordered">
@@ -251,14 +252,14 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         <!-- Maintenance History -->
         <div class="tab-pane fade" id="history">
-            <h5>Past Maintenance</h5>
+            <h5>Maintenance History</h5>
             <table class="table table-bordered">
                 <thead class="table-light">
                     <tr>
                         <th>Equipment</th>
-                        <th>Date</th>
                         <th>Type</th>
                         <th>Remarks</th>
+                        <th>Completed At</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -267,10 +268,10 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php else: ?>
                         <?php foreach ($history as $h): ?>
                             <tr>
-                                <td><?= htmlspecialchars($h['item_name']) ?></td>
-                                <td><?= htmlspecialchars($h['maintenance_date']) ?></td>
-                                <td><?= htmlspecialchars($h['maintenance_type']) ?></td>
+                                <td><?= htmlspecialchars($h['equipment']) ?></td>
+                                <td><?= htmlspecialchars($h['type']) ?></td>
                                 <td><?= htmlspecialchars($h['remarks']) ?></td>
+                                <td><?= htmlspecialchars($h['completed_at']) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
