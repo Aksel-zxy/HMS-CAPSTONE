@@ -2,8 +2,8 @@
 session_start(); // Always start session
 
 include '../../../../SQL/config.php';
-require '../../../Pharmacy Management/classes/Prescription.php';
-require '../../../Pharmacy Management/classes/Medicine.php';
+require '../../../pharmacy_management/classes/Prescription.php';
+require '../../../pharmacy_management/classes/Medicine.php';
 
 // ✅ Authentication check
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
@@ -248,7 +248,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
     <link rel="stylesheet" href="../../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../../assets/CSS/super.css">
     <link rel="stylesheet" href="../../assets/CSS/user_duty.css">
-    <link rel="stylesheet" href="../../../Pharmacy Management/assets/css/med_inventory.css">
+    <link rel="stylesheet" href="../../../pharmacy_management/assets/css/med_inventory.css">
 
     <script>
         // Only validate prescription form, not the appointment assignment form

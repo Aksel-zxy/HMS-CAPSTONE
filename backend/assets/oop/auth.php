@@ -110,8 +110,8 @@ class Login
     }
 
     private function processUserLogin($user, $password)
-{
-    $dbPassword = $user['password'];
+    {
+        $dbPassword = $user['password'];
 
     if (password_verify($password, $dbPassword) || $password === $dbPassword) {
         // Upgrade plain text passwords to hashed
@@ -130,7 +130,7 @@ class Login
                 case '0': $_SESSION['superadmin'] = true; header("Location: " . BASE_URL . "backend/superadmin_dashboard.php"); break;
                 case '1': $_SESSION['hr'] = true; header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php"); break;
                 case '2': $_SESSION['doctor'] = true; header("Location: " . BASE_URL . "backend/Doctor and Nurse Management/doctor_dashboard.php"); break;
-                case '3': $_SESSION['patient'] = true; header("Location: " . BASE_URL . "backend/patient_management/patient_dashboard.php"); break;
+                case '3': $_SESSION['patient'] = true; header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php"); break;
                 case '4': $_SESSION['billing'] = true; header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php"); break;
                 case '5': $_SESSION['pharmacy'] = true; header("Location: " . BASE_URL . "backend/Pharmacy Management/pharmacy_dashboard.php"); break;
                 case '6': $_SESSION['labtech'] = true; header("Location: " . BASE_URL . "backend/Laboratory and Diagnostic Management/labtech_dashboard.php"); break;
@@ -174,7 +174,7 @@ class Login
                     header("Location: Doctor and Nurse Management/user_panel/user_doctor.php");
                     break;
                 case 'Pharmacist':
-                    header("Location: Pharmacy Management/user_panel/user_pharmacist.php");
+                    header("Location: pharmacy_management/user_panel/user_pharmacist.php");
                     break;
                 case 'Nurse':
                     header("Location: Doctor and Nurse Management/user_panel/user_nurse.php");
@@ -183,7 +183,7 @@ class Login
                     header("Location: Billing and Insurance Management/user_panel/user_accountant.php");
                     break;
                 case 'Laboratorist':
-                    header("Location: Laboratory and Diagnostic Management/user_panel/user_lab.php");
+                    header("Location: laboratory_and_diagnostic_management/user_panel/user_lab.php");
                     break;
                 default:
                     $this->error = "Unknown profession.";

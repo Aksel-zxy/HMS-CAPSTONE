@@ -1,5 +1,5 @@
 <?php
-require_once('../../Pharmacy Management/tcpdf/tcpdf.php');
+require_once('../../pharmacy_management/tcpdf/tcpdf.php');
 include '../../../SQL/config.php';
 
 if (!isset($_GET['employee_id']) || empty(trim($_GET['employee_id']))) {
@@ -55,8 +55,8 @@ $pdf->SetFont('helvetica', '', 12);
 // Nurse info
 $full_name = trim(
     ($nurse['first_name'] ?? '') . ' ' .
-    ($nurse['middle_name'] ?? '') . ' ' .
-    ($nurse['last_name'] ?? '')
+        ($nurse['middle_name'] ?? '') . ' ' .
+        ($nurse['last_name'] ?? '')
 );
 $employee_id = htmlspecialchars($nurse['employee_id'] ?? '');
 $profession = htmlspecialchars($nurse['profession'] ?? '');
@@ -70,12 +70,12 @@ $html = "<h2>Nurse Schedule</h2>
 
 // Days mapping (adjust based on DB column names)
 $days = [
-    'Monday' => 'mon', 
-    'Tuesday' => 'tue', 
-    'Wednesday' => 'wed', 
-    'Thursday' => 'thu', 
-    'Friday' => 'fri', 
-    'Saturday' => 'sat', 
+    'Monday' => 'mon',
+    'Tuesday' => 'tue',
+    'Wednesday' => 'wed',
+    'Thursday' => 'thu',
+    'Friday' => 'fri',
+    'Saturday' => 'sat',
     'Sunday' => 'sun'
 ];
 
@@ -116,4 +116,3 @@ foreach ($schedules as $sched) {
 
 $pdf->writeHTML($html, true, false, true, false, '');
 $pdf->Output("nurse_schedule_{$employee_id}.pdf", 'D');
-?>
