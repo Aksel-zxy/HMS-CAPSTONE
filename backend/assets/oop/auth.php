@@ -130,7 +130,7 @@ class Login
                 case '0': $_SESSION['superadmin'] = true; header("Location: " . BASE_URL . "backend/superadmin_dashboard.php"); break;
                 case '1': $_SESSION['hr'] = true; header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php"); break;
                 case '2': $_SESSION['doctor'] = true; header("Location: " . BASE_URL . "backend/Doctor and Nurse Management/doctor_dashboard.php"); break;
-                case '3': $_SESSION['patient'] = true; header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php"); break;
+                case '3': $_SESSION['patient'] = true; header("Location: " . BASE_URL . "backend/patient_management/patient_dashboard.php"); break;
                 case '4': $_SESSION['billing'] = true; header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php"); break;
                 case '5': $_SESSION['pharmacy'] = true; header("Location: " . BASE_URL . "backend/Pharmacy Management/pharmacy_dashboard.php"); break;
                 case '6': $_SESSION['labtech'] = true; header("Location: " . BASE_URL . "backend/Laboratory and Diagnostic Management/labtech_dashboard.php"); break;

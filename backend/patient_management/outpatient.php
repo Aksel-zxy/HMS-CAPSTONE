@@ -85,13 +85,13 @@ if (!$user) {
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Patient Management/registered.php" class="sidebar-link">Registered Patient</a>
+                        <a href="../patient_management/registered.php" class="sidebar-link">Registered Patient</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Patient Management/inpatient.php" class="sidebar-link">Inpatients</a>
+                        <a href="../patient_management/inpatient.php" class="sidebar-link">Inpatients</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Patient Management/outpatient.php" class="sidebar-link">Outpatients</a>
+                        <a href="../patient_management/outpatient.php" class="sidebar-link">Outpatients</a>
                     </li>
                 </ul>
             </li>
@@ -251,14 +251,14 @@ if (!$user) {
                             <td style="padding:12px;"><?= htmlspecialchars($row['doctor_name']) ?></td>
                             <td style="padding:12px; text-align:center;">
                                 <a class="btn btn-sm"
-                                    href="../Patient Management/iview.php?patient_id=<?= $row['patient_id'] ?>"
+                                    href="../patient_management/iview.php?patient_id=<?= $row['patient_id'] ?>"
                                     style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#337ab7; cursor:pointer;">
                                     View
                                 </a>
                             </td>
                             <td style="padding:12px; text-align:center;">
                                 <a class="btn btn-sm"
-                                    href="../Patient Management/iupdate.php?patient_id=<?= $row['patient_id'] ?>"
+                                    href="../patient_management/iupdate.php?patient_id=<?= $row['patient_id'] ?>"
                                     style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0dcaf0; border:none; color:#337ab7; cursor:pointer;">
                                     Edit
                                 </a>

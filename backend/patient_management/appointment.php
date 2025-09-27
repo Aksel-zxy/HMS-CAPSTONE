@@ -90,13 +90,13 @@ $user = $result->fetch_assoc();
 
                 <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Patient Management/registered.php" class="sidebar-link">Registered Patient</a>
+                        <a href="../patient_management/registered.php" class="sidebar-link">Registered Patient</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Patient Management/inpatient.php" class="sidebar-link">Inpatients</a>
+                        <a href="../patient_management/inpatient.php" class="sidebar-link">Inpatients</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Patient Management/outpatient.php" class="sidebar-link">Outpatients</a>
+                        <a href="../patient_management/outpatient.php" class="sidebar-link">Outpatients</a>
                     </li>
                 </ul>
             </li>
