@@ -1,5 +1,4 @@
 <?php
-// Prevent redeclaration
 if (!defined("BASE_URL")) {
     define("BASE_URL", "/hms-capstone/");
 }
@@ -7,10 +6,7 @@ if (!defined("BASE_URL")) {
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-
-// 1800 for 30mins
 $inactive = 1800;
-
 if (isset($_SESSION['timeout'])) {
     $session_life = time() - $_SESSION['timeout'];
     if ($session_life > $inactive) {
@@ -23,29 +19,28 @@ if (isset($_SESSION['timeout'])) {
         exit();
     }
 }
-
 $_SESSION['timeout'] = time();
 
-// -----------------------------
+
 // MySQL settings
-// -----------------------------
-$host     = "127.0.0.1";   // use IP instead of "localhost"
-$port     = "3306";        // adjust for your setup
-$dbname   = "hmscapstone"; // or hmscapstone1 for PDO
+
+$host     = "127.0.0.1";   
+$port     = "3306";        
+$dbname   = "hmscapstone"; 
 $username = "root";
 $password = "";
 
-// -----------------------------
+
 // mysqli connection
-// -----------------------------
+
 $conn = new mysqli($host, $username, $password, $dbname, $port);
 if ($conn->connect_error) {
     die("Connection failed (MySQLi): " . $conn->connect_error);
 }
 
-// -----------------------------
+
 // PDO connection
-// -----------------------------
+
 try {
     $pdo = new PDO(
         "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4",
