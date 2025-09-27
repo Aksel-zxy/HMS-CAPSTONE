@@ -15,7 +15,16 @@
 <div class="sidebar open" id="mySidebar">
     <div class="logo-container">
         <img src="assets/image/logo-dark.png" alt="Logo">
-        <span class="welcome-text">Welcome, <?= htmlspecialchars($user['fname'] . " " . $user['lname']); ?></span>
+        <span class="welcome-text">
+            Welcome, 
+            <?php
+                if (isset($user) && is_array($user) && isset($user['fname'], $user['lname'])) {
+                    echo htmlspecialchars($user['fname'] . " " . $user['lname']);
+                } else {
+                    echo "Guest";
+                }
+            ?>
+        </span>
     </div>
 
     <nav class="nav">
