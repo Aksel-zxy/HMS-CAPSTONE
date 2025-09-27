@@ -221,13 +221,22 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <form method="post" class="row g-3">
                         <input type="hidden" name="action" value="schedule">
                         <div class="col-md-4">
-                            <label class="form-label">Select Equipment</label>
-                            <select name="inventory_id" class="form-select" required>
-                                <?php foreach ($equipment as $eq): ?>
-                                    <option value="<?= $eq['id'] ?>"><?= htmlspecialchars($eq['item_name']) ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
+    <label class="form-label">Select Equipment</label>
+    <select name="inventory_id" class="form-select" required>
+        <?php
+        // Get IDs of equipment already scheduled
+        $scheduled_ids = array_column($schedules, 'inventory_id');
+        foreach ($equipment as $eq):
+            $disabled = in_array($eq['id'], $scheduled_ids) ? "disabled" : "";
+        ?>
+            <option value="<?= $eq['id'] ?>" <?= $disabled ?>>
+                <?= htmlspecialchars($eq['item_name']) ?>
+                <?= $disabled ? "(Already Scheduled)" : "" ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+</div>
+
                         <div class="col-md-3">
                             <label class="form-label">Maintenance Day (1-31)</label>
                             <input type="number" name="maintenance_day" class="form-control" min="1" max="31" required>
