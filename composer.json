@@ -1,4 +1,11 @@
 {
+    "name": "4101/hms",
+    "authors": [
+        {
+            "name": "4101"
+        }
+    ],
+    "php": ">=8.1",
     "require": {
         "dompdf/dompdf": "^3.1",
         "phpmailer/phpmailer": "*",
