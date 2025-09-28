@@ -134,7 +134,7 @@ class Login
                 case '4': $_SESSION['billing'] = true; header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php"); break;
                 case '5': $_SESSION['pharmacy'] = true; header("Location: " . BASE_URL . "backend/Pharmacy Management/pharmacy_dashboard.php"); break;
                 case '6': $_SESSION['labtech'] = true; header("Location: " . BASE_URL . "backend/Laboratory and Diagnostic Management/labtech_dashboard.php"); break;
-                case '7': $_SESSION['inventory'] = true; header("Location: " . BASE_URL . "backend/Inventory and Supply Chain Management/inventory_dashboard.php"); break;
+                case '7': $_SESSION['inventory'] = true; header("Location: " . BASE_URL . "backend/inventory_and_supply_chain_management/inventory_dashboard.php"); break;
                 case '8': $_SESSION['report'] = true; header("Location: " . BASE_URL . "backend/Report and Analytics/report_dashboard.php"); break;
                 default: header("Location: " . BASE_URL . "backend/login.php?error=Invalid role."); break;
             }
