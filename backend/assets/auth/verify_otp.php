@@ -27,26 +27,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['username'] = $_SESSION['pending_username'];
         $_SESSION['role'] = $_SESSION['pending_role'];
         switch ($_SESSION['role']) {
-            case '0': $_SESSION['superadmin'] = true; break;
-            case '1': $_SESSION['hr'] = true; break;
-            case '2': $_SESSION['doctor'] = true; break;
-            case '3': $_SESSION['patient'] = true; break;
-            case '4': $_SESSION['billing'] = true; break;
-            case '5': $_SESSION['pharmacy'] = true; break;
-            case '6': $_SESSION['labtech'] = true; break;
-            case '7': $_SESSION['inventory'] = true; break;
-            case '8': $_SESSION['report'] = true; break;
+            case '0':
+                $_SESSION['superadmin'] = true;
+                break;
+            case '1':
+                $_SESSION['hr'] = true;
+                break;
+            case '2':
+                $_SESSION['doctor'] = true;
+                break;
+            case '3':
+                $_SESSION['patient'] = true;
+                break;
+            case '4':
+                $_SESSION['billing'] = true;
+                break;
+            case '5':
+                $_SESSION['pharmacy'] = true;
+                break;
+            case '6':
+                $_SESSION['labtech'] = true;
+                break;
+            case '7':
+                $_SESSION['inventory'] = true;
+                break;
+            case '8':
+                $_SESSION['report'] = true;
+                break;
         }
         if (!empty($_SESSION['remember_me']) && $_SESSION['remember_me'] === true) {
             $token = bin2hex(random_bytes(32));
             setcookie(
                 "remember_token",
                 $token,
-                time() + (86400 * 7), 
+                time() + (86400 * 7),
                 "/",
                 "",
                 false,
-                true 
+                true
             );
             $stmt = $conn->prepare("UPDATE users SET remember_token=? WHERE user_id=?");
             $stmt->bind_param("si", $token, $_SESSION['user_id']);
@@ -60,16 +78,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['pending_role']
         );
         switch ($_SESSION['role']) {
-            case '0': header("Location: " . BASE_URL . "backend/superadmin_dashboard.php"); break;
-            case '1': header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php"); break;
-            case '2': header("Location: " . BASE_URL . "backend/Doctor and Nurse Management/doctor_dashboard.php"); break;
-            case '3': header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php"); break;
-            case '4': header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php"); break;
-            case '5': header("Location: " . BASE_URL . "backend/Pharmacy Management/pharmacy_dashboard.php"); break;
-            case '6': header("Location: " . BASE_URL . "backend/Laboratory and Diagnostic Management/labtech_dashboard.php"); break;
-            case '7': header("Location: " . BASE_URL . "backend/Inventory and Supply Chain Management/inventory_dashboard.php"); break;
-            case '8': header("Location: " . BASE_URL . "backend/Report and Analytics/report_dashboard.php"); break;
-            default: header("Location: " . BASE_URL . "backend/login.php?error=Invalid role."); break;
+            case '0':
+                header("Location: " . BASE_URL . "backend/superadmin_dashboard.php");
+                break;
+            case '1':
+                header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php");
+                break;
+            case '2':
+                header("Location: " . BASE_URL . "backend/doctor_and_nurse_management/doctor_dashboard.php");
+                break;
+            case '3':
+                header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php");
+                break;
+            case '4':
+                header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php");
+                break;
+            case '5':
+                header("Location: " . BASE_URL . "backend/pharmacy_management/pharmacy_dashboard.php");
+                break;
+            case '6':
+                header("Location: " . BASE_URL . "backend/laboratory_and_diagnostic_management/labtech_dashboard.php");
+                break;
+            case '7':
+                header("Location: " . BASE_URL . "backend/Inventory and Supply Chain Management/inventory_dashboard.php");
+                break;
+            case '8':
+                header("Location: " . BASE_URL . "backend/Report and Analytics/report_dashboard.php");
+                break;
+            default:
+                header("Location: " . BASE_URL . "backend/login.php?error=Invalid role.");
+                break;
         }
         exit;
     } else {
