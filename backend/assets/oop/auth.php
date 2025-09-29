@@ -133,7 +133,7 @@ class Login
                         break;
                     case '1':
                         $_SESSION['hr'] = true;
-                        header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php");
+                        header("Location: " . BASE_URL . "backend/hr_management/admin_dashboard.php");
                         break;
                     case '2':
                         $_SESSION['doctor'] = true;
