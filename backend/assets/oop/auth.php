@@ -131,11 +131,11 @@ class Login
                 case '1': $_SESSION['hr'] = true; header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php"); break;
                 case '2': $_SESSION['doctor'] = true; header("Location: " . BASE_URL . "backend/doctor_and_nurse_management/doctor_dashboard.php"); break;
                 case '3': $_SESSION['patient'] = true; header("Location: " . BASE_URL . "backend/patient_management/patient_dashboard.php"); break;
-                case '4': $_SESSION['billing'] = true; header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php"); break;
-                case '5': $_SESSION['pharmacy'] = true; header("Location: " . BASE_URL . "backend/Pharmacy Management/pharmacy_dashboard.php"); break;
-                case '6': $_SESSION['labtech'] = true; header("Location: " . BASE_URL . "backend/Laboratory and Diagnostic Management/labtech_dashboard.php"); break;
+                case '4': $_SESSION['billing'] = true; header("Location: " . BASE_URL . "backend/billing_and_insurance_management/billing_dashboard.php"); break;
+                case '5': $_SESSION['pharmacy'] = true; header("Location: " . BASE_URL . "backend/pharmacy_management/pharmacy_dashboard.php"); break;
+                case '6': $_SESSION['labtech'] = true; header("Location: " . BASE_URL . "backend/laboratory_and_diagnostic_management/labtech_dashboard.php"); break;
                 case '7': $_SESSION['inventory'] = true; header("Location: " . BASE_URL . "backend/inventory_and_supply_chain_management/inventory_dashboard.php"); break;
-                case '8': $_SESSION['report'] = true; header("Location: " . BASE_URL . "backend/Report and Analytics/report_dashboard.php"); break;
+                case '8': $_SESSION['report'] = true; header("Location: " . BASE_URL . "backend/report_and_analytics/report_dashboard.php"); break;
                 default: header("Location: " . BASE_URL . "backend/login.php?error=Invalid role."); break;
             }
             exit;
@@ -180,7 +180,7 @@ class Login
                     header("Location: doctor_and_nurse_management/user_panel/user_nurse.php");
                     break;
                 case 'Accountant':
-                    header("Location: Billing and Insurance Management/user_panel/user_accountant.php");
+                    header("Location: billing_and_insurance_management/user_panel/user_accountant.php");
                     break;
                 case 'Laboratorist':
                     header("Location: laboratory_and_diagnostic_management/user_panel/user_lab.php");
@@ -211,7 +211,7 @@ class Login
             $_SESSION['username'] = $patient['username'];
             $_SESSION['profession'] = 'patient';
 
-            header("Location: Patient Management/user_panel/user_patient.php");
+            header("Location: pharmacy_management/user_panel/user_patient.php");
             exit();
         } else {
             $this->error = "Incorrect password.";
