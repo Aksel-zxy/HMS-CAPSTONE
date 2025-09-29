@@ -195,7 +195,12 @@ foreach ($data as $batch) {
                     return $date ? $date->format('M Y') : '-'; // e.g., Sep 2025
                 }
                 ?>
-
+                <?php if (isset($_GET['msg']) && $_GET['msg'] === 'disposed_success'): ?>
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        ✅ Batch disposed successfully!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
                 <table class="table" id="medicineExpiryTable">
                     <thead class="table">
                         <tr>
@@ -203,6 +208,7 @@ foreach ($data as $batch) {
                             <th>Stock Quantity</th>
                             <th>Expiry Date</th>
                             <th>Status</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -214,7 +220,7 @@ foreach ($data as $batch) {
                             ?>
                             <!-- Main Medicine Row -->
                             <tr class="medicine-main" data-med-name="<?= htmlspecialchars($medName) ?>" style="cursor:pointer;">
-                                <td><strong><?= htmlspecialchars($medName) ?></strong></td>
+                                <td><?= htmlspecialchars($medName) ?></td>
                                 <td><?= $totalStock ?></td>
                                 <td><?= formatMonthYear($earliestExpiry) ?></td>
                                 <td>
@@ -222,6 +228,7 @@ foreach ($data as $batch) {
                                         <?= $status ?>
                                     </span>
                                 </td>
+                                <td></td>
                             </tr>
 
                             <!-- Hidden Batch Rows -->
@@ -235,8 +242,29 @@ foreach ($data as $batch) {
                                             <?= $batch['status'] ?>
                                         </span>
                                     </td>
+                                    <td>
+                                        <?php if ($batch['status'] == 'Expired'): ?>
+                                            <form method="POST" action="pharmacy_disposed_batch.php" onsubmit="return confirm('Are you sure you want to dispose this batch?');">
+                                                <input type="hidden" name="batch_id" value="<?= $batch['batch_id'] ?>">
+                                                <input type="hidden" name="med_id" value="<?= $batch['med_id'] ?>">
+                                                <input type="hidden" name="med_name" value="<?= htmlspecialchars($medName) ?>">
+                                                <input type="hidden" name="quantity" value="<?= $batch['stock_quantity'] ?>">
+                                                <input type="hidden" name="price" value="<?= $batch['unit_price'] ?>">
+                                                <input type="hidden" name="expiration_date" value="<?= $batch['expiry_date'] ?>">
+                                                <button type="submit"
+                                                    class="badge bg-danger border-0"
+                                                    style="cursor:pointer; font-size:0.85rem; padding:0.45em 0.65em;">
+                                                    Dispose
+                                                </button>
+
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
+
                         <?php endforeach; ?>
                     </tbody>
                 </table>
@@ -345,6 +373,44 @@ foreach ($data as $batch) {
     <!----- End of Main Content ----->
     </div>
 
+    <script>
+        // Search + Filter functionality
+        const searchInput = document.getElementById("searchInput");
+        const statusFilter = document.getElementById("statusFilter");
+
+        function filterTable() {
+            const searchValue = searchInput.value.toLowerCase();
+            const filterValue = statusFilter.value;
+
+            document.querySelectorAll("#medicineExpiryTable tbody tr.medicine-main").forEach(row => {
+                const medName = row.querySelector("td strong").innerText.toLowerCase();
+                const status = row.querySelector("td span").innerText.trim();
+
+                // check search match
+                const matchesSearch = medName.includes(searchValue);
+
+                // check filter match
+                const matchesFilter =
+                    filterValue === "All" ||
+                    status === filterValue;
+
+                // show/hide row
+                if (matchesSearch && matchesFilter) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                    // hide batch rows if parent hidden
+                    const medNameAttr = row.dataset.medName;
+                    document.querySelectorAll(`.batch-row[data-med="${medNameAttr}"]`)
+                        .forEach(batch => batch.style.display = "none");
+                }
+            });
+        }
+
+        // Listen for changes
+        searchInput.addEventListener("keyup", filterTable);
+        statusFilter.addEventListener("change", filterTable);
+    </script>
 
 
     <script>

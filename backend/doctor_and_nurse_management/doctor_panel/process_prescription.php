@@ -1,6 +1,6 @@
 <?php
 require '../../../SQL/config.php';
-require '../../Pharmacy Management/classes/prescription.php';
+require '../../pharmacy_management/classes/prescription.php';
 
 
 

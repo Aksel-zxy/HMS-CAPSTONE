@@ -184,16 +184,24 @@ class Medicine
     public function getAllBatches()
     {
         $query = "
-        SELECT i.med_name, b.batch_no, b.stock_quantity, b.expiry_date,
-        CASE 
-            WHEN b.expiry_date < CURDATE() THEN 'Expired'
-            WHEN b.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 'Near Expiry'
-            ELSE 'Available'
-        END AS status
+        SELECT 
+            i.med_id,
+            i.med_name,
+            i.unit_price, -- get price from pharmacy_inventory
+            b.batch_id,
+            b.batch_no,
+            b.stock_quantity,
+            b.expiry_date,
+            CASE 
+                WHEN b.expiry_date < CURDATE() THEN 'Expired'
+                WHEN b.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 'Near Expiry'
+                ELSE 'Available'
+            END AS status
         FROM pharmacy_stock_batches b
         JOIN pharmacy_inventory i ON i.med_id = b.med_id
-        ORDER BY i.med_name, b.expiry_date ASC
+        ORDER BY b.expiry_date ASC, i.med_name
     ";
+
         $result = $this->conn->query($query);
         if (!$result) throw new Exception("Error fetching batches: " . $this->conn->error);
         return $result->fetch_all(MYSQLI_ASSOC);
