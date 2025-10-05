@@ -1,9 +1,6 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
-require_once "oop2/upd_stats.php";
-require_once "../mod1/oop/fetchdetails.php";
-require_once "oop2/audit.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -22,8 +19,6 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
-$patient = new Patient($conn);
-$allPatients = $patient->getAllPatients();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -89,13 +84,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="test_process.php" class="sidebar-link">Sample Process</a>
+                        <a href="../mod2/test_process.php" class="sidebar-link">Sample Process</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="sps.php" class="sidebar-link">Sample Processing Status</a>
+                        <a href="../mod2/sps.php" class="sidebar-link">Sample Processing Status</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="audit.php" class="sidebar-link">Audit Trail</a>
+                        <a href="../mod2/audit.php" class="sidebar-link">Audit Trail</a>
                     </li>
                 </ul>
             </li>
@@ -115,9 +110,6 @@ $allPatients = $patient->getAllPatients();
                     <li class="sidebar-item">
                         <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="../mod3/operation_report.php" class="sidebar-link">Operation Equipment</a>
-                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -130,10 +122,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Equipment/equipment_list.php" class="sidebar-link">Laboratory Equipment </a>
+                        <a href="lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Equipment/maintenance_schedule.php" class="sidebar-link">Maintenance Schedule</a>
+                        <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -162,7 +157,7 @@ $allPatients = $patient->getAllPatients();
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -172,74 +167,12 @@ $allPatients = $patient->getAllPatients();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
-                <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
-                    📜 Appointment Audit Trail
-                </h2>
-                <div class="col-md-3 mb-3">
-                    <input type="text" id="searchInput" class="form-control"
-                        style="width:300px; border-radius:20px; padding:8px 15px;"
-                        placeholder="🔍 Search patient, test, or status...">
-                </div>
-
-                <!-- Table -->
-                <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
-                    <table id="auditTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
-                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
-                            <tr>
-                                <th style="padding:12px; text-align:center;">#</th>
-                                <th style="padding:12px; text-align:center;">Patient</th>
-                                <th style="padding:12px; text-align:center;">Service</th>
-                                <th style="padding:12px; text-align:center;">Scheduled Date</th>
-                                <th style="padding:12px; text-align:center;">Time</th>
-                                <th style="padding:12px; text-align:center;">Laboratorist</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($auditLogs)): ?>
-                                <?php foreach ($auditLogs as $row): ?>
-                                    <tr style="border-bottom:1px solid #f1f1f1;">
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleID']) ?></td>
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['patient_name'] ?? '—') ?></td>
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['serviceName']) ?></td>
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleDate']) ?></td>
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleTime']) ?></td>
-                                        <td style="padding:12px; text-align:center;"><?= !empty($row['employee_name']) ? htmlspecialchars($row['employee_name']) : 'System' ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="6" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
-                                        📋 No audit records found
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <h1>LAB EQUIPMENT</h1>
             <!----- End of Main Content ----->
             <script>
-                // Sidebar toggle
-                document.querySelector(".toggler-btn")?.addEventListener("click", function() {
+                const toggler = document.querySelector(".toggler-btn");
+                toggler.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
-                });
-                document.addEventListener("DOMContentLoaded", function() {
-                    const searchInput = document.getElementById("searchInput");
-                    const tableRows = document.querySelectorAll("tbody tr");
-
-                    searchInput.addEventListener("keyup", function() {
-                        let filter = searchInput.value.toLowerCase();
-
-                        tableRows.forEach(row => {
-                            let text = row.textContent.toLowerCase();
-                            if (text.includes(filter)) {
-                                row.style.display = "";
-                            } else {
-                                row.style.display = "none";
-                            }
-                        });
-                    });
                 });
             </script>
             <script src="../assets/Bootstrap/all.min.js"></script>

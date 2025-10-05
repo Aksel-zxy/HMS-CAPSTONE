@@ -1,7 +1,6 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
-require_once "../mod1/oop/fetchdetails.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -20,8 +19,6 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
-$patient = new Patient($conn);
-$allPatients = $patient->getAllPatients();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -108,13 +105,10 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="results.php" class="sidebar-link">Test Results</a>
+                        <a href="../mod3/results.php" class="sidebar-link">Test Results</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="result_deliveries.php" class="sidebar-link">Result Deliveries</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
+                        <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                 </ul>
             </li>
@@ -128,10 +122,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Equipment/equipment_list.php" class="sidebar-link">Laboratory Equipment </a>
+                        <a href="lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Equipment/maintenance_schedule.php" class="sidebar-link">Maintenance Schedule</a>
+                        <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -160,7 +157,7 @@ $allPatients = $patient->getAllPatients();
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -170,173 +167,14 @@ $allPatients = $patient->getAllPatients();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
-                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
-                    📊 Results
-                </h2>
-                <div class="col-md-3 mb-3">
-                    <input type="text" id="searchInput" class="form-control"
-                        style="width:300px; border-radius:20px; padding:8px 15px;"
-                        placeholder="🔍 Search patient, test, or remarks...">
-                </div>
-                <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
-                    <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
-                        <thead style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left; position:sticky; top:0; z-index:1;">
-                            <tr>
-                                <th style="padding:12px;text-align:center;">Patient ID</th>
-                                <th style="padding:12px;text-align:center;">Patient Name</th>
-                                <th style="padding:12px;text-align:center;">Remarks</th>
-                                <th style="padding:12px;text-align:center;">Test Name</th>
-                                <th style="padding:12px;text-align:center;">Completed Time</th>
-                                <th style="padding:12px;text-align:center;">Result</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php
-                            $query = "
-            SELECT 
-                p.patient_id,
-                CONCAT(p.fname, ' ', p.lname) AS patient_name,
-                s.scheduleID,    
-                s.serviceName,
-                s.completed_at,
-                r.result,
-                r.remarks
-            FROM dl_results r
-            INNER JOIN dl_result_schedules rs ON r.resultID = rs.resultID
-            INNER JOIN dl_schedule s ON rs.scheduleID = s.scheduleID
-            INNER JOIN patientinfo p ON s.patientid = p.patient_id
-            ORDER BY p.patient_id, s.completed_at DESC
-        ";
-                            $result = $conn->query($query);
-
-                            if ($result && $result->num_rows > 0):
-                                $patients = [];
-                                while ($row = $result->fetch_assoc()) {
-                                    $pid = $row['patient_id'];
-                                    if (!isset($patients[$pid])) {
-                                        $patients[$pid] = [
-                                            'name'    => $row['patient_name'],
-                                            'tests'   => [],
-                                            'remarks' => []
-                                        ];
-                                    }
-                                    $patients[$pid]['tests'][] = $row;
-                                    if (!empty($row['remarks'])) {
-                                        $patients[$pid]['remarks'][] = $row['remarks'];
-                                    }
-                                }
-
-                                foreach ($patients as $patientId => $pdata):
-                                    $rowspan = count($pdata['tests']);
-                                    $firstRow = true;
-                                    $allRemarks = !empty($pdata['remarks']) ? implode("\n---\n", array_unique($pdata['remarks'])) : "No remarks yet";
-
-                                    foreach ($pdata['tests'] as $test):
-                            ?>
-                                        <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
-                                            <?php if ($firstRow): ?>
-                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>"><?= htmlspecialchars($patientId) ?></td>
-                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>"><?= htmlspecialchars($pdata['name']) ?></td>
-                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
-                                                    <button class="btn btn-warning ai-impression-btn"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#aiImpressionModal"
-                                                        data-impression="<?= htmlspecialchars($allRemarks) ?>">
-                                                        View Remarks
-                                                    </button>
-                                                </td>
-                                            <?php $firstRow = false;
-                                            endif; ?>
-
-                                            <td style="padding:12px;text-align:center;"><?= htmlspecialchars($test['serviceName']) ?></td>
-                                            <td style="padding:12px;text-align:center;">
-                                                <?= $test['completed_at'] ? date("Y-m-d | H:i", strtotime($test['completed_at'])) : "N/A" ?>
-                                            </td>
-                                            <td style="padding:12px; text-align:center;">
-                                                <?php
-                                                $testData = [
-                                                    "scheduleID"  => $test['scheduleID'],
-                                                    "serviceName" => $test['serviceName']
-                                                ];
-                                                ?>
-                                                <button class="btn btn-success view-result-btn"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#viewResultModal"
-                                                    data-results='<?= json_encode([$testData]) ?>'>
-                                                    View Result
-                                                </button>
-                                            </td>
-                                        </tr>
-                            <?php
-                                    endforeach;
-                                endforeach;
-                            else:
-                                echo "<tr><td colspan='6' style='padding:20px; text-align:center; color:gray; font-style:italic;'>No Results Found</td></tr>";
-                            endif;
-                            ?>
-                        </tbody>
-                    </table>
-
-                </div>
-            </div>
-            <!-- MODAL AREA -->
-            <div class="modal fade" id="viewResultModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header bg-success text-white">
-                            <h5 class="modal-title" id="modalTitle">Laboratory Result</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body" id="resultContent">
-                            <p class="text-center text-muted">Loading result...</p>
-                        </div>
-                        <div class="modal-footer d-flex justify-content-between">
-                            <button id="prevResult" class="btn btn-outline-success">⟨ Prev</button>
-                            <button id="nextResult" class="btn btn-outline-success">Next ⟩</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!-- Impression Modal -->
-            <div class="modal fade" id="aiImpressionModal" tabindex="-1">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <!-- Header -->
-                        <div class="modal-header" style="background: linear-gradient(90deg, #4facfe, #00f2fe); color: #fff;">
-                            <h5 class="modal-title">Remarks</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-
-                        <!-- Body -->
-                        <div class="modal-body">
-                            <pre id="impressionText" class="p-3 bg-light rounded border" style="font-family: 'Arial', sans-serif; font-size:14px;">
-                                Loading...
-                            </pre>
-                        </div>
-
-                        <!-- Footer -->
-                        <div class="modal-footer d-flex justify-content-between">
-                            <button class="btn btn-outline-primary" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h1>MAINTENANCE</h1>
             <!----- End of Main Content ----->
             <script>
-                document.addEventListener("DOMContentLoaded", function() {
-                    const impressionButtons = document.querySelectorAll(".ai-impression-btn");
-                    const impressionText = document.getElementById("impressionText");
-
-                    impressionButtons.forEach((btn) => {
-                        btn.addEventListener("click", function() {
-                            const impression = this.getAttribute("data-impression") || "⚠️ No remarks available.";
-                            impressionText.textContent = impression;
-                        });
-                    });
+                const toggler = document.querySelector(".toggler-btn");
+                toggler.addEventListener("click", function() {
+                    document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
             </script>
-            <script src="../assets/javascript/test_process.js"></script>
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
             <script src="../assets/Bootstrap/fontawesome.min.js"></script>

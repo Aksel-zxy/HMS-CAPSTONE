@@ -110,9 +110,6 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="mod3/operation_report.php" class="sidebar-link">Operation Equipment</a>
-                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -125,10 +122,13 @@ if (!$user) {
                 </a>
                 <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Equipment/equipment_list.php" class="sidebar-link">Laboratory Equipment </a>
+                        <a href="mod4/lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Equipment/maintenance_schedule.php" class="sidebar-link">Maintenance Schedule</a>
+                        <a href="mod4/maintenance.php" class="sidebar-link">Maintenance Schedule</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="mod4/operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>

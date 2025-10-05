@@ -67,10 +67,10 @@ if (!$user) {
 
                 <ul id="labtech" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="doctor_referral.php" class="sidebar-link">Doctor Referral</a>
+                        <a href="../mod1/doctor_referral.php" class="sidebar-link">Doctor Referral</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
+                        <a href="../mod1/cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
                 </ul>
             </li>
@@ -110,9 +110,6 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="../mod3/operation_report.php" class="sidebar-link">Operation Equipment</a>
-                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -125,10 +122,13 @@ if (!$user) {
                 </a>
                 <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Equipment/equipment_list.php" class="sidebar-link">Laboratory Equipment </a>
+                        <a href="lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Equipment/maintenance_schedule.php" class="sidebar-link">Maintenance Schedule</a>
+                        <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -157,7 +157,7 @@ if (!$user) {
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -167,50 +167,14 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-
-            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
-
-                <div style="display:flex; gap:15px;">
-                    <!-- Calendar -->
-                    <div id="scheduleCalendar" style="flex:2; background:#fff; border-radius:8px; padding:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    </div>
-
-                    <!-- Available Slots -->
-                    <div style="flex:1; background:#fff; border-radius:8px; padding:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                        <h4 style="margin-bottom:12px; color:#0d6efd; font-family:Arial, sans-serif;">Available Slots</h4>
-                        <ul id="availableSlots" style="list-style:none; padding:0; margin:0; font-family:Arial, sans-serif; font-size:14px;">
-                            <!-- Slots will be injected here -->
-                        </ul>
-                    </div>
-                </div>
-
-            </div>
-
-
-            <!-- MODAL AREA PO -->
-            <div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="dayModalLabel">Available Slots</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body" id="dayModalBody">
-                            <!-- Filled by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h1>LABORATORY REPORT</h1>
             <!----- End of Main Content ----->
-            <script src="../assets/javascript/calendar.js"></script>
             <script>
-                // Sidebar toggle
-                document.querySelector(".toggler-btn")?.addEventListener("click", function() {
+                const toggler = document.querySelector(".toggler-btn");
+                toggler.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
             </script>
-            <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
-            <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
             <script src="../assets/Bootstrap/fontawesome.min.js"></script>

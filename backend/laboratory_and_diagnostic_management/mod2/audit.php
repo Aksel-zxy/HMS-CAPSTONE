@@ -3,6 +3,7 @@ session_start();
 include '../../../SQL/config.php';
 require_once "oop2/upd_stats.php";
 require_once "../mod1/oop/fetchdetails.php";
+require_once "oop2/audit.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -114,9 +115,6 @@ $allPatients = $patient->getAllPatients();
                     <li class="sidebar-item">
                         <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="../mod3/operation_report.php" class="sidebar-link">Operation Equipment</a>
-                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -129,10 +127,13 @@ $allPatients = $patient->getAllPatients();
                 </a>
                 <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../Equipment/equipment_list.php" class="sidebar-link">Laboratory Equipment </a>
+                        <a href="../mod4/lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Equipment/maintenance_schedule.php" class="sidebar-link">Maintenance Schedule</a>
+                        <a href="../mod4/maintenance.php" class="sidebar-link">Maintenance Schedule</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="../mod4/operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -172,120 +173,44 @@ $allPatients = $patient->getAllPatients();
             </div>
             <!-- START CODING HERE -->
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
-                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
-                    🧪 Sample Processing Status
+                <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
+                    📜 Appointment Audit Trail
                 </h2>
                 <div class="col-md-3 mb-3">
                     <input type="text" id="searchInput" class="form-control"
                         style="width:300px; border-radius:20px; padding:8px 15px;"
                         placeholder="🔍 Search patient, test, or status...">
                 </div>
-                <!-- Fixed height scroll container -->
+
+                <!-- Table -->
                 <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
-                    <table style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
-                        <thead style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left; position:sticky; top:0; z-index:1;">
+                    <table id="auditTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
+                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
                             <tr>
-                                <th style="padding:12px; text-align:center;">Patient ID</th>
-                                <th style="padding:12px; text-align:center;">Patient Name</th>
-                                <th style="padding:12px; text-align:center;">Date | Time</th>
-                                <th style="padding:12px; text-align:center;">Test Name</th>
-                                <th style="padding:12px; text-align:center;">Status</th>
-                                <th style="padding:12px; text-align:center;">Action</th>
+                                <th style="padding:12px; text-align:center;">#</th>
+                                <th style="padding:12px; text-align:center;">Patient</th>
+                                <th style="padding:12px; text-align:center;">Service</th>
+                                <th style="padding:12px; text-align:center;">Scheduled Date</th>
+                                <th style="padding:12px; text-align:center;">Time</th>
+                                <th style="padding:12px; text-align:center;">Laboratorist</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php
-                            $hasAppointments = false;
-                            ?>
-
-                            <?php foreach ($allPatients as $p):
-                                $counter   = $p['patient_id'];
-                                $name      = $p['fname'] . ' ' . $p['lname'];
-                                $dateTime  = $p['appointment_date'];
-                                $type      = $p['notes'];
-                                $status    = $p['status'];
-                                $apptID    = $p['appointment_id'];
-
-                                $scheduleID   = null;
-                                $scheduleDate = $dateTime ? date('Y-m-d', strtotime($dateTime)) : null;
-                                $scheduleTime = $dateTime ? date('H:i:s', strtotime($dateTime)) : null;
-
-                                $schedQuery = $conn->prepare("
-        SELECT status, scheduleID, scheduleDate, scheduleTime 
-        FROM dl_schedule 
-        WHERE appointment_id = ? 
-        ORDER BY scheduleID DESC 
-        LIMIT 1
-    ");
-                                $schedQuery->bind_param("i", $apptID);
-                                $schedQuery->execute();
-                                $schedResult = $schedQuery->get_result();
-
-                                if ($schedRow = $schedResult->fetch_assoc()) {
-                                    $status       = $schedRow['status'];
-                                    $scheduleID   = $schedRow['scheduleID'];
-                                    $scheduleDate = $schedRow['scheduleDate'];
-                                    $scheduleTime = $schedRow['scheduleTime'];
-                                }
-                                $schedQuery->close();
-
-                                // ✅ skip rows if Completed, Scheduled, or Cancelled
-                                if ($status === 'Completed' || $status === 'Scheduled' || $status === 'Cancelled') {
-                                    continue;
-                                }
-
-                                $hasAppointments = true;
-                            ?>
-                                <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
-                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($counter) ?></td>
-                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($name) ?></td>
-                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($scheduleDate . ' ' . $scheduleTime) ?></td>
-                                    <td style="padding:12px; text-align:center;"><?= htmlspecialchars($type) ?></td>
-                                    <td style="padding:12px; text-align:center;">
-                                        <?php if ($status === 'Completed'): ?>
-                                            <span style="background:#d4edda; color:#155724; padding:4px 12px; border-radius:16px; font-weight:500;">
-                                                <?= htmlspecialchars($status) ?>
-                                            </span>
-                                        <?php elseif ($status === 'Processing'): ?>
-                                            <span style="background:#cce5ff; color:#004085; padding:4px 12px; border-radius:16px; font-weight:500;">
-                                                <?= htmlspecialchars($status) ?>
-                                            </span>
-                                        <?php else: ?>
-                                            <?= htmlspecialchars($status) ?>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td style="padding:12px; text-align:center;">
-                                        <?php if ($status !== 'Completed'): ?>
-                                            <button class="btn btn-sm btn-primary edit-btn"
-                                                style="padding:6px 12px; border-radius:6px; font-size:13px; background:#0d6efd; border:none; color:#fff; cursor:pointer;"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#editScheduleModal"
-                                                data-id="<?= $scheduleID ?>"
-                                                data-date="<?= $scheduleDate ?>"
-                                                data-time="<?= $scheduleTime ?>"
-                                                data-status="<?= $status ?>">
-                                                Update
-                                            </button>
-
-                                            <form method="POST" action="oop2/upd_stats.php" style="display:inline-block; margin-left:6px;" id="cancelForm_<?= $scheduleID ?>">
-                                                <input type="hidden" name="scheduleID" value="<?= $scheduleID ?>">
-                                                <input type="hidden" name="cancel_reason" id="cancelReasonInput_<?= $scheduleID ?>">
-                                                <input type="hidden" name="delete_schedule" value="1">
-                                                <button type="button" class="btn btn-danger btn-sm"
-                                                    style="padding:6px 12px; border-radius:6px; font-size:13px; cursor:pointer;"
-                                                    onclick="askCancelReason(<?= $scheduleID ?>)">Cancel</button>
-                                            </form>
-                                        <?php else: ?>
-                                            <span style="color:gray;">No Actions</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-
-                            <?php if (!$hasAppointments): ?>
+                            <?php if (!empty($auditLogs)): ?>
+                                <?php foreach ($auditLogs as $row): ?>
+                                    <tr style="border-bottom:1px solid #f1f1f1;">
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleID']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['patient_name'] ?? '—') ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['serviceName']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleDate']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['scheduleTime']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= !empty($row['employee_name']) ? htmlspecialchars($row['employee_name']) : 'System' ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
                                 <tr>
-                                    <td colspan="6" style="padding:20px; text-align:center; color:gray; font-style:italic;">
-                                        No Schedule
+                                    <td colspan="6" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                        📋 No audit records found
                                     </td>
                                 </tr>
                             <?php endif; ?>
@@ -293,79 +218,12 @@ $allPatients = $patient->getAllPatients();
                     </table>
                 </div>
             </div>
-
-            <!-- MODAL AREA -->
-            <div class="modal fade" id="editScheduleModal" tabindex="-1" aria-labelledby="editScheduleModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <form method="POST" action="oop2/upd_stats.php">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="editScheduleModalLabel">Update Schedule</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-
-                                <input type="hidden" name="scheduleID" id="modalScheduleId">
-
-                                <div class="mb-3">
-                                    <label for="modalScheduleDate" class="form-label">Schedule Date</label>
-                                    <input type="date" class="form-control" id="modalScheduleDate" name="schedule_date" required>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="modalScheduleTime" class="form-label">Schedule Time</label>
-                                    <input type="time" class="form-control" id="modalScheduleTime" name="schedule_time" required>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="modalStatus" class="form-label">Status</label>
-                                    <select class="form-select" id="modalStatus" name="status" required>
-                                        <option value="Completed">Completed</option>
-                                        <option value="Processing">Processing</option>
-                                    </select>
-                                </div>
-
-                                <!-- ✅ Reason textarea (only used when Cancelled) -->
-                                <div class="mb-3" id="cancelReasonBox" style="display:none;">
-                                    <label for="cancelReason" class="form-label">Reason for Cancellation</label>
-                                    <textarea class="form-control" id="cancelReason" name="cancel_reason" rows="3"></textarea>
-                                </div>
-
-                            </div>
-                            <div class="modal-footer">
-                                <button type="submit" name="update_schedule" class="btn btn-primary">Update</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
             <!----- End of Main Content ----->
             <script>
                 // Sidebar toggle
                 document.querySelector(".toggler-btn")?.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
-
-                document.querySelectorAll('.edit-btn').forEach(button => {
-                    button.addEventListener('click', function() {
-                        document.getElementById('modalScheduleId').value = this.dataset.id;
-                        document.getElementById('modalScheduleDate').value = this.dataset.date;
-                        document.getElementById('modalScheduleTime').value = this.dataset.time;
-                        document.getElementById('modalStatus').value = this.dataset.status;
-                    });
-                });
-
-                function askCancelReason(scheduleID) {
-                    const reason = prompt("Please provide a reason for cancellation:");
-                    if (reason !== null && reason.trim() !== "") {
-                        document.getElementById("cancelReasonInput_" + scheduleID).value = reason;
-                        document.querySelector("input[name='scheduleID'][value='" + scheduleID + "']").form.submit();
-                    } else {
-                        alert("❌ Cancellation aborted. Reason is required.");
-                    }
-                }
                 document.addEventListener("DOMContentLoaded", function() {
                     const searchInput = document.getElementById("searchInput");
                     const tableRows = document.querySelectorAll("tbody tr");
