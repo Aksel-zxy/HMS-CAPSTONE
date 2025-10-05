@@ -27,6 +27,12 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
             <div class="menu">
                 <p class="title">Inventory & Supply Chain Management</p>
                 <ul>
+                    <!-- Dashboard Link -->
+                    <li>
+                        <a href="inventory_dashboard.php" class="<?= $currentPage=='inventory_dashboard.php'?'active-link':'' ?>">
+                            📊 Dashboard
+                        </a>
+                    </li>
                     <!-- Equipment & Medicine Stock -->
                     <?php
         $stockPages = ['inventory-stock', 'batch-expiry', 'return-damage'];
