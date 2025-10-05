@@ -60,17 +60,9 @@ $spent_json = json_encode($spent_budgets);
 <title>Inventory Dashboard</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="assets/css/dashboard.css">
 <style>
-body {
-  background-color: #f8f9fa;
-}
-.card {
-  border-radius: 15px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-.card h5 {
-  font-weight: 600;
-}
+
 </style>
 </head>
 <body>
