@@ -2,7 +2,7 @@
 session_start();
 require 'db.php';
 
-// Show errors (for debugging)
+// Show errors for debugging
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -19,10 +19,11 @@ $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$user) die("User not found.");
 
+// Department info
 $department = !empty($user['department']) ? $user['department'] : 'N/A';
 $department_id = $user['role'] ?? null;
 
-// --- CART ---
+// Initialize cart
 if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
 }
@@ -66,61 +67,47 @@ if (isset($_POST['ajax'])) {
         unset($_SESSION['cart'][$_POST['id']]);
     }
 
-    // ✅ Process Order Directly (no admin approval)
+    // ✅ Process Order → Save to department_request table
     if ($action === 'submit') {
         if (!empty($_SESSION['cart'])) {
-            $items = $_SESSION['cart'];
-            $total_price = 0;
-
-            foreach ($items as $it) {
-                $total_price += ($it['unit_type'] === 'Box')
-                    ? $it['price']
-                    : $it['price'] * $it['qty'];
+            $items = json_encode($_SESSION['cart']);
+            $total_items = 0;
+            foreach ($_SESSION['cart'] as $it) {
+                $total_items += $it['qty'];
             }
 
             try {
-                // Create vendor orders directly
-                foreach ($items as $item_id => $item) {
-                    $qty = $item['qty'];
-
-                    $stmtVendor = $pdo->prepare("SELECT vendor_id FROM vendor_products WHERE id=?");
-                    $stmtVendor->execute([$item_id]);
-                    $vendor_id = $stmtVendor->fetchColumn();
-
-                    if ($vendor_id) {
-                        $stmtInsert = $pdo->prepare("
-                            INSERT INTO vendor_orders 
-                            (user_id, department, department_id, vendor_id, item_id, quantity, status, checklist, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, 'Processing', '[]', NOW())
-                        ");
-                        $stmtInsert->execute([
-                            $user_id,
-                            $department,
-                            $department_id,
-                            $vendor_id,
-                            $item_id,
-                            $qty
-                        ]);
-                    }
-                }
+                $stmt = $pdo->prepare("
+                    INSERT INTO department_request 
+                    (user_id, department, department_id, month, items, total_items, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW())
+                ");
+                $stmt->execute([
+                    $user_id,
+                    $department,
+                    $department_id,
+                    date('Y-m'),
+                    $items,
+                    $total_items
+                ]);
 
                 $_SESSION['cart'] = [];
-                echo json_encode(["success" => true, "message" => "✅ Order successfully processed!"]);
+                echo json_encode(["success" => true, "message" => "✅ Request successfully sent to admin!"]);
                 exit;
             } catch (PDOException $e) {
-                echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
+                echo json_encode(["success" => false, "message" => "⚠️ Database error: " . $e->getMessage()]);
                 exit;
             }
         } else {
-            echo json_encode(["success" => false, "message" => "Cart is empty."]);
+            echo json_encode(["success" => false, "message" => "⚠️ Cart is empty."]);
             exit;
         }
     }
 
-    // Update cart display
+    // Update cart HTML
     $grand = 0;
     foreach ($_SESSION['cart'] as $it) {
-        $grand += ($it['unit_type'] === 'Box') ? $it['price'] : $it['price'] * $it['qty'];
+        $grand += $it['price'] * $it['qty'];
     }
 
     ob_start();
@@ -136,6 +123,9 @@ if (isset($_POST['ajax'])) {
 }
 
 // --- PRODUCT LISTING ---
+$search = $_GET['search'] ?? '';
+$selected_category = $_GET['category'] ?? '';
+
 $categories = [
     "IT and supporting tech",
     "Medications and pharmacy supplies",
@@ -143,9 +133,6 @@ $categories = [
     "Therapeutic equipment",
     "Diagnostic Equipment"
 ];
-
-$search = $_GET['search'] ?? '';
-$selected_category = $_GET['category'] ?? '';
 
 $limit = 8;
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -176,24 +163,25 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Process Order</title>
+    <title>Department Request</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
 
+<!-- ✅ Sidebar -->
 <div class="main-sidebar">
     <?php include 'inventory_sidebar.php'; ?>
 </div>
 
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>🧾 Process Order</h2>
+        <h2>📦 Department Request</h2>
         <div class="text-end">
             <h5 class="mb-1"><?= htmlspecialchars($department) ?></h5>
         </div>
     </div>
 
-    <!-- Filter -->
+    <!-- Filters -->
     <form method="get" class="mb-3">
         <div class="row g-2">
             <div class="col-md-4">
@@ -220,7 +208,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </form>
 
-    <!-- Product List -->
+    <!-- Products -->
     <div class="row">
         <?php foreach ($products as $p): ?>
             <div class="col-md-3 mb-4">
@@ -230,17 +218,15 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php endif; ?>
                     <div class="card-body text-center">
                         <h6 class="card-title"><?= htmlspecialchars($p['item_name']) ?></h6>
-                        <p class="small"><?= htmlspecialchars($p['item_description']) ?></p>
-                        <p>
-                            <strong>₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?></strong>
-                        </p>
+                        <p class="small text-muted"><?= htmlspecialchars($p['item_description']) ?></p>
+                        <p><strong>₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?></strong></p>
                         <button class="btn btn-success btn-sm w-100 addToCart" 
                             data-id="<?= $p['id'] ?>" 
                             data-name="<?= htmlspecialchars($p['item_name']) ?>" 
                             data-price="<?= $p['price'] ?>"
                             data-unit_type="<?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?>"
                             data-pcs_per_box="<?= htmlspecialchars($p['pcs_per_box'] ?? '') ?>">
-                            Add to Cart
+                            Add to Request
                         </button>
                     </div>
                 </div>
@@ -267,7 +253,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">🧾 Your Order</h5>
+        <h5 class="modal-title">🧾 Your Department Request</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="cartContent">
@@ -280,7 +266,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-// Add to cart
+// Add item
 $(document).on("click", ".addToCart", function() {
     $.post("purchase_order.php", {
         ajax: "add",
@@ -305,13 +291,22 @@ $(document).on("click", ".removeItem", function() {
     });
 });
 
-// Update qty
+// Update quantity
 $(document).on("input", ".qtyInput", function() {
     let formData = $("#updateCartForm").serialize();
     $.post("purchase_order.php", formData + "&ajax=update", function(res) {
         let data = JSON.parse(res);
-        $("#cartTotal").text(data.total);
+        $("#cartContent").html(data.cart_html);
         $("#cartCount").text(data.count);
+    });
+});
+
+// Submit request
+$(document).on("click", "#submitRequest", function() {
+    $.post("purchase_order.php", {ajax:"submit"}, function(res) {
+        let data = JSON.parse(res);
+        alert(data.message);
+        if (data.success) location.reload();
     });
 });
 </script>
