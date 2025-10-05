@@ -33,6 +33,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("Failed to insert patient");
         }
 
+        // Insert into patient_user table with fname, lname, mname, username (as fname), and password
+        $username = $data['fname']; // Username set to fname
+        $password = '123'; // Hardcoded password - WARNING: In production, hash this (e.g., password_hash('123', PASSWORD_DEFAULT)) and never hardcode!
+
+        $stmt_user = $conn->prepare("
+            INSERT INTO patient_user (patient_id, fname, lname, mname, username, password)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+
+        if (!$stmt_user) {
+            throw new Exception("Prepare failed for patient_user: " . $conn->error);
+        }
+
+        $stmt_user->bind_param("isssss", $patient_id, $data['fname'], $data['lname'], $data['mname'], $username, $password);
+
+        if (!$stmt_user->execute()) {
+            throw new Exception("Execute failed for patient_user: " . $stmt_user->error);
+        }
+
+        $stmt_user->close();
+
         $stmt = $conn->prepare("
             INSERT INTO p_previous_medical_records (patient_id, condition_name, diagnosis_date, notes)
             VALUES (?, ?, ?, ?)
