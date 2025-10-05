@@ -6,6 +6,8 @@ ini_set('display_errors', 1);
 
 // Initialize cart
 if (!isset($_SESSION['cart'])) $_SESSION['cart'] = [];
+$status_order = ["Processing", "Packed", "Shipped"];
+$vendor_id = 1; // Replace with logged-in vendor ID
 
 // --- Handle AJAX requests ---
 if (isset($_POST['ajax'])) {
@@ -47,34 +49,24 @@ if (isset($_POST['ajax'])) {
     // Submit order
     if ($action === 'submit') {
         if (!empty($_SESSION['cart'])) {
-            $po_number = 'PO'.date('YmdHis').rand(100,999);
-
-            try {
-                foreach ($_SESSION['cart'] as $item_id => $item) {
-                    $qty = $item['qty'];
-
-                    // Get vendor_id
-                    $stmtVendor = $pdo->prepare("SELECT vendor_id FROM vendor_products WHERE id=?");
-                    $stmtVendor->execute([$item_id]);
-                    $vendor_id = $stmtVendor->fetchColumn();
-
-                    if ($vendor_id) {
-                        $stmtInsert = $pdo->prepare("
-                            INSERT INTO vendor_orders
-                            (purchase_order_number, vendor_id, item_id, quantity, status, checklist, created_at)
-                            VALUES (?, ?, ?, ?, 'Processing', '[]', NOW())
-                        ");
-                        $stmtInsert->execute([$po_number, $vendor_id, $item_id, $qty]);
-                    }
-                }
-
-                $_SESSION['cart'] = [];
-                echo json_encode(["success" => true, "message" => "✅ Order placed successfully!", "po_number" => $po_number]);
-                exit;
-            } catch (PDOException $e) {
-                echo json_encode(["success" => false, "message" => "⚠️ Database error: " . $e->getMessage()]);
-                exit;
+            $po_number = 'PO' . date('YmdHis') . rand(100, 999);
+            $items = $_SESSION['cart'];
+            $total_price = 0;
+            foreach ($items as $it) {
+                $total_price += $it['price'] * $it['qty'];
             }
+
+            // Insert into vendor_orders using JSON items
+            $stmt = $pdo->prepare("
+                INSERT INTO vendor_orders
+                (purchase_order_number, vendor_id, items, status, total_price, created_at)
+                VALUES (?, ?, ?, 'Processing', ?, NOW())
+            ");
+            $stmt->execute([$po_number, $vendor_id, json_encode($items), $total_price]);
+
+            $_SESSION['cart'] = [];
+            echo json_encode(["success" => true, "message" => "✅ Order placed successfully!", "po_number" => $po_number]);
+            exit;
         } else {
             echo json_encode(["success" => false, "message" => "⚠️ Cart is empty."]);
             exit;
@@ -84,16 +76,52 @@ if (isset($_POST['ajax'])) {
     // Update cart HTML
     $grand = 0;
     foreach ($_SESSION['cart'] as $it) $grand += $it['price'] * $it['qty'];
-
     ob_start();
-    include "cart_table.php";
+    ?>
+    <table class="table table-bordered">
+        <thead>
+        <tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+        <?php foreach ($_SESSION['cart'] as $id => $it): ?>
+            <tr>
+                <td><?= htmlspecialchars($it['name']) ?></td>
+                <td><input type="number" class="form-control qtyInput" name="qty[<?= $id ?>]" value="<?= $it['qty'] ?>" min="1"></td>
+                <td>₱<?= number_format($it['price'], 2) ?></td>
+                <td>₱<?= number_format($it['price'] * $it['qty'], 2) ?></td>
+                <td><button class="btn btn-sm btn-danger removeItem" data-id="<?= $id ?>">Remove</button></td>
+            </tr>
+        <?php endforeach; ?>
+        <tr class="table-secondary">
+            <td colspan="3" class="text-end"><strong>Total:</strong></td>
+            <td colspan="2"><strong>₱<?= number_format($grand, 2) ?></strong></td>
+        </tr>
+        </tbody>
+    </table>
+    <?php
     $html = ob_get_clean();
+    echo json_encode(["cart_html" => $html, "count" => count($_SESSION['cart']), "total" => number_format($grand, 2)]);
+    exit;
+}
 
-    echo json_encode([
-        "cart_html" => $html,
-        "count" => count($_SESSION['cart']),
-        "total" => number_format($grand, 2)
-    ]);
+// --- Handle status update ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'], $_POST['po_number'], $_POST['status'])) {
+    $po_number = $_POST['po_number'];
+    $new_status = $_POST['status'];
+
+    $stmt = $pdo->prepare("SELECT status FROM vendor_orders WHERE purchase_order_number=? AND vendor_id=?");
+    $stmt->execute([$po_number, $vendor_id]);
+    $current_status = $stmt->fetchColumn();
+
+    $current_index = array_search($current_status, $status_order);
+    $new_index = array_search($new_status, $status_order);
+
+    if ($new_index > $current_index) {
+        $update = $pdo->prepare("UPDATE vendor_orders SET status=? WHERE purchase_order_number=? AND vendor_id=?");
+        $update->execute([$new_status, $po_number, $vendor_id]);
+    }
+
+    header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
 
@@ -102,13 +130,16 @@ $search = $_GET['search'] ?? '';
 $category = $_GET['category'] ?? '';
 $where = "WHERE 1";
 $params = [];
-
 if ($category) { $where .= " AND item_type=?"; $params[] = $category; }
 if ($search) { $where .= " AND item_name LIKE ?"; $params[] = "%$search%"; }
-
 $stmt = $pdo->prepare("SELECT * FROM vendor_products $where ORDER BY item_name ASC");
 $stmt->execute($params);
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// --- Fetch Vendor Orders ---
+$poStmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE vendor_id=? ORDER BY created_at DESC");
+$poStmt->execute([$vendor_id]);
+$poList = $poStmt->fetchAll(PDO::FETCH_ASSOC);
 
 $categories = [
     "IT and supporting tech",
@@ -127,7 +158,6 @@ $categories = [
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body class="bg-light">
-
 
 <div class="main-sidebar">
     <?php include 'inventory_sidebar.php'; ?>
@@ -195,10 +225,64 @@ $categories = [
 </div>
 <div class="modal-body" id="cartContent">
 <?php include "cart_table.php"; ?>
+<div class="text-end mt-3">
+    <button class="btn btn-primary" id="submitOrder">Submit Order</button>
 </div>
 </div>
 </div>
 </div>
+</div>
+
+<hr>
+<h3>Vendor Purchase Orders</h3>
+<table class="table table-bordered">
+<thead class="table-dark">
+<tr>
+<th>PO Number</th>
+<th>Items</th>
+<th>Total Price</th>
+<th>Status</th>
+<th>Update Status</th>
+</tr>
+</thead>
+<tbody>
+<?php foreach($poList as $po): ?>
+<tr>
+<td><?= $po['purchase_order_number'] ?></td>
+<td>
+<?php
+$items = json_decode($po['items'], true);
+foreach($items as $it) {
+    echo htmlspecialchars($it['name'])." x".$it['qty']."<br>";
+}
+?>
+</td>
+<td>₱<?= number_format($po['total_price'],2) ?></td>
+<td><?= $po['status'] ?></td>
+<td>
+<?php if($po['status']!=='Shipped'): ?>
+<form method="post">
+<input type="hidden" name="po_number" value="<?= $po['purchase_order_number'] ?>">
+<select name="status" class="form-select">
+<?php
+$current_index = array_search($po['status'],$status_order);
+foreach($status_order as $i=>$s) {
+    $disabled = ($i<$current_index || $i>$current_index+1)?'disabled':''; 
+    $selected = ($s==$po['status'])?'selected':''; 
+    echo "<option value='$s' $disabled $selected>$s</option>";
+}
+?>
+</select>
+<button type="submit" name="update_status" class="btn btn-sm btn-primary mt-1 w-100">Update</button>
+</form>
+<?php else: ?>
+<span class="text-success fw-bold">Shipped</span>
+<?php endif; ?>
+</td>
+</tr>
+<?php endforeach; ?>
+</tbody>
+</table>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -215,8 +299,9 @@ $(document).ready(function(){
             pcs_per_box:$(this).data("pcs_per_box")
         },function(res){
             let data = JSON.parse(res);
-            $("#cartContent").html(data.cart_html);
+            $("#cartContent").html(data.cart_html + '<div class="text-end mt-3"><button class="btn btn-primary" id="submitOrder">Submit Order</button></div>');
             $("#cartCount").text(data.count);
+            $('#cartModal').modal('show');
         });
     });
 
@@ -228,7 +313,7 @@ $(document).ready(function(){
         });
         $.post("",{ajax:"update", qty:qtyData}, function(res){
             let data = JSON.parse(res);
-            $("#cartContent").html(data.cart_html);
+            $("#cartContent").html(data.cart_html + '<div class="text-end mt-3"><button class="btn btn-primary" id="submitOrder">Submit Order</button></div>');
             $("#cartCount").text(data.count);
         });
     });
@@ -237,8 +322,21 @@ $(document).ready(function(){
     $(document).on("click",".removeItem",function(){
         $.post("",{ajax:"remove", id:$(this).data("id")}, function(res){
             let data = JSON.parse(res);
-            $("#cartContent").html(data.cart_html);
+            $("#cartContent").html(data.cart_html + '<div class="text-end mt-3"><button class="btn btn-primary" id="submitOrder">Submit Order</button></div>');
             $("#cartCount").text(data.count);
+        });
+    });
+
+    // Submit order
+    $(document).on("click","#submitOrder",function(){
+        $.post("",{ajax:"submit"},function(res){
+            let data = JSON.parse(res);
+            alert(data.message);
+            if(data.success){
+                $("#cartContent").html('');
+                $("#cartCount").text('0');
+                location.reload();
+            }
         });
     });
 
