@@ -1,6 +1,7 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
+require_once "oop3/machine.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -167,12 +168,62 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <h1>LAB EQUIPMENT</h1>
+             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+                <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
+                    ⚙️ Laboratory & Diagnostic Equipment and Maintenance Schedule
+                </h2>
+
+                <!-- Search box -->
+                <div class="col-md-3 mb-3">
+                    <input type="text" id="searchMachineInput" class="form-control"
+                        style="width:300px; border-radius:20px; padding:8px 15px;"
+                        placeholder="🔍 Search machine type or name...">
+                </div>
+
+                <!-- Table container -->
+                <div style="height:600px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+                    <table id="machineTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
+                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
+                            <tr>
+                                <th style="padding:12px; text-align:center;">#</th>
+                                <th style="padding:12px; text-align:center;">Machine Name</th>
+                                <th style="padding:12px; text-align:center;">Machine Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($labDiagnosticEquipments)): ?>
+                                <?php foreach ($labDiagnosticEquipments as $row): ?>
+                                    <tr style="border-bottom:1px solid #f1f1f1;">
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['machine_id']) ?></td>
+                                        <td style="padding:12px; text-align:left;"><?= htmlspecialchars($row['machine_name']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['machine_type']) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="3" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                        🧾 No Laboratory or Diagnostic equipment found
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             <!----- End of Main Content ----->
             <script>
                 const toggler = document.querySelector(".toggler-btn");
                 toggler.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
+                });
+                document.getElementById('searchMachineInput').addEventListener('keyup', function() {
+                    const filter = this.value.toLowerCase();
+                    const rows = document.querySelectorAll('#machineTable tbody tr');
+
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(filter) ? '' : 'none';
+                    });
                 });
             </script>
             <script src="../assets/Bootstrap/all.min.js"></script>
