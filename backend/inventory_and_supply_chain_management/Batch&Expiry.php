@@ -214,7 +214,7 @@ foreach ($rows as $row) {
 <body class="bg-light p-4">
 
 <div class="main-sidebar">
-    <?php include 'Inventory_dashboard.php'; ?>
+    <?php include 'inventory_sidebar.php'; ?>
 </div>
 
 <div class="container">

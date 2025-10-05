@@ -65,7 +65,7 @@ $departments = $stmt->fetchAll(PDO::FETCH_COLUMN);
 <body class="bg-light p-4">
 
 <div class="main-sidebar">
-    <?php include 'Inventory_dashboard.php'; ?>
+    <?php include 'inventory_sidebar.php'; ?>
 </div>
 
 

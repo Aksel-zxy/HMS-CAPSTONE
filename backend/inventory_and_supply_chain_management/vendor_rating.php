@@ -63,7 +63,7 @@ function displayStars($avg) {
 
 
 <div class="main-sidebar">
-    <?php include 'Inventory_dashboard.php'; ?>
+    <?php include 'inventory_sidebar.php'; ?>
 </div>
 
 <div class="container py-5">
