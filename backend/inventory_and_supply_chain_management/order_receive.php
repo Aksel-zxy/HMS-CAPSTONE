@@ -32,6 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                 $item_id = $o['item_id'];
                 $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
 
+                // ADD THIS CHECK: Only process if still 'Shipped'
+                $stmt_check = $pdo->prepare("SELECT status FROM vendor_orders WHERE id=?");
+                $stmt_check->execute([$o['id']]);
+                $current_status = $stmt_check->fetchColumn();
+                if ($current_status !== 'Shipped') {
+                    continue; // Skip if already processed
+                }
+
                 if ($received > 0) {
                     $now = date('Y-m-d H:i:s');
 
@@ -102,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                     // ---------------- Subtotal ----------------
                     $subtotal += $lineSubtotal;
 
-                    // Mark as completed
+                    // Mark as completed IMMEDIATELY after processing this item
                     $stmt = $pdo->prepare("UPDATE vendor_orders SET status='Completed' WHERE id=?");
                     $stmt->execute([$o['id']]);
                 }
