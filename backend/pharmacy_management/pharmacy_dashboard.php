@@ -22,7 +22,96 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+$notif_sql = "SELECT COUNT(*) AS pending 
+              FROM pharmacy_prescription 
+              WHERE status = 'Pending'";
+$notif_res = $conn->query($notif_sql);
+
+$pendingCount = 0;
+if ($notif_res && $notif_res->num_rows > 0) {
+    $notif_row = $notif_res->fetch_assoc();
+    $pendingCount = $notif_row['pending'];
+}
+
+
+
+
+date_default_timezone_set('Asia/Manila'); // PH timezone
+$notifCount = 0;
+$notifications = [];
+
+// 1. Pending prescriptions (use exact prescription_date from DB)
+$sqlPres = "
+    SELECT prescription_id, prescription_date
+    FROM pharmacy_prescription
+    WHERE status = 'Pending'
+    ORDER BY prescription_date DESC
+";
+
+if ($resPres = $conn->query($sqlPres)) {
+    while ($row = $resPres->fetch_assoc()) {
+        $notifications[] = [
+            'type' => 'prescription',
+            'message' => "New Prescription Added",
+            // show the actual creation time from DB
+            'time' => date("Y-m-d H:i:s", strtotime($row['prescription_date'])),
+            'link' => "pharmacy_prescription.php?id=" . $row['prescription_id']
+        ];
+    }
+    $notifCount += $resPres->num_rows;
+}
+
+// 2. Medicines expiring within 30 days
+$sqlExp = "
+    SELECT i.med_name, b.batch_no, b.expiry_date,
+           DATEDIFF(b.expiry_date, CURDATE()) AS days_left,
+           CASE 
+                WHEN b.expiry_date < CURDATE() THEN 'Expired'
+                WHEN b.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 'Near Expiry'
+                ELSE 'Available'
+           END AS status
+    FROM pharmacy_stock_batches b
+    JOIN pharmacy_inventory i ON i.med_id = b.med_id
+    WHERE b.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+    ORDER BY b.expiry_date ASC
+";
+
+if ($resExp = $conn->query($sqlExp)) {
+    while ($row = $resExp->fetch_assoc()) {
+        if ($row['status'] === 'Near Expiry') {
+            $notifications[] = [
+                'type' => 'expiry',
+                'message' => "Medicine {$row['med_name']} (Batch {$row['batch_no']}) is about to expire in {$row['days_left']} day(s)",
+                // use PH current time when notif is generated
+                'time' => date("Y-m-d H:i:s"),
+                'link' => "pharmacy_med_inventory.php"
+            ];
+        } elseif ($row['status'] === 'Expired') {
+            $notifications[] = [
+                'type' => 'expiry',
+                'message' => "Medicine {$row['med_name']} (Batch {$row['batch_no']}) has already expired",
+                'time' => date("Y-m-d H:i:s"),
+                'link' => "pharmacy_med_inventory.php"
+            ];
+        }
+    }
+    $notifCount += $resExp->num_rows;
+}
+
+// Sort all notifications by timestamp (latest first)
+usort($notifications, function ($a, $b) {
+    return strtotime($b['time']) - strtotime($a['time']);
+});
+
+// 👉 If you only want to show the latest 10 in dropdown
+$latestNotifications = array_slice($notifications, 0, 10);
+
+
+
 ?>
+
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -34,6 +123,7 @@ if (!$user) {
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
+    <link rel="stylesheet" href="assets/CSS/prescription.css">
 </head>
 
 <body>
@@ -72,16 +162,25 @@ if (!$user) {
             </li>
 
             <li class="sidebar-item">
-                <a class="sidebar-link" data-bs-toggle="collapse" href="#prescriptionMenu" role="button" aria-expanded="false" aria-controls="prescriptionMenu">
+                <a class="sidebar-link position-relative" data-bs-toggle="collapse" href="#prescriptionMenu" role="button" aria-expanded="false" aria-controls="prescriptionMenu">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-file-prescription" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
                         <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
                     <span style="font-size: 18px;">Prescription</span>
+                    <?php if ($pendingCount > 0): ?>
+                        <span class="notif-dot"></span>
+                    <?php endif; ?>
                 </a>
+
                 <ul class="collapse list-unstyled ms-3" id="prescriptionMenu">
                     <li>
-                        <a href="pharmacy_prescription.php" class="sidebar-link">View Prescriptions</a>
+                        <a href="pharmacy_prescription.php" class="sidebar-link position-relative">
+                            View Prescriptions
+                            <?php if ($pendingCount > 0): ?>
+                                <span class="notif-badge"><?php echo $pendingCount; ?></span>
+                            <?php endif; ?>
+                        </a>
                     </li>
                     <li>
                         <a href="pharmacy_add_prescription.php" class="sidebar-link">Add Prescription</a>
@@ -129,24 +228,97 @@ if (!$user) {
                     </button>
                 </div>
                 <div class="logo">
-                    <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
-                        <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-person-circle"></i>
-                        </button>
-                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 200px; padding: 10px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background-color: #fff; color: #333;">
-                            <li style="margin-bottom: 8px; font-size: 14px; color: #555;">
-                                <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
-                                    Logout
-                                </a>
-                            </li>
-                        </ul>
+                    <div class="d-flex align-items-center">
+                        <!-- Notification Icon -->
+                        <div class="notification me-3 dropdown position-relative">
+                            <a href="#" id="notifBell" data-bs-toggle="dropdown" aria-expanded="false" class="text-dark" style="text-decoration: none;">
+                                <i class="fa-solid fa-bell fs-4"></i>
+                                <?php if ($notifCount > 0): ?>
+                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:11px;">
+                                        <?php echo $notifCount; ?>
+                                    </span>
+                                <?php endif; ?>
+                            </a>
 
+                            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="notifBell"
+                                style="min-width:320px; max-height:400px; overflow-y:auto; border-radius:8px;">
+                                <li class="dropdown-header fw-bold">Notifications</li>
+
+                                <?php if (!empty($notifications)): ?>
+                                    <?php foreach ($notifications as $index => $n): ?>
+                                        <li class="notif-item <?php echo $index >= 10 ? 'd-none extra-notif' : ''; ?>">
+                                            <a class="dropdown-item d-flex align-items-start" href="<?php echo $n['link']; ?>">
+                                                <div class="me-2">
+                                                    <?php if ($n['type'] == 'prescription'): ?>
+                                                        <i class="bi bi-file-earmark-medical-fill text-primary fs-5"></i>
+                                                    <?php elseif ($n['type'] == 'expiry'): ?>
+                                                        <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                                                    <?php else: ?>
+                                                        <i class="bi bi-info-circle-fill text-secondary fs-5"></i>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div>
+                                                    <div class="small fw-semibold text-wrap" style="white-space: normal; word-break: break-word;">
+                                                        <?php echo $n['message']; ?>
+                                                    </div>
+                                                    <div class="small text-muted text-wrap" style="white-space: normal; word-break: break-word;">
+                                                        <?php
+                                                        if ($n['type'] == 'expiry' && isset($n['days_left'])) {
+                                                            $daysLeft = (int)$n['days_left'];
+                                                            if ($daysLeft > 0) {
+                                                                echo "in {$daysLeft} day(s)";
+                                                            } elseif ($daysLeft == 0) {
+                                                                echo "today";
+                                                            } else {
+                                                                echo abs($daysLeft) . " day(s) ago";
+                                                            }
+                                                        } else {
+                                                            echo $n['time'];
+                                                        }
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </li>
+                                        <?php if ($index < count($notifications) - 1): ?>
+                                            <li class="<?php echo $index >= 10 ? 'd-none extra-notif' : ''; ?>">
+                                                <hr class="dropdown-divider">
+                                            </li>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+
+                                    <!-- Load More Button -->
+                                    <?php if (count($notifications) > 10): ?>
+                                        <li class="text-center">
+                                            <a href="#" id="loadMoreNotif" class="dropdown-item fw-semibold">View Previous Notifications</a>
+                                        </li>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <li><span class="dropdown-item text-muted">No new notifications</span></li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+
+
+
+
+
+
+
+                        <!-- Username + Profile Dropdown -->
+                        <div class="dropdown d-flex align-items-center">
+                            <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
+                            <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown">
+                                <i class="bi bi-person-circle"></i>
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+                                <li><span>Welcome <strong><?php echo $user['lname']; ?></strong>!</span></li>
+                                <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
+
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
@@ -159,6 +331,19 @@ if (!$user) {
         </div>
         <!----- End of Main Content ----->
     </div>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const loadMoreBtn = document.getElementById("loadMoreNotif");
+            if (loadMoreBtn) {
+                loadMoreBtn.addEventListener("click", function(e) {
+                    e.preventDefault();
+                    document.querySelectorAll(".extra-notif").forEach(el => el.classList.remove("d-none"));
+                    this.style.display = "none"; // hide the button once expanded
+                });
+            }
+        });
+    </script>
+
     <script>
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {

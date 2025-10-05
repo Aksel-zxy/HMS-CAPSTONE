@@ -2,7 +2,7 @@
 session_start();
 require 'db.php';
 
-// Show errors for debugging
+// Show errors (for debugging)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -19,11 +19,10 @@ $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
 if (!$user) die("User not found.");
 
-// Department info
 $department = !empty($user['department']) ? $user['department'] : 'N/A';
 $department_id = $user['role'] ?? null;
 
-// Initialize cart
+// --- CART ---
 if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
 }
@@ -68,6 +67,7 @@ if (isset($_POST['ajax'])) {
     }
 
     // ✅ Process order: insert into purchase_requests then vendor_orders
+    // ✅ Process Order Directly (no admin approval)
     if ($action === 'submit') {
         if (!empty($_SESSION['cart'])) {
             try {
@@ -100,24 +100,61 @@ if (isset($_POST['ajax'])) {
                 }
 
                 $pdo->commit();
+            $items = $_SESSION['cart'];
+            $total_price = 0;
+
+            foreach ($items as $it) {
+                $total_price += ($it['unit_type'] === 'Box')
+                    ? $it['price']
+                    : $it['price'] * $it['qty'];
+            }
+
+            try {
+                // Create vendor orders directly
+                foreach ($items as $item_id => $item) {
+                    $qty = $item['qty'];
+
+                    $stmtVendor = $pdo->prepare("SELECT vendor_id FROM vendor_products WHERE id=?");
+                    $stmtVendor->execute([$item_id]);
+                    $vendor_id = $stmtVendor->fetchColumn();
+
+                    if ($vendor_id) {
+                        $stmtInsert = $pdo->prepare("
+                            INSERT INTO vendor_orders 
+                            (user_id, department, department_id, vendor_id, item_id, quantity, status, checklist, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, 'Processing', '[]', NOW())
+                        ");
+                        $stmtInsert->execute([
+                            $user_id,
+                            $department,
+                            $department_id,
+                            $vendor_id,
+                            $item_id,
+                            $qty
+                        ]);
+                    }
+                }
+
                 $_SESSION['cart'] = [];
                 echo json_encode(["success" => true, "message" => "✅ Order successfully placed!"]);
+                echo json_encode(["success" => true, "message" => "✅ Order successfully processed!"]);
                 exit;
             } catch (PDOException $e) {
                 $pdo->rollBack();
                 echo json_encode(["success" => false, "message" => "⚠️ Database error: " . $e->getMessage()]);
+                echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
                 exit;
             }
         } else {
-            echo json_encode(["success" => false, "message" => "⚠️ Cart is empty."]);
+            echo json_encode(["success" => false, "message" => "Cart is empty."]);
             exit;
         }
     }
 
-    // Update cart HTML
+    // Update cart display
     $grand = 0;
     foreach ($_SESSION['cart'] as $it) {
-        $grand += $it['price'] * $it['qty'];
+        $grand += ($it['unit_type'] === 'Box') ? $it['price'] : $it['price'] * $it['qty'];
     }
 
     ob_start();
@@ -133,9 +170,6 @@ if (isset($_POST['ajax'])) {
 }
 
 // --- PRODUCT LISTING ---
-$search = $_GET['search'] ?? '';
-$selected_category = $_GET['category'] ?? '';
-
 $categories = [
     "IT and supporting tech",
     "Medications and pharmacy supplies",
@@ -143,6 +177,9 @@ $categories = [
     "Therapeutic equipment",
     "Diagnostic Equipment"
 ];
+
+$search = $_GET['search'] ?? '';
+$selected_category = $_GET['category'] ?? '';
 
 $limit = 8;
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -175,6 +212,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <title>Department Orders</title>
+    <title>Process Order</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
@@ -186,12 +224,13 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>📦 Department Orders</h2>
+        <h2>🧾 Process Order</h2>
         <div class="text-end">
             <h5><?= htmlspecialchars($department) ?></h5>
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filter -->
     <form method="get" class="mb-3">
         <div class="row g-2">
             <div class="col-md-4">
@@ -218,7 +257,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </form>
 
-    <!-- Products -->
+    <!-- Product List -->
     <div class="row">
         <?php foreach ($products as $p): ?>
             <div class="col-md-3 mb-4">
@@ -228,8 +267,10 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php endif; ?>
                     <div class="card-body text-center">
                         <h6 class="card-title"><?= htmlspecialchars($p['item_name']) ?></h6>
-                        <p class="small text-muted"><?= htmlspecialchars($p['item_description']) ?></p>
-                        <p><strong>₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?></strong></p>
+                        <p class="small"><?= htmlspecialchars($p['item_description']) ?></p>
+                        <p>
+                            <strong>₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?></strong>
+                        </p>
                         <button class="btn btn-success btn-sm w-100 addToCart" 
                             data-id="<?= $p['id'] ?>" 
                             data-name="<?= htmlspecialchars($p['item_name']) ?>" 
@@ -237,6 +278,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             data-unit_type="<?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?>"
                             data-pcs_per_box="<?= htmlspecialchars($p['pcs_per_box'] ?? '') ?>">
                             Add to Order
+                            Add to Cart
                         </button>
                     </div>
                 </div>
@@ -276,7 +318,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-// Add item
+// Add to cart
 $(document).on("click", ".addToCart", function() {
     $.post("purchase_order.php", {
         ajax: "add",
@@ -301,12 +343,12 @@ $(document).on("click", ".removeItem", function() {
     });
 });
 
-// Update quantity
+// Update qty
 $(document).on("input", ".qtyInput", function() {
     let formData = $("#updateCartForm").serialize();
     $.post("purchase_order.php", formData + "&ajax=update", function(res) {
         let data = JSON.parse(res);
-        $("#cartContent").html(data.cart_html);
+        $("#cartTotal").text(data.total);
         $("#cartCount").text(data.count);
     });
 });
