@@ -67,24 +67,15 @@ if (isset($_POST['ajax'])) {
         unset($_SESSION['cart'][$_POST['id']]);
     }
 
-    // ✅ Process order: insert into purchase_requests then vendor_orders
+    // ✅ Submit order directly to vendor_orders
     if ($action === 'submit') {
         if (!empty($_SESSION['cart'])) {
+
             try {
-                $pdo->beginTransaction();
-
-                // Insert purchase request
-                $stmtReq = $pdo->prepare("
-                    INSERT INTO purchase_requests (user_id, department, department_id, created_at)
-                    VALUES (?, ?, ?, NOW())
-                ");
-                $stmtReq->execute([$user_id, $department, $department_id]);
-                $purchase_request_id = $pdo->lastInsertId();
-
-                // Insert each cart item into vendor_orders
                 foreach ($_SESSION['cart'] as $item_id => $item) {
                     $qty = $item['qty'];
 
+                    // Get vendor_id from vendor_products
                     $stmtVendor = $pdo->prepare("SELECT vendor_id FROM vendor_products WHERE id=?");
                     $stmtVendor->execute([$item_id]);
                     $vendor_id = $stmtVendor->fetchColumn();
@@ -92,22 +83,26 @@ if (isset($_POST['ajax'])) {
                     if ($vendor_id) {
                         $stmtInsert = $pdo->prepare("
                             INSERT INTO vendor_orders 
-                            (purchase_request_id, vendor_id, item_id, quantity, status, checklist, created_at)
-                            VALUES (?, ?, ?, ?, 'Processing', '[]', NOW())
+                            (vendor_id, item_id, quantity, status, checklist, created_at)
+                            VALUES (?, ?, ?, 'Processing', '[]', NOW())
                         ");
-                        $stmtInsert->execute([$purchase_request_id, $vendor_id, $item_id, $qty]);
+                        $stmtInsert->execute([
+                            $vendor_id,
+                            $item_id,
+                            $qty
+                        ]);
                     }
                 }
 
-                $pdo->commit();
                 $_SESSION['cart'] = [];
-                echo json_encode(["success" => true, "message" => "✅ Order successfully placed!"]);
+                echo json_encode(["success" => true, "message" => "✅ Order successfully placed directly to vendor!"]);
                 exit;
+
             } catch (PDOException $e) {
-                $pdo->rollBack();
                 echo json_encode(["success" => false, "message" => "⚠️ Database error: " . $e->getMessage()]);
                 exit;
             }
+
         } else {
             echo json_encode(["success" => false, "message" => "⚠️ Cart is empty."]);
             exit;
@@ -117,7 +112,7 @@ if (isset($_POST['ajax'])) {
     // Update cart HTML
     $grand = 0;
     foreach ($_SESSION['cart'] as $it) {
-        $grand += $it['price'] * $it['qty'];
+        $grand += ($it['unit_type'] === 'Box') ? $it['price'] : $it['price'] * $it['qty'];
     }
 
     ob_start();
@@ -169,12 +164,11 @@ $stmt = $pdo->prepare("SELECT * FROM vendor_products $where ORDER BY item_name A
 $stmt->execute($params);
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Department Orders</title>
+    <title>Direct Vendor Orders</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
@@ -185,9 +179,9 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>📦 Department Orders</h2>
+        <h2>📦 Direct Vendor Orders</h2>
         <div class="text-end">
-            <h5><?= htmlspecialchars($department) ?></h5>
+            <h5 class="mb-1"><?= htmlspecialchars($department) ?></h5>
         </div>
     </div>
 
@@ -211,7 +205,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <button type="submit" class="btn btn-primary w-100">Filter</button>
             </div>
             <div class="col-md-1 text-end">
-                <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#cartModal">
+                <button type="button" class="btn btn-warning w-100" data-bs-toggle="modal" data-bs-target="#cartModal" id="cartBtn">
                     🛒(<span id="cartCount"><?= count($_SESSION['cart']) ?></span>)
                 </button>
             </div>
@@ -229,14 +223,14 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="card-body text-center">
                         <h6 class="card-title"><?= htmlspecialchars($p['item_name']) ?></h6>
                         <p class="small text-muted"><?= htmlspecialchars($p['item_description']) ?></p>
-                        <p><strong>₱<?= number_format($p['price'], 2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?></strong></p>
-                        <button class="btn btn-success btn-sm w-100 addToCart" 
-                            data-id="<?= $p['id'] ?>" 
-                            data-name="<?= htmlspecialchars($p['item_name']) ?>" 
-                            data-price="<?= $p['price'] ?>"
-                            data-unit_type="<?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?>"
-                            data-pcs_per_box="<?= htmlspecialchars($p['pcs_per_box'] ?? '') ?>">
-                            Add to Order
+                        <p><strong>₱<?= number_format($p['price'],2) ?> / <?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?></strong></p>
+                        <button class="btn btn-success btn-sm w-100 addToCart"
+                                data-id="<?= $p['id'] ?>"
+                                data-name="<?= htmlspecialchars($p['item_name']) ?>"
+                                data-price="<?= $p['price'] ?>"
+                                data-unit_type="<?= htmlspecialchars($p['unit_type'] ?? 'Piece') ?>"
+                                data-pcs_per_box="<?= htmlspecialchars($p['pcs_per_box'] ?? '') ?>">
+                            Add to Cart
                         </button>
                     </div>
                 </div>
@@ -247,11 +241,9 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- Pagination -->
     <nav>
         <ul class="pagination justify-content-center">
-            <?php for ($i = 1; $i <= $total_pages; $i++): ?>
-                <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                    <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&category=<?= urlencode($selected_category) ?>">
-                        <?= $i ?>
-                    </a>
+            <?php for ($i=1;$i<=$total_pages;$i++): ?>
+                <li class="page-item <?= ($i==$page)?'active':'' ?>">
+                    <a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>&category=<?= urlencode($selected_category) ?>"><?= $i ?></a>
                 </li>
             <?php endfor; ?>
         </ul>
@@ -260,64 +252,40 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <!-- Cart Modal -->
 <div class="modal fade" id="cartModal" tabindex="-1">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">🧾 Your Order</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="cartContent">
-          <?php include "cart_table.php"; ?>
-      </div>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🛒 Your Cart</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="cartContent">
+                <?php include "cart_table.php"; ?>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-// Add item
-$(document).on("click", ".addToCart", function() {
-    $.post("purchase_order.php", {
-        ajax: "add",
-        id: $(this).data("id"),
-        name: $(this).data("name"),
-        price: $(this).data("price"),
-        unit_type: $(this).data("unit_type"),
-        pcs_per_box: $(this).data("pcs_per_box")
-    }, function(res) {
-        let data = JSON.parse(res);
-        $("#cartContent").html(data.cart_html);
-        $("#cartCount").text(data.count);
-    });
-});
+$(document).ready(function(){
 
-// Remove item
-$(document).on("click", ".removeItem", function() {
-    $.post("purchase_order.php", {ajax:"remove", id:$(this).data("id")}, function(res) {
-        let data = JSON.parse(res);
-        $("#cartContent").html(data.cart_html);
-        $("#cartCount").text(data.count);
+    // Add to cart
+    $(document).on("click",".addToCart",function(){
+        $.post("purchase_order.php",{
+            ajax:"add",
+            id:$(this).data("id"),
+            name:$(this).data("name"),
+            price:$(this).data("price"),
+            unit_type:$(this).data("unit_type"),
+            pcs_per_box:$(this).data("pcs_per_box")
+        },function(res){
+            let data = JSON.parse(res);
+            $("#cartContent").html(data.cart_html);
+            $("#cartCount").text(data.count);
+        });
     });
-});
 
-// Update quantity
-$(document).on("input", ".qtyInput", function() {
-    let formData = $("#updateCartForm").serialize();
-    $.post("purchase_order.php", formData + "&ajax=update", function(res) {
-        let data = JSON.parse(res);
-        $("#cartContent").html(data.cart_html);
-        $("#cartCount").text(data.count);
-    });
-});
-
-// Submit order directly
-$(document).on("click", "#submitOrder", function() {
-    $.post("purchase_order.php", {ajax:"submit"}, function(res) {
-        let data = JSON.parse(res);
-        alert(data.message);
-        if (data.success) location.reload();
-    });
 });
 </script>
 </body>
