@@ -13,7 +13,7 @@ $vendors = $pdo->query("SELECT id, registration_number, company_name, status, ap
 </head>
 
 <div class="main-sidebar">
-    <?php include 'Inventory_dashboard.php'; ?>
+    <?php include 'inventory_sidebar.php'; ?>
 </div>
 
 <body class="p-4">

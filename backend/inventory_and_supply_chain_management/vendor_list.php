@@ -18,7 +18,7 @@ $vendors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
 <div class="main-sidebar">
-        <?php include 'Inventory_dashboard.php'; ?>
+        <?php include 'inventory_sidebar.php'; ?>
     </div>
 
 

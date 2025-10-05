@@ -106,7 +106,7 @@ $min_month = date('Y-m');
 <body class="bg-light">
 
 <div class="main-sidebar">
-    <?php include 'Inventory_dashboard.php'; ?>
+    <?php include 'inventory_sidebar.php'; ?>
 </div>
 
 <div class="container py-5">

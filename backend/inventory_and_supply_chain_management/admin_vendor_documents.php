@@ -27,7 +27,7 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <!-- Sidebar -->
     <div class="sidebar">
-        <?php include 'Inventory_dashboard.php'; ?>
+        <?php include 'inventory_sidebar.php'; ?>
     </div>
 
     <!-- Main Content -->

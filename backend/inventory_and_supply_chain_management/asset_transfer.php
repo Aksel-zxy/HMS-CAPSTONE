@@ -89,7 +89,7 @@ $main_inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <body class="bg-light p-4">
 
 <div class="main-sidebar">
-    <?php include 'Inventory_dashboard.php'; ?>
+    <?php include 'inventory_sidebar.php'; ?>
 </div>
 
 <div class="container">
