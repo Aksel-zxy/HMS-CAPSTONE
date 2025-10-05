@@ -15,25 +15,24 @@ $status_order = ["Processing","Packed","Shipped"];
 if(isset($_GET['ajax'], $_GET['po_number']) && $_GET['ajax'] === "po_details") {
     $po_number = $_GET['po_number'];
 
+    // Fetch all rows for this PO
     $stmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE purchase_order_number = ? AND vendor_id = ?");
     $stmt->execute([$po_number, $vendor_id]);
-    $po = $stmt->fetch(PDO::FETCH_ASSOC);
+    $po_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    if(!$po){
+    if(!$po_rows){
         echo "<p class='text-muted'>No items found for this PO.</p>";
         exit;
     }
 
-    $items = json_decode($po['items'], true);
-
-    if(!$items){
-        echo "<p class='text-muted'>No items found for this PO.</p>";
-        exit;
+    $items = [];
+    $po_status = $po_rows[0]['status'];
+    foreach($po_rows as $row){
+        $row_items = json_decode($row['items'], true);
+        if($row_items) $items = array_merge($items, $row_items);
     }
 
-    // Find current status index
-    $current_status_index = array_search($po['status'], $status_order);
-
+    $current_status_index = array_search($po_status, $status_order);
     ?>
     <table class="table table-bordered">
         <thead class="table-dark">
@@ -68,14 +67,14 @@ if(isset($_GET['ajax'], $_GET['po_number']) && $_GET['ajax'] === "po_details") {
     </table>
 
     <!-- Status Update Form -->
-    <?php if($po['status'] !== "Shipped"): ?>
-    <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>" class="mt-3">
+    <?php if($po_status !== "Shipped"): ?>
+    <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>" class="mt-3 po-status-form">
         <input type="hidden" name="po_number" value="<?= htmlspecialchars($po_number) ?>">
         <label class="form-label fw-bold">Update Status:</label>
         <select name="status" class="form-select" required>
             <?php
             foreach($status_order as $i => $status):
-                $selected = ($status === $po['status']) ? "selected" : "";
+                $selected = ($status === $po_status) ? "selected" : "";
                 $disabled = ($i < $current_status_index || $i > $current_status_index + 1) ? "disabled" : "";
             ?>
                 <option value="<?= $status ?>" <?= $disabled ?> <?= $selected ?>><?= $status ?></option>
@@ -95,16 +94,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'], $_PO
     $po_number = $_POST['po_number'];
     $new_status = $_POST['status'];
 
+    // Fetch all rows for this PO
     $stmt = $pdo->prepare("SELECT status FROM vendor_orders WHERE purchase_order_number = ? AND vendor_id = ?");
     $stmt->execute([$po_number, $vendor_id]);
-    $po = $stmt->fetch(PDO::FETCH_ASSOC);
+    $po_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    if($po){
-        $current_index = array_search($po['status'], $status_order);
+    if($po_rows){
+        $current_index = array_search($po_rows[0]['status'], $status_order);
         $new_index = array_search($new_status, $status_order);
 
-        if($current_index === false) $current_index = -1;
         if($new_index > $current_index){
+            // Update all rows of this PO
             $updateStmt = $pdo->prepare("UPDATE vendor_orders SET status = ? WHERE purchase_order_number = ? AND vendor_id = ?");
             $updateStmt->execute([$new_status, $po_number, $vendor_id]);
         }
@@ -118,7 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'], $_PO
 $poStmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE vendor_id = ? ORDER BY created_at DESC");
 $poStmt->execute([$vendor_id]);
 $poList = $poStmt->fetchAll(PDO::FETCH_ASSOC);
-
 ?>
 
 <!DOCTYPE html>

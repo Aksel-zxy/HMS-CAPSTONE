@@ -18,15 +18,56 @@ if (!$receipt) {
     die("❌ Receipt not found for ID: " . htmlspecialchars($receipt_id));
 }
 
-// Fetch receipt items (with unit type + pcs_per_box)
-$stmt = $pdo->prepare("SELECT * FROM receipt_items WHERE receipt_id = ?");
-$stmt->execute([$receipt_id]);
-$items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Fetch the original purchase order for this receipt
+$stmt = $pdo->prepare("
+    SELECT items 
+    FROM vendor_orders 
+    WHERE purchase_request_id = ? 
+    LIMIT 1
+");
+$stmt->execute([$receipt['order_id']]);
+$order = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$order) {
+    die("❌ Purchase order not found for this receipt.");
+}
+
+// Decode items JSON
+$items_json = json_decode($order['items'], true);
+
+// Prepare final items array with totals
+$items = [];
+foreach ($items_json as $item_id => $data) {
+    $quantity_received = 0;
+    $subtotal = 0;
+
+    // Find corresponding quantity received in receipt_items
+    $stmt2 = $pdo->prepare("SELECT SUM(quantity_received) as qty_sum, SUM(subtotal) as subtotal_sum 
+                            FROM receipt_items 
+                            WHERE receipt_id = ? AND item_id = ?");
+    $stmt2->execute([$receipt_id, $item_id]);
+    $received_data = $stmt2->fetch(PDO::FETCH_ASSOC);
+    if ($received_data) {
+        $quantity_received = $received_data['qty_sum'] ?? 0;
+        $subtotal = $received_data['subtotal_sum'] ?? 0;
+    }
+
+    $items[] = [
+        'item_id' => $item_id,
+        'item_name' => $data['name'],
+        'unit_type' => $data['unit_type'],
+        'pcs_per_box' => $data['pcs_per_box'] ?? null,
+        'price' => $data['price'],
+        'quantity_received' => $quantity_received,
+        'subtotal' => $subtotal > 0 ? $subtotal : ($quantity_received * $data['price'])
+    ];
+}
 
 // Fetch payment status
 $stmt = $pdo->prepare("SELECT * FROM receipt_payments WHERE receipt_id = ? LIMIT 1");
 $stmt->execute([$receipt_id]);
 $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+
 ?>
 <!DOCTYPE html>
 <html lang="en">

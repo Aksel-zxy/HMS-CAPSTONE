@@ -26,10 +26,6 @@
                 <li><a href="vendorcontract.php"><span class="text">Contract & Agreement</span></a></li>
 
                 <li><a href="v_rating.php"><span class="text">Rating</span></a></li>
-                
-
-                <li><a href="#"><span class="text">Rating</span></a></li>
-
             </ul>
         </div>
 
