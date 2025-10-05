@@ -1,0 +1,159 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f4f6f9;
+    margin: 0;
+    padding: 0;
+}
+
+/* Receipt Card */
+.card {
+    max-width: 850px;
+    margin: auto;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+}
+
+/* Header */
+.card-header {
+    background: linear-gradient(90deg, #0d6efd, #0dcaf0);
+    color: white;
+    padding: 20px 25px;
+    border-bottom: none;
+}
+
+.card-header h3 {
+    font-size: 1.6rem;
+    margin: 0;
+    font-weight: bold;
+}
+
+.card-header small {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+/* Vendor Info */
+.vendor-info {
+    background: #f9fafb;
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #eee;
+}
+
+.vendor-info h5 {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.vendor-info p {
+    margin: 0;
+    font-size: 13px;
+    color: #555;
+}
+
+/* Items Table */
+.table {
+    margin-top: 20px;
+    font-size: 14px;
+    border: 1px solid #ddd;
+}
+
+.table th {
+    background: #f1f3f5 !important;
+    color: #333 !important;
+    font-size: 13px;
+    text-transform: uppercase;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 10px;
+}
+
+/* Summary */
+.summary {
+    font-size: 15px;
+    margin-top: 20px;
+}
+
+.summary p {
+    margin: 3px 0;
+    font-weight: 500;
+}
+
+.summary .total {
+    font-size: 18px;
+    font-weight: bold;
+    color: #0d6efd;
+    border-top: 2px solid #ddd;
+    padding-top: 8px;
+}
+
+/* Payment Status */
+.status-badge {
+    font-size: 15px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    display: inline-block;
+    font-weight: bold;
+}
+
+.status-paid {
+    background: #d1f7d6;
+    color: #0f9d58;
+    border: 1px solid #0f9d58;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+/* Buttons */
+.btn-primary,
+.btn-success {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #0d6efd;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #084298;
+}
+
+.btn-success {
+    background: #198754;
+    border: none;
+}
+
+.btn-success:hover {
+    background: #145c32;
+}
+
+/* ✅ Print Styling */
+@media print {
+    body {
+        background: white;
+    }
+    .card {
+        box-shadow: none;
+        border: none;
+        margin: 0;
+        padding: 0;
+    }
+    .btn-primary, .btn-success {
+        display: none;
+    }
+}
