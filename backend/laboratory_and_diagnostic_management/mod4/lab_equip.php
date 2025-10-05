@@ -1,6 +1,6 @@
 <?php
 session_start();
-include '../../../SQL/config.php';
+include '../../SQL/config.php';
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -27,9 +27,9 @@ if (!$user) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Laboratory and Diagnostic Management</title>
-    <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+    <link rel="stylesheet" href="assets/CSS/super.css">
 </head>
 
 <body>
@@ -37,12 +37,12 @@ if (!$user) {
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
-                <img src="../assets/image/logo-dark.png" width="90px" height="20px">
+                <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
             <!----- Sidebar Navigation ----->
             <li class="sidebar-item">
-                <a href="../labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
@@ -67,10 +67,10 @@ if (!$user) {
 
                 <ul id="labtech" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="doctor_referral.php" class="sidebar-link">Doctor Referral</a>
+                        <a href="mod1/doctor_referral.php" class="sidebar-link">Doctor Referral</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
+                        <a href="mod1/cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
                 </ul>
             </li>
@@ -84,13 +84,13 @@ if (!$user) {
                 </a>
                 <ul id="sample" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../mod2/test_process.php" class="sidebar-link">Sample Process</a>
+                        <a href="mod2/test_process.php" class="sidebar-link">Sample Process</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod2/sps.php" class="sidebar-link">Sample Processing Status</a>
+                        <a href="mod2/sps.php" class="sidebar-link">Sample Processing Status</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod2/audit.php" class="sidebar-link">Audit Trail</a>
+                        <a href="mod2/audit.php" class="sidebar-link">Audit Trail</a>
                     </li>
                 </ul>
             </li>
@@ -105,10 +105,10 @@ if (!$user) {
                 </a>
                 <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../mod3/results.php" class="sidebar-link">Test Results</a>
+                        <a href="mod3/results.php" class="sidebar-link">Test Results</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
+                        <a href="mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                 </ul>
             </li>
@@ -122,13 +122,13 @@ if (!$user) {
                 </a>
                 <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../mod4/lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
+                        <a href="lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod4/maintenance.php" class="sidebar-link">Maintenance Schedule</a>
+                        <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod4/operation_report.php" class="sidebar-link">Operation Equipment</a>
+                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -157,7 +157,7 @@ if (!$user) {
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -167,54 +167,18 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-
-            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
-
-                <div style="display:flex; gap:15px;">
-                    <!-- Calendar -->
-                    <div id="scheduleCalendar" style="flex:2; background:#fff; border-radius:8px; padding:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    </div>
-
-                    <!-- Available Slots -->
-                    <div style="flex:1; background:#fff; border-radius:8px; padding:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                        <h4 style="margin-bottom:12px; color:#0d6efd; font-family:Arial, sans-serif;">Available Slots</h4>
-                        <ul id="availableSlots" style="list-style:none; padding:0; margin:0; font-family:Arial, sans-serif; font-size:14px;">
-                            <!-- Slots will be injected here -->
-                        </ul>
-                    </div>
-                </div>
-
-            </div>
-
-
-            <!-- MODAL AREA PO -->
-            <div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="dayModalLabel">Available Slots</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body" id="dayModalBody">
-                            <!-- Filled by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <h1>wala pa here</h1>
             <!----- End of Main Content ----->
-            <script src="../assets/javascript/calendar.js"></script>
             <script>
-                // Sidebar toggle
-                document.querySelector(".toggler-btn")?.addEventListener("click", function() {
+                const toggler = document.querySelector(".toggler-btn");
+                toggler.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
             </script>
-            <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
-            <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-            <script src="../assets/Bootstrap/all.min.js"></script>
-            <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-            <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-            <script src="../assets/Bootstrap/jq.js"></script>
+            <script src="assets/Bootstrap/all.min.js"></script>
+            <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+            <script src="assets/Bootstrap/fontawesome.min.js"></script>
+            <script src="assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
