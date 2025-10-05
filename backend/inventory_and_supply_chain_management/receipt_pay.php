@@ -20,31 +20,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receipt_id'])) {
 
     if ($payment) {
         if ($payment['status'] === 'Paid') {
-            // Already paid — just redirect
+            // Already paid — redirect
             header("Location: receipt.php?receipt_id=" . $receipt_id);
             exit;
         }
 
         // Update existing payment to Paid
-        $stmt = $pdo->prepare("
-            UPDATE receipt_payments 
-            SET status = 'Paid', paid_at = NOW() 
-            WHERE receipt_id = ?
-        ");
+        $stmt = $pdo->prepare("UPDATE receipt_payments SET status = 'Paid', paid_at = NOW() WHERE receipt_id = ?");
         $stmt->execute([$receipt_id]);
     } else {
         // Insert new payment record
-        $stmt = $pdo->prepare("
-            INSERT INTO receipt_payments (receipt_id, status, paid_at) 
-            VALUES (?, 'Paid', NOW())
-        ");
+        $stmt = $pdo->prepare("INSERT INTO receipt_payments (receipt_id, status, paid_at) VALUES (?, 'Paid', NOW())");
         $stmt->execute([$receipt_id]);
     }
 
-    // 🚫 REMOVE inventory and batch updates
-    // Inventory is already updated in receive_order.php during confirmation.
-
-    // ✅ Redirect back to the receipt view
+    // Redirect back to the receipt view
     header("Location: receipt.php?receipt_id=" . $receipt_id);
     exit;
 }

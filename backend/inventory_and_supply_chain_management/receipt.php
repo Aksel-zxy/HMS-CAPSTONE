@@ -55,16 +55,16 @@ $payment = $stmt->fetch(PDO::FETCH_ASSOC);
             <p><strong>TIN/VAT:</strong> <?= htmlspecialchars($receipt['tin_vat']) ?></p>
             <p><strong>Date Issued:</strong> <?= $receipt['created_at'] ?></p>
 
-            <!-- Purchase Request Info -->
+            <!-- Purchase Order Info -->
             <hr>
-            <p><strong>Purchase Request #:</strong> <?= htmlspecialchars($receipt['order_id']) ?></p>
+            <p><strong>Purchase Order #:</strong> <?= htmlspecialchars($receipt['order_id']) ?></p>
 
-            <!-- Items -->
+            <!-- Items Table -->
             <table class="table table-bordered mt-4">
                 <thead class="table-dark">
                     <tr>
                         <th>Item</th>
-                        <th>Quantity</th>
+                        <th>Quantity Received</th>
                         <th>Unit</th>
                         <th>Price</th>
                         <th>Subtotal</th>

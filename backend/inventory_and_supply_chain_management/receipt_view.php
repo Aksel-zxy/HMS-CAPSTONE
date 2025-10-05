@@ -32,6 +32,7 @@ if (!$payment) {
     die("❌ Receipt not found");
 }
 
+// Fetch receipt items
 $stmt = $pdo->prepare("SELECT * FROM receipt_items WHERE receipt_id = ?");
 $stmt->execute([$payment['receipt_id']]);
 $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -65,12 +66,12 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <p><strong>TIN/VAT:</strong> <?= htmlspecialchars($payment['tin_vat']) ?></p>
             <p><strong>Date Issued:</strong> <?= date("Y-m-d H:i", strtotime($payment['receipt_date'])) ?></p>
 
-            <!-- Items -->
+            <!-- Items Table -->
             <table class="table table-bordered mt-4">
                 <thead class="table-dark">
                     <tr>
                         <th>Item</th>
-                        <th>Quantity</th>
+                        <th>Quantity Received</th>
                         <th>Unit</th>
                         <th>Price</th>
                         <th>Subtotal</th>
@@ -109,6 +110,7 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <span class="badge bg-warning">⏳ Pending</span>
                 <?php endif; ?>
             </div>
+
         </div>
     </div>
 </div>
