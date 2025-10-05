@@ -13,7 +13,7 @@ RewriteRule ^contract-tracking/?$ admin_vendor_contracts.php [L]
 RewriteRule ^compliance-docs/?$ admin_vendor_documents.php [L]
 
 RewriteRule ^purchase-order/?$ purchase_order.php [L]
-RewriteRule ^purchase-request/?$ admin_purchase_requests.php [L]
+RewriteRule ^purchase-request/?$ department_request.php [L]
 RewriteRule ^order-receive/?$ order_receive.php [L]
 RewriteRule ^po-status/?$ po_status_tracking.php [L]
 
