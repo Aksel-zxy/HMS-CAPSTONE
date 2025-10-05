@@ -2,7 +2,7 @@
 session_start();
 require 'db.php';
 
-// Show errors for debugging (remove in production)
+// Show errors (for debugging)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -17,26 +17,10 @@ $user_id = $_SESSION['user_id'];
 $user_stmt = $pdo->prepare("SELECT * FROM users WHERE user_id=? LIMIT 1");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
-
 if (!$user) die("User not found.");
 
-// Fallback for department and department_id
 $department = !empty($user['department']) ? $user['department'] : 'N/A';
 $department_id = $user['role'] ?? null;
-
-// --- Fetch budget info ---
-$current_month = date('Y-m'); // YYYY-MM
-$budget_stmt = $pdo->prepare("SELECT * FROM department_budgets WHERE user_id=? AND month=? AND status='Approved'");
-$budget_stmt->execute([$user_id, $current_month]);
-$budget = $budget_stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$budget) {
-    $budget = [
-        "allocated_budget" => 0,
-        "requested_amount" => 0,
-        "approved_amount" => 0
-    ];
-}
 
 // --- CART ---
 if (!isset($_SESSION['cart'])) {
@@ -47,7 +31,7 @@ if (!isset($_SESSION['cart'])) {
 if (isset($_POST['ajax'])) {
     $action = $_POST['ajax'];
 
-    // Add item to cart
+    // Add item
     if ($action === 'add') {
         $id = $_POST['id'];
         $name = $_POST['name'];
@@ -82,48 +66,61 @@ if (isset($_POST['ajax'])) {
         unset($_SESSION['cart'][$_POST['id']]);
     }
 
-    // Submit purchase request
+    // ✅ Process Order Directly (no admin approval)
     if ($action === 'submit') {
         if (!empty($_SESSION['cart'])) {
-            $items = json_encode($_SESSION['cart']);
+            $items = $_SESSION['cart'];
             $total_price = 0;
-            foreach ($_SESSION['cart'] as $it) {
-                // ✅ Fix: If Box, don't multiply by qty for price
-                if (($it['unit_type'] ?? 'Piece') === 'Box') {
-                    $total_price += $it['price'];
-                } else {
-                    $total_price += $it['price'] * $it['qty'];
-                }
+
+            foreach ($items as $it) {
+                $total_price += ($it['unit_type'] === 'Box')
+                    ? $it['price']
+                    : $it['price'] * $it['qty'];
             }
 
-            // Insert into database
-            $stmt = $pdo->prepare("INSERT INTO purchase_requests 
-                (user_id, department, department_id, month, items, total_price, status, created_at) 
-                VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW())");
-
             try {
-                $stmt->execute([$user_id, $department, $department_id, $current_month, $items, $total_price]);
+                // Create vendor orders directly
+                foreach ($items as $item_id => $item) {
+                    $qty = $item['qty'];
+
+                    $stmtVendor = $pdo->prepare("SELECT vendor_id FROM vendor_products WHERE id=?");
+                    $stmtVendor->execute([$item_id]);
+                    $vendor_id = $stmtVendor->fetchColumn();
+
+                    if ($vendor_id) {
+                        $stmtInsert = $pdo->prepare("
+                            INSERT INTO vendor_orders 
+                            (user_id, department, department_id, vendor_id, item_id, quantity, status, checklist, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, 'Processing', '[]', NOW())
+                        ");
+                        $stmtInsert->execute([
+                            $user_id,
+                            $department,
+                            $department_id,
+                            $vendor_id,
+                            $item_id,
+                            $qty
+                        ]);
+                    }
+                }
+
                 $_SESSION['cart'] = [];
-                echo json_encode(["success" => true, "message" => "Purchase request sent to Admin."]);
-                exit; // ✅ prevent extra response
+                echo json_encode(["success" => true, "message" => "✅ Order successfully processed!"]);
+                exit;
             } catch (PDOException $e) {
                 echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
-                exit; // ✅ prevent extra response
+                exit;
             }
         } else {
             echo json_encode(["success" => false, "message" => "Cart is empty."]);
-            exit; // ✅ prevent extra response
+            exit;
         }
     }
 
-    // Grand total for cart display
+    // Update cart display
     $grand = 0;
     foreach ($_SESSION['cart'] as $it) {
-        if (($it['unit_type'] ?? 'Piece') === 'Box') {
-            $grand += $it['price'];
-        } else {
-            $grand += $it['qty'] * $it['price'];
-        }
+        $grand += ($it['unit_type'] === 'Box') ? $it['price'] : $it['price'] * $it['qty'];
     }
 
     ob_start();
@@ -156,6 +153,7 @@ $offset = ($page - 1) * $limit;
 
 $where = "WHERE 1";
 $params = [];
+
 if ($selected_category) {
     $where .= " AND item_type = ?";
     $params[] = $selected_category;
@@ -174,14 +172,12 @@ $stmt = $pdo->prepare("SELECT * FROM vendor_products $where ORDER BY item_name A
 $stmt->execute($params);
 $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Purchase Order</title>
+    <title>Process Order</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/purchase_order.css">
 </head>
 <body class="bg-light">
 
@@ -191,16 +187,13 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <div class="container py-5">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>🛒 Purchase Request</h2>
+        <h2>🧾 Process Order</h2>
         <div class="text-end">
             <h5 class="mb-1"><?= htmlspecialchars($department) ?></h5>
-            <p class="mb-0">
-                Allocated Budget: ₱<?= number_format($budget['allocated_budget'], 2) ?>
-            </p>
         </div>
     </div>
 
-    <!-- Filter Section -->
+    <!-- Filter -->
     <form method="get" class="mb-3">
         <div class="row g-2">
             <div class="col-md-4">
@@ -274,7 +267,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">🛒 Your Cart</h5>
+        <h5 class="modal-title">🧾 Your Order</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body" id="cartContent">
@@ -287,7 +280,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-// Add item
+// Add to cart
 $(document).on("click", ".addToCart", function() {
     $.post("purchase_order.php", {
         ajax: "add",
