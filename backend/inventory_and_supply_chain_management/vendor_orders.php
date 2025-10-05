@@ -160,6 +160,7 @@ if(isset($_GET['ajax'], $_GET['po_number']) && $_GET['ajax'] === "po_details") {
     $status_order = ["Processing","Packed","Shipped"];
     ?>
 
+    <!-- Only show order items, not PO summary headers -->
     <table class="table table-bordered">
         <thead class="table-dark">
             <tr>
