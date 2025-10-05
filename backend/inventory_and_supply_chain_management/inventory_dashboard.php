@@ -71,100 +71,102 @@ $spent_json = json_encode($spent_budgets);
     <?php include 'inventory_sidebar.php'; ?>
 </div>
 
-<div class="container-fluid py-4">
-  <h2 class="text-center mb-4">📊 Inventory & Budget Dashboard</h2>
+<div class="main-content">
+  <div class="container-fluid py-4">
+    <h2 class="text-center mb-4">📊 Inventory & Budget Dashboard</h2>
 
-  <!-- Summary Row -->
-  <div class="row g-4 mb-4">
-    <div class="col-md-3">
-      <div class="card text-center bg-primary text-white">
-        <div class="card-body">
-          <h5>Total Order Requests</h5>
-          <h3><?= number_format($total_orders) ?></h3>
+    <!-- Summary Row -->
+    <div class="row g-4 mb-4">
+      <div class="col-md-3">
+        <div class="card text-center bg-primary text-white">
+          <div class="card-body">
+            <h5>Total Order Requests</h5>
+            <h3><?= number_format($total_orders) ?></h3>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-center bg-success text-white">
-        <div class="card-body">
-          <h5>Total Approved Budget</h5>
-          <h3>₱<?= number_format($total_approved_budget,2) ?></h3>
+      <div class="col-md-3">
+        <div class="card text-center bg-success text-white">
+          <div class="card-body">
+            <h5>Total Approved Budget</h5>
+            <h3>₱<?= number_format($total_approved_budget,2) ?></h3>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-center bg-warning text-dark">
-        <div class="card-body">
-          <h5>Total Spent</h5>
-          <h3>₱<?= number_format($total_spent,2) ?></h3>
+      <div class="col-md-3">
+        <div class="card text-center bg-warning text-dark">
+          <div class="card-body">
+            <h5>Total Spent</h5>
+            <h3>₱<?= number_format($total_spent,2) ?></h3>
+          </div>
         </div>
       </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card text-center bg-info text-white">
-        <div class="card-body">
-          <h5>Remaining Budget</h5>
-          <h3>₱<?= number_format($remaining_budget,2) ?></h3>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Charts Row -->
-  <div class="row g-4">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header bg-light">
-          <h5 class="mb-0 text-center">Budget Distribution by Department</h5>
-        </div>
-        <div class="card-body">
-          <canvas id="budgetPieChart" height="250"></canvas>
+      <div class="col-md-3">
+        <div class="card text-center bg-info text-white">
+          <div class="card-body">
+            <h5>Remaining Budget</h5>
+            <h3>₱<?= number_format($remaining_budget,2) ?></h3>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header bg-light">
-          <h5 class="mb-0 text-center">Allocated vs Spent (per Department)</h5>
+    <!-- Charts Row -->
+    <div class="row g-4">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-light">
+            <h5 class="mb-0 text-center">Budget Distribution by Department</h5>
+          </div>
+          <div class="card-body">
+            <canvas id="budgetPieChart" height="250"></canvas>
+          </div>
         </div>
-        <div class="card-body">
-          <canvas id="budgetBarChart" height="250"></canvas>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header bg-light">
+            <h5 class="mb-0 text-center">Allocated vs Spent (per Department)</h5>
+          </div>
+          <div class="card-body">
+            <canvas id="budgetBarChart" height="250"></canvas>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Table Section -->
-  <div class="row mt-5">
-    <div class="col-12">
-      <div class="card">
-        <div class="card-header bg-dark text-white">
-          <h5 class="mb-0">Department Budget Overview</h5>
-        </div>
-        <div class="card-body p-0">
-          <table class="table table-striped table-bordered mb-0 text-center">
-            <thead class="table-light">
-              <tr>
-                <th>Department</th>
-                <th>Approved Budget</th>
-                <th>Total Spent</th>
-                <th>Remaining</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($dept_data as $d): 
-                $remaining = max($d['approved_budget'] - $d['spent_amount'], 0);
-              ?>
+    <!-- Table Section -->
+    <div class="row mt-5">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Department Budget Overview</h5>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-striped table-bordered mb-0 text-center">
+              <thead class="table-light">
                 <tr>
-                  <td><?= htmlspecialchars($d['department']) ?></td>
-                  <td>₱<?= number_format($d['approved_budget'],2) ?></td>
-                  <td>₱<?= number_format($d['spent_amount'],2) ?></td>
-                  <td class="fw-bold text-success">₱<?= number_format($remaining,2) ?></td>
+                  <th>Department</th>
+                  <th>Approved Budget</th>
+                  <th>Total Spent</th>
+                  <th>Remaining</th>
                 </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                <?php foreach ($dept_data as $d): 
+                  $remaining = max($d['approved_budget'] - $d['spent_amount'], 0);
+                ?>
+                  <tr>
+                    <td><?= htmlspecialchars($d['department']) ?></td>
+                    <td>₱<?= number_format($d['approved_budget'],2) ?></td>
+                    <td>₱<?= number_format($d['spent_amount'],2) ?></td>
+                    <td class="fw-bold text-success">₱<?= number_format($remaining,2) ?></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
