@@ -5,8 +5,8 @@ require 'db.php';
 <?php if (!empty($_SESSION['cart'])): ?>
     <form id="updateCartForm">
         <table class="table table-bordered align-middle">
-            <thead class="table-dark text-center">
-                <tr>
+            <thead class="table-dark">
+                <tr class="text-center">
                     <th>Item</th>
                     <th width="120">Qty</th>
                     <th width="120">Price</th>
@@ -64,8 +64,8 @@ require 'db.php';
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                 <i class="bi bi-arrow-left-circle"></i> Continue Shopping
             </button>
-            <button type="button" id="submitRequest" class="btn btn-success">
-                <i class="bi bi-send-check"></i> Submit Request
+            <button type="button" id="submitOrder" class="btn btn-success">
+                <i class="bi bi-bag-check"></i> Process Order
             </button>
         </div>
     </form>
@@ -98,17 +98,12 @@ require 'db.php';
         });
     });
 
-    // ✅ Submit Department Request (no duplicate confirmation)
-    $(document).on("click", "#submitRequest", function() {
-        $.post("purchase_order.php", { ajax: "submit" }, function(res) {
+    // Process order directly
+    $(document).on("click", "#submitOrder", function() {
+        $.post("purchase_order.php", {ajax:"submit"}, function(res) {
             let data = JSON.parse(res);
-
-            if (data.success) {
-                alert("✅ " + data.message);
-                location.reload();
-            } else {
-                alert("⚠️ " + data.message);
-            }
+            alert(data.message);
+            if (data.success) location.reload();
         });
     });
 </script>
