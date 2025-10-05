@@ -45,26 +45,11 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <style>
-body {
-    background-color: #f8fafc;
-    font-family: 'Segoe UI', sans-serif;
-}
-.main-content {
-    margin-left: 260px; /* space for sidebar */
-    padding: 30px;
-}
-.card {
-    border-radius: 12px;
-    box-shadow: 0 5px 18px rgba(0,0,0,0.08);
-}
-.table thead th {
-    background-color: #1e293b;
-    color: #fff;
-}
-.modal-header {
-    background-color: #2563eb;
-    color: white;
-}
+body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
+.main-content { margin-left: 260px; padding: 30px; }
+.card { border-radius: 12px; box-shadow: 0 5px 18px rgba(0,0,0,0.08); }
+.table thead th { background-color: #1e293b; color: #fff; }
+.modal-header { background-color: #2563eb; color: white; }
 </style>
 </head>
 <body>
@@ -131,7 +116,15 @@ body {
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($requests as $r): ?>
+                <?php foreach ($requests as $r): 
+                    // Normalize items to array for JS
+                    $itemsArray = json_decode($r['items'], true);
+                    if (!is_array($itemsArray)) $itemsArray = [];
+                    // Convert object to array if needed
+                    if (array_keys($itemsArray) !== range(0, count($itemsArray) - 1)) {
+                        $itemsArray = array_values($itemsArray);
+                    }
+                ?>
                     <tr>
                         <td><?= $r['id'] ?></td>
                         <td><?= htmlspecialchars($r['department']) ?></td>
@@ -151,7 +144,7 @@ body {
                             <button class="btn btn-info btn-sm view-items-btn"
                                 data-id="<?= $r['id'] ?>"
                                 data-dept="<?= htmlspecialchars($r['department']) ?>"
-                                data-items='<?= htmlspecialchars($r['items'], ENT_QUOTES) ?>'>
+                                data-items='<?= htmlspecialchars(json_encode($itemsArray), ENT_QUOTES) ?>'>
                                 <i class="bi bi-eye"></i> View
                             </button>
                         </td>
@@ -185,10 +178,16 @@ body {
 document.querySelectorAll('.view-items-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const department = btn.dataset.dept;
-        const items = JSON.parse(btn.dataset.items);
+        let items = [];
+        try {
+            items = JSON.parse(btn.dataset.items || '[]');
+            if (!Array.isArray(items)) items = Object.values(items);
+        } catch(e) {
+            console.error('Invalid JSON:', e);
+        }
 
         let html = '';
-        if (items && items.length > 0) {
+        if (items.length > 0) {
             html += `
                 <table class="table table-bordered">
                     <thead class="table-light">
@@ -204,17 +203,14 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
                 html += `
                     <tr>
                         <td>${item.name || ''}</td>
-                        <td>${item.description || ''}</td>
-                        <td>${item.quantity || 0}</td>
+                        <td>${item.description || item.desc || ''}</td>
+                        <td>${item.quantity || item.qty || 0}</td>
                     </tr>
                 `;
             });
-            html += `
-                    </tbody>
-                </table>
-            `;
+            html += `</tbody></table>`;
         } else {
-            html = `<p>No items found for this request.</p>`;
+            html = `<p class="text-center text-muted">No items found for this request.</p>`;
         }
 
         document.getElementById('viewItemsLabel').innerHTML = `📦 Request from ${department}`;

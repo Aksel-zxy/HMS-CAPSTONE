@@ -18,18 +18,18 @@ if (!$receipt) {
     die("❌ Receipt not found for ID: " . htmlspecialchars($receipt_id));
 }
 
-// Fetch the original purchase order for this receipt
+// Fetch the original vendor order for this receipt using purchase_order_number
 $stmt = $pdo->prepare("
     SELECT items 
     FROM vendor_orders 
-    WHERE purchase_request_id = ? 
+    WHERE purchase_order_number = ? 
     LIMIT 1
 ");
 $stmt->execute([$receipt['order_id']]);
 $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$order) {
-    die("❌ Purchase order not found for this receipt.");
+    die("❌ Vendor order not found for this receipt.");
 }
 
 // Decode items JSON
@@ -67,15 +67,14 @@ foreach ($items_json as $item_id => $data) {
 $stmt = $pdo->prepare("SELECT * FROM receipt_payments WHERE receipt_id = ? LIMIT 1");
 $stmt->execute([$receipt_id]);
 $payment = $stmt->fetch(PDO::FETCH_ASSOC);
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Receipt #<?= $receipt['id'] ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/receipt.css">
+<meta charset="UTF-8">
+<title>Receipt #<?= $receipt['id'] ?></title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/receipt.css">
 </head>
 <body class="bg-light">
 

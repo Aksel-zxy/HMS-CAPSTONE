@@ -9,111 +9,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
     $po_number = $_POST['order_id'];
     $received_qtys = $_POST['received_qty'] ?? [];
 
-    // Fetch vendor order
-    $stmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE purchase_order_number=? LIMIT 1");
+    // Fetch vendor order only if not already received
+    $stmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE purchase_order_number=? AND is_received=0 LIMIT 1");
     $stmt->execute([$po_number]);
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($order) {
-        $vendor_id = $order['vendor_id'];
-        $items = json_decode($order['items'], true);
-        $subtotal = 0;
+    if (!$order) {
+        die("❌ Vendor order already received or not found.");
+    }
 
-        foreach ($items as $item_id => $it) {
-            $received = isset($received_qtys[$item_id]) ? intval($received_qtys[$item_id]) : 0;
-            if ($received <= 0) continue;
+    $vendor_id = $order['vendor_id'];
+    $items = json_decode($order['items'], true);
+    $subtotal = 0;
+    $now = date('Y-m-d H:i:s');
 
-            // Fetch product info
-            $stmt2 = $pdo->prepare("SELECT * FROM vendor_products WHERE id=? LIMIT 1");
-            $stmt2->execute([$item_id]);
-            $product = $stmt2->fetch(PDO::FETCH_ASSOC);
+    foreach ($items as $item_id => $it) {
+        $received = isset($received_qtys[$item_id]) ? intval($received_qtys[$item_id]) : 0;
+        if ($received <= 0) continue;
 
-            if (!$product) continue;
+        // Fetch product info
+        $stmt2 = $pdo->prepare("SELECT * FROM vendor_products WHERE id=? LIMIT 1");
+        $stmt2->execute([$item_id]);
+        $product = $stmt2->fetch(PDO::FETCH_ASSOC);
+        if (!$product) continue;
 
-            $unit_type = $it['unit_type'] ?? 'Piece';
-            $pcs_per_box = intval($it['pcs_per_box'] ?? 0);
+        $unit_type = $it['unit_type'] ?? 'Piece';
+        $pcs_per_box = intval($it['pcs_per_box'] ?? 0);
+        $total_qty = ($unit_type === 'Box' && $pcs_per_box) ? $received * $pcs_per_box : $received;
+        $lineSubtotal = $it['price'] * $received;
+        $subtotal += $lineSubtotal;
 
-            if ($unit_type === 'Box' && $pcs_per_box) {
-                $total_qty = $received * $pcs_per_box;
-                $lineSubtotal = $it['price'] * $received;
-            } else {
-                $total_qty = $received;
-                $lineSubtotal = $it['price'] * $received;
-            }
+        // ---------------- Inventory Update ----------------
+        $stmt_inv = $pdo->prepare("SELECT * FROM inventory WHERE item_id=?");
+        $stmt_inv->execute([$item_id]);
+        $inv = $stmt_inv->fetch(PDO::FETCH_ASSOC);
 
-            $subtotal += $lineSubtotal;
-
-            // ---------------- Inventory Update ----------------
-            $stmt_inv = $pdo->prepare("SELECT * FROM inventory WHERE item_id=?");
-            $stmt_inv->execute([$item_id]);
-            $inv = $stmt_inv->fetch(PDO::FETCH_ASSOC);
-
-            $now = date('Y-m-d H:i:s');
-            if ($inv) {
-                $stmt_upd = $pdo->prepare("UPDATE inventory 
-                    SET quantity=quantity+?, total_qty=total_qty+?, price=?, unit_type=?, pcs_per_box=?, received_at=? 
-                    WHERE item_id=?");
-                $stmt_upd->execute([$received, $total_qty, $it['price'], $unit_type, $pcs_per_box, $now, $item_id]);
-            } else {
-                $stmt_ins = $pdo->prepare("INSERT INTO inventory 
-                    (item_id, item_name, item_type, category, sub_type, quantity, total_qty, price, unit_type, pcs_per_box, received_at, location, min_stock, max_stock) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Main Storage', 0, 9999)");
-                $stmt_ins->execute([
-                    $item_id,
-                    $it['name'],
-                    $product['item_type'],
-                    null,
-                    $product['sub_type'] ?? null,
-                    $received,
-                    $total_qty,
-                    $it['price'],
-                    $unit_type,
-                    $pcs_per_box,
-                    $now
-                ]);
-            }
-
-            // ---------------- Medicine Batches ----------------
-            if (strtolower($product['item_type']) === 'medications and pharmacy supplies') {
-                $batch_no = 'BATCH-' . uniqid();
-                $stmt_batch = $pdo->prepare("INSERT INTO medicine_batches (item_id, batch_no, quantity, received_at) VALUES (?, ?, ?, ?)");
-                $stmt_batch->execute([$item_id, $batch_no, $total_qty, $now]);
-            }
+        if ($inv) {
+            $stmt_upd = $pdo->prepare("UPDATE inventory 
+                SET quantity=quantity+?, total_qty=total_qty+?, price=?, unit_type=?, pcs_per_box=?, received_at=? 
+                WHERE item_id=?");
+            $stmt_upd->execute([$received, $total_qty, $it['price'], $unit_type, $pcs_per_box, $now, $item_id]);
+        } else {
+            $stmt_ins = $pdo->prepare("INSERT INTO inventory 
+                (item_id, item_name, item_type, category, sub_type, quantity, total_qty, price, unit_type, pcs_per_box, received_at, location, min_stock, max_stock) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Main Storage', 0, 9999)");
+            $stmt_ins->execute([
+                $item_id,
+                $it['name'],
+                $product['item_type'],
+                null,
+                $product['sub_type'] ?? null,
+                $received,
+                $total_qty,
+                $it['price'],
+                $unit_type,
+                $pcs_per_box,
+                $now
+            ]);
         }
 
-        // ---------------- Receipt Handling ----------------
-        if ($subtotal > 0) {
-            $vat = $subtotal * 0.12;
-            $total = $subtotal + $vat;
+        // ---------------- Medicine Batches ----------------
+        if (strtolower($product['item_type']) === 'medications and pharmacy supplies') {
+            $batch_no = 'BATCH-' . uniqid();
+            $stmt_batch = $pdo->prepare("INSERT INTO medicine_batches (item_id, batch_no, quantity, received_at) VALUES (?, ?, ?, ?)");
+            $stmt_batch->execute([$item_id, $batch_no, $total_qty, $now]);
+        }
+    }
 
-            $stmt_r = $pdo->prepare("SELECT id FROM receipts WHERE vendor_id=? AND order_id=?");
-            $stmt_r->execute([$vendor_id, $po_number]);
-            $existing_receipt = $stmt_r->fetch(PDO::FETCH_ASSOC);
+    // ---------------- Receipt Handling ----------------
+    if ($subtotal > 0) {
+        $vat = $subtotal * 0.12;
+        $total = $subtotal + $vat;
 
-            if ($existing_receipt) {
-                $receipt_id = $existing_receipt['id'];
-                $stmt_upd = $pdo->prepare("UPDATE receipts SET subtotal=subtotal+?, vat=vat+?, total=total+? WHERE id=?");
-                $stmt_upd->execute([$subtotal, $vat, $total, $receipt_id]);
-            } else {
-                $stmt_ins = $pdo->prepare("INSERT INTO receipts (order_id, vendor_id, subtotal, vat, total) VALUES (?, ?, ?, ?, ?)");
-                $stmt_ins->execute([$po_number, $vendor_id, $subtotal, $vat, $total]);
-                $receipt_id = $pdo->lastInsertId();
+        $stmt_r = $pdo->prepare("SELECT id FROM receipts WHERE vendor_id=? AND order_id=?");
+        $stmt_r->execute([$vendor_id, $po_number]);
+        $existing_receipt = $stmt_r->fetch(PDO::FETCH_ASSOC);
 
-                $stmt_pay = $pdo->prepare("INSERT INTO receipt_payments (receipt_id, status) VALUES (?, 'Pending')");
-                $stmt_pay->execute([$receipt_id]);
-            }
+        if ($existing_receipt) {
+            $receipt_id = $existing_receipt['id'];
+        } else {
+            $stmt_ins = $pdo->prepare("INSERT INTO receipts (order_id, vendor_id, subtotal, vat, total) VALUES (?, ?, ?, ?, ?)");
+            $stmt_ins->execute([$po_number, $vendor_id, $subtotal, $vat, $total]);
+            $receipt_id = $pdo->lastInsertId();
+
+            $stmt_pay = $pdo->prepare("INSERT INTO receipt_payments (receipt_id, status) VALUES (?, 'Pending')");
+            $stmt_pay->execute([$receipt_id]);
 
             // Insert receipt items
             foreach ($items as $item_id => $it) {
                 $received = isset($received_qtys[$item_id]) ? intval($received_qtys[$item_id]) : 0;
                 if ($received <= 0) continue;
 
-                if ($it['unit_type'] === 'Box' && intval($it['pcs_per_box'])) {
-                    $lineSubtotal = $it['price'] * $received;
-                } else {
-                    $lineSubtotal = $it['price'] * $received;
-                }
-
+                $lineSubtotal = $it['price'] * $received;
                 $stmt_item = $pdo->prepare("INSERT INTO receipt_items (receipt_id, item_id, item_name, quantity_received, price, subtotal, unit_type, pcs_per_box) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt_item->execute([
                     $receipt_id,
@@ -126,19 +113,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
                     $it['pcs_per_box']
                 ]);
             }
-
-            // Mark order as Completed
-            $stmt_done = $pdo->prepare("UPDATE vendor_orders SET status='Completed' WHERE purchase_order_number=?");
-            $stmt_done->execute([$po_number]);
-
-            header("Location: receipt.php?receipt_id=" . $receipt_id);
-            exit;
         }
+
+        // Mark order as received
+        $stmt_done = $pdo->prepare("UPDATE vendor_orders SET is_received=1, receive_at=? WHERE purchase_order_number=?");
+        $stmt_done->execute([$now, $po_number]);
+
+        header("Location: receipt.php?receipt_id=" . $receipt_id);
+        exit;
     }
 }
 
 // ---------------- Fetch Orders ----------------
-$stmt = $pdo->query("SELECT * FROM vendor_orders WHERE status='Shipped' ORDER BY created_at DESC");
+// Only show Shipped but not yet received orders
+$stmt = $pdo->query("SELECT * FROM vendor_orders WHERE status='Shipped' AND (is_received IS NULL OR is_received=0) ORDER BY created_at DESC");
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
