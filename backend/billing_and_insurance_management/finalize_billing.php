@@ -34,21 +34,26 @@ if (!empty($dob) && $dob != '0000-00-00') {
 // Check PWD status
 $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 
-// Compute subtotal, item discounts, and grand total
+// Compute totals
 $subtotal = 0;
 foreach ($cart as &$srv) {
     $unit_price = $srv['price'];
-    $srv_discount = ($is_pwd && $age < 60) ? ($unit_price * 0.20) : 0; // adjust business logic if needed
+    $srv_discount = ($is_pwd && $age < 60) ? ($unit_price * 0.20) : 0;
     $srv['total_price'] = $unit_price - $srv_discount;
     $subtotal += $srv['total_price'];
 }
 $discount = ($is_pwd && $age < 60) ? array_sum(array_column($cart, 'price')) - $subtotal : 0;
 $grand_total = $subtotal;
 
+// Store totals in variables (required for bind_param)
+$total_charges = array_sum(array_column($cart, 'price'));
+$total_discount = $discount;
+$total_out_of_pocket = $grand_total;
+
 // Begin transaction
 $conn->begin_transaction();
 try {
-    // Insert into patient_receipt first to get billing_id (use AUTO_INCREMENT)
+    // Insert into patient_receipt
     $stmt_receipt = $conn->prepare("
         INSERT INTO patient_receipt
         (patient_id, total_charges, total_discount, total_out_of_pocket, grand_total, billing_date, payment_method, status, transaction_id, payment_reference, is_pwd)
@@ -63,9 +68,9 @@ try {
     $stmt_receipt->bind_param(
         "iddddssssi",
         $patient_id,
-        array_sum(array_column($cart, 'price')),
-        $discount,
-        $grand_total,
+        $total_charges,
+        $total_discount,
+        $total_out_of_pocket,
         $grand_total,
         $payment_method,
         $status,
@@ -83,7 +88,6 @@ try {
         (billing_id, item_type, item_description, quantity, unit_price, total_price)
         VALUES (?, 'Service', ?, 1, ?, ?)
     ");
-
     foreach ($cart as $srv) {
         $srv_name = $srv['serviceName'];
         $unit_price = $srv['price'];
