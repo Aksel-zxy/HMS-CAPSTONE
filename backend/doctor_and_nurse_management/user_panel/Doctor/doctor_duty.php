@@ -297,9 +297,33 @@ class DoctorDutyController
     public function getViewData()
     {
         $assigned = $this->duty->getAssignedAppointments();
+        $employee_id = $_SESSION['employee_id'] ?? null;
+
+        // Only show appointments assigned to this doctor
+        $appointments = [];
+        if ($employee_id) {
+            $all = $this->appointment->getUnassigned($assigned);
+            foreach ($all as $appt) {
+                if (isset($appt['doctor_id']) && $appt['doctor_id'] == $employee_id) {
+                    $appointments[] = $appt;
+                }
+            }
+        }
+
+        // Only show duties assigned to this doctor
+        $duties = [];
+        if ($employee_id) {
+            $allDuties = $this->duty->getAllActive();
+            foreach ($allDuties as $duty) { 
+                if (isset($duty['doctor_id']) && $duty['doctor_id'] == $employee_id) {
+                    $duties[] = $duty;
+                }
+            }
+        }
+
         return [
-            'appointments' => $this->appointment->getUnassigned($assigned),
-            'duties' => $this->duty->getAllActive(),
+            'appointments' => $appointments,
+            'duties' => $duties,
             'beds' => $this->resources->getBeds(),
             'nurses' => $this->resources->getNurses()
         ];
@@ -643,7 +667,6 @@ $nurses = $controller->getAllNurses();
                                     <th>Purpose</th>
                                     <th>Status</th>
                                     <th>Notes</th>
-
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -657,7 +680,6 @@ $nurses = $controller->getAllNurses();
                                     <td><?= htmlspecialchars($appt['purpose']); ?></td>
                                     <td><?= htmlspecialchars($appt['status']); ?></td>
                                     <td><?= htmlspecialchars($appt['notes']); ?></td>
-
                                     <td>
                                         <a href="doctor_duty.php?manage_id=<?= urlencode($appt['appointment_id']); ?>"
                                             class="btn btn-primary btn-sm">Manage</a>
@@ -729,9 +751,16 @@ $nurses = $controller->getAllNurses();
 
                                     <!-- Procedure -->
                                     <div class="mb-3">
-                                        <label class="form-label">Procedure</label>
-                                        <input type="text" name="procedure" class="form-control form-control-sm"
-                                            required>
+                                        <label class="form-label">Purpose</label>
+                                        <select name="procedure" class="form-select form-select-sm" required>
+                                            <?php
+                                                $purposes = ["consultation", "ob-gyn", "pediatric", "psychiatric", "cardiology", "laboratory"];
+                                                foreach ($purposes as $purpose):
+                                                    $selected = (strcasecmp($purpose, $appointment['purpose']) == 0) ? 'selected' : '';
+                                            ?>
+                                            <option value="<?= $purpose ?>" <?= $selected ?>><?= $purpose ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
 
                                     <!-- Notes -->
@@ -781,7 +810,7 @@ $nurses = $controller->getAllNurses();
                                         <label class="form-label">Purpose</label>
                                         <select name="purpose" class="form-select form-select-sm" required>
                                             <?php
-                                                $purposes = ["consultation", "ob-gyn", "pediatric", "psychiatric", "cardiology"];
+                                                $purposes = ["consultation", "ob-gyn", "pediatric", "psychiatric", "cardiology", "laboratory"];
                                                 foreach ($purposes as $purpose):
                                                     $selected = (strcasecmp($purpose, $appointment['purpose']) == 0) ? 'selected' : '';
                                             ?>
@@ -921,6 +950,7 @@ $nurses = $controller->getAllNurses();
                             </tbody>
                         </table>
                     </div>
+
                     <!-- VIEW MODAL RESULT -->
                     <div class="modal fade" id="resultModal" tabindex="-1">
                         <div class="modal-dialog modal-xl">
