@@ -21,10 +21,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_rating'])) {
 // Fetch vendors + purchase_order_number
 $stmt = $pdo->prepare("
     SELECT v.id AS vendor_id, v.company_name, vo.purchase_order_number,
-           vo.status, MAX(vo.created_at) AS last_order_date
+           vo.status, vo.is_received, MAX(vo.created_at) AS last_order_date
     FROM vendors v
     JOIN vendor_orders vo ON vo.vendor_id = v.id
-    GROUP BY v.id, v.company_name, vo.purchase_order_number, vo.status
+    GROUP BY v.id, v.company_name, vo.purchase_order_number, vo.status, vo.is_received
     ORDER BY last_order_date DESC
 ");
 $stmt->execute();
@@ -32,15 +32,16 @@ $vendors = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Function: status per vendor + PO
 function getVendorStatus($pdo, $vendor_id, $po_number) {
-    $stmt = $pdo->prepare("SELECT status FROM vendor_orders WHERE vendor_id = ? AND purchase_order_number = ?");
+    $stmt = $pdo->prepare("SELECT status, is_received FROM vendor_orders WHERE vendor_id = ? AND purchase_order_number = ?");
     $stmt->execute([$vendor_id, $po_number]);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     if (empty($orders)) return ['text'=>'No Orders','color'=>'secondary','type'=>'none'];
 
+    $is_received = array_column($orders, 'is_received');
     $statuses = array_column($orders, 'status');
 
-    if (in_array("Received", $statuses)) return ['text'=>'Received','color'=>'secondary','type'=>'completed'];
+    if (in_array(1, $is_received)) return ['text'=>'Received','color'=>'secondary','type'=>'completed'];
     if (in_array("Shipped", $statuses)) return ['text'=>'Shipped','color'=>'success','type'=>'processing'];
     if (in_array("Packed", $statuses)) return ['text'=>'Packed','color'=>'info','type'=>'processing'];
     if (in_array("Processing", $statuses)) return ['text'=>'Processing','color'=>'warning','type'=>'processing'];
@@ -121,7 +122,7 @@ $avgRatings = $stmt->fetchAll(PDO::FETCH_GROUP|PDO::FETCH_UNIQUE|PDO::FETCH_ASSO
                 <tbody>
                     <?php foreach ($vendors as $v): 
                         $vendorStatus = getVendorStatus($pdo, $v['vendor_id'], $v['purchase_order_number']);
-                        if($vendorStatus['type'] !== 'processing') continue;
+                        if($vendorStatus['type'] !== 'processing') continue; // only processing
                         $hasProcessing = true;
                         $avgRating = isset($avgRatings[$v['vendor_id']][$v['purchase_order_number']]) ? number_format($avgRatings[$v['vendor_id']][$v['purchase_order_number']]['avg_rating'],1) : null;
                         $items = getOrderItems($pdo, $v['purchase_order_number']);
@@ -133,65 +134,6 @@ $avgRatings = $stmt->fetchAll(PDO::FETCH_GROUP|PDO::FETCH_UNIQUE|PDO::FETCH_ASSO
                         <td><span class="badge bg-<?= $vendorStatus['color'] ?>"><?= $vendorStatus['text'] ?></span></td>
                         <td>
                             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#itemsModal<?= $v['vendor_id'] ?>_<?= $v['purchase_order_number'] ?>">View Items</button>
-
-                            <!-- Items Modal -->
-                            <div class="modal fade" id="itemsModal<?= $v['vendor_id'] ?>_<?= $v['purchase_order_number'] ?>" tabindex="-1">
-                                <div class="modal-dialog modal-lg">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            <h5 class="modal-title">Items for <?= htmlspecialchars($v['company_name']) ?> (PO #<?= htmlspecialchars($v['purchase_order_number']) ?>)</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                        </div>
-                                        <div class="modal-body">
-                                            <?php if($items): ?>
-                                                <table class="table table-bordered">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Item</th>
-                                                            <th>Unit</th>
-                                                            <th>Quantity</th>
-                                                            <th>Price</th>
-                                                            <th>Subtotal</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        <?php 
-                                                        $total_qty = 0;
-                                                        $total_price = 0;
-                                                        foreach($items as $item_id => $item): 
-                                                            $qty = isset($item['qty']) ? (int)$item['qty'] : 1;
-                                                            $subtotal = $qty * (float)$item['price'];
-                                                            $total_qty += $qty;
-                                                            $total_price += $subtotal;
-                                                        ?>
-                                                        <tr>
-                                                            <td><?= htmlspecialchars($item['name']) ?></td>
-                                                            <td><?= htmlspecialchars($item['unit_type'] ?? 'Piece') ?></td>
-                                                            <td><?= $qty ?></td>
-                                                            <td>₱<?= number_format((float)$item['price'],2) ?></td>
-                                                            <td>₱<?= number_format($subtotal,2) ?></td>
-                                                        </tr>
-                                                        <?php endforeach; ?>
-                                                    </tbody>
-                                                    <tfoot class="table-dark">
-                                                        <tr>
-                                                            <th colspan="2">Total</th>
-                                                            <th><?= $total_qty ?></th>
-                                                            <th></th>
-                                                            <th>₱<?= number_format($total_price,2) ?></th>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
-                                            <?php else: ?>
-                                                <div class="alert alert-info">No items found.</div>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </td>
                         <td><?= $avgRating ? $avgRating.' ⭐' : '-' ?></td>
                     </tr>
@@ -219,7 +161,7 @@ $avgRatings = $stmt->fetchAll(PDO::FETCH_GROUP|PDO::FETCH_UNIQUE|PDO::FETCH_ASSO
                 <tbody>
                     <?php foreach ($vendors as $v):
                         $vendorStatus = getVendorStatus($pdo, $v['vendor_id'], $v['purchase_order_number']);
-                        if($vendorStatus['type'] !== 'completed') continue;
+                        if($vendorStatus['type'] !== 'completed') continue; // only completed
                         $hasCompleted = true;
                         $deliveredData = getDeliveredData($pdo, $v['purchase_order_number']);
 
