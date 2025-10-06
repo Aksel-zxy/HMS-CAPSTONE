@@ -12,7 +12,10 @@ if ($patient_id <= 0) {
         FROM patientinfo p
         INNER JOIN dl_results dr ON p.patient_id = dr.patientID
         WHERE dr.status='Completed'
-          AND p.patient_id NOT IN (SELECT DISTINCT patient_id FROM billing_items WHERE finalized=1)
+          AND p.patient_id NOT IN (
+              SELECT DISTINCT patient_id 
+              FROM patient_receipt pr
+          )
         ORDER BY p.lname ASC, p.fname ASC
     ";
     $patients = $conn->query($sql);
@@ -160,12 +163,12 @@ $grand_total = $subtotal - $discount;
 
 // Get services already billed (exclude them)
 $billed_services = [];
-$stmt = $conn->prepare("SELECT service_id FROM billing_items WHERE patient_id=?");
+$stmt = $conn->prepare("SELECT item_id FROM billing_items WHERE patient_id=?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) {
-    $billed_services[] = $row['service_id'];
+    $billed_services[] = $row['item_id'];
 }
 
 // Get services already in cart (exclude them too)
