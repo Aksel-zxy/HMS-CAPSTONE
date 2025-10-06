@@ -64,6 +64,7 @@ class Appointment {
         $stmt = $this->conn->prepare("SELECT doctor_id FROM p_appointments WHERE appointment_id = ?");
         $stmt->bind_param("i", $appointment_id);
         $stmt->execute();
+        $doctor_id = null;
         $stmt->bind_result($doctor_id);
         $stmt->fetch();
         $stmt->close();
