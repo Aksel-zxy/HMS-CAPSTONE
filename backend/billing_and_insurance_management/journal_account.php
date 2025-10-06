@@ -2,59 +2,80 @@
 session_start();
 include '../../SQL/config.php';
 
-// Fetch billing items (income side)
-$sqlBilling = "SELECT item_id, service_name, total_price, created_at 
-               FROM billing_items 
-               WHERE finalized = 1
-               ORDER BY created_at DESC";
-$billing = $conn->query($sqlBilling);
-
-// Fetch expense logs (expense side)
-$sqlExpense = "SELECT expense_id, expense_name, amount, expense_date, category, notes 
-               FROM expense_logs 
-               ORDER BY expense_date DESC";
-$expenses = $conn->query($sqlExpense);
-
-// Auto-classify accounts
-function classifyAccount($name, $isExpense = false) {
-    $name = strtolower($name);
-
-    if ($isExpense) {
-        return "Expense";
+/**
+ * ✅ Step 1: Check available columns in expense_logs
+ * (Prevents "Unknown column" errors)
+ */
+$columns = [];
+$res = $conn->query("SHOW COLUMNS FROM expense_logs");
+if ($res) {
+    while ($col = $res->fetch_assoc()) {
+        $columns[] = $col['Field'];
     }
-
-    // For billing services
-    if (strpos($name, 'scan') !== false || strpos($name, 'laboratory') !== false || strpos($name, 'cbc') !== false) {
-        return "Revenue"; 
-    } elseif (strpos($name, 'insurance') !== false) {
-        return "Asset"; 
-    } elseif (strpos($name, 'loan') !== false || strpos($name, 'payable') !== false) {
-        return "Liability";
-    }
-
-    return "Revenue"; // Default
 }
 
-// Totals
-$totals = [
-    "Asset" => 0,
-    "Liability" => 0,
-    "Revenue" => 0,
-    "Expense" => 0
-];
+// Detect correct expense column names dynamically
+$col_name  = in_array('expense_name', $columns) ? 'expense_name' : (in_array('description', $columns) ? 'description' : (in_array('item_name', $columns) ? 'item_name' : 'category'));
+$col_amt   = in_array('amount', $columns) ? 'amount' : (in_array('total', $columns) ? 'total' : 'value');
+$col_date  = in_array('expense_date', $columns) ? 'expense_date' : (in_array('date', $columns) ? 'date' : 'created_at');
+$col_cat   = in_array('category', $columns) ? 'category' : '';
+$col_note  = in_array('notes', $columns) ? 'notes' : '';
 
-// Collect unified records
+/**
+ * ✅ Step 2: Fetch billing (income side)
+ */
+$sqlBilling = "
+    SELECT 
+        item_id, 
+        item_description, 
+        total_price, 
+        NOW() AS created_at  -- substitute for missing timestamp
+    FROM billing_items
+    ORDER BY item_id DESC
+";
+$billing = $conn->query($sqlBilling);
+
+/**
+ * ✅ Step 3: Fetch expense logs safely
+ */
+$sqlExpense = "SELECT expense_id, $col_name AS expense_name, $col_amt AS amount, $col_date AS expense_date" .
+              ($col_cat ? ", $col_cat AS category" : "") .
+              ($col_note ? ", $col_note AS notes" : "") .
+              " FROM expense_logs ORDER BY $col_date DESC";
+$expenses = $conn->query($sqlExpense);
+
+/**
+ * ✅ Step 4: Account classification logic
+ */
+function classifyAccount($name, $isExpense = false) {
+    $name = strtolower($name);
+    if ($isExpense) return "Expense";
+
+    if (strpos($name, 'scan') !== false || strpos($name, 'lab') !== false || strpos($name, 'test') !== false)
+        return "Revenue";
+    if (strpos($name, 'insurance') !== false)
+        return "Asset";
+    if (strpos($name, 'loan') !== false || strpos($name, 'payable') !== false)
+        return "Liability";
+    return "Revenue";
+}
+
+/**
+ * ✅ Step 5: Initialize totals and records
+ */
+$totals = ["Asset" => 0, "Liability" => 0, "Revenue" => 0, "Expense" => 0];
 $records = [];
 
-// Billing → Revenue/Asset/Liability
+/**
+ * ✅ Step 6: Process Billing Items
+ */
 if ($billing && $billing->num_rows > 0) {
     while ($row = $billing->fetch_assoc()) {
-        $type = classifyAccount($row['service_name']);
+        $type = classifyAccount($row['item_description']);
         $totals[$type] += $row['total_price'];
-
         $records[] = [
             'id' => $row['item_id'],
-            'name' => $row['service_name'],
+            'name' => $row['item_description'],
             'amount' => $row['total_price'],
             'date' => $row['created_at'],
             'type' => $type
@@ -62,12 +83,13 @@ if ($billing && $billing->num_rows > 0) {
     }
 }
 
-// Expenses → Expense
+/**
+ * ✅ Step 7: Process Expense Logs
+ */
 if ($expenses && $expenses->num_rows > 0) {
     while ($row = $expenses->fetch_assoc()) {
         $type = classifyAccount($row['expense_name'], true);
         $totals[$type] += $row['amount'];
-
         $records[] = [
             'id' => $row['expense_id'],
             'name' => $row['expense_name'],
@@ -78,7 +100,9 @@ if ($expenses && $expenses->num_rows > 0) {
     }
 }
 
-// Sort all records by date (newest first)
+/**
+ * ✅ Step 8: Sort by date (newest first)
+ */
 usort($records, function ($a, $b) {
     return strtotime($b['date']) - strtotime($a['date']);
 });
@@ -90,6 +114,7 @@ usort($records, function ($a, $b) {
   <title>Journal Accounts</title>
   <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
   <style>
+    body { background: #f5f5f5; }
     .badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; }
     .asset { background-color: #e8f5e9; color: #2e7d32; }
     .liability { background-color: #ffebee; color: #c62828; }
@@ -97,7 +122,7 @@ usort($records, function ($a, $b) {
     .expense { background-color: #fff8e1; color: #f57f17; }
   </style>
 </head>
-<body class="p-4 bg-light">
+<body class="p-4">
 
 <div class="main-sidebar">
   <?php include 'billing_sidebar.php'; ?>
@@ -110,7 +135,7 @@ usort($records, function ($a, $b) {
     <thead class="table-dark">
       <tr>
         <th>ID</th>
-        <th>Name</th>
+        <th>Description</th>
         <th>Type</th>
         <th class="text-end">Amount (₱)</th>
         <th>Date</th>
@@ -128,39 +153,21 @@ usort($records, function ($a, $b) {
         </tr>
       <?php endforeach; ?>
     <?php else: ?>
-      <tr>
-        <td colspan="5" class="text-center">No records found.</td>
-      </tr>
+      <tr><td colspan="5" class="text-center">No records found.</td></tr>
     <?php endif; ?>
     </tbody>
   </table>
 
-  <!-- Summary -->
+  <!-- Summary Section -->
   <div class="row mt-4">
+    <?php foreach ($totals as $key => $value): ?>
     <div class="col-md-3">
-      <div class="card p-3">
-        <h5>Total Assets</h5>
-        <p class="fw-bold">₱<?= number_format($totals['Asset'], 2) ?></p>
+      <div class="card p-3 text-center">
+        <h5>Total <?= $key ?>s</h5>
+        <p class="fw-bold">₱<?= number_format($value, 2) ?></p>
       </div>
     </div>
-    <div class="col-md-3">
-      <div class="card p-3">
-        <h5>Total Liabilities</h5>
-        <p class="fw-bold">₱<?= number_format($totals['Liability'], 2) ?></p>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card p-3">
-        <h5>Total Revenue</h5>
-        <p class="fw-bold">₱<?= number_format($totals['Revenue'], 2) ?></p>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card p-3">
-        <h5>Total Expenses</h5>
-        <p class="fw-bold">₱<?= number_format($totals['Expense'], 2) ?></p>
-      </div>
-    </div>
+    <?php endforeach; ?>
   </div>
 </div>
 </body>

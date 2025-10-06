@@ -240,7 +240,7 @@ class Login
             $_SESSION['username'] = $patient['username'];
             $_SESSION['profession'] = 'patient';
 
-            header("Location: pharmacy_management/user_panel/user_patient.php");
+            header("Location: patient_management/user_panel/user_patient.php");
             exit();
         } else {
             $this->error = "Incorrect password.";
