@@ -1,5 +1,7 @@
 <?php
 include '../../SQL/config.php';
+require_once "classes/notification.php";
+
 
 if (!isset($_SESSION['pharmacy']) || $_SESSION['pharmacy'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in
@@ -23,6 +25,7 @@ if (!$user) {
     exit();
 }
 
+// 🔔 Pending prescriptions count
 $notif_sql = "SELECT COUNT(*) AS pending 
               FROM pharmacy_prescription 
               WHERE status = 'Pending'";
@@ -34,82 +37,26 @@ if ($notif_res && $notif_res->num_rows > 0) {
     $pendingCount = $notif_row['pending'];
 }
 
+// 🔴 Expiry (Near Expiry or Expired) count
+$expiry_sql = "SELECT COUNT(*) AS expiry 
+               FROM pharmacy_stock_batches 
+               WHERE expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)";
+$expiry_res = $conn->query($expiry_sql);
 
-
-
-date_default_timezone_set('Asia/Manila'); // PH timezone
-$notifCount = 0;
-$notifications = [];
-
-// 1. Pending prescriptions (use exact prescription_date from DB)
-$sqlPres = "
-    SELECT prescription_id, prescription_date
-    FROM pharmacy_prescription
-    WHERE status = 'Pending'
-    ORDER BY prescription_date DESC
-";
-
-if ($resPres = $conn->query($sqlPres)) {
-    while ($row = $resPres->fetch_assoc()) {
-        $notifications[] = [
-            'type' => 'prescription',
-            'message' => "New Prescription Added",
-            // show the actual creation time from DB
-            'time' => date("Y-m-d H:i:s", strtotime($row['prescription_date'])),
-            'link' => "pharmacy_prescription.php?id=" . $row['prescription_id']
-        ];
-    }
-    $notifCount += $resPres->num_rows;
+$expiryCount = 0;
+if ($expiry_res && $expiry_res->num_rows > 0) {
+    $expiry_row = $expiry_res->fetch_assoc();
+    $expiryCount = $expiry_row['expiry'];
 }
 
-// 2. Medicines expiring within 30 days
-$sqlExp = "
-    SELECT i.med_name, b.batch_no, b.expiry_date,
-           DATEDIFF(b.expiry_date, CURDATE()) AS days_left,
-           CASE 
-                WHEN b.expiry_date < CURDATE() THEN 'Expired'
-                WHEN b.expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 'Near Expiry'
-                ELSE 'Available'
-           END AS status
-    FROM pharmacy_stock_batches b
-    JOIN pharmacy_inventory i ON i.med_id = b.med_id
-    WHERE b.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-    ORDER BY b.expiry_date ASC
-";
 
-if ($resExp = $conn->query($sqlExp)) {
-    while ($row = $resExp->fetch_assoc()) {
-        if ($row['status'] === 'Near Expiry') {
-            $notifications[] = [
-                'type' => 'expiry',
-                'message' => "Medicine {$row['med_name']} (Batch {$row['batch_no']}) is about to expire in {$row['days_left']} day(s)",
-                // use PH current time when notif is generated
-                'time' => date("Y-m-d H:i:s"),
-                'link' => "pharmacy_med_inventory.php"
-            ];
-        } elseif ($row['status'] === 'Expired') {
-            $notifications[] = [
-                'type' => 'expiry',
-                'message' => "Medicine {$row['med_name']} (Batch {$row['batch_no']}) has already expired",
-                'time' => date("Y-m-d H:i:s"),
-                'link' => "pharmacy_med_inventory.php"
-            ];
-        }
-    }
-    $notifCount += $resExp->num_rows;
-}
-
-// Sort all notifications by timestamp (latest first)
-usort($notifications, function ($a, $b) {
-    return strtotime($b['time']) - strtotime($a['time']);
-});
-
-// 👉 If you only want to show the latest 10 in dropdown
-$latestNotifications = array_slice($notifications, 0, 10);
-
-
+$notif = new Notification($conn);
+$latestNotifications = $notif->load();
+$notifCount = $notif->notifCount;
 
 ?>
+
+
 
 
 
@@ -198,11 +145,13 @@ $latestNotifications = array_slice($notifications, 0, 10);
                     <span style="font-size: 18px;">Sales</span>
                 </a>
             </li>
-            <li class="sidebar-item">
-                <a href="pharmacy_expiry_tracking.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
+            <li class="sidebar-item position-relative">
+                <a href="pharmacy_expiry_tracking.php" class="sidebar-link">
                     <i class="fa-solid fa-calendar-check"></i>
                     <span style="font-size: 18px;">Drug Expiry Tracking</span>
+                    <?php if ($expiryCount > 0): ?>
+                        <span class="expiry-dot"></span>
+                    <?php endif; ?>
                 </a>
             </li>
             <li class="sidebar-item">
@@ -241,11 +190,11 @@ $latestNotifications = array_slice($notifications, 0, 10);
                             </a>
 
                             <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="notifBell"
-                                style="min-width:320px; max-height:400px; overflow-y:auto; border-radius:8px;">
+                                style="min-width:400px; max-height:400px; overflow-y:auto; border-radius:8px;">
                                 <li class="dropdown-header fw-bold">Notifications</li>
 
-                                <?php if (!empty($notifications)): ?>
-                                    <?php foreach ($notifications as $index => $n): ?>
+                                <?php if (!empty($latestNotifications)): ?>
+                                    <?php foreach ($latestNotifications as $index => $n): ?>
                                         <li class="notif-item <?php echo $index >= 10 ? 'd-none extra-notif' : ''; ?>">
                                             <a class="dropdown-item d-flex align-items-start" href="<?php echo $n['link']; ?>">
                                                 <div class="me-2">
@@ -280,7 +229,7 @@ $latestNotifications = array_slice($notifications, 0, 10);
                                                 </div>
                                             </a>
                                         </li>
-                                        <?php if ($index < count($notifications) - 1): ?>
+                                        <?php if ($index < count($latestNotifications) - 1): ?>
                                             <li class="<?php echo $index >= 10 ? 'd-none extra-notif' : ''; ?>">
                                                 <hr class="dropdown-divider">
                                             </li>
@@ -288,7 +237,7 @@ $latestNotifications = array_slice($notifications, 0, 10);
                                     <?php endforeach; ?>
 
                                     <!-- Load More Button -->
-                                    <?php if (count($notifications) > 10): ?>
+                                    <?php if (count($latestNotifications) > 10): ?>
                                         <li class="text-center">
                                             <a href="#" id="loadMoreNotif" class="dropdown-item fw-semibold">View Previous Notifications</a>
                                         </li>
@@ -298,12 +247,6 @@ $latestNotifications = array_slice($notifications, 0, 10);
                                 <?php endif; ?>
                             </ul>
                         </div>
-
-
-
-
-
-
 
                         <!-- Username + Profile Dropdown -->
                         <div class="dropdown d-flex align-items-center">
@@ -318,7 +261,6 @@ $latestNotifications = array_slice($notifications, 0, 10);
                         </div>
                     </div>
                 </div>
-
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
