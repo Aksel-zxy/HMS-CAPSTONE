@@ -170,10 +170,6 @@ $total_entries = count($entries);
           <option value="Other">Other</option>
         </select>
       </div>
-      <div style="display:flex;justify-content:space-between;">
-        <button type="button" class="btn-close" onclick="closeEditModal()">Cancel</button>
-        <button type="submit" class="btn-save">Save Changes</button>
-      </div>
     </form>
   </div>
 </div>
