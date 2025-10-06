@@ -262,7 +262,7 @@ $allPatients = $patient->getAllPatients();
                                             </td>
                                             <td style="padding:12px;text-align:center;">
                                                 <?php if ($status === 'completed'): ?>
-                                                    <?= $test['received_by'] ? " " . htmlspecialchars($test['received_by']) : "Delivered (no name)" ?>
+                                                    <?= $test['received_by'] ? " Dr. " . htmlspecialchars($test['received_by']) : "Delivered (no name)" ?>
                                                 <?php else: ?>
                                                     -
                                                 <?php endif; ?>

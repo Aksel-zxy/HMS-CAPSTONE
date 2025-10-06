@@ -9,12 +9,15 @@ require '../../../pharmacy_management/classes/Medicine.php';
 // =========================
 // Database Wrapper
 // =========================
-class Database {
+class Database
+{
     private $conn;
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
-    public function getConnection() {
+    public function getConnection()
+    {
         return $this->conn;
     }
 }
@@ -22,12 +25,15 @@ class Database {
 // =========================
 // User (Doctor)
 // =========================
-class User {
+class User
+{
     private $conn;
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
-    public function getById($id) {
+    public function getById($id)
+    {
         $stmt = $this->conn->prepare("SELECT * FROM hr_employees WHERE employee_id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
@@ -39,13 +45,16 @@ class User {
 // =========================
 // Appointment Handling
 // =========================
-class Appointment {
+class Appointment
+{
     private $conn;
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
-    public function getUnassigned($assigned = []) {
+    public function getUnassigned($assigned = [])
+    {
         $sql = "SELECT pa.*, CONCAT(p.fname, ' ', p.lname) AS patient_name
                 FROM p_appointments pa
                 JOIN patientinfo p ON pa.patient_id = p.patient_id
@@ -60,7 +69,8 @@ class Appointment {
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
 
-    public function getDoctorId($appointment_id) {
+    public function getDoctorId($appointment_id)
+    {
         $stmt = $this->conn->prepare("SELECT doctor_id FROM p_appointments WHERE appointment_id = ?");
         $stmt->bind_param("i", $appointment_id);
         $stmt->execute();
@@ -71,7 +81,8 @@ class Appointment {
         return $doctor_id;
     }
 
-    public function update($data) {
+    public function update($data)
+    {
         $stmt = $this->conn->prepare("UPDATE p_appointments 
             SET appointment_date = ?, purpose = ?, status = ?, notes = ? WHERE appointment_id = ?");
         $stmt->bind_param("ssssi", $data['appointment_date'], $data['purpose'], $data['status'], $data['notes'], $data['appointment_id']);
@@ -82,13 +93,17 @@ class Appointment {
 // =========================
 // Duty Assignment
 // =========================
-class Duty {
+class Duty
+{
     private $conn;
-    public function __construct($conn) {
+
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
-    public function getAssignedAppointments() {
+    public function getAssignedAppointments()
+    {
         $assigned = [];
         $res = $this->conn->query("SELECT appointment_id FROM duty_assignments");
         while ($row = $res->fetch_assoc()) {
@@ -97,12 +112,33 @@ class Duty {
         return $assigned;
     }
 
-    public function getAllActive() {
-        $res = $this->conn->query("SELECT * FROM duty_assignments WHERE status != 'Completed' ORDER BY created_at DESC");
+    public function getAllActive()
+    {
+        $sql = "
+        SELECT 
+            d.*,
+            CONCAT(pat.fname, ' ', pat.lname) AS patient_name,
+            r.resultID,
+            r.result AS lab_result,
+            r.status AS lab_status,
+            r.remarks AS lab_remarks,
+            r.received_by AS lab_received_by
+        FROM duty_assignments d
+        INNER JOIN p_appointments a ON d.appointment_id = a.appointment_id
+        INNER JOIN patientinfo pat ON a.patient_id = pat.patient_id
+        LEFT JOIN dl_results r ON r.patientID = pat.patient_id
+        WHERE d.status != 'Completed'
+        ORDER BY d.created_at DESC
+    ";
+        $res = $this->conn->query($sql);
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
-
     public function save($data) {
+    // Start a transaction to ensure both operations are consistent
+    $this->conn->begin_transaction();
+
+    try {
+        // 1️⃣ Insert into duty_assignments
         $stmt = $this->conn->prepare("INSERT INTO duty_assignments 
             (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, notes, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
@@ -115,31 +151,64 @@ class Duty {
             $data['notes'],
             $data['status']
         );
-        return $stmt->execute();
-    }
+        $stmt->execute();
 
-    public function complete($duty_id) {
-        $stmt = $this->conn->prepare("UPDATE duty_assignments SET status = 'Completed', updated_at = NOW() WHERE duty_id = ?");
+        // 2️⃣ Update p_appointments table’s purpose and notes fields
+        $update = $this->conn->prepare("UPDATE p_appointments 
+            SET purpose = ?, notes = ? 
+            WHERE appointment_id = ?");
+        $update->bind_param("ssi",
+            $data['procedure'],
+            $data['notes'],
+            $data['appointment_id']
+        );
+        $update->execute();
+
+        // Commit the transaction if both queries succeed
+        $this->conn->commit();
+
+        return true;
+
+    } catch (Exception $e) {
+        // Rollback if something fails
+        $this->conn->rollback();
+        error_log("Save failed: " . $e->getMessage());
+        return false;
+    }
+}
+
+    public function complete($duty_id)
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE duty_assignments 
+            SET status = 'Completed', updated_at = NOW() 
+            WHERE duty_id = ?
+        ");
         $stmt->bind_param("i", $duty_id);
         return $stmt->execute();
     }
 }
 
+
 // =========================
 // Hospital Resources
 // =========================
-class HospitalResource {
+class HospitalResource
+{
     private $conn;
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
-    public function getBeds() {
+    public function getBeds()
+    {
         $res = $this->conn->query("SELECT * FROM p_beds");
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
 
-    public function getNurses() {
+    public function getNurses()
+    {
         $res = $this->conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse' AND status = 'active'");
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
@@ -148,10 +217,12 @@ class HospitalResource {
 // =========================
 // Main Controller
 // =========================
-class DoctorDutyController {
+class DoctorDutyController
+{
     private $conn, $user, $appointment, $duty, $resources;
 
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
         $this->user = new User($conn);
         $this->appointment = new Appointment($conn);
@@ -159,7 +230,8 @@ class DoctorDutyController {
         $this->resources = new HospitalResource($conn);
     }
 
-    public function authenticate() {
+    public function authenticate()
+    {
         if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
             header('Location: ../../login.php');
             exit();
@@ -174,7 +246,8 @@ class DoctorDutyController {
         return $user;
     }
 
-    public function handleActions() {
+    public function handleActions()
+    {
         // Save duty
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
             $appointment_id = (int) $_POST['appointment_id'];
@@ -221,7 +294,8 @@ class DoctorDutyController {
         }
     }
 
-    public function getViewData() {
+    public function getViewData()
+    {
         $assigned = $this->duty->getAssignedAppointments();
         return [
             'appointments' => $this->appointment->getUnassigned($assigned),
@@ -231,16 +305,19 @@ class DoctorDutyController {
         ];
     }
 
-    public function getAllBeds() {
-    return $this->resources->getBeds();
-}
+    public function getAllBeds()
+    {
+        return $this->resources->getBeds();
+    }
 
-public function getAllNurses() {
-    return $this->resources->getNurses();
-}
+    public function getAllNurses()
+    {
+        return $this->resources->getNurses();
+    }
 
-public function getAppointmentById($appointment_id) {
-    $stmt = $this->conn->prepare("
+    public function getAppointmentById($appointment_id)
+    {
+        $stmt = $this->conn->prepare("
         SELECT 
             pa.*,
             CONCAT(p.fname, ' ', p.lname) AS patient_name
@@ -249,24 +326,26 @@ public function getAppointmentById($appointment_id) {
         WHERE pa.appointment_id = ?
         LIMIT 1
     ");
-    $stmt->bind_param("i", $appointment_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    return $res->fetch_assoc();
+        $stmt->bind_param("i", $appointment_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        return $res->fetch_assoc();
+    }
 }
 
-}
 
-
-class Axl {
+class Axl
+{
     private $conn;
 
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
     // ✅ Get all prescriptions for a specific doctor (with joined data)
-    public function getPrescriptionsByDoctor($doctor_id) {
+    public function getPrescriptionsByDoctor($doctor_id)
+    {
         $sql = "
             SELECT 
                 p.prescription_id,
@@ -365,28 +444,28 @@ $nurses = $controller->getAllNurses();
     <link rel="stylesheet" href="../../../pharmacy_management/assets/css/med_inventory.css">
 
     <script>
-    // Only validate prescription form, not the appointment assignment form
-    document.addEventListener("DOMContentLoaded", function() {
-        var prescriptionForm = document.querySelector('#prescriptionModal form');
-        if (prescriptionForm) {
-            prescriptionForm.addEventListener('submit', function(e) {
-                let invalid = false;
-                prescriptionForm.querySelectorAll('input[name="quantity[]"]').forEach(qtyInput => {
-                    let val = parseInt(qtyInput.value);
-                    if (isNaN(val) || val <= 0) {
-                        invalid = true;
-                        qtyInput.classList.add('is-invalid');
-                    } else {
-                        qtyInput.classList.remove('is-invalid');
+        // Only validate prescription form, not the appointment assignment form
+        document.addEventListener("DOMContentLoaded", function() {
+            var prescriptionForm = document.querySelector('#prescriptionModal form');
+            if (prescriptionForm) {
+                prescriptionForm.addEventListener('submit', function(e) {
+                    let invalid = false;
+                    prescriptionForm.querySelectorAll('input[name="quantity[]"]').forEach(qtyInput => {
+                        let val = parseInt(qtyInput.value);
+                        if (isNaN(val) || val <= 0) {
+                            invalid = true;
+                            qtyInput.classList.add('is-invalid');
+                        } else {
+                            qtyInput.classList.remove('is-invalid');
+                        }
+                    });
+                    if (invalid) {
+                        e.preventDefault();
+                        alert("Please enter a valid quantity greater than 0 for all medicines.");
                     }
                 });
-                if (invalid) {
-                    e.preventDefault();
-                    alert("Please enter a valid quantity greater than 0 for all medicines.");
-                }
-            });
-        }
-    });
+            }
+        });
     </script>
 </head>
 
@@ -564,27 +643,27 @@ $nurses = $controller->getAllNurses();
                             </thead>
                             <tbody>
                                 <?php if (!empty($viewData['appointments'])): ?>
-                                <?php foreach ($viewData['appointments'] as $appt): ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($appt['appointment_id']); ?></td>
-                                    <td><?= htmlspecialchars($appt['patient_name']); ?></td>
-                                    <td><?= htmlspecialchars($appt['appointment_date']); ?></td>
-                                    <td><?= htmlspecialchars($appt['purpose']); ?></td>
-                                    <td><?= htmlspecialchars($appt['status']); ?></td>
-                                    <td><?= htmlspecialchars($appt['notes']); ?></td>
+                                    <?php foreach ($viewData['appointments'] as $appt): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($appt['appointment_id']); ?></td>
+                                            <td><?= htmlspecialchars($appt['patient_name']); ?></td>
+                                            <td><?= htmlspecialchars($appt['appointment_date']); ?></td>
+                                            <td><?= htmlspecialchars($appt['purpose']); ?></td>
+                                            <td><?= htmlspecialchars($appt['status']); ?></td>
+                                            <td><?= htmlspecialchars($appt['notes']); ?></td>
 
-                                    <td>
-                                        <a href="doctor_duty.php?manage_id=<?= urlencode($appt['appointment_id']); ?>"
-                                            class="btn btn-primary btn-sm">Manage</a>
-                                        <a href="doctor_duty.php?edit_id=<?= urlencode($appt['appointment_id']); ?>"
-                                            class="btn btn-warning btn-sm">Update</a>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
+                                            <td>
+                                                <a href="doctor_duty.php?manage_id=<?= urlencode($appt['appointment_id']); ?>"
+                                                    class="btn btn-primary btn-sm">Manage</a>
+                                                <a href="doctor_duty.php?edit_id=<?= urlencode($appt['appointment_id']); ?>"
+                                                    class="btn btn-warning btn-sm">Update</a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
                                 <?php else: ?>
-                                <tr>
-                                    <td colspan="8" class="text-center">No appointments found.</td>
-                                </tr>
+                                    <tr>
+                                        <td colspan="8" class="text-center">No appointments found.</td>
+                                    </tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
@@ -592,149 +671,141 @@ $nurses = $controller->getAllNurses();
                         <!-- Modal-like form for duty assignment -->
                         <!-- Duty Assignment Modal -->
                         <?php if ($manage_id): ?>
-                        <div class="duty-modal" id="dutyModal">
-                            <div class="form-container bg-white p-4 shadow rounded position-relative"
-                                style="max-width: 500px; width: 100%;">
-                                <button class="close-modal-btn position-absolute top-0 end-0 m-2"
-                                    onclick="window.location.href='doctor_duty.php'" aria-label="Close">&times;</button>
-                                <h4 class="mb-4 text-center text-primary fw-bold">Manage Appointment</h4>
+                            <div class="duty-modal" id="dutyModal">
+                                <div class="form-container bg-white p-4 shadow rounded position-relative"
+                                    style="max-width: 500px; width: 100%;">
+                                    <button class="close-modal-btn position-absolute top-0 end-0 m-2"
+                                        onclick="window.location.href='doctor_duty.php'" aria-label="Close">&times;</button>
+                                    <h4 class="mb-4 text-center text-primary fw-bold">Manage Appointment</h4>
 
-                                <form action="" method="POST">
-                                    <input type="hidden" name="appointment_id"
-                                        value="<?= htmlspecialchars($appointment_id ?? '') ?>">
+                                    <form action="" method="POST">
+                                        <input type="hidden" name="appointment_id"
+                                            value="<?= htmlspecialchars($appointment_id ?? '') ?>">
 
-                                    <!-- Bed -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Bed</label>
-                                        <select name="bed_id" class="form-select form-select-sm" required>
-                                            <option value="">-- Select Bed --</option>
-                                            <?php foreach ($beds as $row): ?>
-                                            <?php if (strtolower($row['status']) == 'available'): ?>
-                                            <option value="<?= $row['bed_id'] ?>">
-                                                <?= htmlspecialchars($row['bed_number']) ?>
-                                                (<?= htmlspecialchars($row['ward']) ?>,
-                                                Room <?= htmlspecialchars($row['room_number']) ?>,
-                                                <?= htmlspecialchars($row['bed_type']) ?>)
-                                            </option>
-                                            <?php else: ?>
-                                            <option value="<?= $row['bed_id'] ?>" disabled style="color:#aaa;">
-                                                <?= htmlspecialchars($row['bed_number']) ?>
-                                                (<?= htmlspecialchars($row['ward']) ?>,
-                                                Room <?= htmlspecialchars($row['room_number']) ?>,
-                                                <?= htmlspecialchars($row['bed_type']) ?>) -
-                                                <?= ucfirst($row['status']) ?>
-                                            </option>
-                                            <?php endif; ?>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
+                                        <!-- Bed -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Bed</label>
+                                            <select name="bed_id" class="form-select form-select-sm" required>
+                                                <option value="">-- Select Bed --</option>
+                                                <?php foreach ($beds as $row): ?>
+                                                    <?php if (strtolower($row['status']) == 'available'): ?>
+                                                        <option value="<?= $row['bed_id'] ?>">
+                                                            <?= htmlspecialchars($row['bed_number']) ?>
+                                                            (<?= htmlspecialchars($row['ward']) ?>,
+                                                            Room <?= htmlspecialchars($row['room_number']) ?>,
+                                                            <?= htmlspecialchars($row['bed_type']) ?>)
+                                                        </option>
+                                                    <?php else: ?>
+                                                        <option value="<?= $row['bed_id'] ?>" disabled style="color:#aaa;">
+                                                            <?= htmlspecialchars($row['bed_number']) ?>
+                                                            (<?= htmlspecialchars($row['ward']) ?>,
+                                                            Room <?= htmlspecialchars($row['room_number']) ?>,
+                                                            <?= htmlspecialchars($row['bed_type']) ?>) -
+                                                            <?= ucfirst($row['status']) ?>
+                                                        </option>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
 
-                                    <!-- Nurse Assistant -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Nurse Assistant</label>
-                                        <select name="nurse_assistant" class="form-select form-select-sm">
-                                            <option value="">-- Select Nurse --</option>
-                                            <?php foreach ($nurses as $row): ?>
-                                            <option value="<?= $row['employee_id'] ?>">
-                                                <?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) ?>
-                                            </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
+                                        <!-- Nurse Assistant -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Nurse Assistant</label>
+                                            <select name="nurse_assistant" class="form-select form-select-sm">
+                                                <option value="">-- Select Nurse --</option>
+                                                <?php foreach ($nurses as $row): ?>
+                                                    <option value="<?= $row['employee_id'] ?>">
+                                                        <?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
 
-                                    <!-- Procedure -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Procedure</label>
-                                        <input type="text" name="procedure" class="form-control form-control-sm"
-                                            required>
-                                    </div>
+                                        <!-- Procedure -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Procedure</label>
+                                            <input type="text" name="procedure" class="form-control form-control-sm"
+                                                required>
+                                        </div>
 
-                                    <!-- Notes -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Notes</label>
-                                        <textarea name="notes" class="form-control form-control-sm" rows="2"></textarea>
-                                    </div>
+                                        <!-- Notes -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Notes</label>
+                                            <textarea name="notes" class="form-control form-control-sm" rows="2"></textarea>
+                                        </div>
 
-                                    <button type="submit" name="save_duty" class="btn btn-primary w-100 mt-2">
-                                        Save Assignment
-                                    </button>
-                                </form>
+                                        <button type="submit" name="save_duty" class="btn btn-primary w-100 mt-2">
+                                            Save Assignment
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
-                        </div>
                         <?php endif; ?>
-
-
-
                         <?php if ($edit_id && $appointment): ?>
-                        <div class="duty-modal" id="dutyModal">
-                            <div class="form-container bg-white p-4 shadow rounded position-relative"
-                                style="max-width: 500px; width: 100%;">
-                                <button class="close-modal-btn position-absolute top-0 end-0 m-2"
-                                    onclick="window.location.href='doctor_duty.php'" aria-label="Close">&times;</button>
-                                <h4 class="mb-4 text-center text-primary fw-bold">Edit Appointment</h4>
+                            <div class="duty-modal" id="dutyModal">
+                                <div class="form-container bg-white p-4 shadow rounded position-relative"
+                                    style="max-width: 500px; width: 100%;">
+                                    <button class="close-modal-btn position-absolute top-0 end-0 m-2"
+                                        onclick="window.location.href='doctor_duty.php'" aria-label="Close">&times;</button>
+                                    <h4 class="mb-4 text-center text-primary fw-bold">Edit Appointment</h4>
 
-                                <form action="" method="POST">
-                                    <input type="hidden" name="appointment_id"
-                                        value="<?= htmlspecialchars($appointment['appointment_id']) ?>">
+                                    <form action="" method="POST">
+                                        <input type="hidden" name="appointment_id"
+                                            value="<?= htmlspecialchars($appointment['appointment_id']) ?>">
 
-                                    <!-- Patient -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Patient</label>
-                                        <input type="text" class="form-control form-control-sm"
-                                            value="<?= htmlspecialchars($appointment['patient_name']) ?>" disabled>
-                                    </div>
+                                        <!-- Patient -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Patient</label>
+                                            <input type="text" class="form-control form-control-sm"
+                                                value="<?= htmlspecialchars($appointment['patient_name']) ?>" disabled>
+                                        </div>
 
-                                    <!-- Appointment Date -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Appointment Date</label>
-                                        <input type="datetime-local" name="appointment_date"
-                                            class="form-control form-control-sm"
-                                            value="<?= htmlspecialchars(date('Y-m-d\TH:i', strtotime($appointment['appointment_date']))) ?>"
-                                            required>
-                                    </div>
+                                        <!-- Appointment Date -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Appointment Date</label>
+                                            <input type="datetime-local" name="appointment_date"
+                                                class="form-control form-control-sm"
+                                                value="<?= htmlspecialchars(date('Y-m-d\TH:i', strtotime($appointment['appointment_date']))) ?>"
+                                                required>
+                                        </div>
 
-                                    <!-- Purpose -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Purpose</label>
-                                        <input type="text" name="purpose" class="form-control form-control-sm"
-                                            value="<?= htmlspecialchars($appointment['purpose']) ?>" required>
-                                    </div>
+                                        <!-- Purpose -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Purpose</label>
+                                            <input type="text" name="purpose" class="form-control form-control-sm"
+                                                value="<?= htmlspecialchars($appointment['purpose']) ?>" required>
+                                        </div>
 
-                                    <!-- Status -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Status</label>
-                                        <select name="status" class="form-select form-select-sm" required>
-                                            <?php
-                        $statuses = ["Scheduled", "Ongoing", "Completed", "Cancelled"];
-                        foreach ($statuses as $status):
-                            $selected = ($status == $appointment['status']) ? 'selected' : '';
-                    ?>
-                                            <option value="<?= $status ?>" <?= $selected ?>><?= $status ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
+                                        <!-- Status -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Status</label>
+                                            <select name="status" class="form-select form-select-sm" required>
+                                                <?php
+                                                $statuses = ["Scheduled", "Ongoing", "Completed", "Cancelled"];
+                                                foreach ($statuses as $status):
+                                                    $selected = ($status == $appointment['status']) ? 'selected' : '';
+                                                ?>
+                                                    <option value="<?= $status ?>" <?= $selected ?>><?= $status ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
 
-                                    <!-- Notes -->
-                                    <div class="mb-3">
-                                        <label class="form-label">Notes</label>
-                                        <textarea name="notes" class="form-control form-control-sm" rows="2">
-                    <?= htmlspecialchars($appointment['notes']) ?>
-                </textarea>
-                                    </div>
+                                        <!-- Notes -->
+                                        <div class="mb-3">
+                                            <label class="form-label">Notes</label>
+                                            <textarea name="notes" class="form-control form-control-sm" rows="2">
+                                                <?= htmlspecialchars($appointment['notes']) ?>
+                                            </textarea>
+                                        </div>
 
-                                    <button type="submit" name="update_appointment" class="btn btn-warning w-100 mt-2">
-                                        Update Appointment
-                                    </button>
-                                </form>
+                                        <button type="submit" name="update_appointment" class="btn btn-warning w-100 mt-2">
+                                            Update Appointment
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
-                        </div>
                         <?php endif; ?>
-
-
-
-
                     </div>
-
 
                     <!-- Duties Tab -->
                     <div class="tab-pane fade" id="duties" role="tabpanel">
@@ -742,69 +813,101 @@ $nurses = $controller->getAllNurses();
                             <thead class="table-info">
                                 <tr>
                                     <th>Duty ID</th>
-                                    <th>Appointment ID</th>
-                                    <th>Doctor ID</th>
                                     <th>Bed ID</th>
+                                    <th>Patien Name</th>
                                     <th>Nurse Assistant</th>
                                     <th>Procedure</th>
                                     <th>Notes</th>
+                                    <th>Result</th>
                                     <th>Status</th>
-                                    <th>Created At</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php if (!empty($viewData['duties'])): ?>
-                                <?php foreach ($viewData['duties'] as $duty): ?>
-                                <?php $notesModalId = "notesModal" . $duty['duty_id']; ?>
-                                <tr>
-                                    <td><?= htmlspecialchars($duty['duty_id']); ?></td>
-                                    <td><?= htmlspecialchars($duty['appointment_id']); ?></td>
-                                    <td><?= htmlspecialchars($duty['doctor_id']); ?></td>
-                                    <td><?= htmlspecialchars($duty['bed_id']); ?></td>
-                                    <td><?= htmlspecialchars($duty['nurse_assistant']); ?></td>
-                                    <td><?= htmlspecialchars($duty['procedure']); ?></td>
-                                    <td>
-                                        <button class="btn btn-info btn-sm" data-bs-toggle="modal"
-                                            data-bs-target="#<?= $notesModalId ?>">See</button>
-                                        <!-- Notes Modal -->
-                                        <div class="modal fade" id="<?= $notesModalId ?>" tabindex="-1"
-                                            aria-hidden="true">
-                                            <div class="modal-dialog modal-dialog-centered">
-                                                <div class="modal-content">
-                                                    <div class="modal-header">
-                                                        <h5 class="modal-title">Notes</h5>
-                                                        <button type="button" class="btn-close"
-                                                            data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        <pre><?= htmlspecialchars($duty['notes']); ?></pre>
+                                    <?php foreach ($viewData['duties'] as $duty): ?>
+                                        <?php $notesModalId = "notesModal" . $duty['duty_id']; ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($duty['duty_id']); ?></td>
+                                            <td><?= htmlspecialchars($duty['bed_id']); ?></td>
+                                            <td><?= htmlspecialchars($duty['patient_name']); ?></td>
+                                            <td><?= htmlspecialchars($duty['nurse_assistant']); ?></td>
+                                            <td><?= htmlspecialchars($duty['procedure']); ?></td>
+                                            <td>
+                                                <button class="btn btn-info btn-sm" data-bs-toggle="modal"
+                                                    data-bs-target="#<?= $notesModalId ?>">See</button>
+                                                <!-- Notes Modal -->
+                                                <div class="modal fade" id="<?= $notesModalId ?>" tabindex="-1"
+                                                    aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header">
+                                                                <h5 class="modal-title">Notes</h5>
+                                                                <button type="button" class="btn-close"
+                                                                    data-bs-dismiss="modal"></button>
+                                                            </div>
+                                                            <div class="modal-body">
+                                                                <pre><?= htmlspecialchars($duty['notes']); ?></pre>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td><?= htmlspecialchars($duty['status']); ?></td>
-                                    <td><?= htmlspecialchars($duty['created_at']); ?></td>
-                                    <td>
-                                        <a href="doctor_duty.php?complete_duty_id=<?= urlencode($duty['duty_id']); ?>"
-                                            class="btn btn-success btn-sm"
-                                            onclick="return confirm('Mark this duty as completed?');">
-                                            Mark as Completed
-                                        </a>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
+                                            </td>
+                                          <td>
+                                            <?php if (!empty($duty['lab_result'])): ?>
+                                                <?php if (empty($duty['lab_received_by'])): ?>
+                                                    <form method="POST" action="accept_result.php" style="display:inline;">
+                                                        <!-- ✅ Use correct key name from your query -->
+                                                        <input type="hidden" name="result_id" 
+                                                            value="<?= htmlspecialchars($duty['resultID'] ?? $duty['result_id'] ?? '') ?>">
+                                                        
+                                                        <button type="submit" class="btn btn-primary btn-sm">
+                                                            Accept Result
+                                                        </button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <button class="btn btn-success btn-sm view-result-btn" 
+        data-appointmentid="<?= htmlspecialchars($duty['appointment_id']) ?>">
+    View Result
+</button>
+
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <span class="text-muted">No result yet</span>
+                                            <?php endif; ?>
+                                        </td>
+                                            <td><?= htmlspecialchars($duty['status']); ?></td>
+                                            <td>
+                                                <a href="doctor_duty.php?complete_duty_id=<?= urlencode($duty['duty_id']); ?>"
+                                                    class="btn btn-success btn-sm"
+                                                    onclick="return confirm('Mark this duty as completed?');">
+                                                    Mark as Completed
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
                                 <?php else: ?>
-                                <tr>
-                                    <td colspan="10" class="text-center">No duties found.</td>
-                                </tr>
+                                    <tr>
+                                        <td colspan="10" class="text-center">No duties found.</td>
+                                    </tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
-
                     </div>
-
+                    <!-- VIEW MODAL RESULT -->
+                    <div class="modal fade" id="resultModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalTitle">Laboratory Result</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="resultContent">
+        <p class="text-center text-muted">Loading results...</p>
+      </div>
+    </div>
+  </div>
+</div>
 
                     <!-- Prescriptions Tab -->
                     <div class="tab-pane fade" id="prescriptions" role="tabpanel">
@@ -855,9 +958,9 @@ $nurses = $controller->getAllNurses();
                                                         required>
                                                         <option value="">-- Select Patient --</option>
                                                         <?php foreach ($patients as $pat): ?>
-                                                        <option value="<?= $pat['patient_id'] ?>">
-                                                            <?= htmlspecialchars($pat['fname'] . ' ' . $pat['lname']) ?>
-                                                        </option>
+                                                            <option value="<?= $pat['patient_id'] ?>">
+                                                                <?= htmlspecialchars($pat['fname'] . ' ' . $pat['lname']) ?>
+                                                            </option>
                                                         <?php endforeach; ?>
                                                     </select>
                                                 </div>
@@ -871,11 +974,11 @@ $nurses = $controller->getAllNurses();
                                                                 required>
                                                                 <option value="">-- Select Medicine --</option>
                                                                 <?php foreach ($medicines as $med): ?>
-                                                                <option value="<?= htmlspecialchars($med['med_id']) ?>"
-                                                                    data-dosage="<?= htmlspecialchars($med['dosage']) ?>"
-                                                                    data-stock="<?= htmlspecialchars($med['stock_quantity'] ?? 0) ?>">
-                                                                    <?= htmlspecialchars($med['med_name'] . ' (' . $med['dosage'] . ')') ?>
-                                                                </option>
+                                                                    <option value="<?= htmlspecialchars($med['med_id']) ?>"
+                                                                        data-dosage="<?= htmlspecialchars($med['dosage']) ?>"
+                                                                        data-stock="<?= htmlspecialchars($med['stock_quantity'] ?? 0) ?>">
+                                                                        <?= htmlspecialchars($med['med_name'] . ' (' . $med['dosage'] . ')') ?>
+                                                                    </option>
                                                                 <?php endforeach; ?>
                                                             </select>
                                                             <input type="hidden" class="dosage-input" name="dosage[]">
@@ -939,22 +1042,22 @@ $nurses = $controller->getAllNurses();
                                 </thead>
                                 <tbody>
                                     <?php if (!empty($prescriptionsByDoctor)): ?>
-                                    <?php foreach ($prescriptionsByDoctor as $p): ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars($p['prescription_id']); ?></td>
-                                        <td><?= htmlspecialchars($p['doctor_name']); ?></td>
-                                        <td><?= htmlspecialchars($p['patient_name']); ?></td>
-                                        <td><?= $p['medicines_list']; ?></td>
-                                        <td><?= htmlspecialchars($p['total_quantity']); ?></td>
-                                        <td><?= htmlspecialchars($p['note']); ?></td>
-                                        <td><?= htmlspecialchars($p['formatted_date']); ?></td>
-                                        <td><?= htmlspecialchars($p['status']); ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
+                                        <?php foreach ($prescriptionsByDoctor as $p): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($p['prescription_id']); ?></td>
+                                                <td><?= htmlspecialchars($p['doctor_name']); ?></td>
+                                                <td><?= htmlspecialchars($p['patient_name']); ?></td>
+                                                <td><?= $p['medicines_list']; ?></td>
+                                                <td><?= htmlspecialchars($p['total_quantity']); ?></td>
+                                                <td><?= htmlspecialchars($p['note']); ?></td>
+                                                <td><?= htmlspecialchars($p['formatted_date']); ?></td>
+                                                <td><?= htmlspecialchars($p['status']); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
                                     <?php else: ?>
-                                    <tr>
-                                        <td colspan="8" class="text-center">No prescriptions found.</td>
-                                    </tr>
+                                        <tr>
+                                            <td colspan="8" class="text-center">No prescriptions found.</td>
+                                        </tr>
                                     <?php endif; ?>
                                 </tbody>
                             </table>
@@ -969,97 +1072,120 @@ $nurses = $controller->getAllNurses();
 
 
             <script>
-            // Update medicine info and validate quantity
-            function updateMedicineInfo(selectElem) {
-                let selected = selectElem.options[selectElem.selectedIndex];
-                let dosage = selected.getAttribute('data-dosage') || '';
-                let stock = selected.getAttribute('data-stock') || '0';
+                // Update medicine info and validate quantity
+                function updateMedicineInfo(selectElem) {
+                    let selected = selectElem.options[selectElem.selectedIndex];
+                    let dosage = selected.getAttribute('data-dosage') || '';
+                    let stock = selected.getAttribute('data-stock') || '0';
 
-                let row = selectElem.closest('.medicine-row');
-                row.querySelector('.dosage-input').value = dosage;
-                row.querySelector('.stock-display').value = stock;
+                    let row = selectElem.closest('.medicine-row');
+                    row.querySelector('.dosage-input').value = dosage;
+                    row.querySelector('.stock-display').value = stock;
 
-                // Remove old input listener to prevent stacking
-                let qtyInput = row.querySelector('input[name="quantity[]"]');
-                let newQtyInput = qtyInput.cloneNode(true);
-                qtyInput.parentNode.replaceChild(newQtyInput, qtyInput);
+                    // Remove old input listener to prevent stacking
+                    let qtyInput = row.querySelector('input[name="quantity[]"]');
+                    let newQtyInput = qtyInput.cloneNode(true);
+                    qtyInput.parentNode.replaceChild(newQtyInput, qtyInput);
 
-                newQtyInput.addEventListener('input', function() {
-                    let currentStock = parseInt(row.querySelector('.stock-display').value) || 0;
-                    let enteredQty = parseInt(this.value);
+                    newQtyInput.addEventListener('input', function() {
+                        let currentStock = parseInt(row.querySelector('.stock-display').value) || 0;
+                        let enteredQty = parseInt(this.value);
 
-                    if (!isNaN(enteredQty) && enteredQty > currentStock) {
-                        alert("Entered quantity exceeds available stock (" + currentStock + ")");
-                        this.value = currentStock;
-                    }
-                });
-
-                updateMedicineOptions(); // refresh options to disable already selected medicines
-            }
-
-            // Disable already selected medicines in all rows
-            function updateMedicineOptions() {
-                let selectedValues = Array.from(document.querySelectorAll('.medicine-select'))
-                    .map(sel => sel.value)
-                    .filter(val => val !== '');
-
-                document.querySelectorAll('.medicine-select').forEach(sel => {
-                    Array.from(sel.options).forEach(option => {
-                        if (option.value !== '' && option.value !== sel.value) {
-                            option.disabled = selectedValues.includes(option.value);
+                        if (!isNaN(enteredQty) && enteredQty > currentStock) {
+                            alert("Entered quantity exceeds available stock (" + currentStock + ")");
+                            this.value = currentStock;
                         }
                     });
-                });
-            }
 
-            // Bind existing medicine selects
-            document.querySelectorAll('.medicine-select').forEach(sel => {
-                sel.addEventListener('change', function() {
-                    updateMedicineInfo(this);
-                });
-            });
+                    updateMedicineOptions(); // refresh options to disable already selected medicines
+                }
 
-            // Add new medicine row
-            document.getElementById('addMedicine').addEventListener('click', function() {
-                let newRow = document.querySelector('.medicine-row').cloneNode(true);
+                // Disable already selected medicines in all rows
+                function updateMedicineOptions() {
+                    let selectedValues = Array.from(document.querySelectorAll('.medicine-select'))
+                        .map(sel => sel.value)
+                        .filter(val => val !== '');
 
-                // Clear inputs and selects
-                newRow.querySelectorAll('input').forEach(input => input.value = '');
-                newRow.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
+                    document.querySelectorAll('.medicine-select').forEach(sel => {
+                        Array.from(sel.options).forEach(option => {
+                            if (option.value !== '' && option.value !== sel.value) {
+                                option.disabled = selectedValues.includes(option.value);
+                            }
+                        });
+                    });
+                }
 
-                document.getElementById('medicineRows').appendChild(newRow);
-
-                // Re-bind events for the new row
-                let newSelect = newRow.querySelector('.medicine-select');
-                newSelect.addEventListener('change', function() {
-                    updateMedicineInfo(this);
-                });
-
-                newRow.querySelector('.remove-medicine').addEventListener('click', function() {
-                    newRow.remove();
-                    updateMedicineOptions(); // re-enable removed medicine
+                // Bind existing medicine selects
+                document.querySelectorAll('.medicine-select').forEach(sel => {
+                    sel.addEventListener('change', function() {
+                        updateMedicineInfo(this);
+                    });
                 });
 
-                updateMedicineOptions(); // refresh options for all rows
-            });
+                // Add new medicine row
+                document.getElementById('addMedicine').addEventListener('click', function() {
+                    let newRow = document.querySelector('.medicine-row').cloneNode(true);
 
-            // Remove medicine row buttons
-            document.querySelectorAll('.remove-medicine').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    this.closest('.medicine-row').remove();
-                    updateMedicineOptions();
+                    // Clear inputs and selects
+                    newRow.querySelectorAll('input').forEach(input => input.value = '');
+                    newRow.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
+
+                    document.getElementById('medicineRows').appendChild(newRow);
+
+                    // Re-bind events for the new row
+                    let newSelect = newRow.querySelector('.medicine-select');
+                    newSelect.addEventListener('change', function() {
+                        updateMedicineInfo(this);
+                    });
+
+                    newRow.querySelector('.remove-medicine').addEventListener('click', function() {
+                        newRow.remove();
+                        updateMedicineOptions(); // re-enable removed medicine
+                    });
+
+                    updateMedicineOptions(); // refresh options for all rows
                 });
-            });
+
+                // Remove medicine row buttons
+                document.querySelectorAll('.remove-medicine').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        this.closest('.medicine-row').remove();
+                        updateMedicineOptions();
+                    });
+                });
             </script>
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
     </div>
     <script>
-    const toggler = document.querySelector(".toggler-btn");
-    toggler.addEventListener("click", function() {
-        document.querySelector("#sidebar").classList.toggle("collapsed");
-    });
+        const toggler = document.querySelector(".toggler-btn");
+        toggler.addEventListener("click", function() {
+            document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+        document.querySelectorAll(".view-result-btn").forEach(button => {
+  button.addEventListener("click", function() {
+    const appointmentID = this.dataset.appointmentid;
+    if (!appointmentID) return alert("❌ Missing appointment ID.");
+
+    const modalEl = document.getElementById("resultModal");
+    const modal = new bootstrap.Modal(modalEl);
+    document.getElementById("modalTitle").innerText = `Appointment Results #${appointmentID}`;
+    document.getElementById("resultContent").innerHTML = "<p class='text-center text-muted'>Loading results...</p>";
+    modal.show();
+
+    fetch(`get_result.php?appointmentID=${appointmentID}`)
+      .then(res => res.text())
+      .then(data => {
+        document.getElementById("resultContent").innerHTML = data;
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById("resultContent").innerHTML = "<p class='text-danger'>⚠️ Error loading results.</p>";
+      });
+  });
+});
+
     </script>
     <script src="../../assets/Bootstrap/all.min.js"></script>
     <script src="../../assets/Bootstrap/bootstrap.bundle.min.js"></script>
