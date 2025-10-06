@@ -24,6 +24,19 @@ if (!$user) die("User not found.");
 $department = !empty($user['department']) ? $user['department'] : 'N/A';
 $department_id = $user['role'] ?? null;
 
+// --- Fetch budget info ---
+$current_month = date('Y-m'); // YYYY-MM
+$budget_stmt = $pdo->prepare("SELECT * FROM department_budgets WHERE user_id=? AND month=? AND status='Approved'");
+$budget_stmt->execute([$user_id, $current_month]);
+$budget = $budget_stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$budget) {
+    $budget = [
+        "allocated_budget" => 0,
+        "requested_amount" => 0,
+        "approved_amount" => 0
+    ];
+}
 
 // --- CART ---
 if (!isset($_SESSION['cart'])) {
