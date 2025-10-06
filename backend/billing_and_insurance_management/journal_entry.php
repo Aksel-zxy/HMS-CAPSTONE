@@ -225,8 +225,6 @@ $total_draft = $total_entries - $total_posted;
         <select name="module" id="module" required>
           <option value="billing">Patient Billing</option>
           <option value="insurance">Insurance</option>
-          <option value="supply">Supply</option>
-          <option value="general">General</option>
         </select>
       </div>
 
