@@ -7,22 +7,14 @@ $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 // ✅ If no patient selected — show list of patients with completed services
 if ($patient_id <= 0) {
 
-    // Check if 'finalized' column exists
-    $colCheck = $conn->query("SHOW COLUMNS FROM billing_items LIKE 'finalized'");
-    $hasFinalizedCol = ($colCheck && $colCheck->num_rows > 0);
-
-    // Build query dynamically (avoid SQL error)
     $sql = "
         SELECT DISTINCT p.patient_id,
                CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name
         FROM patientinfo p
         INNER JOIN dl_results dr ON p.patient_id = dr.patientID
         WHERE dr.status='Completed'
+        ORDER BY p.lname ASC, p.fname ASC
     ";
-    if ($hasFinalizedCol) {
-        $sql .= " AND p.patient_id NOT IN (SELECT DISTINCT patient_id FROM billing_items WHERE finalized=1)";
-    }
-    $sql .= " ORDER BY p.lname ASC, p.fname ASC";
 
     $patients = $conn->query($sql);
     ?>
@@ -103,19 +95,22 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $res = $stmt->get_result();
+
     while ($r = $res->fetch_assoc()) {
         $services = explode(",", $r['result']);
         foreach ($services as $srvName) {
             $srvName = trim($srvName);
             if ($srvName == "") continue;
+
             $stmt2 = $conn->prepare("SELECT * FROM dl_services WHERE serviceName=? LIMIT 1");
             $stmt2->bind_param("s", $srvName);
             $stmt2->execute();
             $srv = $stmt2->get_result()->fetch_assoc();
+
             if ($srv) {
                 $exists = false;
                 foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                    if ($c['serviceName'] == $srv['serviceName'] && $c['description'] == $srv['description']) {
+                    if ($c['serviceName'] == $srv['serviceName']) {
                         $exists = true;
                         break;
                     }
@@ -137,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
         if ($srv) {
             $exists = false;
             foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                if ($c['serviceName'] == $srv['serviceName'] && $c['description'] == $srv['description']) {
+                if ($c['serviceName'] == $srv['serviceName']) {
                     $exists = true;
                     break;
                 }
@@ -174,35 +169,18 @@ $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 $discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
 
-// ✅ Get services already billed
+// ✅ Get services already billed from billing_items table (no billing table)
 $billed_services = [];
-$stmt = $conn->prepare("SELECT service_id FROM billing_items WHERE patient_id=?");
-$stmt->bind_param("i", $patient_id);
+$stmt = $conn->prepare("SELECT item_description FROM billing_items WHERE item_type='Service'");
 $stmt->execute();
 $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) {
-    $billed_services[] = $row['service_id'];
+    $billed_services[] = trim($row['item_description']);
 }
 
-// ✅ Get services already in cart
-$cart_services = array_column($cart, 'serviceID');
-
-// ✅ Fetch all services except billed/in-cart
-$exclude = array_merge($billed_services, $cart_services);
-$sql = "SELECT * FROM dl_services";
-if (count($exclude) > 0) {
-    $placeholders = implode(",", array_fill(0, count($exclude), "?"));
-    $sql .= " WHERE serviceID NOT IN ($placeholders)";
-}
-$sql .= " ORDER BY serviceName ASC";
-
-$stmt = $conn->prepare($sql);
-if (count($exclude) > 0) {
-    $bind_types = str_repeat("i", count($exclude));
-    $stmt->bind_param($bind_types, ...$exclude);
-}
-$stmt->execute();
-$allServices = $stmt->get_result();
+// ✅ Get available services
+$sql = "SELECT * FROM dl_services ORDER BY serviceName ASC";
+$allServices = $conn->query($sql);
 ?>
 <!DOCTYPE html>
 <html lang="en">
