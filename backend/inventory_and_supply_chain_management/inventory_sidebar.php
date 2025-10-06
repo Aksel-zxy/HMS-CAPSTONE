@@ -84,9 +84,12 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
                         <div class="dropdown-container" style="<?= $isPOActive ? 'display:block;' : 'display:none;' ?>">
                             <a href="purchase-order"
                                 class="<?= $currentPage=='purchase-order'?'active-link':'' ?>">Purchase Order</a>
+                            <a href="department-request"
+                                class="<?= $currentPage=='department-request'?'active-link':'' ?>">Department Request</a>
                             <a href="purchase-request"
                                 class="<?= $currentPage=='purchase-request'?'active-link':'' ?>">Purchase Request</a>
-                            <a href="order-receive" class="<?= $currentPage=='order-receive'?'active-link':'' ?>">Goods
+                            <a href="order-receive" 
+                                class="<?= $currentPage=='order-receive'?'active-link':'' ?>">Goods
                                 Receipt & Verification</a>
                             <a href="po-status" class="<?= $currentPage=='po-status'?'active-link':'' ?>">PO Status
                                 Tracking</a>
