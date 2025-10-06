@@ -557,7 +557,7 @@ $nurses = $controller->getAllNurses();
                                     <th>Purpose</th>
                                     <th>Status</th>
                                     <th>Notes</th>
-                                    <th>Doctor ID</th>
+
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -571,7 +571,7 @@ $nurses = $controller->getAllNurses();
                                     <td><?= htmlspecialchars($appt['purpose']); ?></td>
                                     <td><?= htmlspecialchars($appt['status']); ?></td>
                                     <td><?= htmlspecialchars($appt['notes']); ?></td>
-                                    <td><?= htmlspecialchars($appt['doctor_id']); ?></td>
+
                                     <td>
                                         <a href="doctor_duty.php?manage_id=<?= urlencode($appt['appointment_id']); ?>"
                                             class="btn btn-primary btn-sm">Manage</a>
