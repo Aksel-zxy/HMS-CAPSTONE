@@ -1,18 +1,21 @@
 <?php
 include '../../SQL/config.php';
 
-// ✅ Fetch patients who have finalized billing items but no fully paid receipt yet
+// Fetch patients with finalized billing items not yet paid
 $sql = "
 SELECT 
     p.patient_id,
     CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
     ir.status AS insurance_status,
     (
-        SELECT pr.billing_id
-        FROM patient_receipt pr
-        WHERE pr.patient_id = p.patient_id
-        AND (pr.status IS NULL OR pr.status != 'Paid')
-        ORDER BY pr.billing_id DESC
+        SELECT bi.billing_id
+        FROM billing_items bi
+        LEFT JOIN patient_receipt pr 
+            ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
+        WHERE bi.patient_id = p.patient_id
+        AND bi.finalized = 1
+        AND pr.receipt_id IS NULL
+        ORDER BY bi.billing_id DESC
         LIMIT 1
     ) AS billing_id
 FROM patientinfo p
@@ -25,9 +28,12 @@ LEFT JOIN insurance_requests ir
     )
 WHERE EXISTS (
     SELECT 1
-    FROM patient_receipt pr
-    WHERE pr.patient_id = p.patient_id
-    AND (pr.status IS NULL OR pr.status != 'Paid')
+    FROM billing_items bi
+    LEFT JOIN patient_receipt pr 
+        ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
+    WHERE bi.patient_id = p.patient_id
+    AND bi.finalized = 1
+    AND pr.receipt_id IS NULL
 )
 ORDER BY p.lname ASC, p.fname ASC
 ";
@@ -41,38 +47,21 @@ $result = $conn->query($sql);
   <title>Patient Billing</title>
   <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="assets/CSS/patient_billing.css">
   <style>
-    body {
-      background: #f5f5f5;
-    }
-    .container {
-      margin-left: 250px;
-      padding: 20px;
-    }
-    .tooltip-icon { 
-      color: #0d6efd; 
-      cursor: pointer; 
-      font-size: 1.2rem; 
-    }
-    .pending-insurance { 
-      background-color: #fff3cd !important; 
-    }
-    .table th, .table td {
-      vertical-align: middle;
-    }
-    .btn-sm { padding: 6px 10px; }
+    .tooltip-icon { color: #0d6efd; cursor: pointer; font-size: 1.2rem; }
+    .pending-insurance { background-color: #fff3cd !important; }
   </style>
 </head>
-<body class="p-4">
+<body class="p-4" style="background:#f5f5f5;">
 
 <div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
 
 <div class="container bg-white p-4 rounded shadow">
-  <h1 class="mb-4">Patient Billing</h1>
-
-  <table class="table table-bordered table-striped align-middle">
+  <h1>Patient Billing</h1>
+  <table class="table table-bordered table-striped">
     <thead class="table-dark">
       <tr>
         <th>Patient Name</th>
@@ -85,8 +74,13 @@ $result = $conn->query($sql);
         <?php while ($row = $result->fetch_assoc()): ?>
           <?php 
               $insuranceStatus = $row['insurance_status'] ?? 'N/A';
+
+              // Disable only if Pending. If N/A or Approved/Rejected, allow bill if billing_id exists
               $disableBill = ($insuranceStatus === 'Pending') || empty($row['billing_id']); 
+              
+              // Show Insurance Request button only if no insurance record at all
               $showInsuranceButton = ($insuranceStatus === 'N/A'); 
+              
               $rowClass = $insuranceStatus === 'Pending' ? 'pending-insurance' : '';
           ?>
           <tr class="<?= $rowClass ?>">
@@ -105,17 +99,20 @@ $result = $conn->query($sql);
             <td class="text-end">
               <div class="d-flex justify-content-end gap-2 align-items-center flex-wrap">
                 <?php if ($insuranceStatus === 'Pending'): ?>
+                    <!-- Disable if insurance is pending -->
                     <button class="btn btn-success btn-sm" disabled>Generate Bill</button>
                     <i class="bi bi-question-circle-fill tooltip-icon" 
                        data-bs-toggle="tooltip" 
                        data-bs-placement="top" 
                        title="Cannot generate bill until insurance request is resolved."></i>
                 <?php elseif (!empty($row['billing_id'])): ?>
+                    <!-- Allow generate bill -->
                     <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>&billing_id=<?= $row['billing_id']; ?>" 
                        class="btn btn-success btn-sm">
                        Generate Bill
                     </a>
                 <?php else: ?>
+                    <!-- No bill exists -->
                     <button class="btn btn-secondary btn-sm" disabled>No Bill Available</button>
                 <?php endif; ?>
 

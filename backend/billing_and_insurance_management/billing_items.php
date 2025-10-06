@@ -4,18 +4,17 @@ include '../../SQL/config.php';
 
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 
-// ✅ If no patient selected — show list of patients with completed services
+// Show patients with completed services if no patient selected
 if ($patient_id <= 0) {
-
     $sql = "
         SELECT DISTINCT p.patient_id,
                CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name
         FROM patientinfo p
         INNER JOIN dl_results dr ON p.patient_id = dr.patientID
         WHERE dr.status='Completed'
+          AND p.patient_id NOT IN (SELECT DISTINCT patient_id FROM billing_items WHERE finalized=1)
         ORDER BY p.lname ASC, p.fname ASC
     ";
-
     $patients = $conn->query($sql);
     ?>
     <!DOCTYPE html>
@@ -24,23 +23,16 @@ if ($patient_id <= 0) {
         <meta charset="UTF-8">
         <title>Select Patient for Billing</title>
         <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-        <style>
-            .container { margin-left: 250px; padding: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { padding: 10px; border-bottom: 1px solid #ccc; }
-            th { background: #f8f9fa; }
-            .text-end { text-align: right; }
-        </style>
     </head>
     <body class="p-4 bg-light">
 
-    <div class="main-sidebar">
-        <?php include 'billing_sidebar.php'; ?>
-    </div>
+<div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
+</div>
 
     <div class="container bg-white p-4 rounded shadow">
-        <h2 class="mb-4">Select Patient for Billing</h2>
-        <table class="table table-bordered table-hover">
+        <h2>Select Patient for Billing</h2>
+        <table class="table table-bordered">
             <thead class="table-dark">
                 <tr>
                     <th>Patient Name</th>
@@ -69,14 +61,14 @@ if ($patient_id <= 0) {
     exit;
 }
 
-// ✅ Load patient info
+// Load patient
 $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
 if (!$patient) die("Patient not found.");
 
-// ✅ Compute age
+// Compute age
 $dob = $patient['dob'];
 $age = 0;
 if (!empty($dob) && $dob != '0000-00-00') {
@@ -85,7 +77,7 @@ if (!empty($dob) && $dob != '0000-00-00') {
     $age = $today->diff($birth)->y;
 }
 
-// ✅ Initialize billing cart
+// Initialize billing cart
 if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $_SESSION['billing_cart'][$patient_id] = [];
 
@@ -95,22 +87,19 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $res = $stmt->get_result();
-
     while ($r = $res->fetch_assoc()) {
         $services = explode(",", $r['result']);
         foreach ($services as $srvName) {
             $srvName = trim($srvName);
             if ($srvName == "") continue;
-
             $stmt2 = $conn->prepare("SELECT * FROM dl_services WHERE serviceName=? LIMIT 1");
             $stmt2->bind_param("s", $srvName);
             $stmt2->execute();
             $srv = $stmt2->get_result()->fetch_assoc();
-
             if ($srv) {
                 $exists = false;
                 foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                    if ($c['serviceName'] == $srv['serviceName']) {
+                    if ($c['serviceName'] == $srv['serviceName'] && $c['description'] == $srv['description']) {
                         $exists = true;
                         break;
                     }
@@ -121,7 +110,7 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
     }
 }
 
-// ✅ Add service
+// Add service
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
     $service_id = intval($_POST['service_id']);
     if ($service_id > 0) {
@@ -132,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
         if ($srv) {
             $exists = false;
             foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                if ($c['serviceName'] == $srv['serviceName']) {
+                if ($c['serviceName'] == $srv['serviceName'] && $c['description'] == $srv['description']) {
                     $exists = true;
                     break;
                 }
@@ -144,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
     exit;
 }
 
-// ✅ Delete service
+// Delete service
 if (isset($_GET['delete'])) {
     $index = intval($_GET['delete']);
     if (isset($_SESSION['billing_cart'][$patient_id][$index])) {
@@ -155,32 +144,50 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// ✅ Toggle PWD dynamically
+// Toggle PWD dynamically via checkbox
 if (isset($_GET['toggle_pwd'])) {
     $_SESSION['is_pwd'][$patient_id] = ($_GET['toggle_pwd'] == 1) ? 1 : 0;
     header("Location: billing_items.php?patient_id=$patient_id");
     exit;
 }
 
-// ✅ Compute totals
+// Compute totals
 $cart = $_SESSION['billing_cart'][$patient_id];
 $subtotal = array_sum(array_column($cart, 'price'));
 $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 $discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
 
-// ✅ Get services already billed from billing_items table (no billing table)
+// Get services already billed (exclude them)
 $billed_services = [];
-$stmt = $conn->prepare("SELECT item_description FROM billing_items WHERE item_type='Service'");
+$stmt = $conn->prepare("SELECT service_id FROM billing_items WHERE patient_id=?");
+$stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $res = $stmt->get_result();
 while ($row = $res->fetch_assoc()) {
-    $billed_services[] = trim($row['item_description']);
+    $billed_services[] = $row['service_id'];
 }
 
-// ✅ Get available services
-$sql = "SELECT * FROM dl_services ORDER BY serviceName ASC";
-$allServices = $conn->query($sql);
+// Get services already in cart (exclude them too)
+$cart_services = array_column($cart, 'serviceID');
+
+// Fetch all services EXCEPT billed or in cart
+$placeholders = implode(",", array_fill(0, count($billed_services) + count($cart_services), "?"));
+$sql = "SELECT * FROM dl_services";
+if (!empty($placeholders)) {
+    $sql .= " WHERE serviceID NOT IN ($placeholders)";
+}
+$sql .= " ORDER BY serviceName ASC";
+
+$stmt = $conn->prepare($sql);
+$bind_types = str_repeat("i", count($billed_services) + count($cart_services));
+$params = array_merge($billed_services, $cart_services);
+if (!empty($params)) {
+    $stmt->bind_param($bind_types, ...$params);
+}
+$stmt->execute();
+$allServices = $stmt->get_result();
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -188,12 +195,8 @@ $allServices = $conn->query($sql);
 <meta charset="UTF-8">
 <title>Billing Items</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-<style>
-.container { margin-left: 250px; padding: 20px; }
-.table th, .table td { vertical-align: middle; }
-.text-end { text-align: right; }
-.text-center { text-align: center; }
-</style>
+<link rel="stylesheet" href="assets/CSS/billing_items.css">
+
 <script>
 function togglePWD(checkbox){
     let val = checkbox.checked ? 1 : 0;
@@ -204,13 +207,13 @@ function togglePWD(checkbox){
 <body class="p-4 bg-light">
 
 <div class="main-sidebar">
-    <?php include 'billing_sidebar.php'; ?>
+<?php include 'billing_sidebar.php'; ?>
 </div>
 
 <div class="container bg-white p-4 rounded shadow">
-    <h2 class="mb-4">Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
+    <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
 
-    <!-- ✅ PWD Checkbox -->
+    <!-- PWD Checkbox -->
     <div class="mb-3">
         <label>
             <input type="checkbox" <?= ($age >= 60) ? 'disabled' : '' ?> <?= $is_pwd ? 'checked' : '' ?> onchange="togglePWD(this)">
@@ -221,21 +224,20 @@ function togglePWD(checkbox){
         <?php endif; ?>
     </div>
 
-    <!-- ✅ Add Service -->
-    <form method="POST" class="mb-3 d-flex gap-2">
-        <select name="service_id" class="form-select" required>
-            <option value="">-- Select Service --</option>
-            <?php while ($srv = $allServices->fetch_assoc()): ?>
-                <option value="<?= $srv['serviceID'] ?>">
-                    <?= htmlspecialchars($srv['serviceName']) ?> - <?= htmlspecialchars($srv['description']) ?> - ₱<?= number_format($srv['price'],2) ?>
-                </option>
-            <?php endwhile; ?>
-        </select>
-        <button type="submit" name="add_service" class="btn btn-primary">Add</button>
-    </form>
+   <!-- Add Service -->
+<form method="POST" class="mb-3 d-flex gap-2">
+    <select name="service_id" class="form-select" required>
+        <option value="">-- Select Service --</option>
+        <?php while ($srv = $allServices->fetch_assoc()): ?>
+            <option value="<?= $srv['serviceID'] ?>">
+                <?= htmlspecialchars($srv['serviceName']) ?> - <?= htmlspecialchars($srv['description']) ?> - ₱<?= number_format($srv['price'],2) ?>
+            </option>
+        <?php endwhile; ?>
+    </select>
+    <button type="submit" name="add_service" class="btn btn-primary">Add</button>
+</form>
 
-    <!-- ✅ Billing Table -->
-    <table class="table table-bordered table-hover">
+    <table class="table table-bordered">
         <thead class="table-dark">
             <tr>
                 <th>Service</th>
@@ -259,9 +261,9 @@ function togglePWD(checkbox){
     </table>
 
     <div class="text-end mt-3">
-        <p>Subtotal: ₱<?= number_format($subtotal,2) ?></p>
-        <p>Discount: -₱<?= number_format($discount,2) ?></p>
-        <h5><strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong></h5>
+        Subtotal: ₱<?= number_format($subtotal,2) ?><br>
+        Discount: -₱<?= number_format($discount,2) ?><br>
+        <strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong>
     </div>
 
     <div class="mt-4 d-flex justify-content-between">
