@@ -57,8 +57,8 @@ if (isset($_GET['export'])) {
     header('Content-Disposition: attachment; filename="journal_entry_' . $entry_id . '.csv"');
     $out = fopen("php://output", "w");
 
-    fputcsv($out, ["Journal Entry ID", "Date", "Reference", "Status", "Created By", "Module", "Description"]);
-    fputcsv($out, [$entry['entry_id'], $entry['entry_date'], $entry['reference'], $entry['status'], $entry['created_by'], $entry['module'], $entry['description']]);
+    fputcsv($out, ["Journal Entry ID", "Date", "Reference Type", "Reference ID", "Description", "Created At"]);
+    fputcsv($out, [$entry['entry_id'], $entry['entry_date'], $entry['reference_type'], $entry['reference_id'], $entry['description'], $entry['created_at']]);
     fputcsv($out, []); // blank line
     fputcsv($out, ["Line ID", "Account Name", "Debit", "Credit", "Description"]);
 
@@ -136,8 +136,9 @@ th { background: #f8f9fa; }
 <div class="container">
   <h1>Journal Entry Lines - Entry #<?= $entry['entry_id'] ?></h1>
   <p><strong>Date:</strong> <?= htmlspecialchars($entry['entry_date']) ?> |
-     <strong>Status:</strong> <?= htmlspecialchars($entry['status']) ?> |
-     <strong>Reference:</strong> <?= htmlspecialchars($entry['reference']) ?></p>
+     <strong>Reference:</strong> <?= htmlspecialchars($entry['reference_type']) ?> #<?= htmlspecialchars($entry['reference_id']) ?></p>
+  <p><strong>Description:</strong> <?= htmlspecialchars($entry['description']) ?></p>
+  <p><strong>Created At:</strong> <?= htmlspecialchars($entry['created_at']) ?></p>
 
   <div class="actions" style="margin:15px 0;">
     <button id="openAddModal" class="btn-primary">+ Add Line</button>
