@@ -82,16 +82,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: " . BASE_URL . "backend/superadmin_dashboard.php");
                 break;
             case '1':
-                header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php");
+                header("Location: " . BASE_URL . "backend/hr_management/admin_dashboard.php");
                 break;
             case '2':
                 header("Location: " . BASE_URL . "backend/doctor_and_nurse_management/doctor_dashboard.php");
                 break;
             case '3':
-                header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php");
+                header("Location: " . BASE_URL . "backend/patient_management/patient_dashboard.php");
                 break;
             case '4':
-                header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php");
+                header("Location: " . BASE_URL . "backend/billing_and_insurance_management/billing_dashboard.php");
                 break;
             case '5':
                 header("Location: " . BASE_URL . "backend/pharmacy_management/pharmacy_dashboard.php");
@@ -100,10 +100,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: " . BASE_URL . "backend/laboratory_and_diagnostic_management/labtech_dashboard.php");
                 break;
             case '7':
-                header("Location: " . BASE_URL . "backend/Inventory and Supply Chain Management/inventory_dashboard.php");
+                header("Location: " . BASE_URL . "backend/inventory_and_supply_chain_management/inventory_dashboard.php");
                 break;
             case '8':
-                header("Location: " . BASE_URL . "backend/Report and Analytics/report_dashboard.php");
+                header("Location: " . BASE_URL . "backend/report_and_analytics/report_dashboard.php");
                 break;
             default:
                 header("Location: " . BASE_URL . "backend/login.php?error=Invalid role.");
