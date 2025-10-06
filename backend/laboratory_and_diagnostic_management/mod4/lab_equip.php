@@ -158,7 +158,7 @@ if (!$user) {
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
