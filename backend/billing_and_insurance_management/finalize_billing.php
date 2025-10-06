@@ -38,31 +38,45 @@ $total_out_of_pocket = $grand_total;
 
 // Begin transaction
 $conn->begin_transaction();
-try {
-    // Generate a new billing_id
-    $res = $conn->query("SELECT IFNULL(MAX(billing_id),0)+1 AS new_id FROM billing_items");
-    $billing_id = $res->fetch_assoc()['new_id'];
 
-    // Save each service in billing_items
+try {
+    /*
+     * STEP 1: Create billing record first
+     * (This table must have AUTO_INCREMENT on billing_id)
+     */
+    $stmt = $conn->prepare("
+        INSERT INTO billing_records (patient_id, total_amount, created_at)
+        VALUES (?, ?, NOW())
+    ");
+    $stmt->bind_param("id", $patient_id, $grand_total);
+    $stmt->execute();
+    $billing_id = $conn->insert_id; // ✅ Get the new billing_id
+
+    /*
+     * STEP 2: Insert each service item into billing_items
+     */
     $stmt = $conn->prepare("
         INSERT INTO billing_items 
-        (patient_id, service_id, service_name, discount, created_at, finalized, total_price, billing_id)
-        VALUES (?,?,?,?, NOW(), 1, ?, ?)
+        (billing_id, item_type, item_description, quantity, unit_price, total_price)
+        VALUES (?, 'Service', ?, 1, ?, ?)
     ");
-    foreach ($cart as $srv) {
-        $srv_id = $srv['serviceID'];
-        $srv_name = $srv['serviceName'];
-        $srv_discount = ($is_pwd && $age < 60) ? ($srv['price'] * 0.20) : 0;
-        $total_price = $srv['price'] - $srv_discount;
 
-        $stmt->bind_param("iisddi", $patient_id, $srv_id, $srv_name, $srv_discount, $total_price, $billing_id);
+    foreach ($cart as $srv) {
+        $srv_desc = $srv['serviceName'] . ' - ' . $srv['description'];
+        $unit_price = $srv['price'];
+        $total_price = $unit_price - (($is_pwd && $age < 60) ? ($unit_price * 0.20) : 0);
+
+        $stmt->bind_param("isdd", $billing_id, $srv_desc, $unit_price, $total_price);
         $stmt->execute();
     }
 
-    // Save summary into patient_receipt
+    /*
+     * STEP 3: Save patient receipt summary
+     */
     $stmt = $conn->prepare("
         INSERT INTO patient_receipt
-        (patient_id, billing_id, total_charges, total_discount, total_out_of_pocket, grand_total, billing_date, payment_method, status, transaction_id, payment_reference, is_pwd)
+        (patient_id, billing_id, total_charges, total_discount, total_out_of_pocket, grand_total, 
+         billing_date, payment_method, status, transaction_id, payment_reference, is_pwd)
         VALUES (?,?,?,?,?,?, CURDATE(), ?, ?, ?, ?, ?)
     ");
 
@@ -71,7 +85,6 @@ try {
     $txn = "TXN" . uniqid();
     $pay_ref = "Not Paid Yet";
 
-    // Bind parameters correctly
     $stmt->bind_param(
         "iiddddssssi",
         $patient_id,
@@ -88,30 +101,42 @@ try {
     );
     $stmt->execute();
 
-    // Auto-create Journal Entry
-    $stmt = $conn->prepare("INSERT INTO journal_entries (entry_date, reference, status, created_by) VALUES (NOW(), ?, 'Posted', 'System')");
+    /*
+     * STEP 4: Create Journal Entries
+     */
+    $stmt = $conn->prepare("
+        INSERT INTO journal_entries (entry_date, reference, status, created_by)
+        VALUES (NOW(), ?, 'Posted', 'System')
+    ");
     $ref = "BILL-" . $billing_id;
     $stmt->bind_param("s", $ref);
     $stmt->execute();
     $entry_id = $stmt->insert_id;
 
     // Debit Accounts Receivable
-    $stmt = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Accounts Receivable', ?, 0, ?)");
+    $stmt = $conn->prepare("
+        INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description)
+        VALUES (?, 'Accounts Receivable', ?, 0, ?)
+    ");
     $desc = "Patient #$patient_id Billing ID $billing_id";
     $stmt->bind_param("ids", $entry_id, $grand_total, $desc);
     $stmt->execute();
 
     // Credit Service Revenue
-    $stmt = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Service Revenue', 0, ?, ?)");
+    $stmt = $conn->prepare("
+        INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description)
+        VALUES (?, 'Service Revenue', 0, ?, ?)
+    ");
     $stmt->bind_param("ids", $entry_id, $grand_total, $desc);
     $stmt->execute();
 
-    // Commit transaction
+    // Commit all
     $conn->commit();
+
 } catch (Exception $e) {
     $conn->rollback();
     error_log("Finalize billing error: " . $e->getMessage());
-    die("Error finalizing billing.");
+    die("Error finalizing billing: " . $e->getMessage());
 }
 
 // Clear session cart
