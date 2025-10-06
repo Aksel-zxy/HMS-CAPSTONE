@@ -24,20 +24,6 @@ if (!$user) die("User not found.");
 $department = !empty($user['department']) ? $user['department'] : 'N/A';
 $department_id = $user['role'] ?? null;
 
-// --- Fetch budget info ---
-$current_month = date('Y-m'); // YYYY-MM
-$budget_stmt = $pdo->prepare("SELECT * FROM department_budgets WHERE user_id=? AND month=? AND status='Approved'");
-$budget_stmt->execute([$user_id, $current_month]);
-$budget = $budget_stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$budget) {
-    $budget = [
-        "allocated_budget" => 0,
-        "requested_amount" => 0,
-        "approved_amount" => 0
-    ];
-}
-
 // --- CART ---
 if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
@@ -88,7 +74,6 @@ if (isset($_POST['ajax'])) {
             $items = json_encode($_SESSION['cart']);
             $total_price = 0;
             foreach ($_SESSION['cart'] as $it) {
-                // ✅ Fix: If Box, don't multiply by qty for price
                 if (($it['unit_type'] ?? 'Piece') === 'Box') {
                     $total_price += $it['price'];
                 } else {
@@ -96,7 +81,6 @@ if (isset($_POST['ajax'])) {
                 }
             }
 
-            // Insert into database
             $stmt = $pdo->prepare("INSERT INTO purchase_requests 
                 (user_id, department, department_id, month, items, total_price, status, created_at) 
                 VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW())");
@@ -105,14 +89,14 @@ if (isset($_POST['ajax'])) {
                 $stmt->execute([$user_id, $department, $department_id, $current_month, $items, $total_price]);
                 $_SESSION['cart'] = [];
                 echo json_encode(["success" => true, "message" => "Purchase request sent to Admin."]);
-                exit; // ✅ prevent extra response
+                exit;
             } catch (PDOException $e) {
                 echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
-                exit; // ✅ prevent extra response
+                exit;
             }
         } else {
             echo json_encode(["success" => false, "message" => "Cart is empty."]);
-            exit; // ✅ prevent extra response
+            exit;
         }
     }
 
@@ -194,9 +178,6 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <h2>🛒 Purchase Request</h2>
         <div class="text-end">
             <h5 class="mb-1"><?= htmlspecialchars($department) ?></h5>
-            <p class="mb-0">
-                Allocated Budget: ₱<?= number_format($budget['allocated_budget'], 2) ?>
-            </p>
         </div>
     </div>
 
