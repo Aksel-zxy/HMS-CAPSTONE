@@ -24,6 +24,7 @@ if (!$user) die("User not found.");
 $department = !empty($user['department']) ? $user['department'] : 'N/A';
 $department_id = $user['role'] ?? null;
 
+
 // --- CART ---
 if (!isset($_SESSION['cart'])) {
     $_SESSION['cart'] = [];
@@ -74,6 +75,7 @@ if (isset($_POST['ajax'])) {
             $items = json_encode($_SESSION['cart']);
             $total_price = 0;
             foreach ($_SESSION['cart'] as $it) {
+                // ✅ Fix: If Box, don't multiply by qty for price
                 if (($it['unit_type'] ?? 'Piece') === 'Box') {
                     $total_price += $it['price'];
                 } else {
@@ -81,6 +83,7 @@ if (isset($_POST['ajax'])) {
                 }
             }
 
+            // Insert into database
             $stmt = $pdo->prepare("INSERT INTO purchase_requests 
                 (user_id, department, department_id, month, items, total_price, status, created_at) 
                 VALUES (?, ?, ?, ?, ?, ?, 'Pending', NOW())");
@@ -89,14 +92,14 @@ if (isset($_POST['ajax'])) {
                 $stmt->execute([$user_id, $department, $department_id, $current_month, $items, $total_price]);
                 $_SESSION['cart'] = [];
                 echo json_encode(["success" => true, "message" => "Purchase request sent to Admin."]);
-                exit;
+                exit; // ✅ prevent extra response
             } catch (PDOException $e) {
                 echo json_encode(["success" => false, "message" => "Database error: " . $e->getMessage()]);
-                exit;
+                exit; // ✅ prevent extra response
             }
         } else {
             echo json_encode(["success" => false, "message" => "Cart is empty."]);
-            exit;
+            exit; // ✅ prevent extra response
         }
     }
 
@@ -178,6 +181,7 @@ $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
         <h2>🛒 Purchase Request</h2>
         <div class="text-end">
             <h5 class="mb-1"><?= htmlspecialchars($department) ?></h5>
+            
         </div>
     </div>
 
