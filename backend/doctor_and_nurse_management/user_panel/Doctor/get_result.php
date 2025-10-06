@@ -61,9 +61,9 @@ while ($schedule = $resSchedules->fetch_assoc()) {
         background-color: #fff;
         box-shadow: 0 0 8px rgba(0,0,0,0.15);
     '>
-        <h2 style='text-align:center; margin:0; font-size:1.5rem;'>PANMED MEDICAL AND LABORATORY SERVICES</h2>
-        <p style='text-align:center; font-size:0.9rem; margin:5px 0;'>Unit A-B, Quirino Highway, Corner Tancinco Drive Greenfields 1, Subd. Novaliches Quezon City</p>
-        <p style='text-align:center; font-size:0.9rem; margin:5px 0;'>DOH LICENSE NO. 13-0527-25-CL-2</p>
+        <h2 style='text-align:center; margin:0; font-size:1.5rem;'>Dr. Eduardo V. Roquero Memorial Hospital</h2>
+        <p style='text-align:center; font-size:0.9rem; margin:5px 0;'> Purok 7, Area F, Brgy.San Pedro, City of San Jose Del Monte, Bulacan</p>
+        <p style='text-align:center; font-size:0.9rem; margin:5px 0;'>DOH LICENSE NO. -------------</p>
         <hr style='border: 1.5px solid #000; margin: 15px 0;'>
 
         <table style='width:100%; border-collapse:collapse; font-size:0.95rem; margin-bottom:15px;'>
@@ -150,16 +150,16 @@ while ($schedule = $resSchedules->fetch_assoc()) {
             <div>
                 <p style='margin:0;'>PROCESSED BY:</p>
                 <p style='font-weight:bold; margin:3px 0;'>JAHZEEL EVI F. LARIOSA</p>
-                <small>Medical Technologist - PRC No. 0132936</small>
+                <small>Medical Technologist - PRC No. --------</small>
             </div>
             <div>
                 <p style='margin:0;'>VALIDATED BY:</p>
                 <p style='font-weight:bold; margin:3px 0;'>CASSIE CYRIS C. FERNANDO</p>
-                <small>Medical Technologist - PRC No. 0072051</small>
+                <small>Medical Technologist - PRC No. ------------</small>
             </div>
             <div>
                 <p style='font-weight:bold; margin:0;'>ALMA N. AQUILIZAN, MD, FPSP</p>
-                <small>Pathologist - PRC No. 0094259</small>
+                <small>Pathologist - PRC No. --------------</small>
             </div>
         </div>
     </div>
