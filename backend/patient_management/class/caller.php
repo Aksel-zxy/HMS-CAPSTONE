@@ -22,16 +22,20 @@ public function callEmr($patient_id) {
 
 
 public function callHistory($patient_id) {
-    $stmt = $this->conn->prepare("SELECT * FROM p_previous_medical_records WHERE patient_id = ?");
+    $query = "SELECT * FROM p_previous_medical_records WHERE patient_id = ?";
+    $stmt = $this->conn->prepare($query);
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        return $result->fetch_assoc();
-    } else {
-        throw new Exception("No previous medical history found for patient ID: " . $patient_id);
+
+    if ($result->num_rows === 0) {
+        return null; // or return [];
     }
+
+    return $result->fetch_assoc();
 }
+
+
 
 public function callResult($patient_id) {
     $stmt = $this->conn->prepare("SELECT * FROM dl_results WHERE patient_id = ?");
