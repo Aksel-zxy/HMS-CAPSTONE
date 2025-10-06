@@ -2,131 +2,83 @@
 session_start();
 require 'db.php';
 
-// ✅ Vendor login check
+// Make sure vendor is logged in
 if (!isset($_SESSION['vendor_id'])) {
     die("❌ You must be logged in to view this page.");
 }
 $vendor_id = $_SESSION['vendor_id'];
 
-// Status order
-$status_order = ["Processing","Packed","Shipped"];
-
-// 🔹 Handle AJAX request for modal
-if(isset($_GET['ajax'], $_GET['po_number']) && $_GET['ajax'] === "po_details") {
-    $po_number = $_GET['po_number'];
-
-    // Fetch all rows for this PO
-    $stmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE purchase_order_number = ? AND vendor_id = ?");
-    $stmt->execute([$po_number, $vendor_id]);
-    $po_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    if(!$po_rows){
-        echo "<p class='text-muted'>No items found for this PO.</p>";
-        exit;
-    }
-
-    $items = [];
-    $po_status = $po_rows[0]['status'];
-    foreach($po_rows as $row){
-        $row_items = json_decode($row['items'], true);
-        if($row_items) $items = array_merge($items, $row_items);
-    }
-
-    $current_status_index = array_search($po_status, $status_order);
-    ?>
-    <table class="table table-bordered">
-        <thead class="table-dark">
-            <tr>
-                <th>Item</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Subtotal</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php
-        $grand_total = 0;
-        foreach($items as $it):
-            $qty = isset($it['qty']) ? (int)$it['qty'] : 1;
-            $price = isset($it['price']) ? (float)$it['price'] : 0;
-            $subtotal = $qty * $price;
-            $grand_total += $subtotal;
-        ?>
-            <tr>
-                <td><?= htmlspecialchars($it['name']) ?></td>
-                <td><?= $qty ?></td>
-                <td>₱<?= number_format($price,2) ?></td>
-                <td>₱<?= number_format($subtotal,2) ?></td>
-            </tr>
-        <?php endforeach; ?>
-        <tr class="table-secondary">
-            <td colspan="3" class="text-end"><strong>Total Amount:</strong></td>
-            <td><strong>₱<?= number_format($grand_total,2) ?></strong></td>
-        </tr>
-        </tbody>
-    </table>
-
-    <!-- Status Update Form -->
-    <?php if($po_status !== "Shipped"): ?>
-    <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>" class="mt-3 po-status-form">
-        <input type="hidden" name="po_number" value="<?= htmlspecialchars($po_number) ?>">
-        <label class="form-label fw-bold">Update Status:</label>
-        <select name="status" class="form-select" required>
-            <?php
-            foreach($status_order as $i => $status):
-                $selected = ($status === $po_status) ? "selected" : "";
-                $disabled = ($i < $current_status_index || $i > $current_status_index + 1) ? "disabled" : "";
-            ?>
-                <option value="<?= $status ?>" <?= $disabled ?> <?= $selected ?>><?= $status ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit" name="update_status" class="btn btn-primary mt-3 w-100">Update Status</button>
-    </form>
-    <?php else: ?>
-        <div class="alert alert-success mt-3 text-center fw-bold">✅ PO Completed - Shipped</div>
-    <?php endif; ?>
-    <?php
-    exit;
-}
-
-// 🔹 Handle status update for entire PO
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'], $_POST['po_number'], $_POST['status'])) {
-    $po_number = $_POST['po_number'];
+// 🔹 Handle status update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'], $_POST['purchase_request_id'], $_POST['status'])) {
+    $request_id = (int)$_POST['purchase_request_id'];
     $new_status = $_POST['status'];
 
-    // Fetch all rows for this PO
-    $stmt = $pdo->prepare("SELECT status FROM vendor_orders WHERE purchase_order_number = ? AND vendor_id = ?");
-    $stmt->execute([$po_number, $vendor_id]);
-    $po_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $status_order = ["Processing", "Packed", "Shipped"];
 
-    if($po_rows){
-        $current_index = array_search($po_rows[0]['status'], $status_order);
+    // Fetch all items for this request belonging to logged-in vendor
+    $stmt = $pdo->prepare("SELECT id, status FROM vendor_orders WHERE purchase_request_id = ? AND vendor_id = ?");
+    $stmt->execute([$request_id, $vendor_id]);
+    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($orders as $order) {
+        $current_index = array_search($order['status'], $status_order);
         $new_index = array_search($new_status, $status_order);
 
-        if($new_index > $current_index){
-            // Update all rows of this PO
-            $updateStmt = $pdo->prepare("UPDATE vendor_orders SET status = ? WHERE purchase_order_number = ? AND vendor_id = ?");
-            $updateStmt->execute([$new_status, $po_number, $vendor_id]);
+        // ✅ Only allow forward movement
+        if ($new_index > $current_index) {
+            $updateStmt = $pdo->prepare("UPDATE vendor_orders SET status = ? WHERE id = ?");
+            $updateStmt->execute([$new_status, $order['id']]);
         }
     }
 
+    // Redirect to avoid resubmission and reload modal
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
 
-// 🔹 Fetch all POs for this vendor
-$poStmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE vendor_id = ? ORDER BY created_at DESC");
-$poStmt->execute([$vendor_id]);
-$poList = $poStmt->fetchAll(PDO::FETCH_ASSOC);
+/**
+ * PROCESSING ORDERS
+ */
+$ongoingStmt = $pdo->prepare("
+    SELECT pr.id AS request_id, pr.created_at AS order_time,
+           SUM(vo.quantity) AS total_qty, SUM(vo.quantity * vp.price) AS total_price,
+           MAX(vo.status) AS status
+    FROM purchase_requests pr
+    JOIN vendor_orders vo ON pr.id = vo.purchase_request_id
+    JOIN vendor_products vp ON vo.item_id = vp.id
+    WHERE vo.vendor_id = ? AND vo.status != 'Completed'
+    GROUP BY pr.id
+");
+$ongoingStmt->execute([$vendor_id]);
+$ongoingOrders = $ongoingStmt->fetchAll(PDO::FETCH_ASSOC);
+
+/**
+ * COMPLETED ORDERS
+ */
+$completedStmt = $pdo->prepare("
+    SELECT pr.id AS request_id, pr.created_at AS order_time,
+           SUM(vo.quantity) AS total_qty, SUM(vo.quantity * vp.price) AS total_price,
+           'Completed' AS status,
+           rp.paid_at, r.id AS receipt_id, rp.id AS payment_id
+    FROM purchase_requests pr
+    JOIN vendor_orders vo ON pr.id = vo.purchase_request_id
+    JOIN vendor_products vp ON vo.item_id = vp.id
+    JOIN receipts r ON r.order_id = pr.id
+    JOIN receipt_payments rp ON rp.receipt_id = r.id AND rp.status = 'Paid'
+    WHERE vo.vendor_id = ?
+    GROUP BY pr.id, rp.paid_at, r.id, rp.id
+");
+$completedStmt->execute([$vendor_id]);
+$completedOrders = $completedStmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vendor Orders</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8">
+    <title>Vendor Orders</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="assets/css/vendor_orders.css" rel="stylesheet">
 </head>
 <body>
 
@@ -134,92 +86,119 @@ $poList = $poStmt->fetchAll(PDO::FETCH_ASSOC);
     <?php include 'vendorsidebar.php'; ?>
 </div>
 
-<div class="container py-5">
-    <h2 class="mb-4">📦 Purchase Orders</h2>
-    <table class="table table-striped table-bordered">
-        <thead class="table-dark">
-            <tr>
-                <th>PO Number</th>
-                <th>Total Price</th>
-                <th>Status</th>
-                <th>View / Update</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php if(empty($poList)): ?>
-            <tr><td colspan="4" class="text-center text-muted">No purchase orders found.</td></tr>
-        <?php else: ?>
-            <?php foreach($poList as $po): ?>
-            <tr>
-                <td><?= htmlspecialchars($po['purchase_order_number']) ?></td>
-                <td>₱<?= number_format($po['total_price'],2) ?></td>
-                <td>
-                    <?php
-                    $badge = match($po['status']){
-                        'Processing'=>'warning',
-                        'Packed'=>'info',
-                        'Shipped'=>'success',
-                        default=>'secondary'
-                    };
-                    ?>
-                    <span class="badge bg-<?= $badge ?>"><?= $po['status'] ?></span>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-primary viewBtn" data-po="<?= htmlspecialchars($po['purchase_order_number']) ?>" data-bs-toggle="modal" data-bs-target="#poModal">
-                        View / Update
-                    </button>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        <?php endif; ?>
-        </tbody>
-    </table>
+<div class="main-content">
+    <h2 class="mb-4">PO Status Tracking</h2>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs" id="orderTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="ongoing-tab" data-bs-toggle="tab" data-bs-target="#ongoing" type="button" role="tab">Processing</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="completed-tab" data-bs-toggle="tab" data-bs-target="#completed" type="button" role="tab">Completed</button>
+        </li>
+    </ul>
+
+    <div class="tab-content mt-3" id="orderTabsContent">
+        <!-- Processing Orders -->
+        <div class="tab-pane fade show active" id="ongoing" role="tabpanel">
+            <table class="table table-striped table-bordered align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order Time</th>
+                        <th>Total Qty</th>
+                        <th>Total Price</th>
+                        <th>Status</th>
+                        <th>View / Update</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($ongoingOrders)): ?>
+                        <tr><td colspan="5" class="text-center text-muted">No processing orders.</td></tr>
+                    <?php else: ?>
+                        <?php foreach ($ongoingOrders as $order): ?>
+                        <tr>
+                            <td><?= $order['order_time'] ?></td>
+                            <td><?= $order['total_qty'] ?></td>
+                            <td>₱<?= number_format($order['total_price'], 2) ?></td>
+                            <td>
+                                <span class="badge bg-warning"><?= $order['status'] ?></span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-primary viewBtn" data-id="<?= $order['request_id'] ?>" data-bs-toggle="modal" data-bs-target="#orderModal">View / Update</button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Completed Orders -->
+        <div class="tab-pane fade" id="completed" role="tabpanel">
+            <table class="table table-striped table-bordered align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order Time</th>
+                        <th>Total Qty</th>
+                        <th>Total Price</th>
+                        <th>Status</th>
+                        <th>Delivered Date</th>
+                        <th>View</th>
+                        <th>Receipt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($completedOrders)): ?>
+                        <tr><td colspan="7" class="text-center text-muted">No completed orders.</td></tr>
+                    <?php else: ?>
+                        <?php foreach ($completedOrders as $order): ?>
+                        <tr>
+                            <td><?= $order['order_time'] ?></td>
+                            <td><?= $order['total_qty'] ?></td>
+                            <td>₱<?= number_format($order['total_price'], 2) ?></td>
+                            <td><span class="badge bg-success"><?= $order['status'] ?></span></td>
+                            <td><?= !empty($order['paid_at']) ? date("F d, Y h:i A", strtotime($order['paid_at'])) : '<span class="text-muted">Not recorded</span>' ?></td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary viewBtn" data-id="<?= $order['request_id'] ?>" data-bs-toggle="modal" data-bs-target="#orderModal">View</button>
+                            </td>
+                            <td>
+                                <?php if(!empty($order['payment_id'])): ?>
+                                    <a href="receipt_view.php?id=<?= $order['payment_id'] ?>" target="_blank" class="btn btn-sm btn-success">📄 View Receipt</a>
+                                <?php else: ?>
+                                    <span class="text-muted">N/A</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <!-- Modal -->
-<div class="modal fade" id="poModal" tabindex="-1" aria-hidden="true">
-<div class="modal-dialog modal-lg">
-<div class="modal-content">
-<div class="modal-header">
-<h5 class="modal-title">📋 PO Details</h5>
-<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-</div>
-<div class="modal-body" id="poDetails">
-<div class="text-center">
-    <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
+<div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Order Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="orderDetails">Loading...</div>
+        </div>
     </div>
-    <p class="mt-2">Loading...</p>
-</div>
-</div>
-</div>
-</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 $(document).on("click", ".viewBtn", function() {
-    var po_number = $(this).data("po");
-    $("#poDetails").html(`
-        <div class="text-center">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-            <p class="mt-2">Loading...</p>
-        </div>
-    `);
-
-    $.ajax({
-        url: window.location.pathname,
-        method: "GET",
-        data: { ajax: "po_details", po_number: po_number },
-        success: function(data){
-            $("#poDetails").html(data);
-        },
-        error: function(){
-            $("#poDetails").html('<div class="alert alert-danger">Error loading PO details.</div>');
-        }
+    var requestId = $(this).data("id");
+    $("#orderDetails").html("Loading...");
+    $.get("vendor_orders_modal.php", { request_id: requestId }, function(data) {
+        $("#orderDetails").html(data);
     });
 });
 </script>

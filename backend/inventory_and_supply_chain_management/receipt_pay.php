@@ -1,31 +1,51 @@
 <?php
 require 'db.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $receipt_id = intval($_POST['receipt_id']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receipt_id'])) {
+    $receipt_id = $_POST['receipt_id'];
 
+    // ✅ Check if receipt exists
     $stmt = $pdo->prepare("SELECT * FROM receipts WHERE id = ?");
     $stmt->execute([$receipt_id]);
     $receipt = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$receipt) {
-        die("❌ Receipt not found.");
+        die("❌ Invalid receipt ID.");
     }
 
-    $order_id = $receipt['order_id'];
-
-    // Mark receipt payment as Paid
-    $stmt = $pdo->prepare("UPDATE receipt_payments SET status='Paid', paid_at=NOW() WHERE receipt_id = ?");
+    // ✅ Check if already paid
+    $stmt = $pdo->prepare("SELECT * FROM receipt_payments WHERE receipt_id = ?");
     $stmt->execute([$receipt_id]);
+    $payment = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Mark vendor order as Received
-    $stmt = $pdo->prepare("UPDATE vendor_orders SET status='Received', received_at=NOW() WHERE id = ?");
-    $stmt->execute([$order_id]);
+    if ($payment) {
+        if ($payment['status'] === 'Paid') {
+            // Already paid — just redirect
+            header("Location: receipt.php?receipt_id=" . $receipt_id);
+            exit;
+        }
 
-    // Remove from order_receive table if exists
-    $stmt = $pdo->prepare("DELETE FROM order_receive WHERE vendor_order_id = ?");
-    $stmt->execute([$order_id]);
+        // Update existing payment to Paid
+        $stmt = $pdo->prepare("
+            UPDATE receipt_payments 
+            SET status = 'Paid', paid_at = NOW() 
+            WHERE receipt_id = ?
+        ");
+        $stmt->execute([$receipt_id]);
+    } else {
+        // Insert new payment record
+        $stmt = $pdo->prepare("
+            INSERT INTO receipt_payments (receipt_id, status, paid_at) 
+            VALUES (?, 'Paid', NOW())
+        ");
+        $stmt->execute([$receipt_id]);
+    }
 
-    header("Location: receipt_view.php?receipt_id=$receipt_id");
+    // 🚫 REMOVE inventory and batch updates
+    // Inventory is already updated in receive_order.php during confirmation.
+
+    // ✅ Redirect back to the receipt view
+    header("Location: receipt.php?receipt_id=" . $receipt_id);
     exit;
 }
+?>

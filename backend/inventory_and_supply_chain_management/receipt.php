@@ -18,50 +18,10 @@ if (!$receipt) {
     die("❌ Receipt not found for ID: " . htmlspecialchars($receipt_id));
 }
 
-// Fetch the original vendor order for this receipt using purchase_order_number
-$stmt = $pdo->prepare("
-    SELECT items 
-    FROM vendor_orders 
-    WHERE purchase_order_number = ? 
-    LIMIT 1
-");
-$stmt->execute([$receipt['order_id']]);
-$order = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$order) {
-    die("❌ Vendor order not found for this receipt.");
-}
-
-// Decode items JSON
-$items_json = json_decode($order['items'], true);
-
-// Prepare final items array with totals
-$items = [];
-foreach ($items_json as $item_id => $data) {
-    $quantity_received = 0;
-    $subtotal = 0;
-
-    // Find corresponding quantity received in receipt_items
-    $stmt2 = $pdo->prepare("SELECT SUM(quantity_received) as qty_sum, SUM(subtotal) as subtotal_sum 
-                            FROM receipt_items 
-                            WHERE receipt_id = ? AND item_id = ?");
-    $stmt2->execute([$receipt_id, $item_id]);
-    $received_data = $stmt2->fetch(PDO::FETCH_ASSOC);
-    if ($received_data) {
-        $quantity_received = $received_data['qty_sum'] ?? 0;
-        $subtotal = $received_data['subtotal_sum'] ?? 0;
-    }
-
-    $items[] = [
-        'item_id' => $item_id,
-        'item_name' => $data['name'],
-        'unit_type' => $data['unit_type'],
-        'pcs_per_box' => $data['pcs_per_box'] ?? null,
-        'price' => $data['price'],
-        'quantity_received' => $quantity_received,
-        'subtotal' => $subtotal > 0 ? $subtotal : ($quantity_received * $data['price'])
-    ];
-}
+// Fetch receipt items (with unit type + pcs_per_box)
+$stmt = $pdo->prepare("SELECT * FROM receipt_items WHERE receipt_id = ?");
+$stmt->execute([$receipt_id]);
+$items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch payment status
 $stmt = $pdo->prepare("SELECT * FROM receipt_payments WHERE receipt_id = ? LIMIT 1");
@@ -71,10 +31,10 @@ $payment = $stmt->fetch(PDO::FETCH_ASSOC);
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Receipt #<?= $receipt['id'] ?></title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/receipt.css">
+    <meta charset="UTF-8">
+    <title>Receipt #<?= $receipt['id'] ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/receipt.css">
 </head>
 <body class="bg-light">
 
@@ -95,16 +55,16 @@ $payment = $stmt->fetch(PDO::FETCH_ASSOC);
             <p><strong>TIN/VAT:</strong> <?= htmlspecialchars($receipt['tin_vat']) ?></p>
             <p><strong>Date Issued:</strong> <?= $receipt['created_at'] ?></p>
 
-            <!-- Purchase Order Info -->
+            <!-- Purchase Request Info -->
             <hr>
-            <p><strong>Purchase Order #:</strong> <?= htmlspecialchars($receipt['order_id']) ?></p>
+            <p><strong>Purchase Request #:</strong> <?= htmlspecialchars($receipt['order_id']) ?></p>
 
-            <!-- Items Table -->
+            <!-- Items -->
             <table class="table table-bordered mt-4">
                 <thead class="table-dark">
                     <tr>
                         <th>Item</th>
-                        <th>Quantity Received</th>
+                        <th>Quantity</th>
                         <th>Unit</th>
                         <th>Price</th>
                         <th>Subtotal</th>
