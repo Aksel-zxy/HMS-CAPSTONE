@@ -36,55 +36,44 @@ $discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
 $total_out_of_pocket = $grand_total;
 
-// Begin transaction
+// Start transaction
 $conn->begin_transaction();
 
 try {
-    /*
-     * STEP 1: Create billing record first
-     * (This table must have AUTO_INCREMENT on billing_id)
-     */
+    // Step 1: Create billing record
     $stmt = $conn->prepare("
         INSERT INTO billing_records (patient_id, total_amount, created_at)
         VALUES (?, ?, NOW())
     ");
     $stmt->bind_param("id", $patient_id, $grand_total);
     $stmt->execute();
-    $billing_id = $conn->insert_id; // ✅ Get the new billing_id
+    $billing_id = $conn->insert_id;
 
-    /*
-     * STEP 2: Insert each service item into billing_items
-     */
+    // Step 2: Insert billing items
     $stmt = $conn->prepare("
         INSERT INTO billing_items 
         (billing_id, item_type, item_description, quantity, unit_price, total_price)
         VALUES (?, 'Service', ?, 1, ?, ?)
     ");
-
     foreach ($cart as $srv) {
         $srv_desc = $srv['serviceName'] . ' - ' . $srv['description'];
         $unit_price = $srv['price'];
         $total_price = $unit_price - (($is_pwd && $age < 60) ? ($unit_price * 0.20) : 0);
-
         $stmt->bind_param("isdd", $billing_id, $srv_desc, $unit_price, $total_price);
         $stmt->execute();
     }
 
-    /*
-     * STEP 3: Save patient receipt summary
-     */
+    // Step 3: Create patient receipt
     $stmt = $conn->prepare("
         INSERT INTO patient_receipt
-        (patient_id, billing_id, total_charges, total_discount, total_out_of_pocket, grand_total, 
+        (patient_id, billing_id, total_charges, total_discount, total_out_of_pocket, grand_total,
          billing_date, payment_method, status, transaction_id, payment_reference, is_pwd)
         VALUES (?,?,?,?,?,?, CURDATE(), ?, ?, ?, ?, ?)
     ");
-
     $payment_method = "Unpaid";
     $status = "Pending";
     $txn = "TXN" . uniqid();
     $pay_ref = "Not Paid Yet";
-
     $stmt->bind_param(
         "iiddddssssi",
         $patient_id,
@@ -101,9 +90,7 @@ try {
     );
     $stmt->execute();
 
-    /*
-     * STEP 4: Create Journal Entries
-     */
+    // Step 4: Journal entry
     $stmt = $conn->prepare("
         INSERT INTO journal_entries (entry_date, reference, status, created_by)
         VALUES (NOW(), ?, 'Posted', 'System')
@@ -130,20 +117,19 @@ try {
     $stmt->bind_param("ids", $entry_id, $grand_total, $desc);
     $stmt->execute();
 
-    // Commit all
+    // Commit
     $conn->commit();
 
 } catch (Exception $e) {
     $conn->rollback();
-    error_log("Finalize billing error: " . $e->getMessage());
     die("Error finalizing billing: " . $e->getMessage());
 }
 
-// Clear session cart
+// Clear session
 unset($_SESSION['billing_cart'][$patient_id]);
 unset($_SESSION['is_pwd'][$patient_id]);
 
-// Redirect to billing summary
+// Redirect
 header("Location: billing_summary.php?patient_id=$patient_id&billing_id=$billing_id");
 exit;
 ?>
