@@ -2,6 +2,10 @@
 session_start();
 include '../../SQL/config.php';
 
+// Enable exceptions for mysqli
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
+// Get patient ID
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 if ($patient_id <= 0) die("Invalid patient ID.");
 
@@ -30,50 +34,43 @@ if (!empty($dob) && $dob != '0000-00-00') {
 // Check PWD status
 $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 
-// Compute totals
-$subtotal = array_sum(array_column($cart, 'price'));
-$discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
-$grand_total = $subtotal - $discount;
+// Compute subtotal, item discounts, and grand total
+$subtotal = 0;
+foreach ($cart as &$srv) {
+    $unit_price = $srv['price'];
+    $srv_discount = ($is_pwd && $age < 60) ? ($unit_price * 0.20) : 0; // adjust if needed
+    $srv['total_price'] = $unit_price - $srv_discount;
+    $subtotal += $srv['total_price'];
+}
+$discount = ($is_pwd && $age < 60) ? array_sum(array_column($cart, 'price')) - $subtotal : 0;
+$grand_total = $subtotal;
 
 // Begin transaction
 $conn->begin_transaction();
 try {
-    // Generate a new billing_id
-    $res = $conn->query("SELECT IFNULL(MAX(billing_id),0)+1 AS new_id FROM billing_items");
-    $billing_id = $res->fetch_assoc()['new_id'];
-
     // Insert each service into billing_items
     $stmt = $conn->prepare("
         INSERT INTO billing_items 
         (billing_id, item_type, item_description, quantity, unit_price, total_price)
         VALUES (?, 'Service', ?, 1, ?, ?)
     ");
-    foreach ($cart as $srv) {
-        $srv_name = $srv['serviceName'];
-        $unit_price = $srv['price'];
-        $srv_discount = ($is_pwd && $age < 60) ? ($unit_price * 0.20) : 0;
-        $total_price = $unit_price - $srv_discount;
 
-        $stmt->bind_param("isdd", $billing_id, $srv_name, $unit_price, $total_price);
-        $stmt->execute();
-    }
-
-    // Save summary into patient_receipt
-    $stmt = $conn->prepare("
+    // Insert into patient_receipt first to get billing_id (use AUTO_INCREMENT)
+    $stmt_receipt = $conn->prepare("
         INSERT INTO patient_receipt
-        (patient_id, billing_id, total_charges, total_discount, total_out_of_pocket, grand_total, billing_date, payment_method, status, transaction_id, payment_reference, is_pwd)
-        VALUES (?,?,?,?,?,?, CURDATE(), ?, ?, ?, ?, ?)
+        (patient_id, total_charges, total_discount, total_out_of_pocket, grand_total, billing_date, payment_method, status, transaction_id, payment_reference, is_pwd)
+        VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?)
     ");
+
     $payment_method = "Unpaid";
     $status = "Pending";
     $txn = "TXN" . uniqid();
     $pay_ref = "Not Paid Yet";
 
-    $stmt->bind_param(
-        "iiddddssssi",
+    $stmt_receipt->bind_param(
+        "idddds ss si",
         $patient_id,
-        $billing_id,
-        $subtotal,
+        array_sum(array_column($cart, 'price')),
         $discount,
         $grand_total,
         $grand_total,
@@ -83,7 +80,19 @@ try {
         $pay_ref,
         $is_pwd
     );
-    $stmt->execute();
+    $stmt_receipt->execute();
+
+    $billing_id = $conn->insert_id; // Get auto-generated billing_id
+
+    // Insert items
+    foreach ($cart as $srv) {
+        $srv_name = $srv['serviceName'];
+        $unit_price = $srv['price'];
+        $total_price = $srv['total_price'];
+
+        $stmt->bind_param("isdd", $billing_id, $srv_name, $unit_price, $total_price);
+        $stmt->execute();
+    }
 
     // Auto-create Journal Entry
     $stmt = $conn->prepare("INSERT INTO journal_entries (entry_date, reference, status, created_by) VALUES (NOW(), ?, 'Posted', 'System')");
