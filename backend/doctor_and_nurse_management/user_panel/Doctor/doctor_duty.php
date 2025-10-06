@@ -9,12 +9,15 @@ require '../../../pharmacy_management/classes/Medicine.php';
 // =========================
 // Database Wrapper
 // =========================
-class Database {
+class Database
+{
     private $conn;
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
-    public function getConnection() {
+    public function getConnection()
+    {
         return $this->conn;
     }
 }
@@ -22,12 +25,15 @@ class Database {
 // =========================
 // User (Doctor)
 // =========================
-class User {
+class User
+{
     private $conn;
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
-    public function getById($id) {
+    public function getById($id)
+    {
         $stmt = $this->conn->prepare("SELECT * FROM hr_employees WHERE employee_id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
@@ -39,13 +45,16 @@ class User {
 // =========================
 // Appointment Handling
 // =========================
-class Appointment {
+class Appointment
+{
     private $conn;
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
-    public function getUnassigned($assigned = []) {
+    public function getUnassigned($assigned = [])
+    {
         $sql = "SELECT pa.*, CONCAT(p.fname, ' ', p.lname) AS patient_name
                 FROM p_appointments pa
                 JOIN patientinfo p ON pa.patient_id = p.patient_id
@@ -60,7 +69,8 @@ class Appointment {
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
 
-    public function getDoctorId($appointment_id) {
+    public function getDoctorId($appointment_id)
+    {
         $stmt = $this->conn->prepare("SELECT doctor_id FROM p_appointments WHERE appointment_id = ?");
         $stmt->bind_param("i", $appointment_id);
         $stmt->execute();
@@ -71,7 +81,8 @@ class Appointment {
         return $doctor_id;
     }
 
-    public function update($data) {
+    public function update($data)
+    {
         $stmt = $this->conn->prepare("UPDATE p_appointments 
             SET appointment_date = ?, purpose = ?, status = ?, notes = ? WHERE appointment_id = ?");
         $stmt->bind_param("ssssi", $data['appointment_date'], $data['purpose'], $data['status'], $data['notes'], $data['appointment_id']);
@@ -82,13 +93,17 @@ class Appointment {
 // =========================
 // Duty Assignment
 // =========================
-class Duty {
+class Duty
+{
     private $conn;
-    public function __construct($conn) {
+
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
-    public function getAssignedAppointments() {
+    public function getAssignedAppointments()
+    {
         $assigned = [];
         $res = $this->conn->query("SELECT appointment_id FROM duty_assignments");
         while ($row = $res->fetch_assoc()) {
@@ -97,12 +112,33 @@ class Duty {
         return $assigned;
     }
 
-    public function getAllActive() {
-        $res = $this->conn->query("SELECT * FROM duty_assignments WHERE status != 'Completed' ORDER BY created_at DESC");
+    public function getAllActive()
+    {
+        $sql = "
+        SELECT 
+            d.*,
+            CONCAT(pat.fname, ' ', pat.lname) AS patient_name,
+            r.resultID,
+            r.result AS lab_result,
+            r.status AS lab_status,
+            r.remarks AS lab_remarks,
+            r.received_by AS lab_received_by
+        FROM duty_assignments d
+        INNER JOIN p_appointments a ON d.appointment_id = a.appointment_id
+        INNER JOIN patientinfo pat ON a.patient_id = pat.patient_id
+        LEFT JOIN dl_results r ON r.patientID = pat.patient_id
+        WHERE d.status != 'Completed'
+        ORDER BY d.created_at DESC
+    ";
+        $res = $this->conn->query($sql);
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
-
     public function save($data) {
+    // Start a transaction to ensure both operations are consistent
+    $this->conn->begin_transaction();
+
+    try {
+        // 1️⃣ Insert into duty_assignments
         $stmt = $this->conn->prepare("INSERT INTO duty_assignments 
             (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, notes, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
@@ -115,31 +151,64 @@ class Duty {
             $data['notes'],
             $data['status']
         );
-        return $stmt->execute();
-    }
+        $stmt->execute();
 
-    public function complete($duty_id) {
-        $stmt = $this->conn->prepare("UPDATE duty_assignments SET status = 'Completed', updated_at = NOW() WHERE duty_id = ?");
+        // 2️⃣ Update p_appointments table’s purpose and notes fields
+        $update = $this->conn->prepare("UPDATE p_appointments 
+            SET purpose = ?, notes = ? 
+            WHERE appointment_id = ?");
+        $update->bind_param("ssi",
+            $data['procedure'],
+            $data['notes'],
+            $data['appointment_id']
+        );
+        $update->execute();
+
+        // Commit the transaction if both queries succeed
+        $this->conn->commit();
+
+        return true;
+
+    } catch (Exception $e) {
+        // Rollback if something fails
+        $this->conn->rollback();
+        error_log("Save failed: " . $e->getMessage());
+        return false;
+    }
+}
+
+    public function complete($duty_id)
+    {
+        $stmt = $this->conn->prepare("
+            UPDATE duty_assignments 
+            SET status = 'Completed', updated_at = NOW() 
+            WHERE duty_id = ?
+        ");
         $stmt->bind_param("i", $duty_id);
         return $stmt->execute();
     }
 }
 
+
 // =========================
 // Hospital Resources
 // =========================
-class HospitalResource {
+class HospitalResource
+{
     private $conn;
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
-    public function getBeds() {
+    public function getBeds()
+    {
         $res = $this->conn->query("SELECT * FROM p_beds");
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
 
-    public function getNurses() {
+    public function getNurses()
+    {
         $res = $this->conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse' AND status = 'active'");
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
@@ -148,10 +217,12 @@ class HospitalResource {
 // =========================
 // Main Controller
 // =========================
-class DoctorDutyController {
+class DoctorDutyController
+{
     private $conn, $user, $appointment, $duty, $resources;
 
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
         $this->user = new User($conn);
         $this->appointment = new Appointment($conn);
@@ -159,7 +230,8 @@ class DoctorDutyController {
         $this->resources = new HospitalResource($conn);
     }
 
-    public function authenticate() {
+    public function authenticate()
+    {
         if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
             header('Location: ../../login.php');
             exit();
@@ -174,7 +246,8 @@ class DoctorDutyController {
         return $user;
     }
 
-    public function handleActions() {
+    public function handleActions()
+    {
         // Save duty
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
             $appointment_id = (int) $_POST['appointment_id'];
@@ -221,7 +294,8 @@ class DoctorDutyController {
         }
     }
 
-    public function getViewData() {
+    public function getViewData()
+    {
         $assigned = $this->duty->getAssignedAppointments();
         return [
             'appointments' => $this->appointment->getUnassigned($assigned),
@@ -231,16 +305,24 @@ class DoctorDutyController {
         ];
     }
 
-    public function getAllBeds() {
-    return $this->resources->getBeds();
-}
+    public function getAllBeds()
+    {
+        return $this->resources->getBeds();
+    }
 
-public function getAllNurses() {
-    return $this->resources->getNurses();
-}
+    public function getAllNurses()
+    {
+        // Get nurses and add a 'full_name' field for convenience
+        $nurses = $this->resources->getNurses();
+        foreach ($nurses as &$nurse) {
+            $nurse['full_name'] = $nurse['first_name'] . ' ' . $nurse['last_name'];
+        }
+        return $nurses;
+    }
 
-public function getAppointmentById($appointment_id) {
-    $stmt = $this->conn->prepare("
+    public function getAppointmentById($appointment_id)
+    {
+        $stmt = $this->conn->prepare("
         SELECT 
             pa.*,
             CONCAT(p.fname, ' ', p.lname) AS patient_name
@@ -249,24 +331,26 @@ public function getAppointmentById($appointment_id) {
         WHERE pa.appointment_id = ?
         LIMIT 1
     ");
-    $stmt->bind_param("i", $appointment_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    return $res->fetch_assoc();
+        $stmt->bind_param("i", $appointment_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        return $res->fetch_assoc();
+    }
 }
 
-}
 
-
-class Axl {
+class Axl
+{
     private $conn;
 
-    public function __construct($conn) {
+    public function __construct($conn)
+    {
         $this->conn = $conn;
     }
 
     // ✅ Get all prescriptions for a specific doctor (with joined data)
-    public function getPrescriptionsByDoctor($doctor_id) {
+    public function getPrescriptionsByDoctor($doctor_id)
+    {
         $sql = "
             SELECT 
                 p.prescription_id,
@@ -330,6 +414,7 @@ $prescriptionsByDoctor = $prescriptionData->getPrescriptionsByDoctor($_SESSION['
 // Example usage:
 // echo "<pre>"; print_r($viewData); echo "</pre>";
 // --- GET IDs from URL ---
+
 $manage_id = $_GET['manage_id'] ?? null;
 $edit_id = $_GET['edit_id'] ?? null;
 
@@ -663,8 +748,6 @@ $nurses = $controller->getAllNurses();
                         </div>
                         <?php endif; ?>
 
-
-
                         <?php if ($edit_id && $appointment): ?>
                         <div class="duty-modal" id="dutyModal">
                             <div class="form-container bg-white p-4 shadow rounded position-relative"
@@ -696,8 +779,15 @@ $nurses = $controller->getAllNurses();
                                     <!-- Purpose -->
                                     <div class="mb-3">
                                         <label class="form-label">Purpose</label>
-                                        <input type="text" name="purpose" class="form-control form-control-sm"
-                                            value="<?= htmlspecialchars($appointment['purpose']) ?>" required>
+                                        <select name="purpose" class="form-select form-select-sm" required>
+                                            <?php
+                                                $purposes = ["consultation", "ob-gyn", "pediatric", "psychiatric", "cardiology"];
+                                                foreach ($purposes as $purpose):
+                                                    $selected = (strcasecmp($purpose, $appointment['purpose']) == 0) ? 'selected' : '';
+                                            ?>
+                                            <option value="<?= $purpose ?>" <?= $selected ?>><?= $purpose ?></option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
 
                                     <!-- Status -->
@@ -705,10 +795,10 @@ $nurses = $controller->getAllNurses();
                                         <label class="form-label">Status</label>
                                         <select name="status" class="form-select form-select-sm" required>
                                             <?php
-                        $statuses = ["Scheduled", "Ongoing", "Completed", "Cancelled"];
-                        foreach ($statuses as $status):
-                            $selected = ($status == $appointment['status']) ? 'selected' : '';
-                    ?>
+                                                $statuses = ["Scheduled", "Ongoing", "Completed", "Cancelled"];
+                                                foreach ($statuses as $status):
+                                                    $selected = ($status == $appointment['status']) ? 'selected' : '';
+                                                ?>
                                             <option value="<?= $status ?>" <?= $selected ?>><?= $status ?></option>
                                             <?php endforeach; ?>
                                         </select>
@@ -718,8 +808,8 @@ $nurses = $controller->getAllNurses();
                                     <div class="mb-3">
                                         <label class="form-label">Notes</label>
                                         <textarea name="notes" class="form-control form-control-sm" rows="2">
-                    <?= htmlspecialchars($appointment['notes']) ?>
-                </textarea>
+                                                <?= htmlspecialchars($appointment['notes']) ?>
+                                            </textarea>
                                     </div>
 
                                     <button type="submit" name="update_appointment" class="btn btn-warning w-100 mt-2">
@@ -729,12 +819,7 @@ $nurses = $controller->getAllNurses();
                             </div>
                         </div>
                         <?php endif; ?>
-
-
-
-
                     </div>
-
 
                     <!-- Duties Tab -->
                     <div class="tab-pane fade" id="duties" role="tabpanel">
@@ -742,14 +827,13 @@ $nurses = $controller->getAllNurses();
                             <thead class="table-info">
                                 <tr>
                                     <th>Duty ID</th>
-                                    <th>Appointment ID</th>
-                                    <th>Doctor ID</th>
                                     <th>Bed ID</th>
+                                    <th>Patien Name</th>
                                     <th>Nurse Assistant</th>
                                     <th>Procedure</th>
                                     <th>Notes</th>
+                                    <th>Result</th>
                                     <th>Status</th>
-                                    <th>Created At</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -759,10 +843,22 @@ $nurses = $controller->getAllNurses();
                                 <?php $notesModalId = "notesModal" . $duty['duty_id']; ?>
                                 <tr>
                                     <td><?= htmlspecialchars($duty['duty_id']); ?></td>
-                                    <td><?= htmlspecialchars($duty['appointment_id']); ?></td>
-                                    <td><?= htmlspecialchars($duty['doctor_id']); ?></td>
                                     <td><?= htmlspecialchars($duty['bed_id']); ?></td>
-                                    <td><?= htmlspecialchars($duty['nurse_assistant']); ?></td>
+                                    <td><?= htmlspecialchars($duty['patient_name']); ?></td>
+                                    <?php
+                                    // Show nurse assistant full name using OOP
+                                    $nurseName = '';
+                                    if (!empty($duty['nurse_assistant'])) {
+                                        // Use the controller's getAllNurses() to map ID to full name
+                                        foreach ($nurses as $nurse) {
+                                            if ($nurse['employee_id'] == $duty['nurse_assistant']) {
+                                                $nurseName = htmlspecialchars($nurse['full_name']);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    ?>
+                                    <td><?= $nurseName ?: '<span class="text-muted">N/A</span>'; ?></td>
                                     <td><?= htmlspecialchars($duty['procedure']); ?></td>
                                     <td>
                                         <button class="btn btn-info btn-sm" data-bs-toggle="modal"
@@ -784,8 +880,30 @@ $nurses = $controller->getAllNurses();
                                             </div>
                                         </div>
                                     </td>
+                                    <td>
+                                        <?php if (!empty($duty['lab_result'])): ?>
+                                        <?php if (empty($duty['lab_received_by'])): ?>
+                                        <form method="POST" action="accept_result.php" style="display:inline;">
+                                            <!-- ✅ Use correct key name from your query -->
+                                            <input type="hidden" name="result_id"
+                                                value="<?= htmlspecialchars($duty['resultID'] ?? $duty['result_id'] ?? '') ?>">
+
+                                            <button type="submit" class="btn btn-primary btn-sm">
+                                                Accept Result
+                                            </button>
+                                        </form>
+                                        <?php else: ?>
+                                        <button class="btn btn-success btn-sm view-result-btn"
+                                            data-appointmentid="<?= htmlspecialchars($duty['appointment_id']) ?>">
+                                            View Result
+                                        </button>
+
+                                        <?php endif; ?>
+                                        <?php else: ?>
+                                        <span class="text-muted">No result yet</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?= htmlspecialchars($duty['status']); ?></td>
-                                    <td><?= htmlspecialchars($duty['created_at']); ?></td>
                                     <td>
                                         <a href="doctor_duty.php?complete_duty_id=<?= urlencode($duty['duty_id']); ?>"
                                             class="btn btn-success btn-sm"
@@ -802,9 +920,21 @@ $nurses = $controller->getAllNurses();
                                 <?php endif; ?>
                             </tbody>
                         </table>
-
                     </div>
-
+                    <!-- VIEW MODAL RESULT -->
+                    <div class="modal fade" id="resultModal" tabindex="-1">
+                        <div class="modal-dialog modal-xl">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="modalTitle">Laboratory Result</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body" id="resultContent">
+                                    <p class="text-center text-muted">Loading results...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- Prescriptions Tab -->
                     <div class="tab-pane fade" id="prescriptions" role="tabpanel">
@@ -1059,6 +1189,30 @@ $nurses = $controller->getAllNurses();
     const toggler = document.querySelector(".toggler-btn");
     toggler.addEventListener("click", function() {
         document.querySelector("#sidebar").classList.toggle("collapsed");
+    });
+    document.querySelectorAll(".view-result-btn").forEach(button => {
+        button.addEventListener("click", function() {
+            const appointmentID = this.dataset.appointmentid;
+            if (!appointmentID) return alert("❌ Missing appointment ID.");
+
+            const modalEl = document.getElementById("resultModal");
+            const modal = new bootstrap.Modal(modalEl);
+            document.getElementById("modalTitle").innerText = `Appointment Results #${appointmentID}`;
+            document.getElementById("resultContent").innerHTML =
+                "<p class='text-center text-muted'>Loading results...</p>";
+            modal.show();
+
+            fetch(`get_result.php?appointmentID=${appointmentID}`)
+                .then(res => res.text())
+                .then(data => {
+                    document.getElementById("resultContent").innerHTML = data;
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById("resultContent").innerHTML =
+                        "<p class='text-danger'>⚠️ Error loading results.</p>";
+                });
+        });
     });
     </script>
     <script src="../../assets/Bootstrap/all.min.js"></script>
