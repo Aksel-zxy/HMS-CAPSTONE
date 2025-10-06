@@ -4,7 +4,9 @@ include '../../SQL/config.php';
 
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 
+// -----------------------------
 // Show patients with completed services if no patient selected
+// -----------------------------
 if ($patient_id <= 0) {
     $sql = "
         SELECT DISTINCT p.patient_id,
@@ -14,7 +16,7 @@ if ($patient_id <= 0) {
         WHERE dr.status='Completed'
           AND p.patient_id NOT IN (
               SELECT DISTINCT patient_id 
-              FROM patient_receipt pr
+              FROM patient_receipt
           )
         ORDER BY p.lname ASC, p.fname ASC
     ";
@@ -28,11 +30,9 @@ if ($patient_id <= 0) {
         <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     </head>
     <body class="p-4 bg-light">
-
-<div class="main-sidebar">
-<?php include 'billing_sidebar.php'; ?>
-</div>
-
+    <div class="main-sidebar">
+        <?php include 'billing_sidebar.php'; ?>
+    </div>
     <div class="container bg-white p-4 rounded shadow">
         <h2>Select Patient for Billing</h2>
         <table class="table table-bordered">
@@ -64,7 +64,9 @@ if ($patient_id <= 0) {
     exit;
 }
 
-// Load patient
+// -----------------------------
+// Load patient data
+// -----------------------------
 $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
@@ -80,40 +82,40 @@ if (!empty($dob) && $dob != '0000-00-00') {
     $age = $today->diff($birth)->y;
 }
 
+// -----------------------------
 // Initialize billing cart
+// -----------------------------
 if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $_SESSION['billing_cart'][$patient_id] = [];
 
     // Load completed services from dl_results
-    $sql = "SELECT result FROM dl_results WHERE patientID=? AND status='Completed'";
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare("SELECT result FROM dl_results WHERE patientID=? AND status='Completed'");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $res = $stmt->get_result();
+
+    $added_services = [];
     while ($r = $res->fetch_assoc()) {
         $services = explode(",", $r['result']);
         foreach ($services as $srvName) {
             $srvName = trim($srvName);
-            if ($srvName == "") continue;
+            if ($srvName == "" || in_array($srvName, $added_services)) continue;
+
             $stmt2 = $conn->prepare("SELECT * FROM dl_services WHERE serviceName=? LIMIT 1");
             $stmt2->bind_param("s", $srvName);
             $stmt2->execute();
             $srv = $stmt2->get_result()->fetch_assoc();
             if ($srv) {
-                $exists = false;
-                foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                    if ($c['serviceName'] == $srv['serviceName'] && $c['description'] == $srv['description']) {
-                        $exists = true;
-                        break;
-                    }
-                }
-                if (!$exists) $_SESSION['billing_cart'][$patient_id][] = $srv;
+                $_SESSION['billing_cart'][$patient_id][] = $srv;
+                $added_services[] = $srvName; // prevent duplicates
             }
         }
     }
 }
 
-// Add service
+// -----------------------------
+// Add service manually
+// -----------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
     $service_id = intval($_POST['service_id']);
     if ($service_id > 0) {
@@ -124,10 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
         if ($srv) {
             $exists = false;
             foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                if ($c['serviceName'] == $srv['serviceName'] && $c['description'] == $srv['description']) {
-                    $exists = true;
-                    break;
-                }
+                if ($c['serviceID'] == $srv['serviceID']) { $exists = true; break; }
             }
             if (!$exists) $_SESSION['billing_cart'][$patient_id][] = $srv;
         }
@@ -136,7 +135,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
     exit;
 }
 
+// -----------------------------
 // Delete service
+// -----------------------------
 if (isset($_GET['delete'])) {
     $index = intval($_GET['delete']);
     if (isset($_SESSION['billing_cart'][$patient_id][$index])) {
@@ -147,50 +148,52 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// Toggle PWD dynamically via checkbox
+// -----------------------------
+// Toggle PWD
+// -----------------------------
 if (isset($_GET['toggle_pwd'])) {
     $_SESSION['is_pwd'][$patient_id] = ($_GET['toggle_pwd'] == 1) ? 1 : 0;
     header("Location: billing_items.php?patient_id=$patient_id");
     exit;
 }
 
+// -----------------------------
 // Compute totals
+// -----------------------------
 $cart = $_SESSION['billing_cart'][$patient_id];
 $subtotal = array_sum(array_column($cart, 'price'));
 $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 $discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
 
-// Get services already billed (exclude them)
+// -----------------------------
+// Fetch services not in cart or already billed
+// -----------------------------
 $billed_services = [];
 $stmt = $conn->prepare("SELECT item_id FROM billing_items WHERE patient_id=?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $res = $stmt->get_result();
-while ($row = $res->fetch_assoc()) {
-    $billed_services[] = $row['item_id'];
-}
+while ($row = $res->fetch_assoc()) { $billed_services[] = $row['item_id']; }
 
-// Get services already in cart (exclude them too)
 $cart_services = array_column($cart, 'serviceID');
+$exclude = array_merge($billed_services, $cart_services);
 
-// Fetch all services EXCEPT billed or in cart
-$placeholders = implode(",", array_fill(0, count($billed_services) + count($cart_services), "?"));
 $sql = "SELECT * FROM dl_services";
-if (!empty($placeholders)) {
+$params = [];
+$bind_types = "";
+if (!empty($exclude)) {
+    $placeholders = implode(",", array_fill(0, count($exclude), "?"));
     $sql .= " WHERE serviceID NOT IN ($placeholders)";
+    $bind_types = str_repeat("i", count($exclude));
+    $params = $exclude;
 }
 $sql .= " ORDER BY serviceName ASC";
 
 $stmt = $conn->prepare($sql);
-$bind_types = str_repeat("i", count($billed_services) + count($cart_services));
-$params = array_merge($billed_services, $cart_services);
-if (!empty($params)) {
-    $stmt->bind_param($bind_types, ...$params);
-}
+if (!empty($params)) $stmt->bind_param($bind_types, ...$params);
 $stmt->execute();
 $allServices = $stmt->get_result();
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -199,7 +202,6 @@ $allServices = $stmt->get_result();
 <title>Billing Items</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="assets/CSS/billing_items.css">
-
 <script>
 function togglePWD(checkbox){
     let val = checkbox.checked ? 1 : 0;
