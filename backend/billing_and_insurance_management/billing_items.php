@@ -5,7 +5,7 @@ include '../../SQL/config.php';
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 
 // -----------------------------
-// Show patients with completed services if no patient selected
+// Show list of patients with completed services if no patient selected
 // -----------------------------
 if ($patient_id <= 0) {
     $sql = "
@@ -65,7 +65,7 @@ if ($patient_id <= 0) {
 }
 
 // -----------------------------
-// Load patient data
+// Load patient info
 // -----------------------------
 $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
 $stmt->bind_param("i", $patient_id);
@@ -83,31 +83,42 @@ if (!empty($dob) && $dob != '0000-00-00') {
 }
 
 // -----------------------------
-// Initialize billing cart
+// Initialize session cart for patient
 // -----------------------------
 if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $_SESSION['billing_cart'][$patient_id] = [];
 
-    // Load completed services from dl_results
-    $stmt = $conn->prepare("SELECT result FROM dl_results WHERE patientID=? AND status='Completed'");
+    // Load completed services that are NOT yet billed
+    $sql = "
+        SELECT dr.result 
+        FROM dl_results dr
+        LEFT JOIN billing_items bi 
+            ON bi.item_description LIKE CONCAT('%', TRIM(dr.result), '%') 
+            AND bi.item_type='Service'
+        WHERE dr.patientID=? AND dr.status='Completed'
+        GROUP BY dr.result
+    ";
+    $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $res = $stmt->get_result();
 
-    $added_services = [];
     while ($r = $res->fetch_assoc()) {
         $services = explode(",", $r['result']);
         foreach ($services as $srvName) {
             $srvName = trim($srvName);
-            if ($srvName == "" || in_array($srvName, $added_services)) continue;
-
+            if ($srvName == "") continue;
             $stmt2 = $conn->prepare("SELECT * FROM dl_services WHERE serviceName=? LIMIT 1");
             $stmt2->bind_param("s", $srvName);
             $stmt2->execute();
             $srv = $stmt2->get_result()->fetch_assoc();
             if ($srv) {
-                $_SESSION['billing_cart'][$patient_id][] = $srv;
-                $added_services[] = $srvName; // prevent duplicates
+                // Avoid duplicates in cart
+                $exists = false;
+                foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
+                    if ($c['serviceID'] == $srv['serviceID']) { $exists = true; break; }
+                }
+                if (!$exists) $_SESSION['billing_cart'][$patient_id][] = $srv;
             }
         }
     }
@@ -166,34 +177,6 @@ $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 $discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
 
-// -----------------------------
-// Fetch services not in cart or already billed
-// -----------------------------
-$billed_services = [];
-$stmt = $conn->prepare("SELECT item_id FROM billing_items WHERE patient_id=?");
-$stmt->bind_param("i", $patient_id);
-$stmt->execute();
-$res = $stmt->get_result();
-while ($row = $res->fetch_assoc()) { $billed_services[] = $row['item_id']; }
-
-$cart_services = array_column($cart, 'serviceID');
-$exclude = array_merge($billed_services, $cart_services);
-
-$sql = "SELECT * FROM dl_services";
-$params = [];
-$bind_types = "";
-if (!empty($exclude)) {
-    $placeholders = implode(",", array_fill(0, count($exclude), "?"));
-    $sql .= " WHERE serviceID NOT IN ($placeholders)";
-    $bind_types = str_repeat("i", count($exclude));
-    $params = $exclude;
-}
-$sql .= " ORDER BY serviceName ASC";
-
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($bind_types, ...$params);
-$stmt->execute();
-$allServices = $stmt->get_result();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -210,11 +193,9 @@ function togglePWD(checkbox){
 </script>
 </head>
 <body class="p-4 bg-light">
-
 <div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
-
 <div class="container bg-white p-4 rounded shadow">
     <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
 
@@ -229,18 +210,29 @@ function togglePWD(checkbox){
         <?php endif; ?>
     </div>
 
-   <!-- Add Service -->
-<form method="POST" class="mb-3 d-flex gap-2">
-    <select name="service_id" class="form-select" required>
-        <option value="">-- Select Service --</option>
-        <?php while ($srv = $allServices->fetch_assoc()): ?>
+    <!-- Add Service -->
+    <form method="POST" class="mb-3 d-flex gap-2">
+        <select name="service_id" class="form-select" required>
+            <option value="">-- Select Service --</option>
+            <?php
+            // Fetch all services that are NOT yet in cart or already billed
+            $cart_services = array_column($cart, 'serviceID');
+            $billed_services = [];
+            $res = $conn->query("SELECT DISTINCT item_description FROM billing_items WHERE patient_id=$patient_id AND item_type='Service'");
+            while ($row = $res->fetch_assoc()) $billed_services[] = $row['item_description'];
+
+            $res = $conn->query("SELECT * FROM dl_services ORDER BY serviceName ASC");
+            while ($srv = $res->fetch_assoc()):
+                if (in_array($srv['serviceID'], $cart_services)) continue;
+                if (in_array($srv['serviceName'], $billed_services)) continue;
+            ?>
             <option value="<?= $srv['serviceID'] ?>">
                 <?= htmlspecialchars($srv['serviceName']) ?> - <?= htmlspecialchars($srv['description']) ?> - ₱<?= number_format($srv['price'],2) ?>
             </option>
-        <?php endwhile; ?>
-    </select>
-    <button type="submit" name="add_service" class="btn btn-primary">Add</button>
-</form>
+            <?php endwhile; ?>
+        </select>
+        <button type="submit" name="add_service" class="btn btn-primary">Add</button>
+    </form>
 
     <table class="table table-bordered">
         <thead class="table-dark">

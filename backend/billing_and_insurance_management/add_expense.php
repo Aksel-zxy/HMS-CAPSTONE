@@ -1,4 +1,5 @@
 <?php
+session_start();
 include '../../SQL/config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -6,17 +7,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $category = $_POST['category'];
     $amount = floatval($_POST['amount']);
     $notes = $_POST['notes'];
-    $created_by = $_SESSION['username'] ?? 'System';
+    $expense_date = $_POST['expense_date'];
+    $recorded_by = $_SESSION['username'] ?? 'System';
 
     if ($amount <= 0) {
         die("Expense amount must be positive.");
     }
 
-    // Insert expense
-    $sql = "INSERT INTO expense_logs (expense_name, category, amount, expense_date, notes, created_by) 
-            VALUES (?, ?, ?, NOW(), ?, ?)";
+    // Combine expense_name and notes into description
+    $description = $expense_name;
+    if (!empty($notes)) {
+        $description .= " - " . $notes;
+    }
+
+    // Insert into expense_logs
+    $sql = "INSERT INTO expense_logs (category, description, amount, expense_date, recorded_by) 
+            VALUES (?, ?, ?, ?, ?)";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ssiss", $expense_name, $category, $amount, $notes, $created_by);
+    $stmt->bind_param("ssdss", $category, $description, $amount, $expense_date, $recorded_by);
     $stmt->execute();
     $expense_id = $stmt->insert_id;
 
@@ -26,11 +34,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $conn->begin_transaction();
 
     try {
-        $sqlEntry = "INSERT INTO journal_entries (entry_date, reference, status, created_by) 
-                     VALUES (NOW(), ?, 'Posted', ?)";
+        // Insert journal entry
+        $description_journal = "Expense: $expense_name";
+        $reference_type = "Expense"; // enum value in your table
+        $reference_id = $expense_id;
+
+        $sqlEntry = "INSERT INTO journal_entries (entry_date, description, reference_type, reference_id) 
+                     VALUES (NOW(), ?, ?, ?)";
         $stmt = $conn->prepare($sqlEntry);
-        $ref = "EXP-" . $expense_id;
-        $stmt->bind_param("ss", $ref, $created_by);
+        $stmt->bind_param("ssi", $description_journal, $reference_type, $reference_id);
         $stmt->execute();
         $entry_id = $stmt->insert_id;
 
@@ -74,10 +86,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="container bg-white p-4 rounded shadow">
   <h2 class="mb-4">Add New Expense</h2>
 
-  <?php if (!empty($error)): ?>
-    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-  <?php endif; ?>
-
   <form method="POST">
     <div class="mb-3">
       <label class="form-label">Expense Name *</label>
@@ -96,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="mb-3">
       <label class="form-label">Expense Date *</label>
-      <input type="datetime-local" name="expense_date" class="form-control" required value="<?= date('Y-m-d\TH:i') ?>">
+      <input type="date" name="expense_date" class="form-control" required value="<?= date('Y-m-d') ?>">
     </div>
 
     <div class="mb-3">

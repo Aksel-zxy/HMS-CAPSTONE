@@ -36,11 +36,10 @@ if (isset($_GET['export_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_entry'])) {
     $entry_id = intval($_POST['entry_id']);
     $description = $_POST['description'];
-    $reference = $_POST['reference'];
-    $status = $_POST['status'];
+    $reference_type = $_POST['reference_type'] ?? 'Expense'; // default fallback
 
-    $stmt = $conn->prepare("UPDATE journal_entries SET description=?, reference=?, status=? WHERE entry_id=?");
-    $stmt->bind_param("sssi", $description, $reference, $status, $entry_id);
+    $stmt = $conn->prepare("UPDATE journal_entries SET description=?, reference_type=? WHERE entry_id=?");
+    $stmt->bind_param("ssi", $description, $reference_type, $entry_id);
     $stmt->execute();
     header("Location: journal_management.php?msg=updated");
     exit;
@@ -49,19 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_entry'])) {
 // -----------------------------
 // ✅ Fetch Filters & Data
 // -----------------------------
-$module_filter = $_GET['module'] ?? 'all';
 $date_from = $_GET['from'] ?? null;
 $date_to = $_GET['to'] ?? null;
 
 $sql = "SELECT * FROM journal_entries WHERE 1=1";
 $params = [];
 $types = "";
-
-if ($module_filter !== "all") {
-    $sql .= " AND module = ?";
-    $params[] = $module_filter;
-    $types .= "s";
-}
 
 if (!empty($date_from)) {
     $sql .= " AND entry_date >= ?";
@@ -83,8 +75,6 @@ $result = $stmt->get_result();
 $entries = $result->fetch_all(MYSQLI_ASSOC);
 
 $total_entries = count($entries);
-$total_posted = count(array_filter($entries, fn($e) => $e['status'] === 'Posted'));
-$total_draft = $total_entries - $total_posted;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -104,16 +94,6 @@ $total_draft = $total_entries - $total_posted;
     <h1>Journal Management Module</h1>
     <form method="get" class="module-controls" style="display:flex;gap:20px;">
       <div>
-        <label>Module:</label>
-        <select name="module">
-          <option value="all" <?= $module_filter=="all"?"selected":"" ?>>All</option>
-          <option value="billing" <?= $module_filter=="billing"?"selected":"" ?>>Patient Billing</option>
-          <option value="insurance" <?= $module_filter=="insurance"?"selected":"" ?>>Insurance</option>
-          <option value="supply" <?= $module_filter=="supply"?"selected":"" ?>>Supply</option>
-          <option value="general" <?= $module_filter=="general"?"selected":"" ?>>General</option>
-        </select>
-      </div>
-      <div>
         <label>From:</label>
         <input type="date" name="from" value="<?= htmlspecialchars($date_from) ?>">
         <label>To:</label>
@@ -129,10 +109,9 @@ $total_draft = $total_entries - $total_posted;
         <th>Entry ID</th>
         <th>Date</th>
         <th>Description</th>
-        <th>Reference</th>
-        <th>Module</th>
-        <th>Created By</th>
-        <th>Status</th>
+        <th>Reference Type</th>
+        <th>Reference ID</th>
+        <th>Created At</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -143,10 +122,9 @@ $total_draft = $total_entries - $total_posted;
           <td><?= $row['entry_id'] ?></td>
           <td><?= htmlspecialchars($row['entry_date']) ?></td>
           <td><?= htmlspecialchars($row['description']) ?></td>
-          <td><?= htmlspecialchars($row['reference']) ?></td>
-          <td><span class="badge <?= strtolower($row['module']) ?>"><?= ucfirst($row['module']) ?></span></td>
-          <td><?= htmlspecialchars($row['created_by']) ?></td>
-          <td><span class="status <?= strtolower($row['status']) ?>"><?= $row['status'] ?></span></td>
+          <td><?= htmlspecialchars($row['reference_type']) ?></td>
+          <td><?= htmlspecialchars($row['reference_id']) ?></td>
+          <td><?= htmlspecialchars($row['created_at']) ?></td>
           <td>
             <a href="journal_entry_line.php?entry_id=<?= $row['entry_id'] ?>" class="btn-view">View Lines</a>
             <div class="dropdown-actions">
@@ -161,15 +139,13 @@ $total_draft = $total_entries - $total_posted;
         </tr>
         <?php endforeach; ?>
       <?php else: ?>
-        <tr><td colspan="8" class="text-center">No journal entries found.</td></tr>
+        <tr><td colspan="7" class="text-center">No journal entries found.</td></tr>
       <?php endif; ?>
     </tbody>
   </table>
 
   <div class="summary">
     <div class="summary-item"><strong>Total Entries:</strong> <?= $total_entries ?></div>
-    <div class="summary-item"><strong>Posted:</strong> <?= $total_posted ?></div>
-    <div class="summary-item"><strong>Draft:</strong> <?= $total_draft ?></div>
   </div>
 </div>
 
@@ -185,14 +161,13 @@ $total_draft = $total_entries - $total_posted;
         <textarea id="edit_description" name="description" rows="3"></textarea>
       </div>
       <div class="form-group">
-        <label>Reference:</label>
-        <input type="text" id="edit_reference" name="reference">
-      </div>
-      <div class="form-group">
-        <label>Status:</label>
-        <select id="edit_status" name="status">
-          <option value="Draft">Draft</option>
-          <option value="Posted">Posted</option>
+        <label>Reference Type:</label>
+        <select id="edit_reference_type" name="reference_type">
+          <option value="Patient Billing">Patient Billing</option>
+          <option value="Insurance">Insurance</option>
+          <option value="Supply">Supply</option>
+          <option value="Expense">Expense</option>
+          <option value="Other">Other</option>
         </select>
       </div>
       <div style="display:flex;justify-content:space-between;">
@@ -221,8 +196,7 @@ $total_draft = $total_entries - $total_posted;
   function openEditModal(entry) {
     document.getElementById('edit_entry_id').value = entry.entry_id;
     document.getElementById('edit_description').value = entry.description;
-    document.getElementById('edit_reference').value = entry.reference;
-    document.getElementById('edit_status').value = entry.status;
+    document.getElementById('edit_reference_type').value = entry.reference_type;
     modal.style.display = 'flex';
   }
   function closeEditModal() { modal.style.display = 'none'; }

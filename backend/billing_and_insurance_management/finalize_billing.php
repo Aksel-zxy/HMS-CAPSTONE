@@ -34,7 +34,6 @@ $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 $subtotal = array_sum(array_column($cart, 'price'));
 $discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
-$total_out_of_pocket = $grand_total;
 
 // Begin transaction
 $conn->begin_transaction();
@@ -43,19 +42,19 @@ try {
     $res = $conn->query("SELECT IFNULL(MAX(billing_id),0)+1 AS new_id FROM billing_items");
     $billing_id = $res->fetch_assoc()['new_id'];
 
-    // Save each service in billing_items
+    // Insert each service into billing_items
     $stmt = $conn->prepare("
         INSERT INTO billing_items 
-        (patient_id, service_id, service_name, discount, created_at, finalized, total_price, billing_id)
-        VALUES (?,?,?,?, NOW(), 1, ?, ?)
+        (billing_id, item_type, item_description, quantity, unit_price, total_price)
+        VALUES (?, 'Service', ?, 1, ?, ?)
     ");
     foreach ($cart as $srv) {
-        $srv_id = $srv['serviceID'];
         $srv_name = $srv['serviceName'];
-        $srv_discount = ($is_pwd && $age < 60) ? ($srv['price'] * 0.20) : 0;
-        $total_price = $srv['price'] - $srv_discount;
+        $unit_price = $srv['price'];
+        $srv_discount = ($is_pwd && $age < 60) ? ($unit_price * 0.20) : 0;
+        $total_price = $unit_price - $srv_discount;
 
-        $stmt->bind_param("iisddi", $patient_id, $srv_id, $srv_name, $srv_discount, $total_price, $billing_id);
+        $stmt->bind_param("isdd", $billing_id, $srv_name, $unit_price, $total_price);
         $stmt->execute();
     }
 
@@ -65,20 +64,18 @@ try {
         (patient_id, billing_id, total_charges, total_discount, total_out_of_pocket, grand_total, billing_date, payment_method, status, transaction_id, payment_reference, is_pwd)
         VALUES (?,?,?,?,?,?, CURDATE(), ?, ?, ?, ?, ?)
     ");
-
     $payment_method = "Unpaid";
     $status = "Pending";
     $txn = "TXN" . uniqid();
     $pay_ref = "Not Paid Yet";
 
-    // Bind parameters correctly
     $stmt->bind_param(
         "iiddddssssi",
         $patient_id,
         $billing_id,
         $subtotal,
         $discount,
-        $total_out_of_pocket,
+        $grand_total,
         $grand_total,
         $payment_method,
         $status,
@@ -106,7 +103,6 @@ try {
     $stmt->bind_param("ids", $entry_id, $grand_total, $desc);
     $stmt->execute();
 
-    // Commit transaction
     $conn->commit();
 } catch (Exception $e) {
     $conn->rollback();
