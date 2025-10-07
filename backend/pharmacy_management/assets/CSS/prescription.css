@@ -1,0 +1,51 @@
+.custom-tabs .nav-link {
+  border: none;
+  color: #555;
+  font-weight: 500;
+  padding: 10px 20px;
+  transition: all 0.3s ease;
+}
+
+.custom-tabs .nav-link:hover {
+  background-color: #f8f9fa; /* light hover */
+  color: #0d6efd; /* bootstrap primary color */
+  border-radius: 5px 5px 0 0;
+}
+
+.custom-tabs .nav-link.active {
+  color: #0d6efd;
+  border-bottom: 2px solid #0d6efd;
+  background-color: #fff;
+  font-weight: 600;
+}
+
+.notif-badge {
+  position: absolute;
+  top: 1px;
+  right: 90px;
+  background: red;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 50%;
+}
+
+.notif-dot {
+  position: absolute;
+  top: 5px;
+  right: 118px;
+  height: 10px;
+  width: 10px;
+  background-color: red;
+  border-radius: 50%;
+}
+.expiry-dot {
+  position: absolute;
+  top: 5px;
+  right: 50px; /* adjust depending on sidebar text length */
+  height: 10px;
+  width: 10px;
+  background-color: red;
+  border-radius: 50%;
+}

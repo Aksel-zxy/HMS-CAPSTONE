@@ -37,8 +37,8 @@ $posts = $jobPost->getAllPosts();
                     <?php foreach ($posts as $row): ?>
                         <div class="job_post-item">
                             <?php if (!empty($row['image'])): ?>
-                                <img src="HR Management/Recruitment & Onboarding Module/css/pics/<?= htmlspecialchars($row['image']) ?>" alt="Job Post Image">
-                                <p style="font-size: 13px; margin-top: 5px;">
+                                <img src="hr_management/recruitment_onboarding_module/css/pics/<?= htmlspecialchars($row['image']) ?>" alt="Job Post Image">
+                                <p style="font-size: 13px; margin-top: 5px; text-align: justify;">
                                     <span style="font-weight: bold; color: black;">Profession: </span><?= htmlspecialchars($row['profession']) ?><br>
                                     <span style="font-weight: bold; color: black;">Title: </span><?= htmlspecialchars($row['title']) ?><br>
                                     <span style="font-weight: bold; color: black;">Job Position: </span><?= htmlspecialchars($row['job_position']) ?><br>
@@ -62,7 +62,7 @@ $posts = $jobPost->getAllPosts();
                     <center>
                         <h3 style="font-weight: bold;">Job Application Form</h3> 
                     </center>
-                    <form action="HR Management/Recruitment & Onboarding Module/submit_application.php" method="post" enctype="multipart/form-data">
+                    <form action="hr_management/recruitment_onboarding_module/submit_application.php" method="post" enctype="multipart/form-data">
 
                         <br />
                         <br />
@@ -110,6 +110,9 @@ $posts = $jobPost->getAllPosts();
 
                         <label for="resume">Upload Resume</label>
                         <input type="file" id="resume" name="resume" required>
+
+                        <label for="application_letter">Upload Application Letter</label>
+                        <input type="file" id="application_letter" name="application_letter" required>
 
                         <label for="government_id">Upload Goverment ID</label>
                         <input type="file" id="government_id" name="government_id" required>

@@ -110,48 +110,77 @@ class Login
     }
 
     private function processUserLogin($user, $password)
-{
-    $dbPassword = $user['password'];
+    {
+        $dbPassword = $user['password'];
 
-    if (password_verify($password, $dbPassword) || $password === $dbPassword) {
-        // Upgrade plain text passwords to hashed
-        if ($password === $dbPassword) {
-            $newHash = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $this->conn->prepare("UPDATE users SET password=? WHERE user_id=?");
-            $stmt->bind_param("si", $newHash, $user['user_id']);
-            $stmt->execute();
-        }
-        if (!empty($_COOKIE['remember_token']) && $_COOKIE['remember_token'] === $user['remember_token']) {
-            $_SESSION['user_id']   = $user['user_id'];
-            $_SESSION['username']  = $user['username'];
-            $_SESSION['role']      = $user['role'];
-            $_SESSION['otp_verified'] = true;
-            switch ($_SESSION['role']) {
-                case '0': $_SESSION['superadmin'] = true; header("Location: " . BASE_URL . "backend/superadmin_dashboard.php"); break;
-                case '1': $_SESSION['hr'] = true; header("Location: " . BASE_URL . "backend/HR Management/admin_dashboard.php"); break;
-                case '2': $_SESSION['doctor'] = true; header("Location: " . BASE_URL . "backend/Doctor and Nurse Management/doctor_dashboard.php"); break;
-                case '3': $_SESSION['patient'] = true; header("Location: " . BASE_URL . "backend/Patient Management/patient_dashboard.php"); break;
-                case '4': $_SESSION['billing'] = true; header("Location: " . BASE_URL . "backend/Billing and Insurance Management/billing_dashboard.php"); break;
-                case '5': $_SESSION['pharmacy'] = true; header("Location: " . BASE_URL . "backend/Pharmacy Management/pharmacy_dashboard.php"); break;
-                case '6': $_SESSION['labtech'] = true; header("Location: " . BASE_URL . "backend/Laboratory and Diagnostic Management/labtech_dashboard.php"); break;
-                case '7': $_SESSION['inventory'] = true; header("Location: " . BASE_URL . "backend/Inventory and Supply Chain Management/inventory_dashboard.php"); break;
-                case '8': $_SESSION['report'] = true; header("Location: " . BASE_URL . "backend/Report and Analytics/report_dashboard.php"); break;
-                default: header("Location: " . BASE_URL . "backend/login.php?error=Invalid role."); break;
+        if (password_verify($password, $dbPassword) || $password === $dbPassword) {
+            // Upgrade plain text passwords to hashed
+            if ($password === $dbPassword) {
+                $newHash = password_hash($password, PASSWORD_DEFAULT);
+                $stmt = $this->conn->prepare("UPDATE users SET password=? WHERE user_id=?");
+                $stmt->bind_param("si", $newHash, $user['user_id']);
+                $stmt->execute();
             }
-            exit;
+            if (!empty($_COOKIE['remember_token']) && $_COOKIE['remember_token'] === $user['remember_token']) {
+                $_SESSION['user_id']   = $user['user_id'];
+                $_SESSION['username']  = $user['username'];
+                $_SESSION['role']      = $user['role'];
+                $_SESSION['otp_verified'] = true;
+                switch ($_SESSION['role']) {
+                    case '0':
+                        $_SESSION['superadmin'] = true;
+                        header("Location: " . BASE_URL . "backend/superadmin_dashboard.php");
+                        break;
+                    case '1':
+                        $_SESSION['hr'] = true;
+                        header("Location: " . BASE_URL . "backend/hr_management/admin_dashboard.php");
+                        break;
+                    case '2':
+                        $_SESSION['doctor'] = true;
+                        header("Location: " . BASE_URL . "backend/doctor_and_nurse_management/doctor_dashboard.php");
+                        break;
+                    case '3':
+                        $_SESSION['patient'] = true;
+                        header("Location: " . BASE_URL . "backend/patient_management/patient_dashboard.php");
+                        break;
+                    case '4':
+                        $_SESSION['billing'] = true;
+                        header("Location: " . BASE_URL . "backend/billing_and_insurance_management/billing_dashboard.php");
+                        break;
+                    case '5':
+                        $_SESSION['pharmacy'] = true;
+                        header("Location: " . BASE_URL . "backend/pharmacy_management/pharmacy_dashboard.php");
+                        break;
+                    case '6':
+                        $_SESSION['labtech'] = true;
+                        header("Location: " . BASE_URL . "backend/laboratory_and_diagnostic_management/labtech_dashboard.php");
+                        break;
+                    case '7':
+                        $_SESSION['inventory'] = true;
+                        header("Location: " . BASE_URL . "backend/inventory_and_supply_chain_management/inventory_dashboard.php");
+                        break;
+                    case '8':
+                        $_SESSION['report'] = true;
+                        header("Location: " . BASE_URL . "backend/report_and_analytics/report_dashboard.php");
+                        break;
+                    default:
+                        header("Location: " . BASE_URL . "backend/login.php?error=Invalid role.");
+                        break;
+                }
+                exit;
+            }
+            $_SESSION['pending_user_id'] = $user['user_id'];
+            $_SESSION['pending_username'] = $user['username'];
+            $_SESSION['pending_role'] = $user['role'];
+            $_SESSION['remember_me'] = isset($_POST['remember_me']);
+            if ($this->sendOTP($user['email'])) {
+                header("Location: " . BASE_URL . "backend/assets/auth/verify_otp.php");
+                exit;
+            }
+        } else {
+            $this->error = "Incorrect password.";
         }
-        $_SESSION['pending_user_id'] = $user['user_id'];
-        $_SESSION['pending_username'] = $user['username'];
-        $_SESSION['pending_role'] = $user['role'];
-        $_SESSION['remember_me'] = isset($_POST['remember_me']);
-        if ($this->sendOTP($user['email'])) {
-            header("Location: " . BASE_URL . "backend/assets/auth/verify_otp.php");
-            exit; 
-        }
-    } else {
-        $this->error = "Incorrect password.";
     }
-}
 
     private function processEmployeeLogin($employee, $password)
     {
@@ -171,19 +200,19 @@ class Login
 
             switch ($employee['profession']) {
                 case 'Doctor':
-                    header("Location: Doctor and Nurse Management/user_panel/user_doctor.php");
+                    header("Location: doctor_and_nurse_management/user_panel/user_doctor.php");
                     break;
                 case 'Pharmacist':
-                    header("Location: Pharmacy Management/user_panel/user_pharmacist.php");
+                    header("Location: pharmacy_management/user_panel/user_pharmacist.php");
                     break;
                 case 'Nurse':
-                    header("Location: Doctor and Nurse Management/user_panel/user_nurse.php");
+                    header("Location: doctor_and_nurse_management/user_panel/user_nurse.php");
                     break;
                 case 'Accountant':
-                    header("Location: Billing and Insurance Management/user_panel/user_accountant.php");
+                    header("Location: billing_and_insurance_management/user_panel/user_accountant.php");
                     break;
                 case 'Laboratorist':
-                    header("Location: Laboratory and Diagnostic Management/user_panel/user_lab.php");
+                    header("Location: laboratory_and_diagnostic_management/user_panel/user_lab.php");
                     break;
                 default:
                     $this->error = "Unknown profession.";
@@ -211,7 +240,7 @@ class Login
             $_SESSION['username'] = $patient['username'];
             $_SESSION['profession'] = 'patient';
 
-            header("Location: Patient Management/user_panel/user_patient.php");
+            header("Location: patient_management/user_panel/user_patient.php");
             exit();
         } else {
             $this->error = "Incorrect password.";
