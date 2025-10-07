@@ -1,13 +1,74 @@
 <?php
 session_start();
-include '../../SQL/config.php';
-
-// Enable exceptions for mysqli
+require '../../SQL/config.php';
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-// Get patient ID
+// -----------------------------
+// Helper: redirect
+// -----------------------------
+function redirect($url) {
+    header("Location: $url");
+    exit;
+}
+
+// -----------------------------
+// Load patient_id if set
+// -----------------------------
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
-if ($patient_id <= 0) die("Invalid patient ID.");
+
+// -----------------------------
+// Show patient list if no patient_id
+// -----------------------------
+if ($patient_id <= 0) {
+    $patients = [];
+    $res = $conn->query("SELECT * FROM patientinfo p JOIN dl_results r ON p.patient_id = r.patientID GROUP BY p.patient_id ORDER BY p.lname, p.fname");
+    while ($row = $res->fetch_assoc()) $patients[] = $row;
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Patient List</title>
+        <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+        <link rel="stylesheet" href="assets/CSS/billing_sidebar.css">
+        <style>
+            .content-wrapper { margin-left: 250px; padding: 20px; }
+        </style>
+    </head>
+    <body style="background:#f5f5f5;">
+        <!-- Sidebar -->
+        <div class="main-sidebar">
+            <?php include 'billing_sidebar.php'; ?>
+        </div>
+
+        <div class="content-wrapper">
+            <div class="container bg-white p-4 rounded shadow">
+                <h2>Patients with Completed DL Results</h2>
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Patient Name</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($patients as $p): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($p['fname'].' '.$p['lname']) ?></td>
+                            <td>
+                                <a href="billing_items.php?patient_id=<?= $p['patient_id'] ?>" class="btn btn-primary btn-sm">View Accumulated Services</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
 
 // -----------------------------
 // Load patient info
@@ -17,9 +78,7 @@ $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
 if (!$patient) die("Patient not found.");
-
-// Compute age
-$dob = $patient['dob'];
+$dob = $patient['dob'] ?? null;
 $age = 0;
 if (!empty($dob) && $dob != '0000-00-00') {
     $birth = new DateTime($dob);
@@ -28,70 +87,47 @@ if (!empty($dob) && $dob != '0000-00-00') {
 }
 
 // -----------------------------
-// Initialize session cart for patient
+// Initialize session cart
 // -----------------------------
 if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $_SESSION['billing_cart'][$patient_id] = [];
-
-    // Load previously billed services for this patient
-    $billed_services = [];
-    $res = $conn->query("
-        SELECT ds.serviceID
-        FROM billing_items bi
-        JOIN dl_services ds ON ds.serviceName = bi.item_description
-        JOIN patient_receipt pr ON pr.billing_id = bi.billing_id
-        WHERE pr.patient_id = $patient_id
-    ");
-    while ($row = $res->fetch_assoc()) $billed_services[] = $row['serviceID'];
-
-    // Load completed services that are not yet billed
-    $stmt = $conn->prepare("SELECT result FROM dl_results WHERE patientID=? AND status='Completed'");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-
-    while ($r = $res->fetch_assoc()) {
-        $services = explode(",", $r['result']);
+    $res = $conn->prepare("SELECT result FROM dl_results WHERE patientID=? AND status='Completed'");
+    $res->bind_param("i", $patient_id);
+    $res->execute();
+    $res = $res->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $services = explode(",", $row['result']);
         foreach ($services as $srvName) {
             $srvName = trim($srvName);
             if ($srvName == "") continue;
-
             $stmt2 = $conn->prepare("SELECT * FROM dl_services WHERE serviceName=? LIMIT 1");
             $stmt2->bind_param("s", $srvName);
             $stmt2->execute();
             $srv = $stmt2->get_result()->fetch_assoc();
-            if ($srv && !in_array($srv['serviceID'], $billed_services)) {
-                // Avoid duplicates in cart
-                $exists = false;
-                foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                    if ($c['serviceID'] == $srv['serviceID']) { $exists = true; break; }
-                }
-                if (!$exists) $_SESSION['billing_cart'][$patient_id][] = $srv;
-            }
+            $stmt2->close();
+            if ($srv) $_SESSION['billing_cart'][$patient_id][] = $srv;
         }
     }
 }
 
 // -----------------------------
-// Add service manually
+// Add service
 // -----------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
     $service_id = intval($_POST['service_id']);
-    if ($service_id > 0) {
-        $stmt = $conn->prepare("SELECT * FROM dl_services WHERE serviceID=? LIMIT 1");
-        $stmt->bind_param("i", $service_id);
-        $stmt->execute();
-        $srv = $stmt->get_result()->fetch_assoc();
-        if ($srv) {
-            $exists = false;
-            foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                if ($c['serviceID'] == $srv['serviceID']) { $exists = true; break; }
-            }
-            if (!$exists) $_SESSION['billing_cart'][$patient_id][] = $srv;
+    $stmt = $conn->prepare("SELECT * FROM dl_services WHERE serviceID=? LIMIT 1");
+    $stmt->bind_param("i", $service_id);
+    $stmt->execute();
+    $srv = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if ($srv) {
+        $exists = false;
+        foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
+            if ($c['serviceID'] == $srv['serviceID']) { $exists = true; break; }
         }
+        if (!$exists) $_SESSION['billing_cart'][$patient_id][] = $srv;
     }
-    header("Location: billing_items.php?patient_id=$patient_id");
-    exit;
+    redirect("billing_items.php?patient_id=$patient_id");
 }
 
 // -----------------------------
@@ -103,24 +139,15 @@ if (isset($_GET['delete'])) {
         unset($_SESSION['billing_cart'][$patient_id][$index]);
         $_SESSION['billing_cart'][$patient_id] = array_values($_SESSION['billing_cart'][$patient_id]);
     }
-    header("Location: billing_items.php?patient_id=$patient_id");
-    exit;
-}
-
-// -----------------------------
-// Toggle PWD
-// -----------------------------
-if (isset($_GET['toggle_pwd'])) {
-    $_SESSION['is_pwd'][$patient_id] = ($_GET['toggle_pwd'] == 1) ? 1 : 0;
-    header("Location: billing_items.php?patient_id=$patient_id");
-    exit;
+    redirect("billing_items.php?patient_id=$patient_id");
 }
 
 // -----------------------------
 // Compute totals
 // -----------------------------
-$cart = $_SESSION['billing_cart'][$patient_id];
-$subtotal = array_sum(array_column($cart, 'price'));
+$cart = $_SESSION['billing_cart'][$patient_id] ?? [];
+$subtotal = 0.0;
+foreach ($cart as $c) $subtotal += (float)($c['price'] ?? 0);
 $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 $discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
@@ -130,80 +157,57 @@ $grand_total = $subtotal - $discount;
 // -----------------------------
 if (isset($_GET['finalize'])) {
     if (empty($cart)) die("No services to finalize.");
-
     $conn->begin_transaction();
     try {
-        // Insert into patient_receipt
-        $stmt_receipt = $conn->prepare("
-            INSERT INTO patient_receipt
-            (patient_id, total_charges, total_discount, total_out_of_pocket, grand_total, billing_date, payment_method, status, transaction_id, payment_reference, is_pwd)
-            VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?)
-        ");
-        $payment_method = "Unpaid";
-        $status = "Pending";
-        $txn = "TXN" . uniqid();
-        $pay_ref = "Not Paid Yet";
-
-        $stmt_receipt->bind_param(
-            "iddddssssi",
-            $patient_id,
-            $subtotal,
-            $discount,
-            $grand_total,
-            $grand_total,
-            $payment_method,
-            $status,
-            $txn,
-            $pay_ref,
-            $is_pwd
-        );
-        $stmt_receipt->execute();
+        $stmt = $conn->prepare("INSERT INTO patient_receipt (patient_id,total_charges,total_discount,total_out_of_pocket,grand_total,billing_date,payment_method,status,is_pwd) VALUES (?,?,?,?,?,CURDATE(),'Unpaid','Pending',?)");
+        $stmt->bind_param("idddi", $patient_id,$subtotal,$discount,$grand_total,$grand_total,$is_pwd);
+        $stmt->execute();
         $billing_id = $conn->insert_id;
+        $stmt->close();
 
-        // Insert into billing_items
-        $stmt_item = $conn->prepare("
-            INSERT INTO billing_items 
-            (billing_id, item_type, item_description, quantity, unit_price, total_price)
-            VALUES (?, 'Service', ?, 1, ?, ?)
-        ");
+        $stmt = $conn->prepare("INSERT INTO billing_items (billing_id,item_type,item_description,quantity,unit_price,total_price) VALUES (?,?,?,1,?,?)");
         foreach ($cart as $srv) {
-            $srv_name = $srv['serviceName'];
-            $unit_price = $srv['price'];
-            $total_price = $unit_price;
-            $stmt_item->bind_param("isdd", $billing_id, $srv_name, $unit_price, $total_price);
-            $stmt_item->execute();
+            $stmt->bind_param("issdd",$billing_id,$srv['serviceName'],$srv['serviceName'],$srv['price'],$srv['price']);
+            $stmt->execute();
         }
-
+        $stmt->close();
         $conn->commit();
-        // Clear cart
+
         unset($_SESSION['billing_cart'][$patient_id]);
         unset($_SESSION['is_pwd'][$patient_id]);
-
-        header("Location: billing_summary.php?patient_id=$patient_id&billing_id=$billing_id");
-        exit;
-
+        redirect("billing_summary.php?patient_id=$patient_id&billing_id=$billing_id");
     } catch (Exception $e) {
         $conn->rollback();
-        error_log("Finalize billing error: " . $e->getMessage());
-        die("Error finalizing billing.");
+        die("Error finalizing billing: " . $e->getMessage());
     }
 }
-
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Billing Items</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+<link rel="stylesheet" href="assets/CSS/billing_sidebar.css">
 <script>
 function togglePWD(checkbox){
     let val = checkbox.checked ? 1 : 0;
     window.location.href = "billing_items.php?patient_id=<?= $patient_id ?>&toggle_pwd=" + val;
 }
 </script>
+<style>
+.content-wrapper { margin-left: 250px; padding: 20px; }
+</style>
 </head>
-<body class="p-4 bg-light">
+<body style="background:#f5f5f5;">
+
+<!-- Sidebar -->
+<div class="main-sidebar">
+    <?php include 'billing_sidebar.php'; ?>
+</div>
+
+<div class="content-wrapper">
 <div class="container bg-white p-4 rounded shadow">
     <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
 
@@ -218,23 +222,22 @@ function togglePWD(checkbox){
     </div>
 
     <!-- Add Service -->
-    <form method="POST" class="mb-3 d-flex gap-2">
+    <form method="POST" class="mb-3 d-flex gap-2" autocomplete="off">
         <select name="service_id" class="form-select" required>
             <option value="">-- Select Service --</option>
             <?php
             $cart_services = array_column($cart, 'serviceID');
             $res = $conn->query("SELECT * FROM dl_services ORDER BY serviceName ASC");
-            while ($srv = $res->fetch_assoc()):
+            while ($srv = $res->fetch_assoc()) {
                 if (in_array($srv['serviceID'], $cart_services)) continue;
+                echo '<option value="'.$srv['serviceID'].'">'.htmlspecialchars($srv['serviceName']).' - ₱'.number_format($srv['price'],2).'</option>';
+            }
             ?>
-            <option value="<?= $srv['serviceID'] ?>">
-                <?= htmlspecialchars($srv['serviceName']) ?> - ₱<?= number_format($srv['price'],2) ?>
-            </option>
-            <?php endwhile; ?>
         </select>
         <button type="submit" name="add_service" class="btn btn-primary">Add</button>
     </form>
 
+    <!-- Cart Table -->
     <table class="table table-bordered">
         <thead class="table-dark">
             <tr>
@@ -246,8 +249,8 @@ function togglePWD(checkbox){
         <tbody>
         <?php foreach ($cart as $i => $srv): ?>
             <tr>
-                <td><?= htmlspecialchars($srv['serviceName']) ?></td>
-                <td class="text-end">₱<?= number_format($srv['price'],2) ?></td>
+                <td><?= htmlspecialchars($srv['serviceName'] ?? '') ?></td>
+                <td class="text-end">₱<?= number_format((float) ($srv['price'] ?? 0), 2) ?></td>
                 <td class="text-center">
                     <a href="billing_items.php?patient_id=<?= $patient_id ?>&delete=<?= $i ?>" class="btn btn-danger btn-sm">Delete</a>
                 </td>
@@ -263,9 +266,10 @@ function togglePWD(checkbox){
     </div>
 
     <div class="mt-4 d-flex justify-content-between">
-        <a href="billing_items.php" class="btn btn-secondary">Back</a>
+        <a href="billing_items.php" class="btn btn-secondary">Back to Patients</a>
         <a href="billing_items.php?patient_id=<?= $patient_id ?>&finalize=1" class="btn btn-success">Finalize Billing</a>
     </div>
+</div>
 </div>
 </body>
 </html>
