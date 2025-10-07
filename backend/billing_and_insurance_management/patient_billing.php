@@ -1,20 +1,13 @@
 <?php
 include '../../SQL/config.php';
 
-// ✅ Fetch patients who have finalized billing items but no fully paid receipt yet
+// Fetch patients with unpaid billing items
 $sql = "
 SELECT 
     p.patient_id,
     CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
     ir.status AS insurance_status,
-    (
-        SELECT pr.billing_id
-        FROM patient_receipt pr
-        WHERE pr.patient_id = p.patient_id
-        AND (pr.status IS NULL OR pr.status != 'Paid')
-        ORDER BY pr.billing_id DESC
-        LIMIT 1
-    ) AS billing_id
+    pr.billing_id
 FROM patientinfo p
 LEFT JOIN insurance_requests ir 
     ON p.patient_id = ir.patient_id
@@ -23,12 +16,9 @@ LEFT JOIN insurance_requests ir
         FROM insurance_requests 
         WHERE patient_id = p.patient_id
     )
-WHERE EXISTS (
-    SELECT 1
-    FROM patient_receipt pr
-    WHERE pr.patient_id = p.patient_id
-    AND (pr.status IS NULL OR pr.status != 'Paid')
-)
+LEFT JOIN patient_receipt pr 
+    ON pr.patient_id = p.patient_id AND pr.status <> 'Paid'
+WHERE pr.billing_id IS NOT NULL
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
@@ -41,38 +31,21 @@ $result = $conn->query($sql);
   <title>Patient Billing</title>
   <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="assets/CSS/patient_billing.css">
   <style>
-    body {
-      background: #f5f5f5;
-    }
-    .container {
-      margin-left: 250px;
-      padding: 20px;
-    }
-    .tooltip-icon { 
-      color: #0d6efd; 
-      cursor: pointer; 
-      font-size: 1.2rem; 
-    }
-    .pending-insurance { 
-      background-color: #fff3cd !important; 
-    }
-    .table th, .table td {
-      vertical-align: middle;
-    }
-    .btn-sm { padding: 6px 10px; }
+    .tooltip-icon { color: #0d6efd; cursor: pointer; font-size: 1.2rem; }
+    .pending-insurance { background-color: #fff3cd !important; }
   </style>
 </head>
-<body class="p-4">
+<body class="p-4" style="background:#f5f5f5;">
 
 <div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
 
 <div class="container bg-white p-4 rounded shadow">
-  <h1 class="mb-4">Patient Billing</h1>
-
-  <table class="table table-bordered table-striped align-middle">
+  <h1>Patient Billing</h1>
+  <table class="table table-bordered table-striped">
     <thead class="table-dark">
       <tr>
         <th>Patient Name</th>
@@ -126,7 +99,6 @@ $result = $conn->query($sql);
                 <?php endif; ?>
               </div>
 
-              <!-- Insurance Modal -->
               <?php if ($showInsuranceButton): ?>
               <div class="modal fade" id="insuranceModal<?= $row['patient_id'] ?>" tabindex="-1">
                 <div class="modal-dialog">
@@ -163,7 +135,7 @@ $result = $conn->query($sql);
         <?php endwhile; ?>
       <?php else: ?>
         <tr>
-          <td colspan="3" class="text-center">No patients with finalized services pending billing.</td>
+          <td colspan="3" class="text-center">No patients with unpaid billing items.</td>
         </tr>
       <?php endif; ?>
     </tbody>

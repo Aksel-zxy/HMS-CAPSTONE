@@ -1,7 +1,7 @@
 <?php
 include '../../SQL/config.php';
 
-include_once 'class/Caller.php';
+include_once 'class/caller.php';
 
 $callerobj = new Caller($conn);
 $rooms = $callerobj->callBeddings();
