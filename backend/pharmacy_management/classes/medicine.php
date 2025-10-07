@@ -206,4 +206,25 @@ class Medicine
         if (!$result) throw new Exception("Error fetching batches: " . $this->conn->error);
         return $result->fetch_all(MYSQLI_ASSOC);
     }
+    public function updateStatus($med_id, $new_status)
+    {
+        $stmt = $this->conn->prepare("
+        UPDATE pharmacy_inventory 
+        SET status = ? 
+        WHERE med_id = ?
+    ");
+
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $this->conn->error);
+        }
+
+        $stmt->bind_param("si", $new_status, $med_id);
+
+        if (!$stmt->execute()) {
+            throw new Exception("Execute failed: " . $stmt->error);
+        }
+
+        $stmt->close();
+        return true;
+    }
 }

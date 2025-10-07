@@ -1,6 +1,6 @@
 <?php
 require '../../SQL/config.php';
-require_once 'classes/Medicine.php';
+require_once 'classes/medicine.php';
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
 
