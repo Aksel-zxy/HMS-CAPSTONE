@@ -482,7 +482,6 @@ $notifCount = $notif->notifCount;
     </div>
 
     <script>
-        // Search + Filter functionality
         const searchInput = document.getElementById("searchInput");
         const statusFilter = document.getElementById("statusFilter");
 
@@ -491,34 +490,30 @@ $notifCount = $notif->notifCount;
             const filterValue = statusFilter.value;
 
             document.querySelectorAll("#medicineExpiryTable tbody tr.medicine-main").forEach(row => {
-                const medName = row.querySelector("td strong").innerText.toLowerCase();
-                const status = row.querySelector("td span").innerText.trim();
+                const medName = row.querySelector("td").innerText.toLowerCase(); // medicine name
+                const status = row.querySelector("td span").innerText.trim(); // status badge text
 
-                // check search match
+                // check search + filter
                 const matchesSearch = medName.includes(searchValue);
+                const matchesFilter = (filterValue === "All" || status === filterValue);
 
-                // check filter match
-                const matchesFilter =
-                    filterValue === "All" ||
-                    status === filterValue;
-
-                // show/hide row
                 if (matchesSearch && matchesFilter) {
-                    row.style.display = "";
+                    row.style.display = ""; // show medicine row
                 } else {
-                    row.style.display = "none";
-                    // hide batch rows if parent hidden
-                    const medNameAttr = row.dataset.medName;
-                    document.querySelectorAll(`.batch-row[data-med="${medNameAttr}"]`)
-                        .forEach(batch => batch.style.display = "none");
+                    row.style.display = "none"; // hide medicine row
                 }
+
+                // always hide batch rows here → don't reveal them by search/filter
+                const medNameAttr = row.dataset.medName;
+                document.querySelectorAll(`.batch-row[data-med="${medNameAttr}"]`)
+                    .forEach(batch => batch.style.display = "none");
             });
         }
 
-        // Listen for changes
         searchInput.addEventListener("keyup", filterTable);
         statusFilter.addEventListener("change", filterTable);
     </script>
+
 
 
     <script>

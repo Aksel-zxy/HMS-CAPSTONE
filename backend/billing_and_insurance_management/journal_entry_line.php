@@ -57,8 +57,8 @@ if (isset($_GET['export'])) {
     header('Content-Disposition: attachment; filename="journal_entry_' . $entry_id . '.csv"');
     $out = fopen("php://output", "w");
 
-    fputcsv($out, ["Journal Entry ID", "Date", "Reference", "Status", "Created By", "Module", "Description"]);
-    fputcsv($out, [$entry['entry_id'], $entry['entry_date'], $entry['reference'], $entry['status'], $entry['created_by'], $entry['module'], $entry['description']]);
+    fputcsv($out, ["Journal Entry ID", "Date", "Reference Type", "Reference ID", "Description", "Created At"]);
+    fputcsv($out, [$entry['entry_id'], $entry['entry_date'], $entry['reference_type'], $entry['reference_id'], $entry['description'], $entry['created_at']]);
     fputcsv($out, []); // blank line
     fputcsv($out, ["Line ID", "Account Name", "Debit", "Credit", "Description"]);
 
@@ -97,6 +97,7 @@ $total_credit = array_sum(array_column($lines, 'credit'));
 <title>Journal Entry Lines - Entry #<?= $entry['entry_id'] ?></title>
 <link rel="stylesheet" href="assets/CSS/journalentryline.css">
 <style>
+/* Basic styling for table and modals */
 .container { margin-left: 250px; padding: 20px; }
 table { width: 100%; border-collapse: collapse; margin-top: 10px; }
 th, td { padding: 10px; border-bottom: 1px solid #ccc; }
@@ -135,12 +136,13 @@ th { background: #f8f9fa; }
 <div class="container">
   <h1>Journal Entry Lines - Entry #<?= $entry['entry_id'] ?></h1>
   <p><strong>Date:</strong> <?= htmlspecialchars($entry['entry_date']) ?> |
-     <strong>Status:</strong> <?= htmlspecialchars($entry['status']) ?> |
-     <strong>Reference:</strong> <?= htmlspecialchars($entry['reference']) ?></p>
+     <strong>Reference:</strong> <?= htmlspecialchars($entry['reference_type']) ?> #<?= htmlspecialchars($entry['reference_id']) ?></p>
+  <p><strong>Description:</strong> <?= htmlspecialchars($entry['description']) ?></p>
+  <p><strong>Created At:</strong> <?= htmlspecialchars($entry['created_at']) ?></p>
 
   <div class="actions" style="margin:15px 0;">
     <button id="openAddModal" class="btn-primary">+ Add Line</button>
-    <button id="openExport" class="btn-secondary" onclick="window.location='?entry_id=<?= $entry_id ?>&export=1'">Export CSV</button>
+    <button class="btn-secondary" onclick="window.location='?entry_id=<?= $entry_id ?>&export=1'">Export CSV</button>
     <button id="printEntry" class="btn-secondary">Print</button>
     <a href="journal_entry.php" class="btn-secondary">Back</a>
   </div>
@@ -184,7 +186,7 @@ th { background: #f8f9fa; }
   </table>
 </div>
 
-<!-- ✅ Add Line Modal -->
+<!-- Add Line Modal -->
 <div id="addLineModal" class="modal">
   <div class="modal-content">
     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -207,7 +209,7 @@ th { background: #f8f9fa; }
   </div>
 </div>
 
-<!-- ✅ Edit Line Modal -->
+<!-- Edit Line Modal -->
 <div id="editLineModal" class="modal">
   <div class="modal-content">
     <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -236,7 +238,6 @@ th { background: #f8f9fa; }
 const addModal = document.getElementById('addLineModal');
 function closeAddModal(){ addModal.style.display='none'; }
 document.getElementById('openAddModal').onclick = () => addModal.style.display='flex';
-window.onclick = e => { if (e.target === addModal) closeAddModal(); };
 
 // ✅ Edit Modal
 const editModal = document.getElementById('editLineModal');
@@ -249,7 +250,12 @@ function openEditModal(line) {
   editModal.style.display = 'flex';
 }
 function closeEditModal(){ editModal.style.display='none'; }
-window.onclick = e => { if (e.target === editModal) closeEditModal(); };
+
+// ✅ Modal click outside to close
+window.addEventListener('click', function(e){
+  if(e.target === addModal) closeAddModal();
+  if(e.target === editModal) closeEditModal();
+});
 
 // ✅ Print
 document.getElementById('printEntry').addEventListener('click', ()=>window.print());

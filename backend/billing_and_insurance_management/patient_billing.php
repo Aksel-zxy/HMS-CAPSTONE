@@ -1,23 +1,13 @@
 <?php
 include '../../SQL/config.php';
 
-// Fetch patients with finalized billing items not yet paid
+// Fetch patients with unpaid billing items
 $sql = "
 SELECT 
     p.patient_id,
     CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
     ir.status AS insurance_status,
-    (
-        SELECT bi.billing_id
-        FROM billing_items bi
-        LEFT JOIN patient_receipt pr 
-            ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
-        WHERE bi.patient_id = p.patient_id
-        AND bi.finalized = 1
-        AND pr.receipt_id IS NULL
-        ORDER BY bi.billing_id DESC
-        LIMIT 1
-    ) AS billing_id
+    pr.billing_id
 FROM patientinfo p
 LEFT JOIN insurance_requests ir 
     ON p.patient_id = ir.patient_id
@@ -26,15 +16,9 @@ LEFT JOIN insurance_requests ir
         FROM insurance_requests 
         WHERE patient_id = p.patient_id
     )
-WHERE EXISTS (
-    SELECT 1
-    FROM billing_items bi
-    LEFT JOIN patient_receipt pr 
-        ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
-    WHERE bi.patient_id = p.patient_id
-    AND bi.finalized = 1
-    AND pr.receipt_id IS NULL
-)
+LEFT JOIN patient_receipt pr 
+    ON pr.patient_id = p.patient_id AND pr.status <> 'Paid'
+WHERE pr.billing_id IS NOT NULL
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
@@ -74,13 +58,8 @@ $result = $conn->query($sql);
         <?php while ($row = $result->fetch_assoc()): ?>
           <?php 
               $insuranceStatus = $row['insurance_status'] ?? 'N/A';
-
-              // Disable only if Pending. If N/A or Approved/Rejected, allow bill if billing_id exists
               $disableBill = ($insuranceStatus === 'Pending') || empty($row['billing_id']); 
-              
-              // Show Insurance Request button only if no insurance record at all
               $showInsuranceButton = ($insuranceStatus === 'N/A'); 
-              
               $rowClass = $insuranceStatus === 'Pending' ? 'pending-insurance' : '';
           ?>
           <tr class="<?= $rowClass ?>">
@@ -99,20 +78,17 @@ $result = $conn->query($sql);
             <td class="text-end">
               <div class="d-flex justify-content-end gap-2 align-items-center flex-wrap">
                 <?php if ($insuranceStatus === 'Pending'): ?>
-                    <!-- Disable if insurance is pending -->
                     <button class="btn btn-success btn-sm" disabled>Generate Bill</button>
                     <i class="bi bi-question-circle-fill tooltip-icon" 
                        data-bs-toggle="tooltip" 
                        data-bs-placement="top" 
                        title="Cannot generate bill until insurance request is resolved."></i>
                 <?php elseif (!empty($row['billing_id'])): ?>
-                    <!-- Allow generate bill -->
                     <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>&billing_id=<?= $row['billing_id']; ?>" 
                        class="btn btn-success btn-sm">
                        Generate Bill
                     </a>
                 <?php else: ?>
-                    <!-- No bill exists -->
                     <button class="btn btn-secondary btn-sm" disabled>No Bill Available</button>
                 <?php endif; ?>
 
@@ -123,7 +99,6 @@ $result = $conn->query($sql);
                 <?php endif; ?>
               </div>
 
-              <!-- Insurance Modal -->
               <?php if ($showInsuranceButton): ?>
               <div class="modal fade" id="insuranceModal<?= $row['patient_id'] ?>" tabindex="-1">
                 <div class="modal-dialog">
@@ -160,7 +135,7 @@ $result = $conn->query($sql);
         <?php endwhile; ?>
       <?php else: ?>
         <tr>
-          <td colspan="3" class="text-center">No patients with finalized services pending billing.</td>
+          <td colspan="3" class="text-center">No patients with unpaid billing items.</td>
         </tr>
       <?php endif; ?>
     </tbody>
