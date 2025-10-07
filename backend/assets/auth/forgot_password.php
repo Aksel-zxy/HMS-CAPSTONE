@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Send reset email
         $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
         $host = $_SERVER['HTTP_HOST']; // usually "localhost"
-        $resetLink = $protocol . $host . "/hms-capstone/backend/assets/auth/reset_password.php?token=" . $token;
+        $resetLink = $protocol . $host . "/backend/assets/auth/reset_password.php?token=" . $token;
 
         $mail = new PHPMailer(true);
         try {
