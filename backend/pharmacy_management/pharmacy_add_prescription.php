@@ -1,7 +1,7 @@
 <?php
 include '../../SQL/config.php';
-require 'classes/Prescription.php';
-require 'classes/Medicine.php';
+require 'classes/prescription.php';
+require 'classes/medicine.php';
 
 if (!isset($_SESSION['pharmacy']) || $_SESSION['pharmacy'] !== true) {
     header('Location: login.php'); // Redirect to login if not logged in

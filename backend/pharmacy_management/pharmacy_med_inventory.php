@@ -1,6 +1,6 @@
 <?php
 include '../../SQL/config.php';
-require_once 'classes/Medicine.php';
+require_once 'classes/medicine.php';
 require_once "classes/notification.php";
 
 
