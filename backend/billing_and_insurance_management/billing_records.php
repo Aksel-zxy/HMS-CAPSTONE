@@ -44,9 +44,7 @@ $result = $stmt->get_result();
 </head>
 <body class="p-4 bg-light">
 
-<div class="main-sidebar">
-    <?php include 'billing_sidebar.php'; ?>
-</div>
+
 
 <div class="container">
     <h3 class="mb-4">Patient Billing Records</h3>
@@ -116,6 +114,9 @@ $result = $stmt->get_result();
             <?php endif; ?>
         </tbody>
     </table>
+    <div class="main-sidebar">
+    <?php include 'billing_sidebar.php'; ?>
+</div>
 </div>
 </body>
 </html>

@@ -28,18 +28,26 @@ if (!empty($dob) && $dob != '0000-00-00') {
     $age = $today->diff($birth)->y;
 }
 $is_pwd = $patient['is_pwd'] ?? 0;
+$is_senior = $age >= 60 ? 1 : 0;
+
+// VAT percentage (if applicable)
+$vat_rate = 0.12; // 12%
 
 // Compute totals
 $subtotal = 0;
 $total_discount = 0;
 foreach ($cart as $srv) {
     $price = floatval($srv['price']);
-    $subtotal += $price;
-    if ($is_pwd && $age < 60) {
-        $total_discount += $price * 0.20;
+    $discount = 0;
+    if ($is_pwd || $is_senior) {
+        $discount = $price * 0.20; // 20% discount
     }
+    $subtotal += $price;
+    $total_discount += $discount;
 }
-$grand_total = $subtotal - $total_discount;
+
+$vat_amount = ($subtotal - $total_discount) * $vat_rate;
+$grand_total = ($subtotal - $total_discount) + $vat_amount;
 $total_out_of_pocket = $grand_total;
 
 // Begin transaction
@@ -57,7 +65,7 @@ try {
     $billing_id = $stmt->insert_id;
 
     // Insert billing items
-    $stmt = $conn->prepare("
+    $stmt_item = $conn->prepare("
         INSERT INTO billing_items 
         (billing_id, patient_id, service_id, quantity, unit_price, total_price, finalized)
         VALUES (?, ?, ?, 1, ?, ?, 1)
@@ -65,11 +73,31 @@ try {
     foreach ($cart as $srv) {
         $srv_id = intval($srv['serviceID']);
         $price = floatval($srv['price']);
-        $discount = ($is_pwd && $age < 60) ? ($price * 0.20) : 0;
+        $discount = ($is_pwd || $is_senior) ? ($price * 0.20) : 0;
         $total_price = $price - $discount;
-        $stmt->bind_param("iiidd", $billing_id, $patient_id, $srv_id, $price, $total_price);
-        $stmt->execute();
+        $stmt_item->bind_param("iiidd", $billing_id, $patient_id, $srv_id, $price, $total_price);
+        $stmt_item->execute();
     }
+
+    // Insert into patient_receipt
+    $stmt_receipt = $conn->prepare("
+        INSERT INTO patient_receipt
+        (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, created_at, billing_date, insurance_covered, payment_method, status, transaction_id, is_pwd)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 'Pending', 'Unpaid', ?, ?)
+    ");
+    $stmt_receipt->bind_param(
+        "iiddddsii",
+        $patient_id,
+        $billing_id,
+        $subtotal,
+        $vat_amount,
+        $total_discount,
+        $total_out_of_pocket,
+        $grand_total,
+        $txn,
+        $is_pwd
+    );
+    $stmt_receipt->execute();
 
     // Commit transaction
     $conn->commit();
@@ -78,14 +106,14 @@ try {
     unset($_SESSION['billing_cart'][$patient_id]);
     unset($_SESSION['is_pwd'][$patient_id]);
 
-    // ✅ Success popup using SweetAlert2
+    // Success message
     echo "
     <script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>
     <script>
         Swal.fire({
             icon: 'success',
             title: 'Billing Finalized!',
-            text: 'The billing has been finalized successfully.',
+            html: 'The billing has been finalized successfully.<br>Grand Total: ₱ " . number_format($grand_total,2) . "',
             confirmButtonColor: '#198754',
             confirmButtonText: 'OK'
         }).then(() => {
