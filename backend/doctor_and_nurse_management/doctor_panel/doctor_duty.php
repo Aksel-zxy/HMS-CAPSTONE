@@ -2,8 +2,8 @@
 session_start(); // Always start session
 
 include '../../../../SQL/config.php';
-require '../../../pharmacy_management/classes/Prescription.php';
-require '../../../pharmacy_management/classes/Medicine.php';
+require '../../../pharmacy_management/classes/prescription.php';
+require '../../../pharmacy_management/classes/medicine.php';
 
 // ✅ Authentication check
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
