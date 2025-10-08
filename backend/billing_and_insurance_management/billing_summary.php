@@ -1,6 +1,8 @@
 <?php
 include '../../SQL/config.php';
-session_start();
+
+// Safely start session
+if (session_status() === PHP_SESSION_NONE) session_start();
 
 // QR setup
 $vendorAutoload = __DIR__ . '/vendor/autoload.php';
@@ -91,8 +93,8 @@ if ($patient_id > 0 && $billing_id) {
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $billing_items[] = $row;
-        $total_charges += floatval($row['total_price']);
-        $total_discount += floatval($row['discount']);
+        $total_charges += floatval($row['total_price'] ?? 0);
+        $total_discount += floatval($row['discount'] ?? 0);
     }
 }
 
@@ -107,23 +109,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ref = 'N/A';
 
     if (isset($_POST['confirm_paid']) && $total_out_of_pocket == 0) {
-        // Fully covered by insurance
         $payment_method = $insurance_company ?: "Insurance";
         $ref = "Covered by Insurance";
     } elseif (isset($_POST['make_payment'])) {
         $payment_method = trim($_POST['payment_method'] ?? '');
-        $ref = $_POST['payment_reference'] ?? 'N/A';
+        // Only take the reference for the selected method
+        $ref = $_POST['payment_reference_' . strtolower($payment_method)] ?? 'N/A';
 
-        // Normalize casing
         $payment_method = ucfirst(strtolower($payment_method));
-
         if ($payment_method === 'Cash') {
             $ref = "Cash Payment";
         }
     }
 
     if (!empty($payment_method)) {
-        // Mixed payments
         if ($insurance_covered > 0 && $total_out_of_pocket > 0) {
             $payment_method = ($insurance_company ?: "Insurance") . " / " . $payment_method;
         }
@@ -150,8 +149,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($stmt->execute()) {
             $receipt_id = $stmt->insert_id;
-
-            // Journal Entry
             $reference = "RCPT-" . $receipt_id;
             $description = "Receipt for Patient #" . $patient_id . " (" . $payment_method . ")";
             $status = "Posted"; 
@@ -163,23 +160,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt2->execute();
             $entry_id = $stmt2->insert_id;
 
-            // Journal Entry Lines
             if ($insurance_covered >= $grand_total) {
-                // Fully Insurance
-                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
-                                         VALUES (?, 'Accounts Receivable - Insurance', ?, 0, ?)");
+                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Accounts Receivable - Insurance', ?, 0, ?)");
                 $stmt3->bind_param("ids", $entry_id, $grand_total, $description);
                 $stmt3->execute();
 
-                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
-                                         VALUES (?, 'Service Revenue', 0, ?, ?)");
+                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Service Revenue', 0, ?, ?)");
                 $stmt3->bind_param("ids", $entry_id, $grand_total, $description);
                 $stmt3->execute();
             } else {
-                // Mixed or Cash/GCash/Bank/Card
                 if ($insurance_covered > 0) {
-                    $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
-                                             VALUES (?, 'Accounts Receivable - Insurance', ?, 0, ?)");
+                    $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Accounts Receivable - Insurance', ?, 0, ?)");
                     $stmt3->bind_param("ids", $entry_id, $insurance_covered, $description);
                     $stmt3->execute();
                 }
@@ -194,14 +185,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 };
 
                 if ($total_out_of_pocket > 0) {
-                    $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
-                                             VALUES (?, ?, ?, 0, ?)");
+                    $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, ?, ?, 0, ?)");
                     $stmt3->bind_param("isds", $entry_id, $account, $total_out_of_pocket, $description);
                     $stmt3->execute();
                 }
 
-                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
-                                         VALUES (?, 'Service Revenue', 0, ?, ?)");
+                $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Service Revenue', 0, ?, ?)");
                 $stmt3->bind_param("ids", $entry_id, $grand_total, $description);
                 $stmt3->execute();
             }
@@ -239,7 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="mb-2">
         <strong>BILLED TO:</strong><br>
-        <?= htmlspecialchars($selected_patient ? $selected_patient['fname'].' '.(!empty($selected_patient['mname'])?$selected_patient['mname'].' ':'').$selected_patient['lname'] : 'N/A') ?><br>
+        <?= htmlspecialchars($selected_patient ? ($selected_patient['fname'] ?? '') . ' ' . (!empty($selected_patient['mname'] ?? '') ? ($selected_patient['mname'] ?? '') . ' ' : '') . ($selected_patient['lname'] ?? '') : 'N/A') ?><br>
         Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?><br>
         Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?>
     </div>
@@ -255,9 +244,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <tbody>
             <?php if (!empty($billing_items)): foreach ($billing_items as $it): ?>
                 <tr>
-                    <td><?= htmlspecialchars($it['service_name']) ?></td>
-                    <td><?= htmlspecialchars($it['description']) ?></td>
-                    <td class="text-end">₱<?= number_format($it['total_price'],2) ?></td>
+                    <td><?= htmlspecialchars($it['service_name'] ?? '') ?></td>
+                    <td><?= htmlspecialchars($it['description'] ?? '') ?></td>
+                    <td class="text-end">₱<?= number_format($it['total_price'] ?? 0,2) ?></td>
                 </tr>
             <?php endforeach; else: ?>
                 <tr><td colspan="3" class="text-center">No billed services found.</td></tr>
@@ -320,14 +309,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div id="gcash_box" class="payment-extra text-center">
           <p class="fw-bold">Hospital Management System</p>
           <p>Send to GCash: <strong><?= htmlspecialchars($gcash_number) ?></strong></p>
-          <input type="text" name="payment_reference" class="form-control mb-2" placeholder="Enter GCash Reference Number">
+          <input type="text" name="payment_reference_gcash" class="form-control mb-2" placeholder="Enter GCash Reference Number">
           <img src="<?= htmlspecialchars($qrImageSrc) ?>" alt="GCash QR" width="220" class="border rounded">
         </div>
 
         <!-- Bank -->
         <div id="bank_box" class="payment-extra">
           <label class="form-label">Bank Transaction Reference</label>
-          <input type="text" name="payment_reference" class="form-control" placeholder="Enter bank reference">
+          <input type="text" name="payment_reference_bank" class="form-control" placeholder="Enter bank reference">
         </div>
 
         <!-- Card -->
@@ -338,7 +327,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <input type="text" name="expiry" class="form-control" placeholder="MM/YY">
             <input type="text" name="cvv" class="form-control" placeholder="CVV">
           </div>
-          <input type="text" name="payment_reference" class="form-control mt-2" placeholder="Card Authorization Code">
+          <input type="text" name="payment_reference_card" class="form-control mt-2" placeholder="Card Authorization Code">
         </div>
 
         <!-- Cash -->
@@ -346,7 +335,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <p class="fw-bold text-success">
             <i class="bi bi-cash-stack me-2"></i> Cash Payment Selected
           </p>
-          <input type="hidden" name="payment_reference" value="Cash">
+          <input type="hidden" name="payment_reference_cash" value="Cash">
         </div>
 
       </div>
