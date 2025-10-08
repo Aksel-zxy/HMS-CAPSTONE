@@ -1,14 +1,21 @@
 <?php
 include '../../SQL/config.php';
 
-// Fetch patients with unpaid billing items
+// ✅ Corrected SQL — uses billing_records instead of finalized column
 $sql = "
 SELECT 
     p.patient_id,
     CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
     ir.status AS insurance_status,
-    pr.billing_id
+    br.billing_id,
+    br.status AS billing_status,
+    br.grand_total
 FROM patientinfo p
+JOIN billing_records br 
+    ON p.patient_id = br.patient_id 
+    AND br.status IN ('Pending', 'Cancelled')  -- Show only unpaid or pending bills
+JOIN billing_items bi 
+    ON bi.billing_id = br.billing_id
 LEFT JOIN insurance_requests ir 
     ON p.patient_id = ir.patient_id
     AND ir.request_id = (
@@ -16,14 +23,13 @@ LEFT JOIN insurance_requests ir
         FROM insurance_requests 
         WHERE patient_id = p.patient_id
     )
-LEFT JOIN patient_receipt pr 
-    ON pr.patient_id = p.patient_id AND pr.status <> 'Paid'
-WHERE pr.billing_id IS NOT NULL
+GROUP BY br.billing_id
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
 $result = $conn->query($sql);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -50,6 +56,8 @@ $result = $conn->query($sql);
       <tr>
         <th>Patient Name</th>
         <th>Insurance Status</th>
+        <th>Billing Status</th>
+        <th class="text-end">Total Amount</th>
         <th class="text-end">Actions</th>
       </tr>
     </thead>
@@ -58,8 +66,9 @@ $result = $conn->query($sql);
         <?php while ($row = $result->fetch_assoc()): ?>
           <?php 
               $insuranceStatus = $row['insurance_status'] ?? 'N/A';
-              $disableBill = ($insuranceStatus === 'Pending') || empty($row['billing_id']); 
-              $showInsuranceButton = ($insuranceStatus === 'N/A'); 
+              $billingStatus = $row['billing_status'] ?? 'Pending';
+              $disableBill = ($insuranceStatus === 'Pending');
+              $showInsuranceButton = ($insuranceStatus === 'N/A');
               $rowClass = $insuranceStatus === 'Pending' ? 'pending-insurance' : '';
           ?>
           <tr class="<?= $rowClass ?>">
@@ -75,6 +84,16 @@ $result = $conn->query($sql);
                 <span class="badge bg-secondary">N/A</span>
               <?php endif; ?>
             </td>
+            <td>
+              <?php if ($billingStatus === 'Pending'): ?>
+                <span class="badge bg-info text-dark">Pending</span>
+              <?php elseif ($billingStatus === 'Paid'): ?>
+                <span class="badge bg-success">Paid</span>
+              <?php else: ?>
+                <span class="badge bg-secondary"><?= htmlspecialchars($billingStatus) ?></span>
+              <?php endif; ?>
+            </td>
+            <td class="text-end">₱<?= number_format($row['grand_total'], 2) ?></td>
             <td class="text-end">
               <div class="d-flex justify-content-end gap-2 align-items-center flex-wrap">
                 <?php if ($insuranceStatus === 'Pending'): ?>
@@ -83,13 +102,11 @@ $result = $conn->query($sql);
                        data-bs-toggle="tooltip" 
                        data-bs-placement="top" 
                        title="Cannot generate bill until insurance request is resolved."></i>
-                <?php elseif (!empty($row['billing_id'])): ?>
+                <?php else: ?>
                     <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>&billing_id=<?= $row['billing_id']; ?>" 
                        class="btn btn-success btn-sm">
                        Generate Bill
                     </a>
-                <?php else: ?>
-                    <button class="btn btn-secondary btn-sm" disabled>No Bill Available</button>
                 <?php endif; ?>
 
                 <?php if ($showInsuranceButton): ?>
@@ -99,6 +116,7 @@ $result = $conn->query($sql);
                 <?php endif; ?>
               </div>
 
+              <!-- Insurance Modal -->
               <?php if ($showInsuranceButton): ?>
               <div class="modal fade" id="insuranceModal<?= $row['patient_id'] ?>" tabindex="-1">
                 <div class="modal-dialog">
@@ -135,7 +153,7 @@ $result = $conn->query($sql);
         <?php endwhile; ?>
       <?php else: ?>
         <tr>
-          <td colspan="3" class="text-center">No patients with unpaid billing items.</td>
+          <td colspan="5" class="text-center">No patients with pending billing records found.</td>
         </tr>
       <?php endif; ?>
     </tbody>
