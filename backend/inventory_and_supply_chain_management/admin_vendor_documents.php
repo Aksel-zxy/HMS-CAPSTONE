@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+include '../../SQL/config.php';
 
 // Fetch all vendor documents with vendor info
 $stmt = $pdo->prepare("

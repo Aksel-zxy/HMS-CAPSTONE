@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+include '../../SQL/config.php';
 
 // Fetch inventory items with their actual vendors (only items with quantity > 0)
 $inventoryStmt = $pdo->query("

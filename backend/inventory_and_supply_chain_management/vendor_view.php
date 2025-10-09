@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 
 if (!isset($_GET['id'])) { die("Vendor ID required."); }
 $id = intval($_GET['id']);

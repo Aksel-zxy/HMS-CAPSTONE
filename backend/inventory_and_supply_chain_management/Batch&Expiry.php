@@ -1,5 +1,5 @@
 <?php 
-include 'db.php';
+include '../../SQL/config.php';
 
 // ===============================
 // Handle expiry update for medicines (per box)

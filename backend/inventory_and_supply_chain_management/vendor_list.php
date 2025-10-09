@@ -1,5 +1,5 @@
 <?php
-require 'db.php'; // $pdo connection
+include '../../SQL/config.php';
 
 // Fetch all approved vendors
 $stmt = $pdo->prepare("SELECT * FROM vendors WHERE status = 'Approved' ORDER BY company_name ASC");

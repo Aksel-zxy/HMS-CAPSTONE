@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 
 $category = $_GET['category'] ?? '';
 $search   = $_GET['search'] ?? '';

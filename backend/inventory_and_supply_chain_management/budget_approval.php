@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+include '../../SQL/config.php';
 
 // Ensure only admin can access
 // if (!isset($_SESSION['user_id'])) die("Login required.");

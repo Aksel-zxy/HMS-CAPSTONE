@@ -1,5 +1,5 @@
 <?php
-require 'db.php'; // DB connection ($pdo)
+include '../../SQL/config.php';
 
 $type = $_GET['type'] ?? 'username';
 $value = trim($_GET['value'] ?? '');

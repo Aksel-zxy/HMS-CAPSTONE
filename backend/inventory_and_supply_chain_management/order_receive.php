@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+include '../../SQL/config.php';
 
 // ---------------- Handle Receiving ----------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {

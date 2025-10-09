@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 
 if (isset($_GET['id']) && isset($_GET['action'])) {
     $id = (int) $_GET['id'];

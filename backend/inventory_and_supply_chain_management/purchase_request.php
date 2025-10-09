@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+include '../../SQL/config.php';
 
 // Show errors (for debugging)
 error_reporting(E_ALL);

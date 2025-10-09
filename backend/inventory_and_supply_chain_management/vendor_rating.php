@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+include '../../SQL/config.php';
 
 // Fetch vendors
 $stmt = $pdo->prepare("SELECT id, company_name FROM vendors ORDER BY company_name ASC");

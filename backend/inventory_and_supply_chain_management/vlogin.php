@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php'; // Database connection file
+include '../../SQL/config.php';
 
 $message = "";
 
