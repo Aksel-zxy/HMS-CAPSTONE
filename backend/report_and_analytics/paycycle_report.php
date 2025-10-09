@@ -1,6 +1,6 @@
 <?php
 // Step 1: Get all employees
-$apiUrl = "http://host.docker.internal:5288/Hr/getEmployee";
+$apiUrl = "http://host.docker.internal:5288/payroll/getEmployee";
 
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $apiUrl);
@@ -130,11 +130,11 @@ if (!$employeeId) {
                 <div class="sidebar-logo mt-3">
                     <img src="assets/image/logo-dark.png" width="90px" height="20px">
                 </div>
+
                 <div class="menu-title">Navigation</div>
 
-                <!----- Sidebar Navigation ----->
                 <li class="sidebar-item">
-                    <a href="admin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    <a href="report_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                         aria-expanded="false" aria-controls="auth">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                             <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
@@ -145,8 +145,8 @@ if (!$employeeId) {
                 </li>
 
                 <li class="sidebar-item">
-                    <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
-                        aria-expanded="true" aria-controls="auth">
+                    <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#staffMgmt"
+                        aria-expanded="true" aria-controls="staffMgmt">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
                             viewBox="0 0 16 16" style="margin-bottom: 6px;">
                             <path
@@ -157,7 +157,7 @@ if (!$employeeId) {
                         <span style="font-size: 18px;">Doctor and Nurse Management</span>
                     </a>
 
-                    <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <ul id="staffMgmt" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                         <li class="sidebar-item">
                             <a href="../Employee/doctor.php" class="sidebar-link">Doctors</a>
                         </li>
@@ -169,26 +169,11 @@ if (!$employeeId) {
                         </li>
                     </ul>
                 </li>
-                <li class="sidebar-item">
-                    <a href="report_dashboard.php" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
-                        aria-expanded="true" aria-controls="auth">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
-                            viewBox="0 0 16 16" style="margin-bottom: 6px;">
-                            <path
-                                d="M5 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4m4-2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5M9 8a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4A.5.5 0 0 1 9 8m1 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5" />
-                            <path
-                                d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
-                        </svg>
-                        <span style="font-size: 18px;">Reporting and Analytics</span>
-                    </a>
 
-                    <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                        <li class="sidebar-item">
-                            <a href="paycycle_report.php" class="sidebar-link">Employee Paycycle Report</a>
-                            <a href="annualPayroll_Report.php" class="sidebar-link">Employee Annual Payroll Report</a>
-                            <a href="hospital_income_report.php" class="sidebar-link">Hospital month income statement</a>
-                        </li>
-                    </ul>
+                <li class="sidebar-item active">
+                    <a href="report_dashboard.php" class="sidebar-link">
+                        Reporting & Analytics
+                    </a>
                 </li>
             </aside>
         </div>
@@ -227,7 +212,7 @@ if (!$employeeId) {
 }
 
 // Step 3: Get available pay periods for selected employee with URL encoding
-$apiUrl = "http://host.docker.internal:5288/Hr/getPayperiodStartDates/" . urlencode($employeeId);
+$apiUrl = "http://host.docker.internal:5288/payroll/getPayperiodStartDates/" . urlencode($employeeId);
 
 $ch = curl_init();
 curl_setopt($ch, CURLOPT_URL, $apiUrl);
@@ -263,7 +248,7 @@ if (!$selectedPayPeriod) {
 }
 
 // Step 5: Build API URL for payroll info with proper encoding
-$apiUrl = "http://host.docker.internal:5288/Hr/getPayrollInformation/" .
+$apiUrl = "http://host.docker.internal:5288/payroll/getPayrollInformation/" .
     urlencode($employeeId) . "/" .
     urlencode($selectedPayPeriod);
 
@@ -523,11 +508,11 @@ if ($payrollData === null) {
             <div class="sidebar-logo mt-3">
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
+
             <div class="menu-title">Navigation</div>
 
-            <!----- Sidebar Navigation ----->
             <li class="sidebar-item">
-                <a href="admin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="report_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
@@ -538,8 +523,8 @@ if ($payrollData === null) {
             </li>
 
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
-                    aria-expanded="true" aria-controls="auth">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#staffMgmt"
+                    aria-expanded="true" aria-controls="staffMgmt">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
                         viewBox="0 0 16 16" style="margin-bottom: 6px;">
                         <path
@@ -550,7 +535,7 @@ if ($payrollData === null) {
                     <span style="font-size: 18px;">Doctor and Nurse Management</span>
                 </a>
 
-                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <ul id="staffMgmt" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
                         <a href="../Employee/doctor.php" class="sidebar-link">Doctors</a>
                     </li>
@@ -562,26 +547,11 @@ if ($payrollData === null) {
                     </li>
                 </ul>
             </li>
-            <li class="sidebar-item">
-                <a href="report_dashboard.php" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
-                        viewBox="0 0 16 16" style="margin-bottom: 6px;">
-                        <path
-                            d="M5 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4m4-2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5M9 8a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4A.5.5 0 0 1 9 8m1 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5" />
-                        <path
-                            d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
-                    </svg>
-                    <span style="font-size: 18px;">Reporting and Analytics</span>
-                </a>
 
-                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="paycycle_report.php" class="sidebar-link">Employee Paycycle Report</a>
-                        <a href="annualPayroll_Report.php" class="sidebar-link">Employee Annual Payroll Report</a>
-                        <a href="hospital_income_report.php" class="sidebar-link">Hospital month income statement</a>
-                    </li>
-                </ul>
+            <li class="sidebar-item active">
+                <a href="report_dashboard.php" class="sidebar-link">
+                    Reporting & Analytics
+                </a>
             </li>
         </aside>
         <!----- End of Sidebar ----->
