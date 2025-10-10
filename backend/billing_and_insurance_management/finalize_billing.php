@@ -1,6 +1,5 @@
 <?php
 include '../../SQL/config.php';
-session_start();
 
 // Get patient ID
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
