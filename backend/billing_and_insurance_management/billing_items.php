@@ -4,7 +4,7 @@ include '../../SQL/config.php';
 
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 
-// Show patients with completed services if no patient selected
+// Fetch patient info
 if ($patient_id <= 0) {
     $sql = "
         SELECT DISTINCT p.patient_id,
@@ -25,11 +25,9 @@ if ($patient_id <= 0) {
         <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     </head>
     <body class="p-4 bg-light">
-
-<div class="main-sidebar">
-<?php include 'billing_sidebar.php'; ?>
-</div>
-
+    <div class="main-sidebar">
+        <?php include 'billing_sidebar.php'; ?>
+    </div>
     <div class="container bg-white p-4 rounded shadow">
         <h2>Select Patient for Billing</h2>
         <table class="table table-bordered">
@@ -77,11 +75,10 @@ if (!empty($dob) && $dob != '0000-00-00') {
     $age = $today->diff($birth)->y;
 }
 
-// Initialize billing cart
+// Initialize cart
 if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $_SESSION['billing_cart'][$patient_id] = [];
 
-    // Load completed services from dl_results
     $sql = "SELECT result FROM dl_results WHERE patientID=? AND status='Completed'";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $patient_id);
@@ -92,19 +89,12 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
         foreach ($services as $srvName) {
             $srvName = trim($srvName);
             if ($srvName == "") continue;
-            $stmt2 = $conn->prepare("SELECT * FROM dl_services WHERE serviceName=? LIMIT 1");
+            $stmt2 = $conn->prepare("SELECT serviceID, serviceName, description, price FROM dl_services WHERE serviceName=? LIMIT 1");
             $stmt2->bind_param("s", $srvName);
             $stmt2->execute();
             $srv = $stmt2->get_result()->fetch_assoc();
             if ($srv) {
-                $exists = false;
-                foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                    if ($c['serviceName'] == $srv['serviceName'] && $c['description'] == $srv['description']) {
-                        $exists = true;
-                        break;
-                    }
-                }
-                if (!$exists) $_SESSION['billing_cart'][$patient_id][] = $srv;
+                $_SESSION['billing_cart'][$patient_id][] = $srv;
             }
         }
     }
@@ -114,19 +104,12 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
     $service_id = intval($_POST['service_id']);
     if ($service_id > 0) {
-        $stmt = $conn->prepare("SELECT * FROM dl_services WHERE serviceID=? LIMIT 1");
+        $stmt = $conn->prepare("SELECT serviceID, serviceName, description, price FROM dl_services WHERE serviceID=? LIMIT 1");
         $stmt->bind_param("i", $service_id);
         $stmt->execute();
         $srv = $stmt->get_result()->fetch_assoc();
         if ($srv) {
-            $exists = false;
-            foreach ($_SESSION['billing_cart'][$patient_id] as $c) {
-                if ($c['serviceName'] == $srv['serviceName'] && $c['description'] == $srv['description']) {
-                    $exists = true;
-                    break;
-                }
-            }
-            if (!$exists) $_SESSION['billing_cart'][$patient_id][] = $srv;
+            $_SESSION['billing_cart'][$patient_id][] = $srv;
         }
     }
     header("Location: billing_items.php?patient_id=$patient_id");
@@ -144,51 +127,21 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// Toggle PWD dynamically via checkbox
+// PWD toggle
 if (isset($_GET['toggle_pwd'])) {
     $_SESSION['is_pwd'][$patient_id] = ($_GET['toggle_pwd'] == 1) ? 1 : 0;
     header("Location: billing_items.php?patient_id=$patient_id");
     exit;
 }
 
-// Compute totals
 $cart = $_SESSION['billing_cart'][$patient_id];
 $subtotal = array_sum(array_column($cart, 'price'));
 $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
-$discount = ($is_pwd && $age < 60) ? $subtotal * 0.20 : 0;
+$is_senior = $age >= 60 ? 1 : 0;
+$discount = ($is_pwd || $is_senior) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
-
-// Get services already billed (exclude them)
-$billed_services = [];
-$stmt = $conn->prepare("SELECT service_id FROM billing_items WHERE patient_id=?");
-$stmt->bind_param("i", $patient_id);
-$stmt->execute();
-$res = $stmt->get_result();
-while ($row = $res->fetch_assoc()) {
-    $billed_services[] = $row['service_id'];
-}
-
-// Get services already in cart (exclude them too)
-$cart_services = array_column($cart, 'serviceID');
-
-// Fetch all services EXCEPT billed or in cart
-$placeholders = implode(",", array_fill(0, count($billed_services) + count($cart_services), "?"));
-$sql = "SELECT * FROM dl_services";
-if (!empty($placeholders)) {
-    $sql .= " WHERE serviceID NOT IN ($placeholders)";
-}
-$sql .= " ORDER BY serviceName ASC";
-
-$stmt = $conn->prepare($sql);
-$bind_types = str_repeat("i", count($billed_services) + count($cart_services));
-$params = array_merge($billed_services, $cart_services);
-if (!empty($params)) {
-    $stmt->bind_param($bind_types, ...$params);
-}
-$stmt->execute();
-$allServices = $stmt->get_result();
-
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -196,16 +149,38 @@ $allServices = $stmt->get_result();
 <title>Billing Items</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="assets/CSS/billing_items.css">
-
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 function togglePWD(checkbox){
     let val = checkbox.checked ? 1 : 0;
     window.location.href = "billing_items.php?patient_id=<?= $patient_id ?>&toggle_pwd=" + val;
 }
+
+function finalizeBilling(){
+    fetch('finalize_billing.php?patient_id=<?= $patient_id ?>')
+    .then(response => response.text())
+    .then(data => {
+        Swal.fire({
+            icon: 'success',
+            title: 'Billing Finalized!',
+            html: 'Billing has been finalized successfully.<br>Grand Total: ₱ <?= number_format($grand_total,2) ?>',
+            confirmButtonColor: '#198754',
+            confirmButtonText: 'OK'
+        }).then(() => {
+            window.location.href = 'billing_items.php';
+        });
+    })
+    .catch(error => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'An error occurred while finalizing billing.'
+        });
+    });
+}
 </script>
 </head>
 <body class="p-4 bg-light">
-
 <div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
@@ -213,29 +188,44 @@ function togglePWD(checkbox){
 <div class="container bg-white p-4 rounded shadow">
     <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
 
-    <!-- PWD Checkbox -->
     <div class="mb-3">
         <label>
             <input type="checkbox" <?= ($age >= 60) ? 'disabled' : '' ?> <?= $is_pwd ? 'checked' : '' ?> onchange="togglePWD(this)">
             Patient is PWD
         </label>
         <?php if ($age >= 60): ?>
-            <small class="text-muted">(Senior patient, discount applied automatically)</small>
+            <small class="text-muted">(Senior discount applied automatically)</small>
         <?php endif; ?>
     </div>
 
-   <!-- Add Service -->
-<form method="POST" class="mb-3 d-flex gap-2">
-    <select name="service_id" class="form-select" required>
-        <option value="">-- Select Service --</option>
-        <?php while ($srv = $allServices->fetch_assoc()): ?>
-            <option value="<?= $srv['serviceID'] ?>">
-                <?= htmlspecialchars($srv['serviceName']) ?> - <?= htmlspecialchars($srv['description']) ?> - ₱<?= number_format($srv['price'],2) ?>
-            </option>
-        <?php endwhile; ?>
-    </select>
-    <button type="submit" name="add_service" class="btn btn-primary">Add</button>
-</form>
+    <!-- Add Service -->
+    <form method="POST" class="mb-3 d-flex gap-2">
+        <select name="service_id" class="form-select" required>
+            <option value="">-- Select Service --</option>
+            <?php
+            // Exclude services already in the cart
+            $cart_ids = array_column($cart, 'serviceID');
+            if (count($cart_ids) > 0) {
+                $placeholders = implode(',', array_fill(0, count($cart_ids), '?'));
+                $sql = "SELECT * FROM dl_services WHERE serviceID NOT IN ($placeholders) ORDER BY serviceName ASC";
+                $stmt = $conn->prepare($sql);
+                $types = str_repeat('i', count($cart_ids));
+                $stmt->bind_param($types, ...$cart_ids);
+                $stmt->execute();
+                $res = $stmt->get_result();
+            } else {
+                $res = $conn->query("SELECT * FROM dl_services ORDER BY serviceName ASC");
+            }
+
+            while ($srv = $res->fetch_assoc()):
+            ?>
+                <option value="<?= $srv['serviceID'] ?>">
+                    <?= htmlspecialchars($srv['serviceName']) ?> - ₱<?= number_format($srv['price'],2) ?>
+                </option>
+            <?php endwhile; ?>
+        </select>
+        <button type="submit" name="add_service" class="btn btn-primary">Add</button>
+    </form>
 
     <table class="table table-bordered">
         <thead class="table-dark">
@@ -261,14 +251,14 @@ function togglePWD(checkbox){
     </table>
 
     <div class="text-end mt-3">
-        Subtotal: ₱<?= number_format($subtotal,2) ?><br>
-        Discount: -₱<?= number_format($discount,2) ?><br>
-        <strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong>
+        <p>Subtotal: ₱<?= number_format($subtotal,2) ?></p>
+        <p>Discount: -₱<?= number_format($discount,2) ?></p>
+        <h5><strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong></h5>
     </div>
 
     <div class="mt-4 d-flex justify-content-between">
         <a href="billing_items.php" class="btn btn-secondary">Back</a>
-        <a href="finalize_billing.php?patient_id=<?= $patient_id ?>" class="btn btn-success">Finalize Billing</a>
+        <button type="button" class="btn btn-success" onclick="finalizeBilling()">Finalize Billing</button>
     </div>
 </div>
 </body>

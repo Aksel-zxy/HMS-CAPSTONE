@@ -1,6 +1,6 @@
 <?php
 include '../../SQL/config.php';
-session_start(); // ✅ REQUIRED
+session_start(); 
 
 // Get patient ID
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
@@ -50,10 +50,10 @@ $vat_amount = ($subtotal - $total_discount) * $vat_rate;
 $grand_total = ($subtotal - $total_discount) + $vat_amount;
 $total_out_of_pocket = $grand_total;
 
-// Begin transaction
 $conn->begin_transaction();
+
 try {
-    // ✅ Create billing record with grand_total
+    // ✅ Create billing record
     $stmt = $conn->prepare("
         INSERT INTO billing_records 
         (patient_id, billing_date, total_amount, insurance_covered, out_of_pocket, grand_total, status, payment_method, transaction_id)
@@ -99,43 +99,19 @@ try {
     );
     $stmt_receipt->execute();
 
-    // Commit
     $conn->commit();
 
-    // Clear cart
     unset($_SESSION['billing_cart'][$patient_id]);
     unset($_SESSION['is_pwd'][$patient_id]);
 
-    echo "
-    <script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>
-    <script>
-        Swal.fire({
-            icon: 'success',
-            title: 'Billing Finalized!',
-            html: 'Billing has been finalized successfully.<br>Grand Total: ₱ " . number_format($grand_total,2) . "',
-            confirmButtonColor: '#198754',
-            confirmButtonText: 'OK'
-        }).then(() => {
-            window.location.href = document.referrer || 'patient_billing.php';
-        });
-    </script>
-    ";
+    // ✅ Redirect back to billing_items.php with success flag
+    header("Location: billing_items.php?patient_id=$patient_id&success=1&total=" . urlencode($grand_total));
+    exit;
 
 } catch (Exception $e) {
     $conn->rollback();
     error_log('Finalize billing error: ' . $e->getMessage());
-    echo "
-    <script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>
-    <script>
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'An error occurred while finalizing billing. Please try again.',
-            confirmButtonColor: '#dc3545'
-        }).then(() => {
-            window.history.back();
-        });
-    </script>
-    ";
+    header("Location: billing_items.php?patient_id=$patient_id&error=1");
+    exit;
 }
 ?>
