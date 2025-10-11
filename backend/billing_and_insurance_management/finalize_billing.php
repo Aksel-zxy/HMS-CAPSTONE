@@ -1,9 +1,6 @@
 <?php
 include '../../SQL/config.php';
-<<<<<<< HEAD
 session_start(); // ✅ REQUIRED
-=======
->>>>>>> 3c4e68ff8af17af976bbd01deabe78d07d942029
 
 // Get patient ID
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
