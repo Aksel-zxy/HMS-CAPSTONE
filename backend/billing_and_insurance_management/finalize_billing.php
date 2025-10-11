@@ -1,6 +1,6 @@
 <?php
 include '../../SQL/config.php';
-session_start();
+session_start(); // ✅ REQUIRED
 
 // Get patient ID
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
@@ -30,8 +30,8 @@ if (!empty($dob) && $dob != '0000-00-00') {
 $is_pwd = $patient['is_pwd'] ?? 0;
 $is_senior = $age >= 60 ? 1 : 0;
 
-// VAT percentage (if applicable)
-$vat_rate = 0.12; // 12%
+// VAT percentage
+$vat_rate = 0.12;
 
 // Compute totals
 $subtotal = 0;
@@ -53,18 +53,18 @@ $total_out_of_pocket = $grand_total;
 // Begin transaction
 $conn->begin_transaction();
 try {
-    // Create billing record
+    // ✅ Create billing record with grand_total
     $stmt = $conn->prepare("
         INSERT INTO billing_records 
-        (patient_id, billing_date, total_amount, insurance_covered, out_of_pocket, status, payment_method, transaction_id)
-        VALUES (?, NOW(), ?, 0, ?, 'Pending', 'Unpaid', ?)
+        (patient_id, billing_date, total_amount, insurance_covered, out_of_pocket, grand_total, status, payment_method, transaction_id)
+        VALUES (?, NOW(), ?, 0, ?, ?, 'Pending', 'Unpaid', ?)
     ");
     $txn = "TXN" . uniqid();
-    $stmt->bind_param("idds", $patient_id, $grand_total, $total_out_of_pocket, $txn);
+    $stmt->bind_param("iddds", $patient_id, $grand_total, $total_out_of_pocket, $grand_total, $txn);
     $stmt->execute();
     $billing_id = $stmt->insert_id;
 
-    // Insert billing items
+    // ✅ Insert billing items
     $stmt_item = $conn->prepare("
         INSERT INTO billing_items 
         (billing_id, patient_id, service_id, quantity, unit_price, total_price, finalized)
@@ -79,14 +79,14 @@ try {
         $stmt_item->execute();
     }
 
-    // Insert into patient_receipt
+    // ✅ Insert patient receipt
     $stmt_receipt = $conn->prepare("
         INSERT INTO patient_receipt
         (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, created_at, billing_date, insurance_covered, payment_method, status, transaction_id, is_pwd)
         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 0, 'Pending', 'Unpaid', ?, ?)
     ");
     $stmt_receipt->bind_param(
-        "iiddddsii",
+        "iidddddsi",
         $patient_id,
         $billing_id,
         $subtotal,
@@ -99,21 +99,20 @@ try {
     );
     $stmt_receipt->execute();
 
-    // Commit transaction
+    // Commit
     $conn->commit();
 
-    // Clear cart session
+    // Clear cart
     unset($_SESSION['billing_cart'][$patient_id]);
     unset($_SESSION['is_pwd'][$patient_id]);
 
-    // Success message
     echo "
     <script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script>
     <script>
         Swal.fire({
             icon: 'success',
             title: 'Billing Finalized!',
-            html: 'The billing has been finalized successfully.<br>Grand Total: ₱ " . number_format($grand_total,2) . "',
+            html: 'Billing has been finalized successfully.<br>Grand Total: ₱ " . number_format($grand_total,2) . "',
             confirmButtonColor: '#198754',
             confirmButtonText: 'OK'
         }).then(() => {
