@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 $vendors = $pdo->query("SELECT id, registration_number, company_name, status, approved_at FROM vendors ORDER BY created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>

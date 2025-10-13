@@ -2,10 +2,10 @@
 session_start();
 include '../../SQL/config.php';
 
-// Get billing ID (from receipt)
-$billing_id = isset($_GET['receipt_id']) ? intval($_GET['receipt_id']) : 0;
-if ($billing_id <= 0) {
-    echo "Invalid billing ID.";
+// Get receipt ID
+$receipt_id = isset($_GET['receipt_id']) ? intval($_GET['receipt_id']) : 0;
+if ($receipt_id <= 0) {
+    echo "Invalid receipt ID.";
     exit();
 }
 
@@ -16,7 +16,7 @@ $stmt = $conn->prepare("
     JOIN patientinfo pi ON pr.patient_id = pi.patient_id
     WHERE pr.receipt_id = ?
 ");
-$stmt->bind_param("i", $billing_id);
+$stmt->bind_param("i", $receipt_id);
 $stmt->execute();
 $billing = $stmt->get_result()->fetch_assoc();
 if (!$billing) {
@@ -33,9 +33,9 @@ if (!empty($billing['attending_doctor'])) {
     $doctor = $stmt2->get_result()->fetch_assoc();
 }
 
-// Fetch billing items with service description
+// Fetch billing items with service details
 $stmt3 = $conn->prepare("
-    SELECT bi.service_name, bi.total_price, bi.discount, ds.description
+    SELECT bi.quantity, bi.unit_price, bi.total_price, ds.serviceName AS service_name, ds.description
     FROM billing_items bi
     LEFT JOIN dl_services ds ON bi.service_id = ds.serviceID
     WHERE bi.patient_id = ? AND bi.billing_id = ?
@@ -44,25 +44,12 @@ $stmt3->bind_param("ii", $billing['patient_id'], $billing['billing_id']);
 $stmt3->execute();
 $billing_items = $stmt3->get_result()->fetch_all(MYSQLI_ASSOC);
 
-// Fetch insurance covered amount
-$stmt_ins = $conn->prepare("
-    SELECT SUM(covered_amount) AS total_covered
-    FROM insurance_requests
-    WHERE patient_id = ? AND status='Approved'
-");
-$stmt_ins->bind_param("i", $billing['patient_id']);
-$stmt_ins->execute();
-$insurance_covered = floatval($stmt_ins->get_result()->fetch_assoc()['total_covered'] ?? 0);
-
-// Calculate totals
-$total_charges = $total_discount = 0;
-foreach ($billing_items as $item) {
-    $total_charges += floatval($item['total_price']);
-    $total_discount += floatval($item['discount']);
-}
-
-$grand_total = $total_charges - $total_discount;
-$total_out_of_pocket = max($grand_total - $insurance_covered, 0);
+// Use stored totals from patient_receipt
+$total_charges = floatval($billing['total_charges']);
+$total_discount = floatval($billing['total_discount']);
+$insurance_covered = floatval($billing['insurance_covered']);
+$total_out_of_pocket = floatval($billing['total_out_of_pocket']);
+$grand_total = floatval($billing['grand_total']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -127,7 +114,7 @@ if ($doctor) {
 <td class="blue-label">AMOUNT DUE</td>
 </tr>
 <tr>
-<td><?= 'INV-'.$billing_id; ?></td>
+<td><?= 'INV-'.$receipt_id; ?></td>
 <td><?= htmlspecialchars($billing['billing_date']); ?></td>
 <td class="amount-due-box"><?= '₱ '.number_format($total_out_of_pocket, 2); ?></td>
 </tr>
@@ -137,16 +124,20 @@ if ($doctor) {
 <tr>
 <th>ITEM</th>
 <th>DESCRIPTION</th>
+<th>QTY</th>
+<th>UNIT PRICE</th>
 <th>AMOUNT</th>
 </tr>
 <?php if (!empty($billing_items)): foreach ($billing_items as $item): ?>
 <tr>
 <td><?= htmlspecialchars($item['service_name']); ?></td>
 <td><?= htmlspecialchars($item['description']); ?></td>
+<td><?= intval($item['quantity']); ?></td>
+<td>₱ <?= number_format($item['unit_price'],2); ?></td>
 <td>₱ <?= number_format($item['total_price'],2); ?></td>
 </tr>
 <?php endforeach; else: ?>
-<tr><td colspan="3" style="text-align:center;">No billing items found.</td></tr>
+<tr><td colspan="5" style="text-align:center;">No billing items found.</td></tr>
 <?php endif; ?>
 </table>
 

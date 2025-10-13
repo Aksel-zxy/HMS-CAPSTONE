@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+include '../../SQL/config.php';
 
 // ✅ Vendor login check
 $logged_vendor_id = $_SESSION['vendor_id'] ?? 0;

@@ -20,6 +20,99 @@ public function callEmr($patient_id) {
     }
 }
 
+public function callBalance($patient_id) {
+    $stmt = $this->conn->prepare("
+        SELECT 
+            p.patient_id,
+            CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
+            ir.status AS insurance_status,
+            (
+                SELECT bi.billing_id
+                FROM billing_items bi
+                LEFT JOIN patient_receipt pr 
+                    ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
+                WHERE bi.patient_id = p.patient_id
+                AND bi.finalized = 1
+                AND pr.receipt_id IS NULL
+                ORDER BY bi.billing_id DESC
+                LIMIT 1
+            ) AS billing_id
+        FROM patientinfo p
+        LEFT JOIN insurance_requests ir 
+            ON p.patient_id = ir.patient_id
+            AND ir.request_id = (
+                SELECT MAX(request_id) 
+                FROM insurance_requests 
+                WHERE patient_id = p.patient_id
+            )
+        WHERE p.patient_id = ?
+        AND EXISTS (
+            SELECT 1
+            FROM billing_items bi
+            LEFT JOIN patient_receipt pr 
+                ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
+            WHERE bi.patient_id = p.patient_id
+            AND bi.finalized = 1
+            AND pr.receipt_id IS NULL
+        )
+        ORDER BY p.lname ASC, p.fname ASC
+    ");
+    
+    // ✅ Keep bind_param now
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows > 0) {
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } else {
+        return [];
+    }
+}
+
+
+public function callPrescription($patient_id) {
+    $stmt = $this->conn->prepare("
+        SELECT 
+            p.prescription_id,
+            CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+            CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
+            GROUP_CONCAT(
+                CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
+                SEPARATOR '<br>'
+            ) AS medicines_list,
+            SUM(i.quantity_prescribed) AS total_quantity,
+            p.note,
+            DATE_FORMAT(p.prescription_date, '%b %e, %Y %l:%i%p') AS formatted_date,
+            p.status
+        FROM pharmacy_prescription p
+        JOIN patientinfo pi 
+            ON p.patient_id = pi.patient_id
+        JOIN hr_employees e 
+            ON p.doctor_id = e.employee_id 
+            AND LOWER(e.profession) = 'doctor'
+        JOIN pharmacy_prescription_items i 
+            ON p.prescription_id = i.prescription_id
+        JOIN pharmacy_inventory m 
+            ON i.med_id = m.med_id
+        WHERE p.patient_id = ? 
+        GROUP BY p.prescription_id
+        ORDER BY p.prescription_date DESC
+    ");
+
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    // Return all results, or empty array if none
+    if ($result->num_rows > 0) {
+        return $result->fetch_all(MYSQLI_ASSOC);
+    } else {
+        return []; // ✅ return empty array instead of throwing
+    }
+}
+
+
 
 public function callHistory($patient_id) {
     $query = "SELECT * FROM p_previous_medical_records WHERE patient_id = ?";

@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 $today = date("Y-m-d");
 $today_day = intval(date('d'));
 $today_month = intval(date('m'));

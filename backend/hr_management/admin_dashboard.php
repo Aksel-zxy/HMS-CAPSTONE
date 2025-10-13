@@ -3,6 +3,7 @@ require '../../SQL/config.php';
 include 'includes/FooterComponent.php';
 require_once 'classes/Auth.php';
 require_once 'classes/User.php';
+require_once 'classes/Employee.php';
 require_once 'classes/LeaveNotification.php';
 
 Auth::checkHR();
@@ -23,6 +24,15 @@ if (!$user) {
     die("User not found.");
 }
 
+$employee = new Employee($conn);
+
+$totalDoctors    = $employee->countByProfession('Doctor');
+$totalNurses     = $employee->countByProfession('Nurse');
+$totalPharma     = $employee->countByProfession('Pharmacist');
+$totalAccountant = $employee->countByProfession('Accountant');
+$totalLab        = $employee->countByProfession('Laboratorist');
+
+$leaveNotif = new LeaveNotification($conn);
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 ?>
@@ -223,11 +233,45 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>HR DASHBOARD
-                    HI GUYSSSS
-                </h1> 
+            <!-- ----- Card-List of Employees ----- -->
+            <div class="row">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Doctor</h5>
+                        <p class="card-text"><strong><?php echo $totalDoctors; ?></strong> active doctors.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Nurse</h5>
+                        <p class="card-text"><strong><?php echo $totalNurses; ?></strong> active nurses.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Pharmacist</h5>
+                        <p class="card-text"><strong><?php echo $totalPharma; ?></strong> active pharmacist.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Accountant</h5>
+                        <p class="card-text"><strong><?php echo $totalAccountant; ?></strong> active accountant.</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Laboratorist</h5>
+                        <p class="card-text"><strong><?php echo $totalLab; ?></strong> active laboratorist.</p>
+                    </div>
+                </div>
+
             </div>
+
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
@@ -243,6 +287,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
         window.addEventListener("load", function(){
             setTimeout(function(){
                 document.getElementById("loading-screen").style.display = "none";
+                document.body.classList.add("show-cards");
             }, 2000);
         });
 

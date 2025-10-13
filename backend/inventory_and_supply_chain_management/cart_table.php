@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 ?>
 
 <?php if (!empty($_SESSION['cart'])): ?>

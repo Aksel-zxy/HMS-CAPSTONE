@@ -8,6 +8,7 @@ if (!isset($_GET['token'])) {
 $token = $_GET['token'];
 $now = time();
 
+// fetch user with valid token
 $stmt = $conn->prepare("SELECT * FROM users WHERE reset_token=? AND reset_expires > ?");
 $stmt->bind_param("si", $token, $now);
 $stmt->execute();
@@ -28,67 +29,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $newPassword = password_hash($password, PASSWORD_DEFAULT);
 
+        // update password safely
         $stmt = $conn->prepare("UPDATE users SET password=?, reset_token=NULL, reset_expires=NULL WHERE user_id=?");
-        $stmt->bind_param("si", $newPassword, $user['user_id']);
-        $stmt->execute();
+        if (!$stmt) {
+            die("Prepare failed: " . $conn->error);
+        }
 
-        echo "
-<!DOCTYPE html>
-<html lang='en'>
-<head>
-    <meta charset='UTF-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>Password Reset Successful</title>
-    <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
-    <style>
-        body {
-            background: #f0f4f8;
-            font-family: Arial, sans-serif;
+        // bind both as strings to avoid type issue
+        $stmt->bind_param("ss", $newPassword, $user['user_id']);
+
+        if ($stmt->execute() && $stmt->affected_rows > 0) {
+            echo "
+            <!DOCTYPE html>
+            <html lang='en'>
+            <head>
+                <meta charset='UTF-8'>
+                <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                <title>Password Reset Successful</title>
+                <link href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css' rel='stylesheet'>
+                <style>
+                    body { background: #f0f4f8; font-family: Arial, sans-serif; }
+                    .success-container {
+                        max-width: 500px; margin: 100px auto; background: #fff;
+                        padding: 30px; border-radius: 12px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center;
+                    }
+                    .success-container img { height: 40px; margin-bottom: 15px; }
+                    .success-icon { font-size: 60px; color: #198754; margin-bottom: 15px; }
+                    .btn-login {
+                        background: #198754; border: none; padding: 10px 20px;
+                        font-size: 16px; border-radius: 6px; color: #fff;
+                        text-decoration: none;
+                    }
+                    .btn-login:hover { background: #146c43; }
+                </style>
+            </head>
+            <body>
+                <div class='success-container'>
+                    <img src='../image/logo-dark.png' alt='HMS Logo'>
+                    <div class='success-icon'>✅</div>
+                    <h2>Password Reset Successful</h2>
+                    <p>Your password has been updated. You can now log in with your new credentials.</p>
+                    <a href='../../login.php' class='btn-login'>Go to Login</a>
+                </div>
+            </body>
+            </html>";
+            exit;
+        } else {
+            $message = "Failed to update password. Please try again.";
         }
-        .success-container {
-            max-width: 500px;
-            margin: 100px auto;
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .success-container img {
-            height: 40px;
-            margin-bottom: 15px;
-        }
-        .success-icon {
-            font-size: 60px;
-            color: #198754;
-            margin-bottom: 15px;
-        }
-        .btn-login {
-            background: #198754;
-            border: none;
-            padding: 10px 20px;
-            font-size: 16px;
-            border-radius: 6px;
-            color: #fff;
-            text-decoration: none;
-        }
-        .btn-login:hover {
-            background: #146c43;
-        }
-    </style>
-</head>
-<body>
-    <div class='success-container'>
-        <img src='../image/logo-dark.png' alt='HMS Logo'>
-        <div class='success-icon'>✅</div>
-        <h2>Password Reset Successful</h2>
-        <p>Your password has been updated. You can now log in with your new credentials.</p>
-        <a href='../../login.php' class='btn-login'>Go to Login</a>
-    </div>
-</body>
-</html>
-";
-        exit;
     }
 }
 ?>

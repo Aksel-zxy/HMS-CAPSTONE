@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 
 $requestUri = trim($_SERVER['REQUEST_URI'], '/'); // e.g., "inventory-stock"
 $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));

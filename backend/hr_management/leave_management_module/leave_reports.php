@@ -291,7 +291,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="10" class="text-center">No leave records found.</td></tr>
+                            <tr><td colspan="11" class="text-center">No leave records found.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>

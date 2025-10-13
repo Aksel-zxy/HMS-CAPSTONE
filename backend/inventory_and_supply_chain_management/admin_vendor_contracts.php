@@ -1,6 +1,7 @@
 <?php
 session_start();
-require 'db.php';
+
+include '../../SQL/config.php';
 
 // Fetch all vendors and their contract info
 $stmt = $pdo->prepare("

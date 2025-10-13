@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 
 // Handle Asset Transfer
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['transfer_action']) && $_POST['transfer_action'] === 'transfer') {

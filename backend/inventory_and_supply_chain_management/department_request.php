@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 
 // ✅ Handle Approve / Reject Actions
 if (isset($_POST['action'])) {

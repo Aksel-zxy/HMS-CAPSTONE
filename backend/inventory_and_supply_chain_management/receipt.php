@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 
 $receipt_id = $_GET['receipt_id'] ?? 0;
 

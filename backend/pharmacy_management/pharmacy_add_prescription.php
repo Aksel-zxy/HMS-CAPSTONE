@@ -81,9 +81,12 @@ if ($result_pat && $result_pat->num_rows > 0) {
             <li class="sidebar-item">
                 <a href="pharmacy_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
-                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="bi bi-cast" viewBox="0 0 16 16">
+                        <path
+                            d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
+                        <path
+                            d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
                     <span style="font-size: 18px;">Dashboard</span>
                 </a>
@@ -92,19 +95,26 @@ if ($result_pat && $result_pat->num_rows > 0) {
             <li class="sidebar-item">
                 <a href="pharmacy_med_inventory.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-capsules" viewBox="0 0 16 16">
-                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="fa-solid fa-capsules" viewBox="0 0 16 16">
+                        <path
+                            d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
+                        <path
+                            d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
                     <span style="font-size: 18px;">Medicine Inventory</span>
                 </a>
             </li>
 
             <li class="sidebar-item">
-                <a class="sidebar-link" data-bs-toggle="collapse" href="#prescriptionMenu" role="button" aria-expanded="false" aria-controls="prescriptionMenu">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-file-prescription" viewBox="0 0 16 16">
-                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                <a class="sidebar-link" data-bs-toggle="collapse" href="#prescriptionMenu" role="button"
+                    aria-expanded="false" aria-controls="prescriptionMenu">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="fa-solid fa-file-prescription" viewBox="0 0 16 16">
+                        <path
+                            d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
+                        <path
+                            d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
                     <span style="font-size: 18px;">Prescription</span>
                 </a>
@@ -122,9 +132,12 @@ if ($result_pat && $result_pat->num_rows > 0) {
             <li class="sidebar-item">
                 <a href="pharmacy_sales.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-chart-line" viewBox="0 0 16 16">
-                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
+                        class="fa-solid fa-chart-line" viewBox="0 0 16 16">
+                        <path
+                            d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
+                        <path
+                            d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
                     <span style="font-size: 18px;">Sales</span>
                 </a>
@@ -137,8 +150,8 @@ if ($result_pat && $result_pat->num_rows > 0) {
             <div class="topbar">
                 <div class="toggle">
                     <button class="toggler-btn" type="button">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="30px" height="30px" fill="currentColor" class="bi bi-list-ul"
-                            viewBox="0 0 16 16">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="30px" height="30px" fill="currentColor"
+                            class="bi bi-list-ul" viewBox="0 0 16 16">
                             <path fill-rule="evenodd"
                                 d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m-3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2" />
                         </svg>
@@ -146,16 +159,21 @@ if ($result_pat && $result_pat->num_rows > 0) {
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
-                        <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?>
+                            <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton"
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
-                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton" style="min-width: 200px; padding: 10px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background-color: #fff; color: #333;">
+                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton"
+                            style="min-width: 200px; padding: 10px; border-radius: 5px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); background-color: #fff; color: #333;">
                             <li style="margin-bottom: 8px; font-size: 14px; color: #555;">
-                                <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
+                                <span>Welcome <strong
+                                        style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../logout.php"
+                                    style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -178,7 +196,8 @@ if ($result_pat && $result_pat->num_rows > 0) {
                         <h2></h2>
                         <div>
                             <!-- Button trigger modal -->
-                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#prescriptionModal">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                                data-bs-target="#prescriptionModal">
                                 Add Prescription
                             </button>
                         </div>
@@ -187,7 +206,8 @@ if ($result_pat && $result_pat->num_rows > 0) {
 
 
                     <!-- Modal -->
-                    <div class="modal fade" id="prescriptionModal" tabindex="-1" aria-labelledby="prescriptionModalLabel" aria-hidden="true">
+                    <div class="modal fade" id="prescriptionModal" tabindex="-1"
+                        aria-labelledby="prescriptionModalLabel" aria-hidden="true">
                         <div class="modal-dialog modal-lg">
                             <div class="modal-content">
 
@@ -205,9 +225,9 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                             <select class="form-select" id="doctor_id" name="doctor_id" required>
                                                 <option value="">-- Select Doctor --</option>
                                                 <?php foreach ($doctors as $doc): ?>
-                                                    <option value="<?= $doc['employee_id'] ?>">
-                                                        <?= $doc['first_name'] . ' ' . $doc['last_name'] ?>
-                                                    </option>
+                                                <option value="<?= $doc['employee_id'] ?>">
+                                                    <?= $doc['first_name'] . ' ' . $doc['last_name'] ?>
+                                                </option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
@@ -218,9 +238,9 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                             <select class="form-select" id="patient_id" name="patient_id" required>
                                                 <option value="">-- Select Patient --</option>
                                                 <?php foreach ($patients as $pat): ?>
-                                                    <option value="<?= $pat['patient_id'] ?>">
-                                                        <?= htmlspecialchars($pat['fname'] . ' ' . $pat['lname']) ?>
-                                                    </option>
+                                                <option value="<?= $pat['patient_id'] ?>">
+                                                    <?= htmlspecialchars($pat['fname'] . ' ' . $pat['lname']) ?>
+                                                </option>
                                                 <?php endforeach; ?>
                                             </select>
                                         </div>
@@ -230,38 +250,44 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                             <div class="medicine-row row mb-2">
                                                 <div class="col-md-4">
                                                     <label class="form-label">Medicine</label>
-                                                    <select class="form-select medicine-select" name="med_id[]" required>
+                                                    <select class="form-select medicine-select" name="med_id[]"
+                                                        required>
                                                         <option value="">-- Select Medicine --</option>
                                                         <?php foreach ($medicines as $med): ?>
-                                                            <option value="<?= htmlspecialchars($med['med_id']) ?>"
-                                                                data-dosage="<?= htmlspecialchars($med['dosage']) ?>"
-                                                                data-stock="<?= htmlspecialchars($med['stock_quantity'] ?? 0) ?>">
-                                                                <?= htmlspecialchars($med['med_name'] . ' (' . $med['dosage'] . ')') ?>
-                                                            </option>
+                                                        <option value="<?= htmlspecialchars($med['med_id']) ?>"
+                                                            data-dosage="<?= htmlspecialchars($med['dosage']) ?>"
+                                                            data-stock="<?= htmlspecialchars($med['stock_quantity'] ?? 0) ?>">
+                                                            <?= htmlspecialchars($med['med_name'] . ' (' . $med['dosage'] . ')') ?>
+                                                        </option>
                                                         <?php endforeach; ?>
                                                     </select>
                                                     <input type="hidden" class="dosage-input" name="dosage[]">
                                                 </div>
                                                 <div class="col-md-2">
                                                     <label class="form-label">Stock</label>
-                                                    <input type="text" class="form-control stock-display" value="" readonly>
+                                                    <input type="text" class="form-control stock-display" value=""
+                                                        readonly>
                                                 </div>
                                                 <div class="col-md-2">
                                                     <label class="form-label">Quantity</label>
-                                                    <input type="number" class="form-control" name="quantity[]" required>
+                                                    <input type="number" class="form-control" name="quantity[]"
+                                                        required>
                                                 </div>
                                                 <div class="col-md-3">
                                                     <label class="form-label">Note</label>
-                                                    <input type="text" class="form-control" name="note[]" placeholder="e.g. 3x a day">
+                                                    <input type="text" class="form-control" name="note[]"
+                                                        placeholder="e.g. 3x a day">
                                                 </div>
                                                 <div class="col-md-1 d-flex align-items-end">
-                                                    <button type="button" class="btn btn-danger remove-medicine">X</button>
+                                                    <button type="button"
+                                                        class="btn btn-danger remove-medicine">X</button>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <!-- Add Medicine Button -->
-                                        <button type="button" id="addMedicine" class="btn btn-success mb-3">+ Add Medicine</button>
+                                        <button type="button" id="addMedicine" class="btn btn-success mb-3">+ Add
+                                            Medicine</button>
 
                                         <!-- Status (Auto Pending, hidden from doctor) -->
                                         <input type="hidden" name="status" value="Pending">
@@ -269,7 +295,8 @@ if ($result_pat && $result_pat->num_rows > 0) {
                                     </div>
 
                                     <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Close</button>
                                         <button type="submit" class="btn btn-primary">Save Prescription</button>
                                     </div>
                                 </form>
@@ -280,106 +307,107 @@ if ($result_pat && $result_pat->num_rows > 0) {
 
 
                     <script>
-                        // Update medicine info and validate quantity
-                        function updateMedicineInfo(selectElem) {
-                            let selected = selectElem.options[selectElem.selectedIndex];
-                            let dosage = selected.getAttribute('data-dosage') || '';
-                            let stock = selected.getAttribute('data-stock') || '0';
+                    // Update medicine info and validate quantity
+                    function updateMedicineInfo(selectElem) {
+                        let selected = selectElem.options[selectElem.selectedIndex];
+                        let dosage = selected.getAttribute('data-dosage') || '';
+                        let stock = selected.getAttribute('data-stock') || '0';
 
-                            let row = selectElem.closest('.medicine-row');
-                            row.querySelector('.dosage-input').value = dosage;
-                            row.querySelector('.stock-display').value = stock;
+                        let row = selectElem.closest('.medicine-row');
+                        row.querySelector('.dosage-input').value = dosage;
+                        row.querySelector('.stock-display').value = stock;
 
-                            // Remove old input listener to prevent stacking
-                            let qtyInput = row.querySelector('input[name="quantity[]"]');
-                            let newQtyInput = qtyInput.cloneNode(true);
-                            qtyInput.parentNode.replaceChild(newQtyInput, qtyInput);
+                        // Remove old input listener to prevent stacking
+                        let qtyInput = row.querySelector('input[name="quantity[]"]');
+                        let newQtyInput = qtyInput.cloneNode(true);
+                        qtyInput.parentNode.replaceChild(newQtyInput, qtyInput);
 
-                            newQtyInput.addEventListener('input', function() {
-                                let currentStock = parseInt(row.querySelector('.stock-display').value) || 0;
-                                let enteredQty = parseInt(this.value);
+                        newQtyInput.addEventListener('input', function() {
+                            let currentStock = parseInt(row.querySelector('.stock-display').value) || 0;
+                            let enteredQty = parseInt(this.value);
 
-                                if (!isNaN(enteredQty) && enteredQty > currentStock) {
-                                    alert("Entered quantity exceeds available stock (" + currentStock + ")");
-                                    this.value = currentStock;
-                                }
-                            });
-
-                            updateMedicineOptions(); // refresh options to disable already selected medicines
-                        }
-
-                        // Disable already selected medicines in all rows
-                        function updateMedicineOptions() {
-                            let selectedValues = Array.from(document.querySelectorAll('.medicine-select'))
-                                .map(sel => sel.value)
-                                .filter(val => val !== '');
-
-                            document.querySelectorAll('.medicine-select').forEach(sel => {
-                                Array.from(sel.options).forEach(option => {
-                                    if (option.value !== '' && option.value !== sel.value) {
-                                        option.disabled = selectedValues.includes(option.value);
-                                    }
-                                });
-                            });
-                        }
-
-                        // Bind existing medicine selects
-                        document.querySelectorAll('.medicine-select').forEach(sel => {
-                            sel.addEventListener('change', function() {
-                                updateMedicineInfo(this);
-                            });
-                        });
-
-                        // Add new medicine row
-                        document.getElementById('addMedicine').addEventListener('click', function() {
-                            let newRow = document.querySelector('.medicine-row').cloneNode(true);
-
-                            // Clear inputs and selects
-                            newRow.querySelectorAll('input').forEach(input => input.value = '');
-                            newRow.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
-
-                            document.getElementById('medicineRows').appendChild(newRow);
-
-                            // Re-bind events for the new row
-                            let newSelect = newRow.querySelector('.medicine-select');
-                            newSelect.addEventListener('change', function() {
-                                updateMedicineInfo(this);
-                            });
-
-                            newRow.querySelector('.remove-medicine').addEventListener('click', function() {
-                                newRow.remove();
-                                updateMedicineOptions(); // re-enable removed medicine
-                            });
-
-                            updateMedicineOptions(); // refresh options for all rows
-                        });
-
-                        // Remove medicine row buttons
-                        document.querySelectorAll('.remove-medicine').forEach(btn => {
-                            btn.addEventListener('click', function() {
-                                this.closest('.medicine-row').remove();
-                                updateMedicineOptions();
-                            });
-                        });
-
-                        // Prevent form submission if any quantity is 0 or empty
-                        document.querySelector('form').addEventListener('submit', function(e) {
-                            let invalid = false;
-                            document.querySelectorAll('input[name="quantity[]"]').forEach(qtyInput => {
-                                let val = parseInt(qtyInput.value);
-                                if (isNaN(val) || val <= 0) {
-                                    invalid = true;
-                                    qtyInput.classList.add('is-invalid'); // optional: highlight invalid fields
-                                } else {
-                                    qtyInput.classList.remove('is-invalid');
-                                }
-                            });
-
-                            if (invalid) {
-                                e.preventDefault();
-                                alert("Please enter a valid quantity greater than 0 for all medicines.");
+                            if (!isNaN(enteredQty) && enteredQty > currentStock) {
+                                alert("Entered quantity exceeds available stock (" + currentStock + ")");
+                                this.value = currentStock;
                             }
                         });
+
+                        updateMedicineOptions(); // refresh options to disable already selected medicines
+                    }
+
+                    // Disable already selected medicines in all rows
+                    function updateMedicineOptions() {
+                        let selectedValues = Array.from(document.querySelectorAll('.medicine-select'))
+                            .map(sel => sel.value)
+                            .filter(val => val !== '');
+
+                        document.querySelectorAll('.medicine-select').forEach(sel => {
+                            Array.from(sel.options).forEach(option => {
+                                if (option.value !== '' && option.value !== sel.value) {
+                                    option.disabled = selectedValues.includes(option.value);
+                                }
+                            });
+                        });
+                    }
+
+                    // Bind existing medicine selects
+                    document.querySelectorAll('.medicine-select').forEach(sel => {
+                        sel.addEventListener('change', function() {
+                            updateMedicineInfo(this);
+                        });
+                    });
+
+                    // Add new medicine row
+                    document.getElementById('addMedicine').addEventListener('click', function() {
+                        let newRow = document.querySelector('.medicine-row').cloneNode(true);
+
+                        // Clear inputs and selects
+                        newRow.querySelectorAll('input').forEach(input => input.value = '');
+                        newRow.querySelectorAll('select').forEach(select => select.selectedIndex = 0);
+
+                        document.getElementById('medicineRows').appendChild(newRow);
+
+                        // Re-bind events for the new row
+                        let newSelect = newRow.querySelector('.medicine-select');
+                        newSelect.addEventListener('change', function() {
+                            updateMedicineInfo(this);
+                        });
+
+                        newRow.querySelector('.remove-medicine').addEventListener('click', function() {
+                            newRow.remove();
+                            updateMedicineOptions(); // re-enable removed medicine
+                        });
+
+                        updateMedicineOptions(); // refresh options for all rows
+                    });
+
+                    // Remove medicine row buttons
+                    document.querySelectorAll('.remove-medicine').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            this.closest('.medicine-row').remove();
+                            updateMedicineOptions();
+                        });
+                    });
+
+                    // Prevent form submission if any quantity is 0 or empty
+                    document.querySelector('form').addEventListener('submit', function(e) {
+                        let invalid = false;
+                        document.querySelectorAll('input[name="quantity[]"]').forEach(qtyInput => {
+                            let val = parseInt(qtyInput.value);
+                            if (isNaN(val) || val <= 0) {
+                                invalid = true;
+                                qtyInput.classList.add(
+                                'is-invalid'); // optional: highlight invalid fields
+                            } else {
+                                qtyInput.classList.remove('is-invalid');
+                            }
+                        });
+
+                        if (invalid) {
+                            e.preventDefault();
+                            alert("Please enter a valid quantity greater than 0 for all medicines.");
+                        }
+                    });
                     </script>
 
 
@@ -506,16 +534,16 @@ if ($result_pat && $result_pat->num_rows > 0) {
         <!----- End of Main Content ----->
     </div>
     <script>
-        function addMedicine() {
-            let medItem = document.querySelector('#med-items .row').cloneNode(true);
-            document.getElementById('med-items').appendChild(medItem);
-        }
+    function addMedicine() {
+        let medItem = document.querySelector('#med-items .row').cloneNode(true);
+        document.getElementById('med-items').appendChild(medItem);
+    }
     </script>
     <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
+    const toggler = document.querySelector(".toggler-btn");
+    toggler.addEventListener("click", function() {
+        document.querySelector("#sidebar").classList.toggle("collapsed");
+    });
     </script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="assets/Bootstrap/all.min.js"></script>

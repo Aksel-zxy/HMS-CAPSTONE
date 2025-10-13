@@ -1,5 +1,5 @@
 <?php
-include 'db.php';
+include '../../SQL/config.php';
 
 // Handle status update
 if (isset($_POST['update_status'])) {

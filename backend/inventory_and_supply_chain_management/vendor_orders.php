@@ -1,6 +1,6 @@
 <?php
 session_start();
-require 'db.php';
+include '../../SQL/config.php';
 
 // Make sure vendor is logged in
 if (!isset($_SESSION['vendor_id'])) {

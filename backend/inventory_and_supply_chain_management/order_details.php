@@ -1,5 +1,5 @@
 <?php
-require 'db.php';
+include '../../SQL/config.php';
 
 // Get order IDs from query string
 if (!isset($_GET['order_ids']) || empty($_GET['order_ids'])) {

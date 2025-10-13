@@ -1,7 +1,7 @@
 <?php
 // vendorprofile.php
 session_start();
-require_once __DIR__ . '/db.php'; // this gives us $pdo
+include '../../SQL/config.php';
 
 // ---- 1) Determine vendor id ----
 $vendor_id = 0;
