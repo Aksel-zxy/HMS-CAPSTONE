@@ -53,7 +53,7 @@ if (isset($_SESSION['user_id'])) {
                     <div class="dropdown-container">
                         <a href="patient_billing.php">Patient Billing</a>
                         <a href="billing_records.php">Billing Records</a>
-                        <a href="billing_items.php">Billing Items</a>
+                        <!-- <a href="billing_items.php">Billing Items</a> -->
                         <a href="expense_logs.php">Expense Logs</a>
                     </div>
                 </li>
