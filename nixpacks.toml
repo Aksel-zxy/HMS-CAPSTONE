@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ['php82']
+nixPkgs = ['php81']
 
 [phases.install]
 cmds = [
