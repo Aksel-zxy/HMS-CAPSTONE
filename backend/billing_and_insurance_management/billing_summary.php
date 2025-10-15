@@ -2,31 +2,30 @@
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// BillEase API configuration
-$billease_api_key = "YOUR_BILLEASE_API_KEY"; // Replace with your API key
-$billease_api_secret = "YOUR_BILLEASE_API_SECRET"; // Replace with your secret
+// -------------------- BillEase API configuration --------------------
+$billease_api_key = "YOUR_BILLEASE_API_KEY"; // replace with actual key
+$billease_payment_url = "https://sandbox.billease.ph/api/v1/payment"; // sandbox endpoint
 
-// Get patient_id
+// -------------------- Get patient info --------------------
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 $selected_patient = null;
-$billing_items = [];
-$total_charges = 0;
-$insurance_covered = 0;
-
 if ($patient_id > 0) {
-    // Fetch patient info
-    $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
+    $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $selected_patient = $stmt->get_result()->fetch_assoc();
+}
 
-    // Fetch completed results
+// -------------------- Fetch completed lab results --------------------
+$billing_items = [];
+$total_charges = 0;
+if ($patient_id > 0) {
     $stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID=? AND status='Completed'");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $results = $stmt->get_result();
 
-    // Fetch service prices
+    // Load services and prices
     $service_prices = [];
     $service_stmt = $conn->query("SELECT serviceName, description, price FROM dl_services");
     while($row = $service_stmt->fetch_assoc()){
@@ -43,49 +42,45 @@ if ($patient_id > 0) {
             $total_charges += $price;
         }
     }
-
-    // Fetch insurance coverage
-    $stmt = $conn->prepare("SELECT SUM(covered_amount) AS total_covered FROM insurance_requests WHERE patient_id=? AND status='Approved'");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $insurance_covered = floatval($row['total_covered'] ?? 0);
 }
 
-// Calculate totals
+// -------------------- Insurance coverage --------------------
+$insurance_covered = 0;
+$stmt = $conn->prepare("SELECT SUM(covered_amount) AS total_covered FROM insurance_requests WHERE patient_id=? AND status='Approved'");
+$stmt->bind_param("i", $patient_id);
+$stmt->execute();
+$row = $stmt->get_result()->fetch_assoc();
+$insurance_covered = floatval($row['total_covered'] ?? 0);
+
+// -------------------- Totals --------------------
 $grand_total = $total_charges;
 $total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
-// Handle BillEase payment
+// -------------------- Handle BillEase Payment --------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
-    $order_id = "HMS-".uniqid();
-    $customer_name = ($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '');
-    $customer_email = $selected_patient['email'] ?? "noemail@example.com";
 
-    $items = [];
-    foreach($billing_items as $item){
-        $items[] = [
-            "name" => $item['service_name'],
-            "price" => $item['total_price'],
-            "quantity" => 1
-        ];
+    if ($total_out_of_pocket <= 0) {
+        echo "<script>alert('No payment required. Covered by insurance.');</script>";
+        exit;
     }
 
+    $order_id = "HMS-" . uniqid();
+
     $payment_data = [
-        "order_id" => $order_id,
         "amount" => $total_out_of_pocket,
         "currency" => "PHP",
+        "order_id" => $order_id,
         "customer" => [
-            "name" => $customer_name,
-            "email" => $customer_email,
+            "name" => trim(($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '')),
+            "email" => $selected_patient['email'] ?? "noemail@example.com",
             "phone" => $selected_patient['phone_number'] ?? ""
         ],
-        "items" => $items,
-        "success_url" => "http://localhost/hmscapstone/billing_and_insurance_management/bill_payment_callback.php?status=success&patient_id=$patient_id",
-        "fail_url" => "http://localhost/hmscapstone/billing_and_insurance_management/bill_payment_callback.php?status=failed&patient_id=$patient_id"
+        // Replace with your publicly accessible URL or ngrok
+        "callback_url" => "http://localhost/hmscapstone/billing_and_insurance_management/bill_payment_callback.php"
     ];
 
-    $ch = curl_init("https://sandbox.billease.ph/api/v1/transactions"); // BillEase endpoint
+    // Initialize cURL
+    $ch = curl_init($billease_payment_url);
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payment_data));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -96,18 +91,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
 
     $response = curl_exec($ch);
     $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    if(curl_errno($ch)){
+        die("cURL error: " . curl_error($ch));
+    }
+
     curl_close($ch);
 
     $result = json_decode($response, true);
 
-    if($httpcode == 201 && !empty($result['payment_url'])){
-        header("Location: ".$result['payment_url']); // Redirect to BillEase
+    // Debugging
+    if (!isset($result['payment_url'])) {
+        echo "<pre>Failed to create BillEase payment. HTTP: $httpcode\nResponse: $response</pre>";
         exit;
-    } else {
-        echo "<script>alert('Failed to create BillEase payment. Response: ".htmlspecialchars($response)."');</script>";
     }
-}
 
+    // Redirect to BillEase payment page
+    header("Location: " . $result['payment_url']);
+    exit;
+}
 ?>
 
 <!doctype html>
@@ -134,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
 
     <div class="mb-2">
         <strong>BILLED TO:</strong><br>
-        <?= htmlspecialchars($selected_patient ? ($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['mname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '') : 'N/A') ?><br>
+        <?= htmlspecialchars($selected_patient ? trim(($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['mname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '')) : 'N/A') ?><br>
         Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?><br>
         Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?>
     </div>
