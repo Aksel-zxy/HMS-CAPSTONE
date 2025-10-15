@@ -107,7 +107,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
     // Credit Service Revenue
     $account_name = "Service Revenue";
     $credit = $grand_total;
-    $stmt3->bind_param("isdds", $entry_id, $account_name, 0, $credit, $desc);
+    $zero = 0;
+    $stmt3->bind_param("isdds", $entry_id, $account_name, $zero, $credit, $desc);
     $stmt3->execute();
 
     echo "<script>alert('Payment recorded successfully!'); window.location='billing_dashboard.php';</script>";
