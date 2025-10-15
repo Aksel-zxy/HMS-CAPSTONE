@@ -2,21 +2,23 @@
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// Get patient_id
+// -------------------- BillEase API configuration --------------------
+$billease_api_key = "YOUR_BILLEASE_API_KEY"; // replace with actual key
+$billease_payment_url = "https://sandbox.billease.ph/api/v1/payment"; // sandbox endpoint
+
+// -------------------- Get patient info --------------------
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 $selected_patient = null;
-
 if ($patient_id > 0) {
-    $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
+    $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $selected_patient = $stmt->get_result()->fetch_assoc();
 }
 
-// Fetch completed results for this patient
+// -------------------- Fetch completed lab results --------------------
 $billing_items = [];
 $total_charges = 0;
-
 if ($patient_id > 0) {
     $stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID=? AND status='Completed'");
     $stmt->bind_param("i", $patient_id);
@@ -42,7 +44,7 @@ if ($patient_id > 0) {
     }
 }
 
-// Fetch insurance coverage
+// -------------------- Insurance coverage --------------------
 $insurance_covered = 0;
 $stmt = $conn->prepare("SELECT SUM(covered_amount) AS total_covered FROM insurance_requests WHERE patient_id=? AND status='Approved'");
 $stmt->bind_param("i", $patient_id);
@@ -50,71 +52,64 @@ $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
 $insurance_covered = floatval($row['total_covered'] ?? 0);
 
-// Calculate totals
+// -------------------- Totals --------------------
 $grand_total = $total_charges;
 $total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
-// Handle mock online payment request
+// -------------------- Handle BillEase Payment --------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
-    // Simulate payment success (mock)
-    $payment_status = "Paid";
-    $payment_method = "Online Payment (Mock)";
-    $txn_id = "TXN-" . uniqid();
 
-    // Insert receipt
-    $stmt = $conn->prepare("INSERT INTO patient_receipt 
-        (patient_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
-        VALUES (?, ?, 0, 0, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?)
-    ");
-    $is_pwd = $selected_patient['is_pwd'] ?? 0;
-    $stmt->bind_param(
-        "idddddssssi",
-        $patient_id,
-        $total_charges,
-        $total_out_of_pocket,
-        $grand_total,
-        $insurance_covered,
-        $payment_method,
-        $payment_status,
-        $txn_id,
-        $txn_id,
-        $is_pwd
-    );
-    $stmt->execute();
-    $receipt_id = $stmt->insert_id;
+    if ($total_out_of_pocket <= 0) {
+        echo "<script>alert('No payment required. Covered by insurance.');</script>";
+        exit;
+    }
 
-    // Automatically generate journal entries
-    $stmt2 = $conn->prepare("INSERT INTO journal_entries 
-        (entry_date, module, description, reference, status, created_by) VALUES (NOW(), 'billing', ?, ?, 'Posted', ?)
-    ");
-    $desc = "Receipt #$receipt_id for Patient #$patient_id";
-    $reference = "RCPT-$receipt_id";
-    $created_by = $_SESSION['username'] ?? 'System';
-    $stmt2->bind_param("sss", $desc, $reference, $created_by);
-    $stmt2->execute();
-    $entry_id = $stmt2->insert_id;
+    $order_id = "HMS-" . uniqid();
 
-    // Journal lines
-    $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, ?, ?, ?, ?)");
-    
-    // Debit Cash / Online Payment
-    $account_name = "Cash / Online Payment";
-    $debit = $total_out_of_pocket;
-    $credit = 0;
-    $stmt3->bind_param("isdds", $entry_id, $account_name, $debit, $credit, $desc);
-    $stmt3->execute();
-    
-    // Credit Service Revenue
-    $account_name = "Service Revenue";
-    $credit = $grand_total;
-    $zero = 0;
-    $stmt3->bind_param("isdds", $entry_id, $account_name, $zero, $credit, $desc);
-    $stmt3->execute();
+    $payment_data = [
+        "amount" => $total_out_of_pocket,
+        "currency" => "PHP",
+        "order_id" => $order_id,
+        "customer" => [
+            "name" => trim(($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '')),
+            "email" => $selected_patient['email'] ?? "noemail@example.com",
+            "phone" => $selected_patient['phone_number'] ?? ""
+        ],
+        // Replace with your publicly accessible URL or ngrok
+        "callback_url" => "http://localhost/hmscapstone/billing_and_insurance_management/bill_payment_callback.php"
+    ];
 
-    echo "<script>alert('Payment recorded successfully!'); window.location='billing_dashboard.php';</script>";
+    // Initialize cURL
+    $ch = curl_init($billease_payment_url);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payment_data));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Content-Type: application/json",
+        "Authorization: Bearer $billease_api_key"
+    ]);
+
+    $response = curl_exec($ch);
+    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    if(curl_errno($ch)){
+        die("cURL error: " . curl_error($ch));
+    }
+
+    curl_close($ch);
+
+    $result = json_decode($response, true);
+
+    // Debugging
+    if (!isset($result['payment_url'])) {
+        echo "<pre>Failed to create BillEase payment. HTTP: $httpcode\nResponse: $response</pre>";
+        exit;
+    }
+
+    // Redirect to BillEase payment page
+    header("Location: " . $result['payment_url']);
     exit;
 }
-
 ?>
 
 <!doctype html>
@@ -141,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
 
     <div class="mb-2">
         <strong>BILLED TO:</strong><br>
-        <?= htmlspecialchars($selected_patient ? ($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['mname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '') : 'N/A') ?><br>
+        <?= htmlspecialchars($selected_patient ? trim(($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['mname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '')) : 'N/A') ?><br>
         Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?><br>
         Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?>
     </div>
@@ -176,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
     <?php if ($total_out_of_pocket > 0): ?>
         <form method="POST" class="text-end">
             <button type="submit" name="pay_online" class="btn btn-success">
-                <i class="bi bi-credit-card me-1"></i> Pay Online (Mock)
+                <i class="bi bi-credit-card me-1"></i> Pay via BillEase
             </button>
         </form>
     <?php else: ?>
