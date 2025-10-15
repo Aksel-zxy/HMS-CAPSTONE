@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $condition_name = $_POST['condition_name'] ?? '';
-        $diagnosis_date = $_POST['diagnosis_date'] ?? '';
+        $diagnosis_date = !empty($_POST['diagnosis_date']) ? $_POST['diagnosis_date'] : null;
         $notes = $_POST['notes'] ?? '';
 
         $stmt->bind_param("isss", $patient_id, $condition_name, $diagnosis_date, $notes);
