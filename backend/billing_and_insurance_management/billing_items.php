@@ -149,6 +149,7 @@ $grand_total = $subtotal - $discount;
 <title>Billing Items</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="assets/CSS/billing_items.css">
+<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 function togglePWD(checkbox){

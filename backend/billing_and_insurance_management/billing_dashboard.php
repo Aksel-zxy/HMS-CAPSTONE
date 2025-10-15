@@ -3,7 +3,7 @@ session_start();
 include '../../SQL/config.php';
 
 if (!isset($_SESSION['billing']) || $_SESSION['billing'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+    header('Location: login.php');
     exit();
 }
 
@@ -43,20 +43,21 @@ $recent_receipts = $conn->query("SELECT * FROM patient_receipt ORDER BY created_
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Billing Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="assets/CSS/billing_dashboard.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Billing Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/CSS/billing_dashboard.css">
+<link rel="stylesheet" href="assets/css/billing_sidebar.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 <div class="dashboard-wrapper">
 
     <!-- Sidebar -->
     <div class="main-sidebar">
-<?php include 'billing_sidebar.php'; ?>
-</div>
+        <?php include 'billing_sidebar.php'; ?>
+    </div>
 
     <!-- Main content -->
     <div class="main-content-wrapper" id="mainContent">
@@ -105,7 +106,7 @@ $recent_receipts = $conn->query("SELECT * FROM patient_receipt ORDER BY created_
                     <div class="card shadow-sm">
                         <div class="card-body">
                             <h5 class="card-title">Revenue by Payment Method</h5>
-                            <div class="chart-container">
+                            <div class="chart-container" style="height:300px;">
                                 <canvas id="paymentChart"></canvas>
                             </div>
                         </div>
@@ -115,7 +116,7 @@ $recent_receipts = $conn->query("SELECT * FROM patient_receipt ORDER BY created_
                     <div class="card shadow-sm">
                         <div class="card-body">
                             <h5 class="card-title">Paid vs Unpaid</h5>
-                            <div class="chart-container">
+                            <div class="chart-container" style="height:300px;">
                                 <canvas id="statusChart"></canvas>
                             </div>
                         </div>
@@ -163,28 +164,19 @@ $recent_receipts = $conn->query("SELECT * FROM patient_receipt ORDER BY created_
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    const sidebar = document.getElementById('mySidebar');
-    const mainContent = document.getElementById('mainContent');
-    const toggleBtn = document.getElementById('sidebarToggle');
 
-    toggleBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('closed');
-        mainContent.classList.toggle('shifted');
-    });
-</script>
-
-<!-- Chart.js scripts -->
 <script>
+    // Payment Methods Chart
     const paymentData = {
         labels: <?= json_encode(array_column($payment_methods, 'payment_method')) ?>,
         datasets: [{
-            data: <?= json_encode(array_column($payment_methods, 'total')) ?>,
+            data: <?= json_encode(array_map(function($p){ return floatval($p['total']); }, $payment_methods)) ?>,
             backgroundColor: ['#007bff','#28a745','#ffc107','#dc3545','#17a2b8'],
             borderWidth: 2,
             borderColor: '#fff'
@@ -193,13 +185,14 @@ $recent_receipts = $conn->query("SELECT * FROM patient_receipt ORDER BY created_
     new Chart(document.getElementById('paymentChart'), {
         type: 'pie',
         data: paymentData,
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
     });
 
+    // Paid vs Unpaid Chart
     const statusData = {
         labels: ['Paid', 'Unpaid'],
         datasets: [{
-            data: [<?= $total_paid ?>, <?= $total_unpaid ?>],
+            data: [<?= floatval($total_paid) ?>, <?= floatval($total_unpaid) ?>],
             backgroundColor: ['#28a745','#dc3545'],
             borderWidth: 2,
             borderColor: '#fff'
@@ -208,7 +201,7 @@ $recent_receipts = $conn->query("SELECT * FROM patient_receipt ORDER BY created_
     new Chart(document.getElementById('statusChart'), {
         type: 'doughnut',
         data: statusData,
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
     });
 </script>
 </body>

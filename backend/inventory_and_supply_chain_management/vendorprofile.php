@@ -64,6 +64,7 @@ function e($str) {
   <meta charset="UTF-8">
   <title>Vendor Profile</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/vendorsidebar.css">
 </head>
 <body class="bg-light">
 

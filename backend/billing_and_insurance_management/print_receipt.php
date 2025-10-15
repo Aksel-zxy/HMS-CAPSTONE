@@ -58,6 +58,7 @@ $grand_total = floatval($billing['grand_total']);
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="assets/CSS/pdf.css">
+<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 <title>Patient Invoice</title>
 <style>
 .fully-covered { background-color: #28a745; color: white; padding: 10px; text-align: center; font-weight: bold; margin-bottom: 15px; border-radius: 5px; }

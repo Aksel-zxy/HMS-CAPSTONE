@@ -85,6 +85,7 @@ $main_inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <title>Asset Transfer & Disposal</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/Inventory_dashboard.css">
 </head>
 <body class="bg-light p-4">
 

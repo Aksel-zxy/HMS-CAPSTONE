@@ -86,6 +86,7 @@ $avgRatings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); // vendor_id => avg_rating
 <title>PO Status Tracking</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="po_status_tracking.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/Inventory_dashboard.css">
 </head>
 <body class="bg-light">
 

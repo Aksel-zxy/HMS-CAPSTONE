@@ -12,6 +12,7 @@ $result = $conn->query($sql);
   <meta charset="UTF-8">
   <title>Expense Logs</title>
   <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 </head>
 <body class="p-4 bg-light">
 
