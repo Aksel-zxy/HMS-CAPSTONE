@@ -1,23 +1,19 @@
 <?php
 include '../../SQL/config.php';
 
-// Fetch patients with finalized billing items not yet paid
+// ✅ Fetch patients who have lab results (dl_results) but no paid receipt yet
 $sql = "
 SELECT 
     p.patient_id,
     CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
-    ir.status AS insurance_status,
+    COALESCE(ir.status, 'N/A') AS insurance_status,
     (
-        SELECT bi.billing_id
-        FROM billing_items bi
-        LEFT JOIN patient_receipt pr 
-            ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
-        WHERE bi.patient_id = p.patient_id
-        AND bi.finalized = 1
-        AND pr.receipt_id IS NULL
-        ORDER BY bi.billing_id DESC
+        SELECT pr.status 
+        FROM patient_receipt pr 
+        WHERE pr.patient_id = p.patient_id
+        ORDER BY pr.created_at DESC 
         LIMIT 1
-    ) AS billing_id
+    ) AS payment_status
 FROM patientinfo p
 LEFT JOIN insurance_requests ir 
     ON p.patient_id = ir.patient_id
@@ -27,19 +23,16 @@ LEFT JOIN insurance_requests ir
         WHERE patient_id = p.patient_id
     )
 WHERE EXISTS (
-    SELECT 1
-    FROM billing_items bi
-    LEFT JOIN patient_receipt pr 
-        ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
-        WHERE bi.patient_id = p.patient_id
-        AND bi.finalized = 1
-        AND pr.receipt_id IS NULL
+    SELECT 1 
+    FROM dl_results dr
+    WHERE dr.patientID = p.patient_id
 )
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
 $result = $conn->query($sql);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,8 +47,6 @@ $result = $conn->query($sql);
 <body>
 <div class="dashboard-wrapper">
 
-   
-
     <!-- Main Content -->
     <div class="main-content-wrapper" id="mainContent">
         <div class="container-fluid bg-white p-4 rounded shadow">
@@ -65,6 +56,7 @@ $result = $conn->query($sql);
                     <tr>
                         <th>Patient Name</th>
                         <th>Insurance Status</th>
+                        <th>Remarks</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
@@ -73,8 +65,9 @@ $result = $conn->query($sql);
                         <?php while ($row = $result->fetch_assoc()): ?>
                             <?php 
                                 $insuranceStatus = $row['insurance_status'] ?? 'N/A';
-                                $disableBill = ($insuranceStatus === 'Pending') || empty($row['billing_id']); 
-                                $showInsuranceButton = ($insuranceStatus === 'N/A'); 
+                                $paymentStatus = $row['payment_status'] ?? 'Pending';
+                                $disableBill = ($insuranceStatus === 'Pending') || ($paymentStatus === 'Paid');
+                                $showInsuranceButton = ($insuranceStatus === 'N/A');
                                 $rowClass = $insuranceStatus === 'Pending' ? 'pending-insurance' : '';
                             ?>
                             <tr class="<?= $rowClass ?>">
@@ -90,27 +83,36 @@ $result = $conn->query($sql);
                                         <span class="badge bg-secondary">N/A</span>
                                     <?php endif; ?>
                                 </td>
+                                <td>
+                                    <?php if ($paymentStatus === 'Paid'): ?>
+                                        <span class="badge bg-success">Paid</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="text-end">
                                     <div class="d-flex justify-content-end gap-2 align-items-center flex-wrap">
                                         <?php if ($disableBill): ?>
-                                            <button class="btn btn-success btn-sm" disabled>Generate Bill</button>
+                                            <button class="btn btn-success btn-sm" disabled>
+                                                <?= $paymentStatus === 'Paid' ? 'Already Paid' : 'Generate Bill'; ?>
+                                            </button>
                                             <?php if ($insuranceStatus === 'Pending'): ?>
-                                            <i class="bi bi-question-circle-fill tooltip-icon" 
-                                               data-bs-toggle="tooltip" 
-                                               data-bs-placement="top" 
-                                               title="Cannot generate bill until insurance request is resolved."></i>
+                                                <i class="bi bi-question-circle-fill tooltip-icon" 
+                                                   data-bs-toggle="tooltip" 
+                                                   data-bs-placement="top" 
+                                                   title="Cannot generate bill until insurance request is resolved."></i>
                                             <?php endif; ?>
                                         <?php else: ?>
-                                            <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>&billing_id=<?= $row['billing_id']; ?>" 
+                                            <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" 
                                                class="btn btn-success btn-sm">
                                                Generate Bill
                                             </a>
                                         <?php endif; ?>
 
                                         <?php if ($showInsuranceButton): ?>
-                                        <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">
-                                          Insurance Request
-                                        </button>
+                                            <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">
+                                                Insurance Request
+                                            </button>
                                         <?php endif; ?>
                                     </div>
 
@@ -151,14 +153,15 @@ $result = $conn->query($sql);
                         <?php endwhile; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="3" class="text-center">No patients with finalized services pending billing.</td>
+                            <td colspan="4" class="text-center">No patients with completed results pending billing.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
     </div>
-     <!-- Sidebar -->
+
+    <!-- Sidebar -->
     <div class="main-sidebar">
         <?php include 'billing_sidebar.php'; ?>
     </div>
