@@ -2,119 +2,125 @@
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// Get the incoming data from BillEase (JSON)
-$input = file_get_contents('php://input');
-$data = json_decode($input, true);
+// BillEase webhook sends payment info
+$payload = file_get_contents('php://input');
+$data = json_decode($payload, true);
 
-// Log the callback (optional, for debugging)
-// file_put_contents('billease_callback.log', $input.PHP_EOL, FILE_APPEND);
+// Log incoming data for debugging (optional)
+// file_put_contents('bill_payment_log.txt', json_encode($data, JSON_PRETTY_PRINT));
 
-if (!$data || !isset($data['payment_status']) || $data['payment_status'] !== 'success') {
+if (!$data || !isset($data['status']) || !isset($data['order_id'])) {
     http_response_code(400);
-    exit('Invalid payment callback');
+    exit("Invalid request");
 }
 
-// Get patient_id and amount from callback (these should be passed in BillEase payload)
-$patient_id = intval($data['patient_id'] ?? 0);
+$order_id = $data['order_id'];
+$payment_status = strtolower($data['status']);
 $amount_paid = floatval($data['amount'] ?? 0);
-$transaction_id = $data['transaction_id'] ?? 'BE'.uniqid();
 
-if($patient_id <= 0 || $amount_paid <= 0){
-    http_response_code(400);
-    exit('Invalid data');
-}
-
-// --- Fetch patient and billing info ---
-$stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
-$stmt->bind_param("i",$patient_id);
+// Map order_id to patient and billing
+// Assuming you saved order_id in session or DB when creating BillEase payment
+$stmt = $conn->prepare("SELECT patient_id FROM billing_orders WHERE order_id=? LIMIT 1");
+$stmt->bind_param("s", $order_id);
 $stmt->execute();
-$patient = $stmt->get_result()->fetch_assoc();
+$row = $stmt->get_result()->fetch_assoc();
+$patient_id = $row['patient_id'] ?? 0;
 
-if(!$patient){
-    http_response_code(404);
-    exit('Patient not found');
+if (!$patient_id || $payment_status !== 'paid') {
+    http_response_code(400);
+    exit("Payment not successful or patient not found");
 }
 
-// --- Calculate billing totals ---
+// Fetch billing items and insurance coverage
 $total_charges = 0;
 $billing_items = [];
-
-$stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID=? AND status='Completed'");
-$stmt->bind_param("i",$patient_id);
-$stmt->execute();
-$res = $stmt->get_result();
-
 $service_prices = [];
 $service_stmt = $conn->query("SELECT serviceName, description, price FROM dl_services");
-while($row=$service_stmt->fetch_assoc()){
-    $service_prices[$row['serviceName']] = [
-        'description'=>$row['description'],
-        'price'=>floatval($row['price'])
-    ];
+while($r = $service_stmt->fetch_assoc()){
+    $service_prices[$r['serviceName']] = ['description'=>$r['description'], 'price'=>floatval($r['price'])];
 }
 
-while($row = $res->fetch_assoc()){
-    $services = explode(',',$row['result']);
+$stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID=? AND status='Completed'");
+$stmt->bind_param("i", $patient_id);
+$stmt->execute();
+$results = $stmt->get_result();
+while($row = $results->fetch_assoc()){
+    $services = explode(',', $row['result']);
     foreach($services as $s){
         $s = trim($s);
         $price = $service_prices[$s]['price'] ?? 0;
         $desc = $service_prices[$s]['description'] ?? '';
-        $billing_items[] = ['service_name'=>$s,'description'=>$desc,'total_price'=>$price];
+        $billing_items[] = ['service_name'=>$s, 'description'=>$desc, 'total_price'=>$price];
         $total_charges += $price;
     }
 }
 
-// --- Insurance ---
+// Insurance coverage
 $insurance_covered = 0;
 $stmt = $conn->prepare("SELECT SUM(covered_amount) AS total_covered FROM insurance_requests WHERE patient_id=? AND status='Approved'");
-$stmt->bind_param("i",$patient_id);
+$stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
 $insurance_covered = floatval($row['total_covered'] ?? 0);
 
-// --- Totals ---
 $grand_total = $total_charges;
-$total_out_of_pocket = max($grand_total - $insurance_covered,0);
+$total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
-// --- Insert receipt ---
-$stmt = $conn->prepare("INSERT INTO patient_receipt
-    (patient_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
-    VALUES (?, ?, 0, 0, ?, ?, CURDATE(), ?, 'BillEase', 'Paid', ?, ?, ?)
+// Save receipt
+$txn_id = "BE-" . uniqid();
+$payment_method = "BillEase Online";
+$ref = $data['transaction_id'] ?? $txn_id;
+
+$stmt = $conn->prepare("
+    INSERT INTO patient_receipt 
+    (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
+    VALUES (?, ?, ?, 0, 0, ?, ?, CURDATE(), ?, ?, 'Paid', ?, ?, 0)
 ");
-$is_pwd = $patient['is_pwd'] ?? 0;
-$stmt->bind_param("iddddsis",$patient_id,$total_charges,$total_out_of_pocket,$grand_total,$insurance_covered,$transaction_id,$transaction_id,$is_pwd);
+
+// Determine billing_id (latest finalized)
+$billing_id = null;
+$stmt2 = $conn->prepare("SELECT MAX(billing_id) AS latest_billing_id FROM billing_items WHERE patient_id=? AND finalized=1");
+$stmt2->bind_param("i", $patient_id);
+$stmt2->execute();
+$res = $stmt2->get_result()->fetch_assoc();
+$billing_id = $res['latest_billing_id'] ?? null;
+
+$stmt->bind_param("iidddds", $patient_id, $billing_id, $total_charges, $total_out_of_pocket, $grand_total, $insurance_covered, $payment_method, $txn_id, $ref);
 $stmt->execute();
 $receipt_id = $stmt->insert_id;
 
-// --- Create journal entry ---
-$description = "BillEase Payment for Patient #$patient_id";
-$stmt = $conn->prepare("INSERT INTO journal_entries (entry_date,module,description,reference_type,reference,status,created_by) VALUES (NOW(),'billing',?,'Patient Billing',?,'Posted',?)");
-$created_by = 'System';
-$stmt->bind_param("sss",$description,$receipt_id,$created_by);
+// Create journal entry
+$description = "Receipt for Patient #$patient_id (BillEase Payment)";
+$reference = "RCPT-" . $receipt_id;
+$status = "Posted";
+$created_by = $_SESSION['username'] ?? 'System';
+
+$stmt = $conn->prepare("INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by, reference_type, reference_id) VALUES (NOW(), 'billing', ?, ?, ?, ?, 'Patient Billing', ?)");
+$stmt->bind_param("ssssi", $description, $reference, $status, $created_by, $receipt_id);
 $stmt->execute();
 $entry_id = $stmt->insert_id;
 
-// --- Journal entry lines ---
-if($insurance_covered>0){
-    $stmt2 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,?,?,?)");
-    $insurance_account = 'Accounts Receivable - Insurance';
-    $zero = 0;
-    $stmt2->bind_param("isdss", $entry_id, $insurance_account, $insurance_covered, $zero, $description);
-    $stmt2->execute();
+// Create journal entry lines
+// 1. Accounts Receivable - Insurance (if any)
+if($insurance_covered > 0){
+    $stmt = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Accounts Receivable - Insurance', ?, 0, ?)");
+    $stmt->bind_param("ids", $entry_id, $insurance_covered, $description);
+    $stmt->execute();
 }
-if($total_out_of_pocket>0){
-    $stmt2 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,?,?,?)");
-    $account = 'Cash in Bank - Online';
-    $zero = 0;
-    $stmt2->bind_param("isdss", $entry_id, $account, $total_out_of_pocket, $zero, $description);
-    $stmt2->execute();
-}
-$stmt2 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,?,?,?)");
-$zero = 0;
-$service_revenue_account = 'Service Revenue';
-$stmt2->bind_param("isdss", $entry_id, $service_revenue_account, $zero, $grand_total, $description);
-$stmt2->execute();
 
-// Respond to BillEase
+// 2. Accounts Receivable - BillEase (online payment)
+if($total_out_of_pocket > 0){
+    $stmt = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Accounts Receivable - BillEase', ?, 0, ?)");
+    $stmt->bind_param("ids", $entry_id, $total_out_of_pocket, $description);
+    $stmt->execute();
+}
+
+// 3. Service Revenue
+$stmt = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Service Revenue', 0, ?, ?)");
+$stmt->bind_param("ids", $entry_id, $grand_total, $description);
+$stmt->execute();
+
+// Respond to BillEase webhook
 http_response_code(200);
-echo json_encode(['status'=>'success']);
+echo json_encode(["status"=>"success"]);
+?>

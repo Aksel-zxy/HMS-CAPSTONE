@@ -2,8 +2,9 @@
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// BillEase integration
+// BillEase API configuration
 $billease_api_key = "YOUR_BILLEASE_API_KEY"; // replace with your actual key
+$billease_api_secret = "YOUR_BILLEASE_API_SECRET"; // replace with your actual secret
 $billease_payment_url = "https://sandbox.billease.ph/api/v1/payment"; // BillEase endpoint
 
 // Get patient_id
@@ -17,7 +18,7 @@ if ($patient_id > 0) {
     $selected_patient = $stmt->get_result()->fetch_assoc();
 }
 
-// Fetch services from dl_results and prices from dl_services
+// Fetch completed results for this patient
 $billing_items = [];
 $total_charges = 0;
 
@@ -27,7 +28,7 @@ if ($patient_id > 0) {
     $stmt->execute();
     $results = $stmt->get_result();
 
-    // Get service prices
+    // Load services and prices
     $service_prices = [];
     $service_stmt = $conn->query("SELECT serviceName, description, price FROM dl_services");
     while($row = $service_stmt->fetch_assoc()){
@@ -46,7 +47,7 @@ if ($patient_id > 0) {
     }
 }
 
-// Insurance coverage
+// Fetch insurance coverage
 $insurance_covered = 0;
 $stmt = $conn->prepare("SELECT SUM(covered_amount) AS total_covered FROM insurance_requests WHERE patient_id=? AND status='Approved'");
 $stmt->bind_param("i", $patient_id);
@@ -54,57 +55,46 @@ $stmt->execute();
 $row = $stmt->get_result()->fetch_assoc();
 $insurance_covered = floatval($row['total_covered'] ?? 0);
 
-// Totals
+// Calculate totals
 $grand_total = $total_charges;
-$total_out_of_pocket = max($grand_total - $insurance_covered,0);
+$total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
 // Handle BillEase payment request
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
 
-    // Here you would normally call BillEase API to create payment
-    // For simplicity, we simulate a successful payment
-    $transaction_id = 'BE'.uniqid();
+    // Prepare BillEase payment data
+    $payment_data = [
+        "amount" => $total_out_of_pocket,
+        "currency" => "PHP",
+        "order_id" => "HMS-".uniqid(),
+        "customer" => [
+            "name" => ($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['lname'] ?? ''),
+            "email" => $selected_patient['email'] ?? "noemail@example.com",
+            "phone" => $selected_patient['phone_number'] ?? ""
+        ],
+        "callback_url" => "http://localhost/hmscapstone/billing_and_insurance_management/bill_payment_callback.php"
+    ];
 
-    // Insert receipt
-    $stmt = $conn->prepare("INSERT INTO patient_receipt
-        (patient_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
-        VALUES (?, ?, 0, 0, ?, ?, CURDATE(), ?, 'BillEase', 'Paid', ?, ?, ?)
-    ");
-    $is_pwd = $selected_patient['is_pwd'] ?? 0;
-    $stmt->bind_param("iddddsis",$patient_id,$total_charges,$total_out_of_pocket,$grand_total,$insurance_covered,$transaction_id,$transaction_id,$is_pwd);
-    $stmt->execute();
-    $receipt_id = $stmt->insert_id;
+    $ch = curl_init($billease_payment_url);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payment_data));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Content-Type: application/json",
+        "Authorization: Bearer $billease_api_key"
+    ]);
 
-    // Create journal entry
-    $description = "BillEase Payment for Patient #$patient_id";
-    $stmt = $conn->prepare("INSERT INTO journal_entries (entry_date,module,description,reference_type,reference,status,created_by) VALUES (NOW(),'billing',?,'Patient Billing',?,'Posted','System')");
-    $stmt->bind_param("ss",$description,$receipt_id);
-    $stmt->execute();
-    $entry_id = $stmt->insert_id;
+    $response = curl_exec($ch);
+    curl_close($ch);
+    $result = json_decode($response, true);
 
-    // Journal entry lines
-    if($insurance_covered>0){
-        $stmt2 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,?,?,?)");
-        $insurance_account = 'Accounts Receivable - Insurance';
-        $zero = 0;
-        $stmt2->bind_param("isdss", $entry_id, $insurance_account, $insurance_covered, $zero, $description);
-        $stmt2->execute();
+    if (isset($result['payment_url'])) {
+        // Redirect user to BillEase payment page
+        header("Location: ".$result['payment_url']);
+        exit;
+    } else {
+        echo "<script>alert('Failed to create BillEase payment.');</script>";
     }
-    if($total_out_of_pocket>0){
-        $stmt2 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,?,?,?)");
-        $account = 'Cash in Bank - Online';
-        $zero = 0;
-        $stmt2->bind_param("isdss", $entry_id, $account, $total_out_of_pocket, $zero, $description);
-        $stmt2->execute();
-    }
-    $stmt2 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,?,?,?)");
-    $zero = 0;
-    $service_revenue_account = 'Service Revenue';
-    $stmt2->bind_param("isdss", $entry_id, $service_revenue_account, $zero, $grand_total, $description);
-    $stmt2->execute();
-
-    echo "<script>alert('Payment successful via BillEase!'); window.location='billing_summary.php?patient_id={$patient_id}';</script>";
-    exit;
 }
 
 ?>
@@ -120,6 +110,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>
 <body class="bg-light p-4">
+
+ <div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
+</div>
 
 <div class="receipt-box">
     <div class="d-flex justify-content-between mb-3">
@@ -168,9 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
             </button>
         </form>
     <?php else: ?>
-        <div class="text-end">
-            <span class="text-success fw-bold">No payment required. Covered by insurance.</span>
-        </div>
+        <div class="text-end text-success fw-bold">No payment required. Covered by insurance.</div>
     <?php endif; ?>
 </div>
 
