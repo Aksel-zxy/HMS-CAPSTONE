@@ -83,6 +83,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $merchant_id = 'YOUR_SANDBOX_MERCHANT_ID';
         $private_key = 'YOUR_SANDBOX_PRIVATE_KEY';
 
+        // ✅ Switch between real & mock (for XAMPP testing)
+        $mock_mode = true; // set to false when you have real credentials
+
+        if ($mock_mode) {
+            // Simulate successful checkout response for local testing
+            $fake_checkout_url = "https://trx-test.billease.ph/fake-checkout?order_id=" . uniqid();
+
+            $stmt = $conn->prepare("INSERT INTO patient_receipt 
+                (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
+                VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, 'BillEase (Mock)', 'Pending', ?, 'Pending', ?)
+            ");
+            $is_pwd = $selected_patient['is_pwd'] ?? 0;
+            $stmt->bind_param("iidddddssi",
+                $patient_id,
+                $billing_id,
+                $total_charges,
+                $total_discount,
+                $total_out_of_pocket,
+                $grand_total,
+                $insurance_covered,
+                $txn_id,
+                $is_pwd
+            );
+            $stmt->execute();
+
+            header("Location: " . $fake_checkout_url);
+            exit;
+        }
+
+        // Real API call
         if (empty($merchant_id) || empty($private_key)) {
             echo "<script>alert('BillEase API credentials not configured.');</script>";
             exit;
@@ -93,7 +123,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $redirect_url = "https://yourdomain.com/billing/billease_success.php?patient_id={$patient_id}&billing_id={$billing_id}";
         $cancel_url   = "https://yourdomain.com/billing/billing_summary.php?patient_id={$patient_id}";
 
-        // ✅ Proper payload
         $payload = [
             "merchant_id" => $merchant_id,
             "order_id" => $order_id,
@@ -114,7 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]
         ];
 
-        $api_url = "https://sandbox.billease.ph/api/checkout"; // ✅ Sandbox endpoint
+        // ✅ Correct sandbox endpoint
+        $api_url = "https://trx-test.billease.ph/be-transactions-api/checkout";
 
         $ch = curl_init($api_url);
         curl_setopt($ch, CURLOPT_POST, true);
@@ -132,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $result = json_decode($response, true);
 
-        // 🧩 Debug (remove in production)
+        // 🧩 Debug (remove later)
         if ($curl_error) {
             echo "<pre>⚠️ CURL Error: $curl_error</pre>";
         } elseif ($http_status !== 200) {
@@ -140,7 +170,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (isset($result['checkout_url'])) {
-            // ✅ Save pending record
             $stmt = $conn->prepare("INSERT INTO patient_receipt 
                 (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
                 VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, 'BillEase', 'Pending', ?, 'Pending', ?)
@@ -200,6 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
+
 
 <!doctype html>
 <html lang="en">
