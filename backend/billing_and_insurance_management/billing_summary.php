@@ -3,32 +3,30 @@ include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 // BillEase API configuration
-$billease_api_key = "YOUR_BILLEASE_API_KEY"; // replace with your actual key
-$billease_api_secret = "YOUR_BILLEASE_API_SECRET"; // replace with your actual secret
-$billease_payment_url = "https://sandbox.billease.ph/api/v1/payment"; // BillEase endpoint
+$billease_api_key = "YOUR_BILLEASE_API_KEY"; // Replace with your API key
+$billease_api_secret = "YOUR_BILLEASE_API_SECRET"; // Replace with your secret
 
 // Get patient_id
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 $selected_patient = null;
+$billing_items = [];
+$total_charges = 0;
+$insurance_covered = 0;
 
 if ($patient_id > 0) {
+    // Fetch patient info
     $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $selected_patient = $stmt->get_result()->fetch_assoc();
-}
 
-// Fetch completed results for this patient
-$billing_items = [];
-$total_charges = 0;
-
-if ($patient_id > 0) {
+    // Fetch completed results
     $stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID=? AND status='Completed'");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $results = $stmt->get_result();
 
-    // Load services and prices
+    // Fetch service prices
     $service_prices = [];
     $service_stmt = $conn->query("SELECT serviceName, description, price FROM dl_services");
     while($row = $service_stmt->fetch_assoc()){
@@ -45,37 +43,49 @@ if ($patient_id > 0) {
             $total_charges += $price;
         }
     }
-}
 
-// Fetch insurance coverage
-$insurance_covered = 0;
-$stmt = $conn->prepare("SELECT SUM(covered_amount) AS total_covered FROM insurance_requests WHERE patient_id=? AND status='Approved'");
-$stmt->bind_param("i", $patient_id);
-$stmt->execute();
-$row = $stmt->get_result()->fetch_assoc();
-$insurance_covered = floatval($row['total_covered'] ?? 0);
+    // Fetch insurance coverage
+    $stmt = $conn->prepare("SELECT SUM(covered_amount) AS total_covered FROM insurance_requests WHERE patient_id=? AND status='Approved'");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $insurance_covered = floatval($row['total_covered'] ?? 0);
+}
 
 // Calculate totals
 $grand_total = $total_charges;
 $total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
-// Handle BillEase payment request
+// Handle BillEase payment
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
+    $order_id = "HMS-".uniqid();
+    $customer_name = ($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '');
+    $customer_email = $selected_patient['email'] ?? "noemail@example.com";
 
-    // Prepare BillEase payment data
+    $items = [];
+    foreach($billing_items as $item){
+        $items[] = [
+            "name" => $item['service_name'],
+            "price" => $item['total_price'],
+            "quantity" => 1
+        ];
+    }
+
     $payment_data = [
+        "order_id" => $order_id,
         "amount" => $total_out_of_pocket,
         "currency" => "PHP",
-        "order_id" => "HMS-".uniqid(),
         "customer" => [
-            "name" => ($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['lname'] ?? ''),
-            "email" => $selected_patient['email'] ?? "noemail@example.com",
+            "name" => $customer_name,
+            "email" => $customer_email,
             "phone" => $selected_patient['phone_number'] ?? ""
         ],
-        "callback_url" => "http://localhost/hmscapstone/billing_and_insurance_management/bill_payment_callback.php"
+        "items" => $items,
+        "success_url" => "http://localhost/hmscapstone/billing_and_insurance_management/bill_payment_callback.php?status=success&patient_id=$patient_id",
+        "fail_url" => "http://localhost/hmscapstone/billing_and_insurance_management/bill_payment_callback.php?status=failed&patient_id=$patient_id"
     ];
 
-    $ch = curl_init($billease_payment_url);
+    $ch = curl_init("https://sandbox.billease.ph/api/v1/transactions"); // BillEase endpoint
     curl_setopt($ch, CURLOPT_POST, 1);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payment_data));
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -85,15 +95,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
     ]);
 
     $response = curl_exec($ch);
+    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+
     $result = json_decode($response, true);
 
-    if (isset($result['payment_url'])) {
-        // Redirect user to BillEase payment page
-        header("Location: ".$result['payment_url']);
+    if($httpcode == 201 && !empty($result['payment_url'])){
+        header("Location: ".$result['payment_url']); // Redirect to BillEase
         exit;
     } else {
-        echo "<script>alert('Failed to create BillEase payment.');</script>";
+        echo "<script>alert('Failed to create BillEase payment. Response: ".htmlspecialchars($response)."');</script>";
     }
 }
 
@@ -111,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
 </head>
 <body class="bg-light p-4">
 
- <div class="main-sidebar">
+<div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
 
