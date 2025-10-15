@@ -21,6 +21,7 @@ if (isset($_SESSION['user_id'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Billing & Insurance Management</title>
     <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
+    <link rel="stylesheet" type="text/css" href="/HMS-CAPSTONE/backend/billing_and_insurance_management/assets/CSS/billing_sidebar.css"> 
 </head>
 <body>
 

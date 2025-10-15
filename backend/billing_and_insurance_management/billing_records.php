@@ -6,16 +6,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// ✅ Handle marking payment as Paid
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mark_paid'])) {
-    $receipt_id = intval($_POST['receipt_id']);
-    $stmt = $conn->prepare("UPDATE patient_receipt SET status = 'Paid' WHERE receipt_id = ?");
-    $stmt->bind_param("i", $receipt_id);
-    $stmt->execute();
-    echo "<script>alert('Payment marked as Paid.');window.location='billing_records.php';</script>";
-    exit;
-}
-
 // ✅ Search functionality
 $search = '';
 if (isset($_GET['search']) && !empty($_GET['search'])) {
@@ -56,8 +46,6 @@ $result = $stmt->get_result();
     <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 </head>
 <body class="p-4 bg-light">
-
-
 
 <div class="container">
     <h3 class="mb-4">🧾 Patient Billing Records</h3>
@@ -109,16 +97,9 @@ $result = $stmt->get_result();
                             <td><?= htmlspecialchars($row['payment_method'] ?: 'Unpaid') ?></td>
                             <td><?= htmlspecialchars($row['transaction_id'] ?: '-') ?></td>
                             <td>
+                                <!-- Only print/view action -->
                                 <a href="print_receipt.php?receipt_id=<?= $row['receipt_id'] ?>" 
                                    class="btn btn-info btn-sm" target="_blank">Print</a>
-
-                                <?php if ($row['status'] === 'Pending'): ?>
-                                    <form method="POST" style="display:inline-block;" 
-                                          onsubmit="return confirm('Mark this payment as Paid?');">
-                                        <input type="hidden" name="receipt_id" value="<?= $row['receipt_id'] ?>">
-                                        <button type="submit" name="mark_paid" class="btn btn-success btn-sm">Mark Paid</button>
-                                    </form>
-                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endwhile; ?>
@@ -131,9 +112,9 @@ $result = $stmt->get_result();
         </table>
     </div>
 
-<div class="main-sidebar">
-<?php include 'billing_sidebar.php'; ?>
-</div>
+    <div class="main-sidebar">
+        <?php include 'billing_sidebar.php'; ?>
+    </div>
 
 </div>
 

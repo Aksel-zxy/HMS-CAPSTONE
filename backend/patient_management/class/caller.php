@@ -22,40 +22,25 @@ public function callEmr($patient_id) {
 
 public function callBalance($patient_id) {
     $stmt = $this->conn->prepare("
-        SELECT 
-            p.patient_id,
-            CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
-            ir.status AS insurance_status,
-            (
-                SELECT bi.billing_id
-                FROM billing_items bi
-                LEFT JOIN patient_receipt pr 
-                    ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
-                WHERE bi.patient_id = p.patient_id
-                AND bi.finalized = 1
-                AND pr.receipt_id IS NULL
-                ORDER BY bi.billing_id DESC
-                LIMIT 1
-            ) AS billing_id
-        FROM patientinfo p
-        LEFT JOIN insurance_requests ir 
-            ON p.patient_id = ir.patient_id
-            AND ir.request_id = (
-                SELECT MAX(request_id) 
-                FROM insurance_requests 
-                WHERE patient_id = p.patient_id
+                SELECT 
+                p.patient_id,
+                CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
+                ds.serviceID,
+                ds.serviceName,
+                ds.price
+            FROM patientinfo p
+            INNER JOIN dl_results dr 
+                ON p.patient_id = dr.patientID
+            CROSS JOIN dl_services ds
+            WHERE dr.status = 'Completed'
+            AND p.patient_id = ?   -- 👈 change this to any patientID you want
+            AND p.patient_id NOT IN (
+                SELECT DISTINCT patient_id 
+                FROM billing_items 
+                WHERE finalized = 1
             )
-        WHERE p.patient_id = ?
-        AND EXISTS (
-            SELECT 1
-            FROM billing_items bi
-            LEFT JOIN patient_receipt pr 
-                ON pr.billing_id = bi.billing_id AND pr.status = 'Paid'
-            WHERE bi.patient_id = p.patient_id
-            AND bi.finalized = 1
-            AND pr.receipt_id IS NULL
-        )
-        ORDER BY p.lname ASC, p.fname ASC
+            ORDER BY ds.serviceName ASC;
+
     ");
     
     // ✅ Keep bind_param now
@@ -218,37 +203,7 @@ public function getDoctors() {
     
 }
 
-public function getRecords($patient_id) {
-    $stmt = $this->conn->prepare("
-                    SELECT 
-                        'Lab Result' AS TYPE,
-                        dl.resultDate AS DATE,
-                        dl.result AS Details
-                    FROM dl_results dl
-                    WHERE dl.patientID = ?
 
-                    UNION ALL
-
-                    SELECT 
-                        'Prescription' AS TYPE,
-                        pp.prescription_date AS DATE,
-                        pi.med_name AS Details
-                    FROM pharmacy_prescription pp
-                    JOIN pharmacy_prescription_items ppi 
-                    ON pp.prescription_id = ppi.prescription_id
-                    JOIN pharmacy_inventory PI 
-                    ON ppi.med_id = pi.med_id
-                    WHERE pp.patient_id = ?
-
-
-                ORDER BY Date DESC;
-                ");
-       $stmt->bind_param("ii", $patient_id, $patient_id);
-
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result;
-}
 
     public function getResults($patient_id) {
     $stmt = $this->conn->prepare("

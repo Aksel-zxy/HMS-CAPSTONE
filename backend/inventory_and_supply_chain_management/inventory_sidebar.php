@@ -13,6 +13,7 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory & Supply Chain Management</title>
     <link rel="stylesheet" href="assets/css/Inventory_dashboard.css">
+    <link rel="stylesheet" type="text/css" href="/HMS-CAPSTONE/backend/inventory_and_supply_chain_management/assets/CSS/inventory_dashboard.css"> 
 </head>
 
 <body>

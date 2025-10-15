@@ -8,7 +8,7 @@ if (!isset($_GET['token'])) {
 $token = $_GET['token'];
 $now = time();
 
-// fetch user with valid token
+// Fetch user with valid token
 $stmt = $conn->prepare("SELECT * FROM users WHERE reset_token=? AND reset_expires > ?");
 $stmt->bind_param("si", $token, $now);
 $stmt->execute();
@@ -29,16 +29,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $newPassword = password_hash($password, PASSWORD_DEFAULT);
 
-        // update password safely
+        // ✅ bind_param type fixed: user_id is integer
         $stmt = $conn->prepare("UPDATE users SET password=?, reset_token=NULL, reset_expires=NULL WHERE user_id=?");
         if (!$stmt) {
             die("Prepare failed: " . $conn->error);
         }
 
-        // bind both as strings to avoid type issue
-        $stmt->bind_param("ss", $newPassword, $user['user_id']);
+        $stmt->bind_param("si", $newPassword, $user['user_id']);
+        $stmt->execute();
 
-        if ($stmt->execute() && $stmt->affected_rows > 0) {
+        // ✅ check if any rows were updated
+        if ($stmt->affected_rows > 0) {
             echo "
             <!DOCTYPE html>
             <html lang='en'>
@@ -84,7 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -93,17 +93,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="../CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../CSS/login.css">
 </head>
-
 <body>
     <div class="login-container">
         <div class="login-box">
             <a href="#" class="logo">
-                <img src="..//image/logo-dark.png" alt="HMS Logo" style="height: 20px;">
+                <img src="../image/logo-dark.png" alt="HMS Logo" style="height: 20px;">
             </a>
             <p class="subtext">Enter your new password to reset your account.</p>
 
             <?php if (!empty($message)): ?>
-                <div class="alert"><?= $message ?></div>
+                <div class="alert alert-warning text-center"><?= htmlspecialchars($message) ?></div>
             <?php endif; ?>
 
             <form method="POST" action="">
@@ -117,10 +116,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
 
             <div class="forgot-password">
-                <a href="login.php">Back to Login</a>
+                <a href="../../login.php">Back to Login</a>
             </div>
         </div>
     </div>
 </body>
-
 </html>
