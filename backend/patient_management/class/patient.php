@@ -67,28 +67,34 @@ class Patient {
         return $stmt->get_result()->fetch_assoc();
     }
 
-   public function insertPatient($data) {
-    $stmt = $this->conn->prepare("INSERT INTO patientinfo (fname, mname, lname, address, age, dob, gender, civil_status, phone_number, email, admission_type, attending_doctor, height, weight, color_of_eyes) VALUES ( ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+public function insertPatient($data) {
+    $stmt = $this->conn->prepare("
+        INSERT INTO patientinfo (
+            fname, mname, lname, address, age, dob, gender, civil_status,
+            phone_number, email, admission_type, attending_doctor, height, weight, color_of_eyes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    if (!$stmt) {
+        die("Prepare failed: " . $this->conn->error);
+    }
+
     $stmt->bind_param(
         "ssssissssssssss",
-        $data['fname'], $data['mname'], $data['lname'], $data['address'], $data['age'], $data['dob'],
-        $data['gender'], $data['civil_status'], $data['phone_number'], $data['email'],
-        $data['admission_type'], $data['attending_doctor'], $data['height'], $data['weight'], $data['color_of_eyes']
+        $data['fname'], $data['mname'], $data['lname'], $data['address'],
+        $data['age'], $data['dob'], $data['gender'], $data['civil_status'],
+        $data['phone_number'], $data['email'], $data['admission_type'],
+        $data['attending_doctor'], $data['height'], $data['weight'], $data['color_of_eyes']
     );
 
     if (!$stmt->execute()) {
-        throw new Exception("Insert failed: " . $stmt->error);
+        die("Execute failed: " . $stmt->error);
     }
 
     $insert_id = $this->conn->insert_id;
     $stmt->close();
-
     return $insert_id;
 }
-
-
-   
-   
 
     public function updatePatient($patient_id, $data) {
     $stmt = $this->conn->prepare(" UPDATE patientinfo SET fname=?, mname=?, lname=?, address=?, dob=?, age=?, gender=?, civil_status=?,

@@ -471,7 +471,7 @@ $nurses = $controller->getAllNurses();
     <link rel="stylesheet" href="../../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../../assets/CSS/super.css">
     <link rel="stylesheet" href="../../assets/CSS/user_duty.css">
-    <link rel="stylesheet" href="../../../pharmacy_management/assets/css/med_inventory.css">
+    <link rel="stylesheet" href="../../../pharmacy_management/assets/CSS/med_inventory.css">
 
     <script>
     // Only validate prescription form, not the appointment assignment form
