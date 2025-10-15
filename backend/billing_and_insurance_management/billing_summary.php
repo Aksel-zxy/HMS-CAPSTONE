@@ -8,9 +8,7 @@ $insurance_covered = 0;
 $insurance_company = null;
 $selected_patient = null;
 
-/* ==============================
-   FETCH PATIENT INFO
-   ============================== */
+/* ---------------- Fetch patient info ---------------- */
 if ($patient_id > 0) {
     $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
     $stmt->bind_param("i", $patient_id);
@@ -18,9 +16,7 @@ if ($patient_id > 0) {
     $selected_patient = $stmt->get_result()->fetch_assoc();
 }
 
-/* ==============================
-   GET LATEST FINALIZED BILLING ID
-   ============================== */
+/* ---------------- Latest finalized billing ID ---------------- */
 if ($patient_id > 0) {
     $stmt = $conn->prepare("SELECT MAX(billing_id) AS latest_billing_id FROM billing_items WHERE patient_id = ? AND finalized=1");
     $stmt->bind_param("i", $patient_id);
@@ -29,9 +25,7 @@ if ($patient_id > 0) {
     $billing_id = $res['latest_billing_id'] ?? null;
 }
 
-/* ==============================
-   GET INSURANCE DETAILS
-   ============================== */
+/* ---------------- Insurance coverage ---------------- */
 if ($patient_id > 0 && $billing_id) {
     $stmt = $conn->prepare("
         SELECT insurance_company, SUM(covered_amount) AS total_covered
@@ -48,9 +42,7 @@ if ($patient_id > 0 && $billing_id) {
     $insurance_company = $row['insurance_company'] ?? null;
 }
 
-/* ==============================
-   FETCH BILLING ITEMS
-   ============================== */
+/* ---------------- Billing Items ---------------- */
 $billing_items = [];
 $total_charges = 0;
 $total_discount = 0;
@@ -72,12 +64,11 @@ if ($patient_id > 0 && $billing_id) {
     }
 }
 
+/* ---------------- Totals ---------------- */
 $grand_total = $total_charges - $total_discount;
 $total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
-/* ==============================
-   PAYMENT LOGIC
-   ============================== */
+/* ---------------- Payment Handling ---------------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $txn_id = 'TXN' . uniqid();
     $ref = 'N/A';
@@ -92,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $order_id = 'ORD-' . uniqid();
         $amount = (float)$total_out_of_pocket;
-        $redirect_url = "https://yourdomain.com/billing/billease_success.php?patient_id={$patient_id}&billing_id={$billing_id}";
-        $cancel_url   = "https://yourdomain.com/billing/billing_summary.php?patient_id={$patient_id}";
+        $redirect_url = "http://localhost/HMS-CAPSTONE/backend/billing_and_insurance_management/billease_success.php?patient_id={$patient_id}&billing_id={$billing_id}";
+        $cancel_url   = "http://localhost/HMS-CAPSTONE/backend/billing_and_insurance_management/billing_summary.php?patient_id={$patient_id}";
 
         $payload = [
             "merchant_id" => $merchant_id,
@@ -111,8 +102,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]
         ];
 
-        // 🧪 MOCK MODE for XAMPP/offline testing
-        $mock_mode = true;
+        /* 🧪 MOCK MODE (for XAMPP/offline testing) */
+        $mock_mode = true; 
         if ($mock_mode) {
             $result = [
                 "checkout_url" => "mock_billease_checkout.php?mock_txn=" . $txn_id,
@@ -141,6 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        /* ---------- Save Transaction ---------- */
         if ($http_status === 200 && isset($result['checkout_url'])) {
             $is_pwd = $selected_patient['is_pwd'] ?? 0;
 
@@ -166,10 +158,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ref,
                 $is_pwd
             );
-
             $stmt->execute();
 
-            // ✅ Journal entry
+            /* Journal Entry */
             $desc = "BillEase payment initialized for patient " .
                     ($selected_patient['fname'] ?? '') . " " . ($selected_patient['lname'] ?? '');
             $j = $conn->prepare("INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by)
@@ -185,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    /* ---------- Insurance Payment ---------- */
+    /* ---------- Insurance Auto-Payment ---------- */
     if (isset($_POST['confirm_paid']) && $total_out_of_pocket == 0) {
         $payment_method = $insurance_company ?: "Insurance";
         $ref = "Covered by Insurance";
@@ -215,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $stmt->execute();
 
-        // ✅ Journal entry
+        /* Journal Entry */
         $desc = "Insurance payment recorded for patient " .
                 ($selected_patient['fname'] ?? '') . " " . ($selected_patient['lname'] ?? '');
         $j = $conn->prepare("INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by)
