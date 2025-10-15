@@ -1,0 +1,11 @@
+[phases.setup]
+nixPkgs = ['php82']
+
+[phases.install]
+cmds = [
+    'mkdir -p /etc/php/conf.d',
+    'cp _php.ini /etc/php/conf.d/99-custom.ini'
+]
+
+[start]
+cmd = 'php-fpm'
