@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Supplier Portal</title>
     <link rel="stylesheet" type="text/css" href="assets/css/vendorsidebar.css">
+    <link rel="stylesheet" type="text/css" href="/HMS-CAPSTONE/backend/inventory_and_supply_chain_management/assets/CSS/vendorsidebar.css"> 
 </head>
 <body>
 
