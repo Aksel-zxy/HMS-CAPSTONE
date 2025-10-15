@@ -1,4 +1,5 @@
 <?php
+include '../../../SQL/config.php';
 //oop
 class Patient {
     private $conn;

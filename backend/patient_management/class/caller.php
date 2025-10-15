@@ -1,4 +1,5 @@
 <?php
+include '../../../SQL/config.php';
 require_once 'patient.php';
 
 class Caller {
