@@ -69,6 +69,7 @@ $requests = $requestStmt->fetchAll(PDO::FETCH_ASSOC);
 <meta charset="UTF-8">
 <title>Return & Damage Handling</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/Inventory_dashboard.css">
 <style>
 body { font-family: Arial, sans-serif; }
 .container { margin-left: 270px; }

@@ -21,6 +21,7 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/Inventory_dashboard.css"> 
       <link rel="stylesheet" href="assets/css/vendor_documents.css"> 
+      <link rel="stylesheet" href="assets/css/Inventory_dashboard.css">
   
 </head>
 <body class="bg-light">
