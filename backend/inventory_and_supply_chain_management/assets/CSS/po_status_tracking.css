@@ -1,0 +1,33 @@
+.card-item-img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 15px;
+}
+.progress-bar-packed { background-color: #0d6efd; }
+.progress-bar-labeled { background-color: #6f42c1; }
+.progress-bar-ready { background-color: #fd7e14; }
+.progress-bar-shipped { background-color: #198754; }
+.btn-view {
+    font-size: 0.85rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.card-item-img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+.item-card {
+    transition: transform 0.2s;
+}
+.item-card:hover {
+    transform: scale(1.02);
+}
+.btn-view {
+    font-size: 0.85rem;
+    padding: 0.25rem 0.5rem;
+}
+

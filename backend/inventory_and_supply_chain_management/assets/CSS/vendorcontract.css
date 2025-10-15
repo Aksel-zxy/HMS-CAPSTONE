@@ -1,0 +1,28 @@
+/* Push content aside for sidebar */
+.vendor-main {
+    margin-left: 260px; /* same as sidebar width */
+    padding: 30px;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+}
+
+/* Contract card */
+.contract {
+    background: #fff;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+}
+
+/* Headings */
+.contract h2 {
+    font-weight: bold;
+}
+
+/* Signature section */
+.signature {
+    margin-top: 60px;
+}
+
+.signature div {
+    font-size: 14px;
+}
