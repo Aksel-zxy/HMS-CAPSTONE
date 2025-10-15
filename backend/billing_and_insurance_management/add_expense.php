@@ -1,60 +1,66 @@
 <?php
-include '../../SQL/config.php';
+include '../../SQL/config.php'; // assume session_start() is in config.php
+
+$showModal = false; // flag to control modal display
+$modalMessage = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $expense_name = $_POST['expense_name'];
     $category = $_POST['category'];
     $amount = floatval($_POST['amount']);
     $notes = $_POST['notes'];
-    $created_by = $_SESSION['username'] ?? 'System';
+    $expense_date = $_POST['expense_date'];
+    $recorded_by = $_SESSION['username'] ?? 'System';
 
     if ($amount <= 0) {
-        die("Expense amount must be positive.");
+        $modalMessage = "Expense amount must be positive.";
+        $showModal = true;
+    } else {
+        // Insert expense into expense_logs
+        $sql = "INSERT INTO expense_logs (expense_name, category, description, amount, expense_date, recorded_by, notes) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("sssisss", $expense_name, $category, $expense_name, $amount, $expense_date, $recorded_by, $notes);
+        $stmt->execute();
+        $expense_id = $stmt->insert_id;
+
+        // CREATE JOURNAL ENTRY
+        $conn->begin_transaction();
+        try {
+            $ref = "EXP-" . $expense_id;
+
+            // Insert into journal_entries with description and module
+            $sqlEntry = "INSERT INTO journal_entries 
+                (entry_date, description, module, reference_type, reference_id, reference, status, created_by) 
+                VALUES (NOW(), ?, ?, 'Expense', ?, ?, 'Posted', ?)";
+            $stmt = $conn->prepare($sqlEntry);
+            $stmt->bind_param("ssiss", $expense_name, $category, $expense_id, $ref, $recorded_by);
+            $stmt->execute();
+            $entry_id = $stmt->insert_id;
+
+            // Debit Expense
+            $sqlLine = "INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
+                        VALUES (?, ?, ?, 0, ?)";
+            $stmt = $conn->prepare($sqlLine);
+            $stmt->bind_param("isds", $entry_id, $category, $amount, $expense_name);
+            $stmt->execute();
+
+            // Credit Cash
+            $sqlLine = "INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
+                        VALUES (?, 'Cash', 0, ?, ?)";
+            $stmt = $conn->prepare($sqlLine);
+            $stmt->bind_param("ids", $entry_id, $amount, $expense_name);
+            $stmt->execute();
+
+            $conn->commit();
+            $modalMessage = "Expense added and journal entry created successfully!";
+            $showModal = true;
+        } catch (Exception $e) {
+            $conn->rollback();
+            $modalMessage = "Error posting journal: " . $e->getMessage();
+            $showModal = true;
+        }
     }
-
-    // Insert expense
-    $sql = "INSERT INTO expense_logs (expense_name, category, amount, expense_date, notes, created_by) 
-            VALUES (?, ?, ?, NOW(), ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ssiss", $expense_name, $category, $amount, $notes, $created_by);
-    $stmt->execute();
-    $expense_id = $stmt->insert_id;
-
-    // -------------------------
-    // CREATE JOURNAL ENTRY
-    // -------------------------
-    $conn->begin_transaction();
-
-    try {
-        $sqlEntry = "INSERT INTO journal_entries (entry_date, reference, status, created_by) 
-                     VALUES (NOW(), ?, 'Posted', ?)";
-        $stmt = $conn->prepare($sqlEntry);
-        $ref = "EXP-" . $expense_id;
-        $stmt->bind_param("ss", $ref, $created_by);
-        $stmt->execute();
-        $entry_id = $stmt->insert_id;
-
-        // Debit Expense
-        $sqlLine = "INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
-                    VALUES (?, ?, ?, 0, ?)";
-        $stmt = $conn->prepare($sqlLine);
-        $stmt->bind_param("isds", $entry_id, $category, $amount, $expense_name);
-        $stmt->execute();
-
-        // Credit Cash
-        $sqlLine = "INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) 
-                    VALUES (?, 'Cash', 0, ?, ?)";
-        $stmt = $conn->prepare($sqlLine);
-        $stmt->bind_param("ids", $entry_id, $amount, $expense_name);
-        $stmt->execute();
-
-        $conn->commit();
-    } catch (Exception $e) {
-        $conn->rollback();
-        die("Error posting journal: " . $e->getMessage());
-    }
-
-    echo "Expense added and journal entry created.";
 }
 ?>
 
@@ -64,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="UTF-8">
   <title>Add Expense</title>
   <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+  <script src="assets/JS/bootstrap.bundle.min.js"></script>
 </head>
 <body class="p-4 bg-light">
 
@@ -73,10 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="container bg-white p-4 rounded shadow">
   <h2 class="mb-4">Add New Expense</h2>
-
-  <?php if (!empty($error)): ?>
-    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-  <?php endif; ?>
 
   <form method="POST">
     <div class="mb-3">
@@ -110,6 +113,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   </form>
 </div>
+
+<!-- Feedback Modal -->
+<div class="modal fade" id="feedbackModal" tabindex="-1" aria-labelledby="feedbackModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="feedbackModalLabel">Notification</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <?= htmlspecialchars($modalMessage) ?>
+      </div>
+      <div class="modal-footer">
+        <a href="expense_logs.php" class="btn btn-primary">View Expenses</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<?php if ($showModal): ?>
+<script>
+  var feedbackModal = new bootstrap.Modal(document.getElementById('feedbackModal'));
+  feedbackModal.show();
+</script>
+<?php endif; ?>
 
 </body>
 </html>

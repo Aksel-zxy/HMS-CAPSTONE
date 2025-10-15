@@ -105,7 +105,7 @@ if ($receipt_id > 0) {
 
     <div class="d-grid gap-2 mt-4">
         <?php if ($status === 'success'): ?>
-            <a href="view_receipt.php?receipt_id=<?= urlencode($receipt['receipt_id'] ?? 0) ?>" class="btn btn-primary">
+            <a href="print_receipt.php?receipt_id=<?= urlencode($receipt['receipt_id'] ?? 0) ?>" class="btn btn-primary">
                 <i class="bi bi-receipt me-2"></i>View Receipt
             </a>
         <?php else: ?>

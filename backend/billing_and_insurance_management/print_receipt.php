@@ -33,19 +33,43 @@ if (!empty($billing['attending_doctor'])) {
     $doctor = $stmt2->get_result()->fetch_assoc();
 }
 
-// Fetch billing items with service details
-$stmt3 = $conn->prepare("
-    SELECT bi.quantity, bi.unit_price, bi.total_price, ds.serviceName AS service_name, ds.description
-    FROM billing_items bi
-    LEFT JOIN dl_services ds ON bi.service_id = ds.serviceID
-    WHERE bi.patient_id = ? AND bi.billing_id = ?
-");
-$stmt3->bind_param("ii", $billing['patient_id'], $billing['billing_id']);
-$stmt3->execute();
-$billing_items = $stmt3->get_result()->fetch_all(MYSQLI_ASSOC);
+// Fetch completed lab results for this patient
+$billing_items = [];
+$total_charges = 0;
+
+$result_stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID=? AND status='Completed'");
+$result_stmt->bind_param("i", $billing['patient_id']);
+$result_stmt->execute();
+$results = $result_stmt->get_result();
+
+// Fetch service prices
+$service_prices = [];
+$service_stmt = $conn->query("SELECT serviceName, description, price FROM dl_services");
+while ($row = $service_stmt->fetch_assoc()) {
+    $service_prices[$row['serviceName']] = [
+        'description' => $row['description'],
+        'price'       => floatval($row['price'])
+    ];
+}
+
+while ($row = $results->fetch_assoc()) {
+    $services = explode(',', $row['result']);
+    foreach ($services as $s) {
+        $s = trim($s);
+        $price = $service_prices[$s]['price'] ?? 0;
+        $desc  = $service_prices[$s]['description'] ?? '';
+        $billing_items[] = [
+            'service_name' => $s,
+            'description'  => $desc,
+            'quantity'     => 1,
+            'unit_price'   => $price,
+            'total_price'  => $price
+        ];
+        $total_charges += $price;
+    }
+}
 
 // Use stored totals from patient_receipt
-$total_charges = floatval($billing['total_charges']);
 $total_discount = floatval($billing['total_discount']);
 $insurance_covered = floatval($billing['insurance_covered']);
 $total_out_of_pocket = floatval($billing['total_out_of_pocket']);
@@ -121,7 +145,7 @@ if ($doctor) {
 </tr>
 </table>
 
-<table class="invoice-table table table-bordered">
+<table width="100%" class="invoice-table table table-bordered">
 <tr>
 <th>ITEM</th>
 <th>DESCRIPTION</th>

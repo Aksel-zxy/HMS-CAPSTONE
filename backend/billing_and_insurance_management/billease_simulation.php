@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Simulate Failed Payment
             </button>
             
-            <a href="billing_summary.php?patient_id=<?= $_GET['patient_id'] ?? 0 ?>" class="btn btn-outline-secondary">
+            <a href="patient_billing.php" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-2"></i>
                 Cancel Payment
             </a>

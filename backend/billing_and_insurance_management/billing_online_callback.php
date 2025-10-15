@@ -163,3 +163,4 @@ echo "<script>
     window.location='billing_summary.php?patient_id=$patient_id';
 </script>";
 exit;
+

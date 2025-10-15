@@ -1,7 +1,7 @@
 <?php
 include '../../SQL/config.php';
 
-// ✅ Fetch patients who have lab results (dl_results) but no paid receipt yet
+// ✅ Fetch patients who have lab results but no paid receipt yet
 $sql = "
 SELECT 
     p.patient_id,
@@ -27,11 +27,25 @@ WHERE EXISTS (
     FROM dl_results dr
     WHERE dr.patientID = p.patient_id
 )
+AND (
+    SELECT pr.status 
+    FROM patient_receipt pr 
+    WHERE pr.patient_id = p.patient_id
+    ORDER BY pr.created_at DESC
+    LIMIT 1
+) IS NULL OR (
+    SELECT pr.status 
+    FROM patient_receipt pr 
+    WHERE pr.patient_id = p.patient_id
+    ORDER BY pr.created_at DESC
+    LIMIT 1
+) != 'Paid'
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
 $result = $conn->query($sql);
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
