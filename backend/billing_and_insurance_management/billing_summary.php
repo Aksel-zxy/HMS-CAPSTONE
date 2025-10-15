@@ -1,16 +1,16 @@
 <?php
 include '../../SQL/config.php';
-
-// Safely start session
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// Get patient_id
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 $billing_id = null;
 $insurance_covered = 0;
 $insurance_company = null;
 $selected_patient = null;
 
+/* ==============================
+   FETCH PATIENT INFO
+   ============================== */
 if ($patient_id > 0) {
     $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
     $stmt->bind_param("i", $patient_id);
@@ -18,7 +18,9 @@ if ($patient_id > 0) {
     $selected_patient = $stmt->get_result()->fetch_assoc();
 }
 
-// Get latest finalized billing_id
+/* ==============================
+   GET LATEST FINALIZED BILLING ID
+   ============================== */
 if ($patient_id > 0) {
     $stmt = $conn->prepare("SELECT MAX(billing_id) AS latest_billing_id FROM billing_items WHERE patient_id = ? AND finalized=1");
     $stmt->bind_param("i", $patient_id);
@@ -27,7 +29,9 @@ if ($patient_id > 0) {
     $billing_id = $res['latest_billing_id'] ?? null;
 }
 
-// Fetch insurance coverage & company
+/* ==============================
+   GET INSURANCE DETAILS
+   ============================== */
 if ($patient_id > 0 && $billing_id) {
     $stmt = $conn->prepare("
         SELECT insurance_company, SUM(covered_amount) AS total_covered
@@ -44,7 +48,9 @@ if ($patient_id > 0 && $billing_id) {
     $insurance_company = $row['insurance_company'] ?? null;
 }
 
-// Fetch billing items
+/* ==============================
+   FETCH BILLING ITEMS
+   ============================== */
 $billing_items = [];
 $total_charges = 0;
 $total_discount = 0;
@@ -66,57 +72,23 @@ if ($patient_id > 0 && $billing_id) {
     }
 }
 
-// Calculate totals
 $grand_total = $total_charges - $total_discount;
 $total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
-// Handle payments
+/* ==============================
+   PAYMENT LOGIC
+   ============================== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $txn_id = 'TXN' . uniqid();
     $ref = 'N/A';
     $payment_method = trim($_POST['payment_method'] ?? '');
+    $created_by = $_SESSION['username'] ?? 'System';
 
-    /* ---------------- BILL EASE INTEGRATION ---------------- */
+    /* ---------- BillEase Integration ---------- */
     if (isset($_POST['make_payment']) && strtolower($payment_method) === 'billease') {
-
-        // ⚙️ Replace with your actual BillEase sandbox credentials
         $merchant_id = 'YOUR_SANDBOX_MERCHANT_ID';
         $private_key = 'YOUR_SANDBOX_PRIVATE_KEY';
-
-        // ✅ Switch between real & mock (for XAMPP testing)
-        $mock_mode = true; // set to false when you have real credentials
-
-        if ($mock_mode) {
-            // Simulate successful checkout response for local testing
-            $fake_checkout_url = "https://trx-test.billease.ph/fake-checkout?order_id=" . uniqid();
-
-            $stmt = $conn->prepare("INSERT INTO patient_receipt 
-                (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
-                VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, 'BillEase (Mock)', 'Pending', ?, 'Pending', ?)
-            ");
-            $is_pwd = $selected_patient['is_pwd'] ?? 0;
-            $stmt->bind_param("iidddddssi",
-                $patient_id,
-                $billing_id,
-                $total_charges,
-                $total_discount,
-                $total_out_of_pocket,
-                $grand_total,
-                $insurance_covered,
-                $txn_id,
-                $is_pwd
-            );
-            $stmt->execute();
-
-            header("Location: " . $fake_checkout_url);
-            exit;
-        }
-
-        // Real API call
-        if (empty($merchant_id) || empty($private_key)) {
-            echo "<script>alert('BillEase API credentials not configured.');</script>";
-            exit;
-        }
+        $api_url = "https://trx-test.billease.ph/api/checkout";
 
         $order_id = 'ORD-' . uniqid();
         $amount = (float)$total_out_of_pocket;
@@ -131,11 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "redirect_url" => $redirect_url,
             "cancel_url" => $cancel_url,
             "items" => [
-                [
-                    "name" => "Hospital Bill Payment",
-                    "price" => $amount,
-                    "quantity" => 1
-                ]
+                ["name" => "Hospital Bill Payment", "price" => $amount, "quantity" => 1]
             ],
             "metadata" => [
                 "patient_id" => $patient_id,
@@ -143,39 +111,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]
         ];
 
-        // ✅ Correct sandbox endpoint
-        $api_url = "https://trx-test.billease.ph/be-transactions-api/checkout";
+        // 🧪 MOCK MODE for XAMPP/offline testing
+        $mock_mode = true;
+        if ($mock_mode) {
+            $result = [
+                "checkout_url" => "mock_billease_checkout.php?mock_txn=" . $txn_id,
+                "status" => "success"
+            ];
+            $http_status = 200;
+        } else {
+            $ch = curl_init($api_url);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                "Content-Type: application/json",
+                "Authorization: Bearer $private_key"
+            ]);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
-        $ch = curl_init($api_url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json",
-            "Authorization: Bearer $private_key"
-        ]);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $response = curl_exec($ch);
+            $curl_error = curl_error($ch);
+            $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            $result = json_decode($response, true);
 
-        $response = curl_exec($ch);
-        $curl_error = curl_error($ch);
-        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        $result = json_decode($response, true);
-
-        // 🧩 Debug (remove later)
-        if ($curl_error) {
-            echo "<pre>⚠️ CURL Error: $curl_error</pre>";
-        } elseif ($http_status !== 200) {
-            echo "<pre>⚠️ HTTP Status: $http_status\nResponse: $response</pre>";
+            if ($curl_error) {
+                echo "<pre>⚠️ CURL Error: $curl_error</pre>";
+                exit;
+            }
         }
 
-        if (isset($result['checkout_url'])) {
-            $stmt = $conn->prepare("INSERT INTO patient_receipt 
-                (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
-                VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, 'BillEase', 'Pending', ?, 'Pending', ?)
-            ");
+        if ($http_status === 200 && isset($result['checkout_url'])) {
             $is_pwd = $selected_patient['is_pwd'] ?? 0;
-            $stmt->bind_param("iidddddssi",
+
+            $stmt = $conn->prepare("
+                INSERT INTO patient_receipt 
+                (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket,
+                 grand_total, billing_date, insurance_covered, payment_method, status, transaction_id,
+                 payment_reference, is_pwd)
+                VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, ?, 'Pending', ?, ?, ?)
+            ");
+
+            $stmt->bind_param(
+                "iidddddsssii",
                 $patient_id,
                 $billing_id,
                 $total_charges,
@@ -183,33 +161,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $total_out_of_pocket,
                 $grand_total,
                 $insurance_covered,
+                $payment_method,
                 $txn_id,
+                $ref,
                 $is_pwd
             );
+
             $stmt->execute();
+
+            // ✅ Journal entry
+            $desc = "BillEase payment initialized for patient " .
+                    ($selected_patient['fname'] ?? '') . " " . ($selected_patient['lname'] ?? '');
+            $j = $conn->prepare("INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by)
+                                 VALUES (NOW(), 'billing', ?, ?, 'Posted', ?)");
+            $j->bind_param("sss", $desc, $txn_id, $created_by);
+            $j->execute();
 
             header("Location: " . $result['checkout_url']);
             exit;
         } else {
-            $error_msg = $result['message'] ?? ($result['error'] ?? 'Unknown API error');
-            echo "<script>alert('BillEase API Error: " . htmlspecialchars($error_msg) . "');</script>";
-            echo "<pre>BillEase Full Response:\n" . print_r($result, true) . "</pre>";
+            echo "<pre>❌ BillEase Error:\n" . print_r($result, true) . "</pre>";
             exit;
         }
     }
 
-    /* ---------------- INSURANCE PAYMENT HANDLING ---------------- */
+    /* ---------- Insurance Payment ---------- */
     if (isset($_POST['confirm_paid']) && $total_out_of_pocket == 0) {
         $payment_method = $insurance_company ?: "Insurance";
         $ref = "Covered by Insurance";
-
         $is_pwd = $selected_patient['is_pwd'] ?? 0;
-        $stmt = $conn->prepare("INSERT INTO patient_receipt 
-            (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
+
+        $stmt = $conn->prepare("
+            INSERT INTO patient_receipt 
+            (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket,
+             grand_total, billing_date, insurance_covered, payment_method, status, transaction_id,
+             payment_reference, is_pwd)
             VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, ?, 'Paid', ?, ?, ?)
         ");
+
         $stmt->bind_param(
-            "iidddddsssi",
+            "iidddddsssii",
             $patient_id,
             $billing_id,
             $total_charges,
@@ -224,12 +215,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
         $stmt->execute();
 
+        // ✅ Journal entry
+        $desc = "Insurance payment recorded for patient " .
+                ($selected_patient['fname'] ?? '') . " " . ($selected_patient['lname'] ?? '');
+        $j = $conn->prepare("INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by)
+                             VALUES (NOW(), 'billing', ?, ?, 'Posted', ?)");
+        $j->bind_param("sss", $desc, $txn_id, $created_by);
+        $j->execute();
+
         echo "<script>alert('Insurance payment recorded successfully!'); window.location='billing_records.php';</script>";
         exit;
     }
 }
 ?>
-
 
 <!doctype html>
 <html lang="en">
@@ -256,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="mb-2">
         <strong>BILLED TO:</strong><br>
-        <?= htmlspecialchars($selected_patient ? ($selected_patient['fname'] ?? '') . ' ' . (!empty($selected_patient['mname'] ?? '') ? ($selected_patient['mname'] ?? '') . ' ' : '') . ($selected_patient['lname'] ?? '') : 'N/A') ?><br>
+        <?= htmlspecialchars(($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '')) ?><br>
         Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?><br>
         Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?>
     </div>
@@ -321,7 +319,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <input type="hidden" id="payment_method" name="payment_method" required>
         </div>
 
-        <!-- BillEase Info -->
         <div id="billease_box" class="payment-extra text-center">
           <p class="fw-bold">You’ll be redirected to BillEase to complete your payment securely.</p>
         </div>
