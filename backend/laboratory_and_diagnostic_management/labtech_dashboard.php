@@ -167,7 +167,7 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <h1>ANO DITO BOSS</h1>
+            <h1>ANO DITO BOSS | KAHIT ANO</h1>
             <!----- End of Main Content ----->
             <script>
                 const toggler = document.querySelector(".toggler-btn");
