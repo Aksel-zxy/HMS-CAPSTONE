@@ -1,6 +1,6 @@
 <?php
 include '../../SQL/config.php';
-include 'classes/Sales.php';
+include 'classes/sales.php';
 require_once "classes/notification.php";
 
 
