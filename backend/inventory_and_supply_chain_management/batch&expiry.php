@@ -2,6 +2,74 @@
 include '../../SQL/config.php';
 
 // ===============================
+// Function to display quantity nicely
+// ===============================
+function displayQty($quantity, $pcs_per_box, $unit_type) {
+    if ($unit_type === 'Box') {
+        if ($pcs_per_box > 0) {
+            $boxes = intdiv($quantity, $pcs_per_box);
+            $pcs = $quantity % $pcs_per_box;
+            $out = '';
+            if ($boxes > 0) $out .= $boxes . " Box(es)";
+            if ($pcs > 0) $out .= ($boxes > 0 ? " + " : "") . $pcs . " pcs";
+            if ($out === '') $out = '0 pcs';
+            return $out;
+        } else {
+            return $quantity . " pcs";
+        }
+    } else {
+        return $quantity . " pcs";
+    }
+}
+
+// ===============================
+// Update inventory quantity function
+// ===============================
+function updateInventory($item_id, $pdo) {
+    // Sum all batches that exist and have NOT been disposed
+    // A batch is disposed if it appears in disposed_medicines table
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(mb.quantity), 0) as total_qty
+        FROM medicine_batches mb
+        WHERE mb.item_id = ? 
+        AND mb.id NOT IN (SELECT DISTINCT batch_id FROM disposed_medicines WHERE batch_id IS NOT NULL)
+    ");
+    $stmt->execute([$item_id]);
+    $total_qty = (int)$stmt->fetchColumn();
+
+    $stmtCheck = $pdo->prepare("SELECT * FROM inventory WHERE item_id = ?");
+    $stmtCheck->execute([$item_id]);
+    $exists = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+    if ($exists) {
+        $stmtUpdate = $pdo->prepare("UPDATE inventory SET quantity = ? WHERE item_id = ?");
+        $stmtUpdate->execute([$total_qty, $item_id]);
+    } else {
+        $stmtProd = $pdo->prepare("SELECT * FROM vendor_products WHERE id = ?");
+        $stmtProd->execute([$item_id]);
+        $prod = $stmtProd->fetch(PDO::FETCH_ASSOC);
+
+        if ($prod) {
+            $stmtInsert = $pdo->prepare("INSERT INTO inventory 
+                (item_id, item_name, quantity, price, item_type, unit_type, pcs_per_box, received_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            $stmtInsert->execute([
+                $item_id,
+                $prod['item_name'],
+                $total_qty,
+                $prod['price'],
+                $prod['item_type'],
+                $prod['unit_type'],
+                $prod['pcs_per_box']
+            ]);
+        }
+    }
+
+    return $total_qty;
+}
+
+// ===============================
 // Handle expiry update for medicines (per box)
 // ===============================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_id'], $_POST['expiry_date'])) {
@@ -19,10 +87,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_id'], $_POST['e
         // If unit is BOX → create separate batch entries for each box with expiry per box
         if ($batch['unit_type'] === 'Box' && $batch['quantity'] > 1 && is_array($_POST['expiry_date'])) {
             foreach ($_POST['expiry_date'] as $exp) {
-                $stmt = $pdo->prepare("INSERT INTO medicine_batches 
+                $stmtInsert = $pdo->prepare("INSERT INTO medicine_batches 
                     (item_id, batch_no, quantity, expiration_date, received_at) 
                     VALUES (?, ?, ?, ?, NOW())");
-                $stmt->execute([
+                $stmtInsert->execute([
                     $batch['item_id'],
                     "BATCH-" . uniqid(),
                     $batch['pcs_per_box'], // pieces per box stored as quantity
@@ -30,41 +98,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_id'], $_POST['e
                 ]);
             }
             // Remove placeholder batch
-            $stmt = $pdo->prepare("DELETE FROM medicine_batches WHERE id = ?");
-            $stmt->execute([$batch_id]);
+            $stmtDel = $pdo->prepare("DELETE FROM medicine_batches WHERE id = ?");
+            $stmtDel->execute([$batch_id]);
         } else {
             // Single box or piece → set expiry directly
             $expiry_date = is_array($_POST['expiry_date']) ? $_POST['expiry_date'][0] : $_POST['expiry_date'];
-            $stmt = $pdo->prepare("UPDATE medicine_batches SET expiration_date = ? WHERE id = ?");
-            $stmt->execute([$expiry_date, $batch_id]);
+            $stmtUpdate = $pdo->prepare("UPDATE medicine_batches SET expiration_date = ? WHERE id = ?");
+            $stmtUpdate->execute([$expiry_date, $batch_id]);
         }
 
         // Update inventory stock
-        $stmt = $pdo->prepare("SELECT SUM(quantity) as total_qty FROM medicine_batches WHERE item_id = ?");
-        $stmt->execute([$batch['item_id']]);
-        $total_qty = (int)$stmt->fetchColumn();
-
-        $stmt = $pdo->prepare("SELECT * FROM inventory WHERE item_id = ?");
-        $stmt->execute([$batch['item_id']]);
-        $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($existing) {
-            $stmt = $pdo->prepare("UPDATE inventory SET quantity = ? WHERE item_id = ?");
-            $stmt->execute([$total_qty, $batch['item_id']]);
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO inventory 
-                (item_id, item_name, quantity, price, item_type, unit_type, pcs_per_box, received_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmt->execute([
-                $batch['item_id'],
-                $batch['item_name'],
-                $total_qty,
-                $batch['price'],
-                $batch['item_type'],
-                $batch['unit_type'],
-                $batch['pcs_per_box']
-            ]);
-        }
+        updateInventory($batch['item_id'], $pdo);
     }
 
     header("Location: " . $_SERVER['PHP_SELF']);
@@ -85,12 +129,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
 
     if ($item && $dispose_qty > 0 && $dispose_qty <= $item['quantity']) {
         while($dispose_qty > 0) {
-            // Find expired batch
-            $stmt = $pdo->prepare("SELECT * FROM medicine_batches 
-                                   WHERE item_id = ? AND expiration_date < CURDATE()
-                                   ORDER BY id ASC LIMIT 1");
-            $stmt->execute([$item['item_id']]);
-            $batch = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Find expired batch that hasn't been disposed yet
+            $stmtBatch = $pdo->prepare("SELECT mb.* FROM medicine_batches mb
+                                        WHERE mb.item_id = ? 
+                                        AND mb.expiration_date < CURDATE()
+                                        AND mb.id NOT IN (SELECT DISTINCT batch_id FROM disposed_medicines WHERE batch_id IS NOT NULL)
+                                        ORDER BY mb.expiration_date ASC, mb.id ASC 
+                                        LIMIT 1");
+            $stmtBatch->execute([$item['item_id']]);
+            $batch = $stmtBatch->fetch(PDO::FETCH_ASSOC);
 
             if (!$batch) break;
 
@@ -98,12 +145,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
             $qty_to_dispose = min($dispose_qty, $batch_qty);
 
             // Log into disposed_medicines
-            $stmt = $pdo->prepare("INSERT INTO disposed_medicines 
-                (batch_id, batch_no, item_name, quantity, price, expiration_date) 
-                VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute([
+            $stmtLog = $pdo->prepare("INSERT INTO disposed_medicines 
+                (batch_id, batch_no, item_id, item_name, quantity, price, expiration_date) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $stmtLog->execute([
                 $batch['id'],
                 $batch['batch_no'],
+                $item['item_id'],
                 $item['item_name'],
                 $qty_to_dispose,
                 $item['price'],
@@ -111,23 +159,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
             ]);
 
             // Update or delete batch
-            $stmt = $pdo->prepare("UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ?");
-            $stmt->execute([$qty_to_dispose, $batch['id']]);
             if ($batch_qty - $qty_to_dispose <= 0) {
-                $stmt = $pdo->prepare("DELETE FROM medicine_batches WHERE id = ?");
-                $stmt->execute([$batch['id']]);
+                // If disposing entire batch, delete it
+                $stmtDel = $pdo->prepare("DELETE FROM medicine_batches WHERE id = ?");
+                $stmtDel->execute([$batch['id']]);
+            } else {
+                // Otherwise, reduce the quantity
+                $stmtUpdate = $pdo->prepare("UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ?");
+                $stmtUpdate->execute([$qty_to_dispose, $batch['id']]);
             }
 
             $dispose_qty -= $qty_to_dispose;
         }
 
         // Update inventory quantity
-        $stmt = $pdo->prepare("SELECT SUM(quantity) as total_qty FROM medicine_batches WHERE item_id = ?");
-        $stmt->execute([$item['item_id']]);
-        $total_qty = (int)$stmt->fetchColumn();
-
-        $stmt = $pdo->prepare("UPDATE inventory SET quantity = ? WHERE id = ?");
-        $stmt->execute([$total_qty, $dispose_id]);
+        updateInventory($item['item_id'], $pdo);
     }
 
     header("Location: " . $_SERVER['PHP_SELF']);
@@ -149,15 +195,22 @@ $new_delivered = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Fetch inventory with batch info
 // ===============================
 $stmt = $pdo->prepare("
-    SELECT i.*, mb.batch_no, mb.expiration_date 
+    SELECT i.id, i.item_id, i.item_name, i.price, i.unit_type, i.pcs_per_box,
+           mb.id as batch_id, mb.batch_no, mb.quantity as batch_quantity, mb.expiration_date,
+           mb.received_at
     FROM inventory i
-    LEFT JOIN medicine_batches mb ON i.item_id = mb.item_id
-    LEFT JOIN disposed_medicines dm ON mb.id = dm.batch_id
-    WHERE dm.id IS NULL
-    ORDER BY i.id ASC
+    INNER JOIN medicine_batches mb ON i.item_id = mb.item_id
+    WHERE mb.expiration_date IS NOT NULL
+    AND mb.id NOT IN (SELECT DISTINCT batch_id FROM disposed_medicines WHERE batch_id IS NOT NULL)
+    ORDER BY i.item_name ASC, mb.expiration_date ASC
 ");
 $stmt->execute();
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Debug: Check if rows have batch_no
+if (!empty($rows)) {
+    error_log("First row keys: " . print_r(array_keys($rows[0]), true));
+}
 
 // ===============================
 // Fetch disposed meds
@@ -179,6 +232,8 @@ foreach ($rows as $row) {
         $today = new DateTime();
         $expiry = new DateTime($row['expiration_date']);
         $diffDays = (int)$today->diff($expiry)->format("%r%a");
+
+        $row['quantity'] = $row['batch_quantity']; // Use batch quantity for display
 
         if ($expiry < $today) {
             $row['row_class'] = "table-danger";
@@ -226,15 +281,26 @@ foreach ($rows as $row) {
         <div class="alert alert-warning">
             <h6><strong>⚠️ Expiry Alerts</strong></h6>
             <ul class="mb-0">
-                <?php foreach ($seven_days_alert as $item): ?>
-                    <?php
-                        $today = new DateTime();
-                        $expiry = new DateTime($item['expiration_date']);
-                        $diffDays = (int)$today->diff($expiry)->format("%r%a");
-                        $msg = $expiry < $today ? 
-                               htmlspecialchars($item['item_name'])." is already <strong>Expired</strong>!" :
-                               htmlspecialchars($item['item_name'])." will expire in <strong>$diffDays days</strong>!";
-                    ?>
+                <?php 
+                $alerted = [];
+                foreach ($seven_days_alert as $item): 
+                    $itemName = isset($item['item_name']) ? $item['item_name'] : 'Unknown';
+                    $batchNo = isset($item['batch_no']) ? $item['batch_no'] : 'N/A';
+                    $expiryDate = isset($item['expiration_date']) ? $item['expiration_date'] : '';
+                    
+                    $key = $itemName . '_' . $expiryDate;
+                    if (in_array($key, $alerted)) continue;
+                    $alerted[] = $key;
+                    
+                    if (empty($expiryDate)) continue;
+                    
+                    $today = new DateTime();
+                    $expiry = new DateTime($expiryDate);
+                    $diffDays = (int)$today->diff($expiry)->format("%r%a");
+                    $msg = $expiry < $today ? 
+                           htmlspecialchars($itemName)." (Batch: ".htmlspecialchars($batchNo).") is already <strong>Expired</strong>!" :
+                           htmlspecialchars($itemName)." (Batch: ".htmlspecialchars($batchNo).") will expire in <strong>$diffDays days</strong>!";
+                ?>
                     <li><?= $msg ?></li>
                 <?php endforeach; ?>
             </ul>
@@ -269,7 +335,7 @@ foreach ($rows as $row) {
                             <tr>
                                 <td><?= $row['id'] ?></td>
                                 <td><?= htmlspecialchars($row['item_name']) ?></td>
-                                <td><?= $row['quantity'] ?> <?= $row['unit_type'] ?></td>
+                                <td><?= displayQty($row['quantity'], $row['pcs_per_box'], $row['unit_type']) ?></td>
                                 <td><?= number_format($row['price'],2) ?></td>
                                 <td>
                                     <form method="post">
@@ -300,7 +366,8 @@ foreach ($rows as $row) {
                 <table class="table table-bordered">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th>
+                            <th>Batch ID</th>
+                            <th>Batch No</th>
                             <th>Item Name</th>
                             <th>Quantity</th>
                             <th>Price</th>
@@ -312,16 +379,24 @@ foreach ($rows as $row) {
                     <tbody>
                         <?php foreach (array_merge($expired,$near_expiry,$safe) as $row): ?>
                             <tr class="<?= $row['row_class'] ?>">
-                                <td><?= $row['id'] ?></td>
-                                <td><?= htmlspecialchars($row['item_name']) ?></td>
-                                <td><?= $row['quantity'] ?></td>
-                                <td><?= number_format($row['price'],2) ?></td>
-                                <td><?= $row['expiration_date'] ?></td>
-                                <td><?= $row['status'] ?></td>
+                                <td><?= isset($row['batch_id']) ? $row['batch_id'] : 'N/A' ?></td>
+                                <td><?= isset($row['batch_no']) ? htmlspecialchars($row['batch_no']) : 'N/A' ?></td>
+                                <td><?= isset($row['item_name']) ? htmlspecialchars($row['item_name']) : 'N/A' ?></td>
+                                <td><?= displayQty($row['quantity'], $row['pcs_per_box'] ?? 0, $row['unit_type'] ?? 'Piece') ?></td>
+                                <td><?= isset($row['price']) ? number_format($row['price'],2) : '0.00' ?></td>
+                                <td><?= isset($row['expiration_date']) ? $row['expiration_date'] : 'N/A' ?></td>
                                 <td>
-                                    <?php if ($row['status'] === 'Expired'): ?>
+                                    <?= isset($row['status']) ? $row['status'] : 'Unknown' ?>
+                                    <?php if (isset($row['days_left'])): ?>
+                                        (<?= $row['days_left'] ?> days)
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if (isset($row['status']) && $row['status'] === 'Expired'): ?>
                                         <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#disposeModal" 
-                                            data-id="<?= $row['id'] ?>" data-name="<?= htmlspecialchars($row['item_name']) ?>" 
+                                            data-id="<?= $row['id'] ?>" 
+                                            data-name="<?= isset($row['item_name']) ? htmlspecialchars($row['item_name']) : '' ?>" 
+                                            data-batch="<?= isset($row['batch_no']) ? htmlspecialchars($row['batch_no']) : '' ?>"
                                             data-qty="<?= $row['quantity'] ?>">Dispose</button>
                                     <?php else: ?>
                                         <span class="text-muted">-</span>
@@ -345,6 +420,7 @@ foreach ($rows as $row) {
                         <tr>
                             <th>ID</th>
                             <th>Batch ID</th>
+                            <th>Batch No</th>
                             <th>Item Name</th>
                             <th>Quantity</th>
                             <th>Price</th>
@@ -357,8 +433,9 @@ foreach ($rows as $row) {
                             <tr class="table-secondary">
                                 <td><?= $row['id'] ?></td>
                                 <td><?= $row['batch_id'] ?></td>
+                                <td><?= htmlspecialchars($row['batch_no']) ?></td>
                                 <td><?= htmlspecialchars($row['item_name']) ?></td>
-                                <td><?= $row['quantity'] ?></td>
+                                <td><?= $row['quantity'] ?> pcs</td>
                                 <td><?= number_format($row['price'],2) ?></td>
                                 <td><?= $row['expiration_date'] ?></td>
                                 <td><?= $row['disposed_at'] ?></td>
@@ -381,6 +458,7 @@ foreach ($rows as $row) {
       </div>
       <div class="modal-body">
         <p>Are you sure you want to dispose <strong id="medicineName"></strong>?</p>
+        <p class="text-muted small">Batch: <span id="batchNo"></span></p>
         <div class="mb-2">
             <label for="disposeQty" class="form-label">Quantity to Dispose:</label>
             <input type="number" min="1" class="form-control" id="disposeQty" name="dispose_qty">
@@ -389,6 +467,7 @@ foreach ($rows as $row) {
       <div class="modal-footer">
         <form method="post" id="disposeForm">
             <input type="hidden" name="dispose_id" id="disposeId">
+            <input type="hidden" name="dispose_qty" id="disposeQtyHidden">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             <button type="submit" class="btn btn-danger">Dispose</button>
         </form>
@@ -404,12 +483,19 @@ disposeModal.addEventListener('show.bs.modal', function (event) {
     var button = event.relatedTarget;
     var itemId = button.getAttribute('data-id');
     var itemName = button.getAttribute('data-name');
+    var batchNo = button.getAttribute('data-batch');
     var qty = button.getAttribute('data-qty');
 
     document.getElementById('disposeId').value = itemId;
     document.getElementById('medicineName').textContent = itemName;
+    document.getElementById('batchNo').textContent = batchNo;
     document.getElementById('disposeQty').value = qty;
     document.getElementById('disposeQty').max = qty;
+});
+
+document.getElementById('disposeForm').addEventListener('submit', function(e) {
+    var qty = document.getElementById('disposeQty').value;
+    document.getElementById('disposeQtyHidden').value = qty;
 });
 </script>
 </body>
