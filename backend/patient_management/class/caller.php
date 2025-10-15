@@ -1,5 +1,5 @@
 <?php
-include '../../../SQL/config.php';
+include __DIR__ . '/../../../SQL/config.php';
 require_once 'patient.php';
 
 class Caller {

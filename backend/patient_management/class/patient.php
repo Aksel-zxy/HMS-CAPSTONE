@@ -1,5 +1,5 @@
 <?php
-include '../../../SQL/config.php';
+include __DIR__ . '/../../../SQL/config.php';
 //oop
 class Patient {
     private $conn;
