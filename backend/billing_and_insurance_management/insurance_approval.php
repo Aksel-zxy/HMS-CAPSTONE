@@ -35,6 +35,7 @@ $result = $conn->query($sql);
 <meta charset="UTF-8">
 <title>Insurance Approval</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 <style>
 .table td, .table th { vertical-align: middle; }
 </style>

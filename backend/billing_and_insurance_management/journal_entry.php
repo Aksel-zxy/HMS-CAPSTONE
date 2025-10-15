@@ -102,6 +102,7 @@ $total_draft = $total_entries - $total_posted;
 <meta charset="UTF-8">
 <title>Journal Management Module</title>
 <link rel="stylesheet" href="assets/CSS/journalentry.css">
+<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 <style>
 /* Basic styling and dropdown/modal CSS */
 .modal { display: none; position: fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; }

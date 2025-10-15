@@ -65,6 +65,7 @@ $total_credit = array_sum(array_column($lines, 'credit'));
 <head>
     <meta charset="UTF-8">
     <title>Journal Entry Lines - Entry #<?= $entry['entry_id'] ?></title>
+    <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
     <link rel="stylesheet" href="assets/CSS/journalentryline.css">
     <style>
         /* Modal styles */

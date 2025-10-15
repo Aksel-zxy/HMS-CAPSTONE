@@ -76,17 +76,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ref = 'N/A';
     $payment_method = trim($_POST['payment_method'] ?? '');
 
+    /* ---------------- BILL EASE INTEGRATION ---------------- */
     if (isset($_POST['make_payment']) && strtolower($payment_method) === 'billease') {
 
-        // BillEase API credentials
-        $merchant_id = 'YOUR_MERCHANT_ID';
-        $private_key = 'YOUR_PRIVATE_KEY';
+        // ⚙️ Replace with your actual BillEase sandbox credentials
+        $merchant_id = 'YOUR_SANDBOX_MERCHANT_ID';
+        $private_key = 'YOUR_SANDBOX_PRIVATE_KEY';
+
+        if (empty($merchant_id) || empty($private_key)) {
+            echo "<script>alert('BillEase API credentials not configured.');</script>";
+            exit;
+        }
 
         $order_id = 'ORD-' . uniqid();
-        $amount = number_format($total_out_of_pocket, 2, '.', '');
+        $amount = (float)$total_out_of_pocket;
         $redirect_url = "https://yourdomain.com/billing/billease_success.php?patient_id={$patient_id}&billing_id={$billing_id}";
         $cancel_url   = "https://yourdomain.com/billing/billing_summary.php?patient_id={$patient_id}";
 
+        // ✅ Proper payload
         $payload = [
             "merchant_id" => $merchant_id,
             "order_id" => $order_id,
@@ -107,7 +114,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]
         ];
 
-        $ch = curl_init("https://api.billease.ph/checkout");
+        $api_url = "https://sandbox.billease.ph/api/checkout"; // ✅ Sandbox endpoint
+
+        $ch = curl_init($api_url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "Content-Type: application/json",
@@ -115,12 +124,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
         $response = curl_exec($ch);
-        $result = json_decode($response, true);
+        $curl_error = curl_error($ch);
+        $http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
+        $result = json_decode($response, true);
+
+        // 🧩 Debug (remove in production)
+        if ($curl_error) {
+            echo "<pre>⚠️ CURL Error: $curl_error</pre>";
+        } elseif ($http_status !== 200) {
+            echo "<pre>⚠️ HTTP Status: $http_status\nResponse: $response</pre>";
+        }
+
         if (isset($result['checkout_url'])) {
-            // Save temporary record as pending
+            // ✅ Save pending record
             $stmt = $conn->prepare("INSERT INTO patient_receipt 
                 (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
                 VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, 'BillEase', 'Pending', ?, 'Pending', ?)
@@ -142,10 +162,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: " . $result['checkout_url']);
             exit;
         } else {
-            echo "<script>alert('Failed to initialize BillEase payment.');</script>";
+            $error_msg = $result['message'] ?? ($result['error'] ?? 'Unknown API error');
+            echo "<script>alert('BillEase API Error: " . htmlspecialchars($error_msg) . "');</script>";
+            echo "<pre>BillEase Full Response:\n" . print_r($result, true) . "</pre>";
+            exit;
         }
     }
 
+    /* ---------------- INSURANCE PAYMENT HANDLING ---------------- */
     if (isset($_POST['confirm_paid']) && $total_out_of_pocket == 0) {
         $payment_method = $insurance_company ?: "Insurance";
         $ref = "Covered by Insurance";
@@ -266,7 +290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <input type="hidden" id="payment_method" name="payment_method" required>
         </div>
 
-        <!-- BillEase -->
+        <!-- BillEase Info -->
         <div id="billease_box" class="payment-extra text-center">
           <p class="fw-bold">You’ll be redirected to BillEase to complete your payment securely.</p>
         </div>

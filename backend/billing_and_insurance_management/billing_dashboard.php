@@ -48,6 +48,7 @@ $recent_receipts = $conn->query("SELECT * FROM patient_receipt ORDER BY created_
   <title>Billing Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/CSS/billing_dashboard.css">
+  <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>

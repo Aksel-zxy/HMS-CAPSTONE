@@ -92,6 +92,7 @@ usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
 <meta charset="UTF-8">
 <title>Journal Accounts</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 <style>
 .badge { padding:5px 10px; border-radius:20px; font-size:12px; }
 .asset { background:#e8f5e9; color:#2e7d32; }

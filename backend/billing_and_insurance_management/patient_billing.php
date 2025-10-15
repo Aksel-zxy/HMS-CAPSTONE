@@ -49,6 +49,7 @@ $result = $conn->query($sql);
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 <link rel="stylesheet" href="assets/CSS/patient_billing.css">
+<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 </head>
 <body>
 <div class="dashboard-wrapper">
