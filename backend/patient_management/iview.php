@@ -98,19 +98,18 @@ try {
                             <p><strong>Name:</strong>
                                 <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
                             </p>
-                            <p><strong>Address:</strong> <?= htmlspecialchars($patient['address']) ?></p>
-                            <p><strong>Date of Birth:</strong>
-                                <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob']))) ?></p>
-                            <p><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
-                            <p><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?></p>
-                            <p><strong>Civil Status:</strong> <?= htmlspecialchars($patient['civil_status']) ?></p>
-                            <p><strong>Contact Number:</strong> <?= htmlspecialchars($patient['phone_number']) ?></p>
-                            <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
-                            <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
-                            <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['doctor_name']) ?></p>
-                            <p><strong>Weight:</strong> <?= htmlspecialchars($patient['weight']) ?></p>
-                            <p><strong>Height:</strong> <?= htmlspecialchars($patient['height']) ?></p>
-                            <p><strong>Color of Eyes:</strong> <?= htmlspecialchars($patient['color_of_eyes']) ?></p>
+                            <?= htmlspecialchars($patient['address'] ?? '') ?>
+                            <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob'] ?? ''))) ?>
+                            <?= htmlspecialchars($patient['age'] ?? '') ?>
+                            <?= htmlspecialchars($patient['gender'] ?? '') ?>
+                            <?= htmlspecialchars($patient['civil_status'] ?? '') ?>
+                            <?= htmlspecialchars($patient['phone_number'] ?? '') ?>
+                            <?= htmlspecialchars($patient['email'] ?? '') ?>
+                            <?= htmlspecialchars($patient['admission_type'] ?? '') ?>
+                            <?= htmlspecialchars($patient['doctor_name'] ?? '') ?>
+                            <?= htmlspecialchars($patient['weight'] ?? '') ?>
+                            <?= htmlspecialchars($patient['height'] ?? '') ?>
+                            <?= htmlspecialchars($patient['color_of_eyes'] ?? '') ?>
 
                             <h5 class="mt-4">Previous Medical History</h5>
                             <div>
