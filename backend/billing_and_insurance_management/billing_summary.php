@@ -99,12 +99,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_online'])) {
     
     // Debit Cash / Online Payment
     $account_name = "Cash / Online Payment";
-    $stmt3->bind_param("isdds", $entry_id, $account_name, $total_out_of_pocket, 0, $desc);
+    $debit = $total_out_of_pocket;
+    $credit = 0;
+    $stmt3->bind_param("isdds", $entry_id, $account_name, $debit, $credit, $desc);
     $stmt3->execute();
     
     // Credit Service Revenue
     $account_name = "Service Revenue";
-    $stmt3->bind_param("isdds", $entry_id, $account_name, 0, $grand_total, $desc);
+    $credit = $grand_total;
+    $stmt3->bind_param("isdds", $entry_id, $account_name, 0, $credit, $desc);
     $stmt3->execute();
 
     echo "<script>alert('Payment recorded successfully!'); window.location='billing_dashboard.php';</script>";
