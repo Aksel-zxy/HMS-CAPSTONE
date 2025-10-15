@@ -7,8 +7,6 @@ require_once '../classes/LeaveNotification.php';
 
 Auth::checkHR();
 
-$conn = $conn;
-
 $userId = Auth::getUserId();
 if (!$userId) {
     die("User ID not set.");
@@ -23,7 +21,41 @@ if (!$user) {
     die("User not found.");
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['budget_id'])) {
+    $budget_id = $_POST['budget_id'];
+    $status = $_POST['status'];
+    $allocated_budget = ($status === 'Approved') ? floatval($_POST['allocated_budget']) : 0;
+
+    $update = $conn->prepare("
+        UPDATE department_budgets
+        SET allocated_budget = ?, 
+            approved_amount = ?, 
+            status = ?
+        WHERE budget_id = ?
+    ");
+    $update->bind_param('ddsi', $allocated_budget, $allocated_budget, $status, $budget_id);
+
+    if ($update->execute()) {
+        $msg = "Budget request updated successfully.";
+    } else {
+        $msg = "Error updating budget: " . $update->error;
+    }
+
+    $update->close();
+}
+
 $pendingCount = $leaveNotif->getPendingLeaveCount();
+
+$stmt = $conn->prepare("
+    SELECT b.*, u.department 
+    FROM department_budgets b
+    JOIN users u ON u.user_id = b.user_id
+    WHERE b.status = 'Pending'
+");
+
+$stmt->execute();
+$result = $stmt->get_result();
+$requests = $result->fetch_all(MYSQLI_ASSOC);
 
 ?>
 
@@ -37,9 +69,22 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="stylesheet" href="css/department_budget_approval.css">
 </head>
 
 <body>
+
+    <!----- Full-page Loader ----->
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -210,9 +255,86 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>DEPARTMENT BUDGET APPROVAL</h1> 
+            <div class="budget">
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Pending Budget Requests</p>
+
+                <?php if(isset($msg)): ?>
+                    <div class="success-message"><?= htmlspecialchars($msg) ?></div>
+                <?php endif; ?>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Department</th>
+                            <th>Requested Budget</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (count($requests) > 0): ?>
+                        <?php foreach($requests as $r): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($r['department']) ?></td>
+                                <td>₱<?= number_format($r['requested_amount'], 2) ?></td>
+                                <td><?= htmlspecialchars($r['status']) ?></td>
+                                <td>
+                                    <a href="javascript:void(0);" class="view-link" onclick="openApprovalPopup('<?= $r['budget_id'] ?>','<?= htmlspecialchars($r['department']) ?>','<?= $r['requested_amount'] ?>')">
+                                        View Details
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="4" style="text-align:center;">No pending requests</td>
+                        </tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
+
+            <!-- ✅ Budget Approval Popup -->
+            <div id="approvalPopup" class="popup-form">
+                <div class="form-container">
+                    <bttn type="button" class="close-btn" onclick="closePopup()">X</bttn>
+                    <center>
+                        <h3 style="font-weight: bold;">Department Budget Approval</h3>
+                    </center>
+                    <br />
+                    <br />
+                    
+                    <form method="POST">
+                        <input type="hidden" name="budget_id" id="budget_id">
+                        <div>
+                            <label>Department</label>
+                            <input type="text" id="department" readonly>
+                        </div>
+
+                        <div>
+                            <label>Requested Budget</label>
+                            <input type="text" id="requested_budget" readonly>
+                        </div>
+
+                        <div>
+                            <label>Allocated Budget</label>
+                            <input type="number" step="0.01" name="allocated_budget" id="allocated_budget" required>
+                        </div>
+
+                        <div>
+                            <label>Status</label>
+                            <select name="status" id="status" required>
+                                <option value="">----- Select -----</option>
+                                <option value="Approved">Approve</option>
+                                <option value="Rejected">Decline</option>
+                            </select>
+                        </div>
+
+                        <button type="submit">Save</button>
+                    </form>
+                </div>
+            </div>
+
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
@@ -224,10 +346,54 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <!----- End of Footer Content ----->
     
     <script>
+        window.addEventListener("load", function(){
+            setTimeout(function(){
+                document.getElementById("loading-screen").style.display = "none";
+            }, 2000);
+        });
+
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+
+        // ✅ Open custom popup with values
+        function openApprovalPopup(budget_id, department, requested) {
+            const popup = document.getElementById('approvalPopup');
+            popup.style.display = 'flex';
+
+            // Fill in form fields
+            document.getElementById('budget_id').value = budget_id;
+            document.getElementById('department').value = department;
+            document.getElementById('requested_budget').value = "₱" + parseFloat(requested).toLocaleString();
+            document.getElementById('allocated_budget').value = requested; // default = requested
+
+            // Default status = Approved
+            const statusSelect = document.getElementById('status');
+            statusSelect.value = "Approved";
+            document.getElementById('allocated_budget').disabled = false;
+        }
+
+        // ✅ Close popup
+        function closePopup() {
+            document.getElementById('approvalPopup').style.display = 'none';
+        }
+
+        // ✅ Disable Allocated Budget input if Declined
+        document.addEventListener('DOMContentLoaded', function () {
+            const statusSelect = document.getElementById('status');
+            const allocatedInput = document.getElementById('allocated_budget');
+
+            statusSelect.addEventListener('change', function () {
+                if (this.value === "Rejected") {
+                    allocatedInput.disabled = true;
+                    allocatedInput.value = 0;
+                } else {
+                    allocatedInput.disabled = false;
+                }
+            });
+        });
+
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
