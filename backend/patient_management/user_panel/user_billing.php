@@ -41,15 +41,15 @@ try {
         throw new Exception("Patient ID not found for this user.");
     }
 
+    $balance = $callerObj->callBalance($patient_id);
     // Get a single patient
     $patient = $patientObj->getPatientOrFail($patient_id);
 
     // Get only this patient's records
     $patients = $patientObj->getPatientsById($patient_id);
 
-    $history = $callerObj->callHistory($patient_id);
     
-    $records = $callerObj->getRecords($patient_id);
+ 
 
 } catch (Exception $e) {
     echo $e->getMessage();
@@ -172,7 +172,39 @@ try {
             </div>
 
             <!-- START CODING HERE -->
-            <h1>Nanakawan ng tax ni jinggoy</h1>
+            <div class="container mt-4">
+                <h2 class="mb-4" style="border-bottom:2px solid">Pending Balance</h2>
+
+
+                <!-- Appointment Table -->
+                <table class="table table-hover align-middle overflow-x-auto">
+                    <thead>
+                        <tr>
+                            <th class="text-center">Service Name</th>
+                            <th class="text-center">Price (₱)</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <?php 
+                    if ($balance && $balance->num_rows > 0) {
+                        while ($row = $balance->fetch_assoc()) {
+                            echo "<tr>
+                                <td class='text-center'>" . htmlspecialchars($row['serviceName']) . "</td>
+                                <td class='text-center'>₱" . number_format($row['price'], 2) . "</td>
+                                <td class='text-center'>" . htmlspecialchars($row['status']) . "</td>
+                            </tr>";
+                        }
+                    } else {
+                        echo "<tr><td colspan='3' class='text-center'>No services found.</td></tr>";
+                    }
+                    ?>
+                    </tbody>
+
+
+                </table>
+            </div>
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->

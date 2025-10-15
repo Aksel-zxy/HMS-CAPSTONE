@@ -49,8 +49,9 @@ try {
 
     $history = $callerObj->callHistory($patient_id);
     
-    $records = $callerObj->getRecords($patient_id);
 
+
+    $prescriptions = $callerObj->callPrescription($patient_id);
 } catch (Exception $e) {
     echo $e->getMessage();
     exit;
@@ -195,7 +196,7 @@ try {
                     </div>
                 </div>
 
-
+                <!-- MEDICAL Table -->
                 <div class="mt-4 border-3 border-bottom">
                     <div class="border-bottom border-2 pb-3">
                         <h3>Medical History</h3>
@@ -237,56 +238,66 @@ try {
                             <tr>
                                 <td colspan="11"
                                     style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
-                                    📋 No Patients Found
+                                    📋 No Medical Found
                                 </td>
                             </tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Prescriptions Table -->
                 <div class="mt-4 border-3 border-bottom">
                     <div class="border-bottom border-2 pb-3">
-                        <h3>Records</h3>
+                        <h3>Prescriptions</h3>
                     </div>
                     <table
                         style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff; border-radius:8px; overflow:hidden; min-height:100px;">
                         <thead>
                             <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
-                                <th style="padding:12px; text-align:center;">Type</th>
-                                <th style="padding:12px; text-align:center;">Date</th>
-                                <th style="padding:12px; text-align:center;">Details</th>
-                                <th style="padding:12px; text-align:center;">Notes</th>
-                                <th style="padding:12px; text-align:center;"> </th>
+                                <th style="text-align:center;">Date</th>
+                                <th style="text-align:center;">Doctor</th>
+                                <th style="text-align:center;">Medicines</th>
+                                <th style="text-align:center;">Note</th>
+                                <th style="text-align:center;">Status</th>
+
 
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if ($records && $records->num_rows > 0): ?>
-                            <?php while ($row = $records->fetch_assoc()): ?>
+                            <?php if (!empty($prescriptions)): ?>
+                            <?php foreach ($prescriptions as $pres): ?>
                             <tr style="border-bottom:1px solid #f1f1f1; transition:background 0.2s;"
                                 onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
-                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['TYPE']) ?></td>
-                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['DATE']) ?></td>
-                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['Details']) ?>
+
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($pres['formatted_date']) ?>
                                 </td>
-                                <td style="text-align:center;">
-                                    <a class="btn btn-sm"
-                                        href="../Patient Management/discharged.php?patient_id=<?= $patient['patient_id'] ?>"
-                                        style="padding:6px 12px; border-radius:6px; font-size:13px; background:red; border:none; color:#fff; cursor:pointer;">
-                                        Download
-                                    </a>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($pres['doctor_name']) ?>
                                 </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= $pres['medicines_list'] ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($pres['note'] ?? 'N/A') ?>
+                                </td>
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($pres['status']) ?>
+                                </td>
+
                             </tr>
-                            <?php endwhile; ?>
+                            <?php endforeach; ?>
                             <?php else: ?>
                             <tr>
-                                <td colspan="11"
+                                <td colspan="6"
                                     style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
-                                    📋 No Records Found
+                                    📋 No Prescriptions Found
                                 </td>
                             </tr>
                             <?php endif; ?>
                         </tbody>
+
 
                     </table>
                 </div>

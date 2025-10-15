@@ -200,11 +200,38 @@ try {
                             <?php endif; ?>
 
                             <!-- Dynamic Balance Section -->
-                            <?php if (!empty($balance) && $balance > 0): ?>
-                            <p><strong>Balance:</strong> ₱<?= number_format($balance, 2) ?></p>
+                            <?php if (!empty($balance)): ?>
+                            <?php if (is_array($balance)): ?>
+                            <h5 class="text-primary mt-3">Services</h5>
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Service Name</th>
+                                        <th>Price (₱)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    $total = 0;
+                                    foreach ($balance as $row): 
+                                        $total += $row['price'];
+                                    ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($row['serviceName']) ?></td>
+                                        <td><?= number_format($row['price'], 2) ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+
+                            <p><strong>Total Service Cost:</strong> ₱<?= number_format($total, 2) ?></p>
                             <?php else: ?>
-                            <p><strong>Balance:</strong> ₱0.00</p>
+                            <p><strong>Balance:</strong> ₱<?= number_format($balance, 2) ?></p>
                             <?php endif; ?>
+                            <?php else: ?>
+                            <p><strong>Balance:</strong> There's no outstanding Balance</p>
+                            <?php endif; ?>
+
                         </div>
                     </div>
                 </div>
