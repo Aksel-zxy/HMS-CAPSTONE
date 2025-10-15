@@ -80,7 +80,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             </div>
 
                             <div class="row mb-3">
-                                <label class="col-sm-3 col-form-label">Gender</label>
+                                <label class="col-sm-3 col-form-label" for="">Gender</label>
                                 <div class="col-sm-9">
                                     <select class="form-select" name="gender" required>
                                         <option value="">-- Select Gender --</option>

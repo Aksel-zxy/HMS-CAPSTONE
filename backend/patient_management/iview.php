@@ -98,18 +98,18 @@ try {
                             <p><strong>Name:</strong>
                                 <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
                             </p>
-                            <?= htmlspecialchars($patient['address'] ?? '') ?>
-                            <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob'] ?? ''))) ?>
-                            <?= htmlspecialchars($patient['age'] ?? '') ?>
-                            <?= htmlspecialchars($patient['gender'] ?? '') ?>
-                            <?= htmlspecialchars($patient['civil_status'] ?? '') ?>
-                            <?= htmlspecialchars($patient['phone_number'] ?? '') ?>
-                            <?= htmlspecialchars($patient['email'] ?? '') ?>
-                            <?= htmlspecialchars($patient['admission_type'] ?? '') ?>
-                            <?= htmlspecialchars($patient['doctor_name'] ?? '') ?>
-                            <?= htmlspecialchars($patient['weight'] ?? '') ?>
-                            <?= htmlspecialchars($patient['height'] ?? '') ?>
-                            <?= htmlspecialchars($patient['color_of_eyes'] ?? '') ?>
+                            <p><?= htmlspecialchars($patient['address'] ?? '') ?></p>
+                            <p><?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob'] ?? ''))) ?></p>
+                            <p><?= htmlspecialchars($patient['age'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['gender'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['civil_status'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['phone_number'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['email'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['admission_type'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['doctor_name'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['weight'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['height'] ?? '') ?></p>
+                            <p><?= htmlspecialchars($patient['color_of_eyes'] ?? '') ?>
 
                             <h5 class="mt-4">Previous Medical History</h5>
                             <div>

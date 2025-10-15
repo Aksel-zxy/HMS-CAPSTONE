@@ -1,5 +1,5 @@
 <?php
-ob_start(); //  Prevent "headers already sent" errors by buffering output
+ob_start(); // Prevent "headers already sent" errors
 include '../../../SQL/config.php';
 require_once 'patient.php';
 
@@ -27,13 +27,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $conn->begin_transaction();
 
     try {
+        // Insert into patientinfo
         $patient_id = $patient->insertPatient($data);
         if (!$patient_id) {
             throw new Exception("Failed to insert patient");
         }
 
+        // Create login for patient
         $username = $data['fname'];
-        $password = '123';
+        $password = password_hash('123', PASSWORD_DEFAULT); // secure password hashing
 
         $stmt_user = $conn->prepare("
             INSERT INTO patient_user (patient_id, fname, lname, mname, username, password)
@@ -49,12 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $stmt_user->close();
 
+        // Insert into previous medical records
         $stmt = $conn->prepare("
             INSERT INTO p_previous_medical_records (patient_id, condition_name, diagnosis_date, notes)
             VALUES (?, ?, ?, ?)
         ");
         if (!$stmt) {
-            throw new Exception("Prepare failed: " . $conn->error);
+            throw new Exception("Prepare failed for p_previous_medical_records: " . $conn->error);
         }
 
         $condition_name = $_POST['condition_name'] ?? '';
@@ -63,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt->bind_param("isss", $patient_id, $condition_name, $diagnosis_date, $notes);
         if (!$stmt->execute()) {
-            throw new Exception("Execute failed: " . $stmt->error);
+            throw new Exception("Execute failed for p_previous_medical_records: " . $stmt->error);
         }
 
         $stmt->close();
@@ -76,12 +79,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->rollback();
         error_log("Patient creation failed: " . $e->getMessage());
 
-        // Log to console (for debugging)
-        echo "<script>console.error('Patient creation failed: " . addslashes($e->getMessage()) . "');</script>";
+        // 🔍 Debug output (remove in production)
+        echo "<pre style='color:red; font-weight:bold;'>Patient creation failed:
+" . htmlspecialchars($e->getMessage()) . "</pre>";
 
-        header("Location: ../registered.php?error=1");
         exit();
     }
 }
-ob_end_flush(); //  Sends any remaining buffered output
+ob_end_flush();
 ?>
