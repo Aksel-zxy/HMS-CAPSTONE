@@ -1,8 +1,8 @@
 <?php
 session_start();
 include '../../SQL/config.php';
-require_once 'class/Patient.php';
-require_once 'class/Caller.php';
+require_once 'class/patient.php';
+require_once 'class/caller.php';
 
 // Check session
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {

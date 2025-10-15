@@ -1,11 +1,11 @@
 <?php
+ob_start(); //  Prevent "headers already sent" errors by buffering output
 include '../../../SQL/config.php';
 require_once 'patient.php';
 
 $patient = new Patient($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Collect form data
     $data = [
         'fname' => trim($_POST["fname"] ?? ''),
         'mname' => trim($_POST["mname"] ?? ''),
@@ -23,8 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'weight' => $_POST["weight"] ?? '',
         'color_of_eyes' => $_POST["coe"] ?? '',
     ];
-    
-    // Start transaction
+
     $conn->begin_transaction();
 
     try {
@@ -33,67 +32,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception("Failed to insert patient");
         }
 
-        // Insert into patient_user table with fname, lname, mname, username (as fname), and password
-        $username = $data['fname']; // Username set to fname
-        $password = '123'; // Hardcoded password - WARNING: In production, hash this (e.g., password_hash('123', PASSWORD_DEFAULT)) and never hardcode!
+        $username = $data['fname'];
+        $password = '123';
 
         $stmt_user = $conn->prepare("
             INSERT INTO patient_user (patient_id, fname, lname, mname, username, password)
             VALUES (?, ?, ?, ?, ?, ?)
         ");
-
         if (!$stmt_user) {
             throw new Exception("Prepare failed for patient_user: " . $conn->error);
         }
 
         $stmt_user->bind_param("isssss", $patient_id, $data['fname'], $data['lname'], $data['mname'], $username, $password);
-
         if (!$stmt_user->execute()) {
             throw new Exception("Execute failed for patient_user: " . $stmt_user->error);
         }
-
         $stmt_user->close();
 
         $stmt = $conn->prepare("
             INSERT INTO p_previous_medical_records (patient_id, condition_name, diagnosis_date, notes)
             VALUES (?, ?, ?, ?)
         ");
-
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $conn->error);
         }
 
-        // Collect POST data for medical record
         $condition_name = $_POST['condition_name'] ?? '';
         $diagnosis_date = $_POST['diagnosis_date'] ?? '';
         $notes = $_POST['notes'] ?? '';
 
         $stmt->bind_param("isss", $patient_id, $condition_name, $diagnosis_date, $notes);
-
         if (!$stmt->execute()) {
             throw new Exception("Execute failed: " . $stmt->error);
         }
 
         $stmt->close();
-
-        // Commit if everything is successful
         $conn->commit();
 
-        // Redirect before any output
         header("Location: ../registered.php?success=1");
         exit();
 
     } catch (Exception $e) {
-        $conn->rollback();  
-    
-        // Log to server error log (still useful for debugging later)
+        $conn->rollback();
         error_log("Patient creation failed: " . $e->getMessage());
 
-        // Also log to browser console
+        // Log to console (for debugging)
         echo "<script>console.error('Patient creation failed: " . addslashes($e->getMessage()) . "');</script>";
 
         header("Location: ../registered.php?error=1");
         exit();
     }
 }
+ob_end_flush(); //  Sends any remaining buffered output
 ?>

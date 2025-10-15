@@ -98,19 +98,18 @@ try {
                             <p><strong>Name:</strong>
                                 <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
                             </p>
-                            <p><strong>Address:</strong> <?= htmlspecialchars($patient['address']) ?></p>
-                            <p><strong>Date of Birth:</strong>
-                                <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob']))) ?></p>
-                            <p><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
-                            <p><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?></p>
-                            <p><strong>Civil Status:</strong> <?= htmlspecialchars($patient['civil_status']) ?></p>
-                            <p><strong>Contact Number:</strong> <?= htmlspecialchars($patient['phone_number']) ?></p>
-                            <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
-                            <p><strong>Admission Type:</strong> <?= htmlspecialchars($patient['admission_type']) ?></p>
-                            <p><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['doctor_name']) ?></p>
-                            <p><strong>Weight:</strong> <?= htmlspecialchars($patient['weight']) ?></p>
-                            <p><strong>Height:</strong> <?= htmlspecialchars($patient['height']) ?></p>
-                            <p><strong>Color of Eyes:</strong> <?= htmlspecialchars($patient['color_of_eyes']) ?></p>
+                            <?= htmlspecialchars($patient['address'] ?? '') ?>
+                            <?= htmlspecialchars(date('F - d - Y', strtotime($patient['dob'] ?? ''))) ?>
+                            <?= htmlspecialchars($patient['age'] ?? '') ?>
+                            <?= htmlspecialchars($patient['gender'] ?? '') ?>
+                            <?= htmlspecialchars($patient['civil_status'] ?? '') ?>
+                            <?= htmlspecialchars($patient['phone_number'] ?? '') ?>
+                            <?= htmlspecialchars($patient['email'] ?? '') ?>
+                            <?= htmlspecialchars($patient['admission_type'] ?? '') ?>
+                            <?= htmlspecialchars($patient['doctor_name'] ?? '') ?>
+                            <?= htmlspecialchars($patient['weight'] ?? '') ?>
+                            <?= htmlspecialchars($patient['height'] ?? '') ?>
+                            <?= htmlspecialchars($patient['color_of_eyes'] ?? '') ?>
 
                             <h5 class="mt-4">Previous Medical History</h5>
                             <div>
@@ -200,11 +199,38 @@ try {
                             <?php endif; ?>
 
                             <!-- Dynamic Balance Section -->
-                            <?php if (!empty($balance) && $balance > 0): ?>
-                            <p><strong>Balance:</strong> ₱<?= number_format($balance, 2) ?></p>
+                            <?php if (!empty($balance)): ?>
+                            <?php if (is_array($balance)): ?>
+                            <h5 class="text-primary mt-3">Services</h5>
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Service Name</th>
+                                        <th>Price (₱)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php 
+                                    $total = 0;
+                                    foreach ($balance as $row): 
+                                        $total += $row['price'];
+                                    ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars($row['serviceName']) ?></td>
+                                        <td><?= number_format($row['price'], 2) ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+
+                            <p><strong>Total Service Cost:</strong> ₱<?= number_format($total, 2) ?></p>
                             <?php else: ?>
-                            <p><strong>Balance:</strong> ₱0.00</p>
+                            <p><strong>Balance:</strong> ₱<?= number_format($balance, 2) ?></p>
                             <?php endif; ?>
+                            <?php else: ?>
+                            <p><strong>Balance:</strong> There's no outstanding Balance</p>
+                            <?php endif; ?>
+
                         </div>
                     </div>
                 </div>
