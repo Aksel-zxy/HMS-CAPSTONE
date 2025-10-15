@@ -3,8 +3,8 @@ session_start();
 
 // Database connection
 include '../../../../SQL/config.php';
-require '../../../pharmacy_management/classes/Prescription.php';
-require '../../../pharmacy_management/classes/Medicine.php';
+require '../../../pharmacy_management/classes/prescription.php';
+require '../../../pharmacy_management/classes/medicine.php';
 
 // =========================
 // Database Wrapper
