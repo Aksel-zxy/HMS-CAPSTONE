@@ -7,6 +7,132 @@
     <link rel="stylesheet" type="text/css" href="assets/css/vendorsidebar.css">
     <link rel="stylesheet" type="text/css" href="/HMS-CAPSTONE/backend/inventory_and_supply_chain_management/assets/CSS/vendorsidebar.css"> 
 </head>
+<script>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    background: whitesmoke;
+    color: black;
+    position: fixed;
+    left: 0;
+    top: 0;
+    overflow-y: auto; 
+    transition: all 0.3s ease-in-out;
+}
+
+.sidebar .logo-container {
+    text-align: center;
+    padding: 20px;
+}
+
+.sidebar .logo-container img {
+    width: 80px;
+    height: auto;
+    border-radius: 50%;
+}
+
+.sidebar .logo-container h2 {
+    margin-top: 10px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.sidebar .nav {
+    padding: 10px;
+}
+
+.menu {
+    margin-bottom: 20px;
+}
+
+.menu .title {
+    font-size: 16px;
+    font-weight: bold;
+    padding: 10px;
+    background: #34495e;
+    border-radius: 5px;
+}
+
+.menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.menu p {
+   color: white;
+    font-size: 14px;
+    padding: 10px;
+}
+
+.menu ul li {
+    padding: 10px;
+    border-bottom: 1px solid rgba(187, 159, 159, 0.1);
+}
+
+.menu ul li a {
+    text-decoration: none;
+    color: black;
+    display: block;
+    transition: 0.3s;
+}
+
+.menu ul li a:hover {
+    background: #0084ff;
+    border-radius: 5px;
+}
+
+.sidebar.active {
+    width: 60px;
+}
+
+.sidebar.active .menu .title, 
+.sidebar.active .menu ul li a .text {
+    display: none;
+}
+
+.sidebar.active .menu ul li a {
+    text-align: center;
+    padding: 10px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 200px;
+    }
+    .sidebar.active {
+        width: 50px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    .sidebar .menu-btn {
+        text-align: left;
+        padding: 15px;
+    }
+    .sidebar .nav {
+        display: none;
+    }
+    .sidebar.active .nav {
+        display: block;
+    }
+}
+
+
+</script>
 <body>
 
 <div class="sidebar">
