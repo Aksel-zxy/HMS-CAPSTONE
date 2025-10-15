@@ -1,6 +1,7 @@
 <?php
 session_start();
 include '../../SQL/config.php';
+include "dashb.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -19,6 +20,9 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+$schedule = new Schedule($conn);
+$stats = $schedule->getDashboardStats();
+$schedules = $schedule->getTodaysSchedules();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -28,6 +32,7 @@ if (!$user) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Laboratory and Diagnostic Management</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
 </head>
@@ -167,13 +172,130 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <h1>ANO DITO BOSS | KAHIT ANO</h1>
+            <div style="width:95%; margin:20px auto; padding:25px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+                <h2 style="color:#0d6efd; font-family:Arial, sans-serif; margin-bottom:25px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
+                    📊 Laboratory Dashboard
+                </h2>
+
+                <!-- Dashboard Stats -->
+                <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;margin-bottom:30px;">
+                    <div style="flex:1;min-width:220px;background:#ffffff;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1);padding:20px;text-align:center;">
+                        <h3 style="color:#0d6efd;margin:0;">Today's Tests</h3>
+                        <p style="font-size:28px;font-weight:bold;color:#333;"><?php echo $stats['total']; ?></p>
+                    </div>
+
+                    <div style="flex:1;min-width:220px;background:#ffffff;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1);padding:20px;text-align:center;">
+                        <h3 style="color:#198754;margin:0;">Completed</h3>
+                        <p style="font-size:28px;font-weight:bold;color:#333;"><?php echo $stats['completed']; ?></p>
+                    </div>
+
+                    <div style="flex:1;min-width:220px;background:#ffffff;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1);padding:20px;text-align:center;">
+                        <h3 style="color:#ffc107;margin:0;">In Progress</h3>
+                        <p style="font-size:28px;font-weight:bold;color:#333;"><?php echo $stats['processing']; ?></p>
+                    </div>
+
+                    <div style="flex:1;min-width:220px;background:#ffffff;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1);padding:20px;text-align:center;">
+                        <h3 style="color:#dc3545;margin:0;">Cancelled</h3>
+                        <p style="font-size:28px;font-weight:bold;color:#333;"><?php echo $stats['cancelled']; ?></p>
+                    </div>
+                </div>
+
+                <!-- Dashboard Grid -->
+                <div style="display:grid;grid-template-columns:2fr 1fr;gap:25px;">
+                    <!-- Reports Overview -->
+                    <div style="background:#fff;border-radius:14px;padding:25px;box-shadow:0 3px 10px rgba(0,0,0,0.06);">
+                        <h2 style="font-size:18px;color:#333;margin-bottom:10px;">Reports Overview</h2>
+                        <p style="color:#888;font-size:13px;margin-bottom:20px;">Weekly summary of completed reports</p>
+                        <canvas id="reportsChart" style="width:100%;height:320px;"></canvas>
+                    </div>
+
+                    <!-- Today's Schedule -->
+                    <div style="background:#fff;border-radius:14px;padding:25px;box-shadow:0 3px 10px rgba(0,0,0,0.06);">
+                        <h2 style="font-size:18px;color:#333;margin-bottom:10px;">Today's Schedule</h2>
+                        <p style="color:#888;font-size:13px;margin-bottom:15px;">List of patients scheduled for today</p>
+
+                        <div style="max-height:320px; overflow-y:auto; background:#fff; border-radius:8px; box-shadow:inset 0 0 4px rgba(0,0,0,0.05);">
+                            <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                                <thead style="background:#e9efff; position:sticky; top:0; z-index:1;">
+                                    <tr>
+                                        <th style="padding:10px; text-align:center;">Patient</th>
+                                        <th style="padding:10px; text-align:center;">Test</th>
+                                        <th style="padding:10px; text-align:center;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($schedules)): ?>
+                                        <tr>
+                                            <td colspan="3" style="padding:20px; text-align:center; color:gray; font-style:italic;">
+                                                No ongoing or pending schedules for today.
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($schedules as $row): ?>
+                                            <tr style="border-bottom:1px solid #e6e6e6;">
+                                                <td style="padding:10px; text-align:center;">
+                                                    <?= htmlspecialchars($row['fname'] . ' ' . $row['lname']) ?>
+                                                </td>
+                                                <td style="padding:10px; text-align:center;">
+                                                    <?= htmlspecialchars($row['serviceName']) ?>
+                                                </td>
+                                                <td style="padding:10px; text-align:center;">
+                                                    <?php
+                                                    $status = strtolower($row['status']);
+                                                    if ($status === 'processing') {
+                                                        echo '<span style="color:#ffc107; font-weight:bold;">Processing</span>';
+                                                    } elseif ($status === 'completed') {
+                                                        echo '<span style="color:#198754; font-weight:bold;">Completed</span>';
+                                                    } elseif ($status === 'cancelled') {
+                                                        echo '<span style="color:#dc3545; font-weight:bold;">Cancelled</span>';
+                                                    } else {
+                                                        echo '<span style="color:#0d6efd; font-weight:bold;">' . htmlspecialchars($row['status']) . '</span>';
+                                                    }
+                                                    ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!----- End of Main Content ----->
             <script>
                 const toggler = document.querySelector(".toggler-btn");
                 toggler.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
+                //chart
+                const ctx = document.getElementById('reportsChart').getContext('2d');
+
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: <?php echo json_encode($labels); ?>,
+        datasets: <?php echo json_encode($datasets); ?>
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: true, position: 'bottom' },
+            title: { display: true, text: "Weekly Completed Tests" }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: { color: '#f0f0f0' },
+                title: { display: true, text: 'Number of Completed Tests' }
+            },
+            x: {
+                grid: { color: '#f9f9f9' },
+                title: { display: true, text: 'Day of the Week' }
+            }
+        }
+    }
+});
             </script>
             <script src="assets/Bootstrap/all.min.js"></script>
             <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
