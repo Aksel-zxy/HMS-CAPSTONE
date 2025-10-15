@@ -118,7 +118,6 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
                     <tr>
                         <th>ID</th>
                         <th>Item Name</th>
-                        <th>Category</th>
                         <th>Type</th>
                         <th>Sub-Type</th>
                         <th>Total Quantity (pcs)</th>
@@ -133,7 +132,6 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
                         <tr>
                             <td><?= $item['id'] ?></td>
                             <td><?= htmlspecialchars($item['item_name']) ?></td>
-                            <td><?= htmlspecialchars($item['category']) ?></td>
                             <td><?= htmlspecialchars($item['item_type']) ?></td>
                             <td><?= htmlspecialchars($item['sub_type']) ?></td>
                             <td><span class="badge bg-primary"><?= (int)$item['total_qty'] ?></span></td>
