@@ -117,14 +117,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if($insurance_covered>= $grand_total){
                 // Fully covered by insurance
                 $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,?,0,?)");
-                $stmt3->bind_param("isds",$entry_id, $acc='Accounts Receivable - Insurance',$grand_total,$description); $stmt3->execute();
+                $acc = 'Accounts Receivable - Insurance';
+                $stmt3->bind_param("isds", $entry_id, $acc, $grand_total, $description); 
+                $stmt3->execute();
                 $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,0,?,?)");
-                $stmt3->bind_param("isds",$entry_id,$acc='Service Revenue',$grand_total,$description); $stmt3->execute();
+                $acc = 'Service Revenue';
+                $stmt3->bind_param("isds", $entry_id, $acc, $grand_total, $description);
+                $stmt3->execute();
             } else {
                 // Partial insurance
                 if($insurance_covered>0){
                     $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,?,0,?)");
-                    $stmt3->bind_param("isds",$entry_id, $acc='Accounts Receivable - Insurance',$insurance_covered,$description); $stmt3->execute();
+                    $acc = 'Accounts Receivable - Insurance';
+                    $stmt3->bind_param("isds", $entry_id, $acc, $insurance_covered, $description);
+                    $stmt3->execute();
                 }
                 if($total_out_of_pocket>0){
                     $method_acc = match(strtolower($payment_method)){
@@ -138,7 +144,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt3->bind_param("isds",$entry_id,$method_acc,$total_out_of_pocket,$description); $stmt3->execute();
                 }
                 $stmt3 = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?,?,0,?,?)");
-                $stmt3->bind_param("isds",$entry_id,$acc='Service Revenue',$grand_total,$description); $stmt3->execute();
+                $acc = 'Service Revenue';
+                $stmt3->bind_param("isds", $entry_id, $acc, $grand_total, $description);
+                $stmt3->execute();
             }
 
             echo "<script>alert('Payment recorded & Journal Entry created successfully!'); window.location='billing_records.php';</script>";
