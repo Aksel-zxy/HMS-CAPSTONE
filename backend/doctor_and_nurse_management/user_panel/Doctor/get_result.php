@@ -134,10 +134,20 @@ while ($schedule = $resSchedules->fetch_assoc()) {
                 <tr><th style='border:2px solid #000; padding:8px;'>Remarks</th><td style='border:2px solid #000; padding:8px;'>{$data['remarks']}</td></tr>
             ";
 
-            if (!empty($data['image_path'])) {
-                echo "<tr><th style='border:2px solid #000; padding:8px;'>Image</th>
-                      <td style='border:2px solid #000; padding:8px; text-align:center;'>
-                      <img src='{$data['image_path']}' style='max-width:100%; border:2px solid #000; border-radius:8px;'></td></tr>";
+            // ✅ Display image from database (BLOB)
+            if (!empty($data['image_blob'])) {
+                $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                $mimeType = finfo_buffer($finfo, $data['image_blob']);
+                finfo_close($finfo);
+
+                $base64Image = base64_encode($data['image_blob']);
+                echo "<tr>
+                        <th style='border:2px solid #000; padding:8px;'>Image</th>
+                        <td style='border:2px solid #000; padding:8px; text-align:center;'>
+                            <img src='data:{$mimeType};base64,{$base64Image}' 
+                                 style='max-width:100%; border:2px solid #000; border-radius:8px;'>
+                        </td>
+                      </tr>";
             }
 
             echo "</table>";
@@ -166,9 +176,3 @@ while ($schedule = $resSchedules->fetch_assoc()) {
     ";
 }
 ?>
-
-<!-- <tr><td>Neutrophils</td><td>{$cbc['neutrophils']}</td><td>40-75%</td></tr> 
- <tr><td>Lymphocytes</td><td>{$cbc['lymphocytes']}</td><td>20-45%</td></tr> 
- <tr><td>Monocytes</td><td>{$cbc['monocytes']}</td><td>2-6%</td></tr> 
- <tr><td>Eosinophils</td><td>{$cbc['eosinophils']}</td><td>1-4%</td></tr> 
- <tr><td>Basophils</td><td>{$cbc['basophils']}</td><td>0.00-0.05%</td></tr> -->

@@ -30,7 +30,7 @@ if (strpos($testType, "cbc") !== false || strpos($testType, "complete blood coun
     exit;
 }
 
-// run query
+// Run query
 $query = "SELECT * FROM $table WHERE scheduleID = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $scheduleID);
@@ -43,21 +43,16 @@ if (!$data) {
     exit;
 }
 
-// Map friendly names for display
-$displayName = '';
-if ($mode === "cbc") {
-    $displayName = "Complete Blood Count (CBC)";
-} elseif ($mode === "xray") {
-    $displayName = "X-Ray";
-} elseif ($mode === "mri") {
-    $displayName = "MRI Scan";
-} elseif ($mode === "ct") {
-    $displayName = "CT Scan";
-} else {
-    $displayName = ucfirst($testType);
+// Friendly display name
+switch ($mode) {
+    case "cbc":  $displayName = "Complete Blood Count (CBC)"; break;
+    case "xray": $displayName = "X-Ray"; break;
+    case "mri":  $displayName = "MRI Scan"; break;
+    case "ct":   $displayName = "CT Scan"; break;
+    default:     $displayName = ucfirst($testType); break;
 }
 
-// Get patient info (optional, if you want to include patient details)
+// Get patient info
 $queryPatient = "SELECT p.*, s.scheduleID 
                  FROM dl_schedule s 
                  LEFT JOIN patientinfo p ON s.patientId = p.patient_id 
@@ -68,7 +63,6 @@ $stmtPatient->execute();
 $resPatient = $stmtPatient->get_result();
 $patient = $resPatient->fetch_assoc();
 
-// render output
 echo "
 <div style='
     font-family: Arial, sans-serif;
@@ -83,12 +77,12 @@ echo "
     box-shadow: 0 0 8px rgba(0,0,0,0.15);
 '>
     <h2 style='text-align:center; margin:0; font-size:1.5rem;'>Dr. Eduardo V. Roquero Memorial Hospital</h2>
-    <p style='text-align:center; font-size:0.9rem; margin:5px 0;'>Purok 7, Area F, Brgy.San Pedro, City of San Jose Del Monte, Bulacan</p>
+    <p style='text-align:center; font-size:0.9rem; margin:5px 0;'>Purok 7, Area F, Brgy. San Pedro, City of San Jose Del Monte, Bulacan</p>
     <p style='text-align:center; font-size:0.9rem; margin:5px 0;'>DOH LICENSE NO. -------------</p>
     <hr style='border: 1.5px solid #000; margin: 15px 0;'>
 ";
 
-// Patient info
+// ✅ Patient Information
 if ($patient) {
     echo "
     <table style='width:100%; border-collapse:collapse; font-size:0.95rem; margin-bottom:15px;'>
@@ -113,7 +107,7 @@ if ($patient) {
 
 echo "<h4 style='margin-bottom:15px; text-align:center; color:#198754;'>{$displayName}</h4>";
 
-// Lab table output
+// ✅ LAB TABLE OUTPUT
 if ($mode === "cbc") {
     echo "
     <table style='width:100%; border:2px solid #000; border-collapse:collapse; font-size:0.95rem;'>
@@ -140,16 +134,27 @@ if ($mode === "cbc") {
         <tr><th style='border:2px solid #000; padding:8px;'>Impression</th><td style='border:2px solid #000; padding:8px;'>{$data['impression']}</td></tr>
         <tr><th style='border:2px solid #000; padding:8px;'>Remarks</th><td style='border:2px solid #000; padding:8px;'>{$data['remarks']}</td></tr>";
 
-    if (!empty($data['image_path'])) {
-        echo "<tr><th style='border:2px solid #000; padding:8px;'>Image</th>
-              <td style='border:2px solid #000; padding:8px; text-align:center;'>
-              <img src='{$data['image_path']}' style='max-width:100%; border:2px solid #000; border-radius:8px;'></td></tr>";
+// ✅ Image from database (using base64)
+    if (!empty($data['image_blob'])) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_buffer($finfo, $data['image_blob']);
+        finfo_close($finfo);
+        $base64Image = base64_encode($data['image_blob']);
+
+        echo "
+        <tr>
+            <th style='border:2px solid #000; padding:8px;'>Image</th>
+            <td style='border:2px solid #000; padding:8px; text-align:center;'>
+                <img src='data:{$mimeType};base64,{$base64Image}' 
+                     style='max-width:100%; border:2px solid #000; border-radius:8px;'>
+            </td>
+        </tr>";
     }
 
     echo "</table>";
 }
 
-// Footer section
+// ✅ Footer section
 echo "
 <div style='margin-top:40px; display:flex; justify-content:space-between; text-align:center;'>
     <div>

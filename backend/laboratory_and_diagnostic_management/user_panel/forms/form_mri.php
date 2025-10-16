@@ -35,6 +35,26 @@ if (!$patient) {
     <meta charset="UTF-8">
     <title>MRI Scan Form</title>
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .card-header {
+            background-color: #007bff;
+            color: white;
+            font-weight: bold;
+        }
+        .btn-save {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-save:hover {
+            background-color: #0056b3;
+        }
+        textarea.form-control {
+            resize: vertical;
+        }
+    </style>
 </head>
 <body class="container mt-4">
 
