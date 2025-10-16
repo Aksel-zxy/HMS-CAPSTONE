@@ -1,7 +1,7 @@
 <?php
 class JobManager {
     private $conn;
-    private $uploadDir = "../uploads/job_pics/"; // ✅ changed from css/pics/
+    private $uploadDir = "/uploads/job_pics/"; // ✅ changed from css/pics/
     private $allowedTypes = ['jpg', 'jpeg', 'png'];
     private $maxFileSize = 2000000; // 2MB
 

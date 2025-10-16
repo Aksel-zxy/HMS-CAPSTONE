@@ -366,8 +366,11 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                             while ($row = $result->fetch_assoc()) {
                                 echo '<div class="job_post-item">';
 
+                                    // ✅ Updated image path
                                     if (!empty($row['image'])) {
-                                        echo '<div style="text-align:center;"><img src="css/pics/' . htmlspecialchars($row['image']) . '" alt="Job Post Image" style="max-width: 100%; height: auto; margin-bottom: 10px;"></div>';
+                                        echo '<div style="text-align:center;">
+                                                <img src="' . htmlspecialchars($row['image']) . '"alt="Job Post Image" style="max-width: 100%; height: auto; margin-bottom: 10px;">
+                                            </div>';
                                     }
 
                                     echo '<p><strong>Title:</strong> ' . htmlspecialchars($row['title']) . '</p>';
@@ -377,7 +380,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                     echo '<p><strong>Date Posted:</strong> ' . htmlspecialchars($row['date_post']) . '</p>';
 
                                     echo '<div class="delete">';
-                                        echo '<a href="job_management.php?job_id=' . $row['job_id'] . '" onclick="return confirm(\'Are you sure you want to delete this job post?\');"">Delete</a>';
+                                        echo '<a href="job_management.php?job_id=' . $row['job_id'] . '" 
+                                                onclick="return confirm(\'Are you sure you want to delete this job post?\');">
+                                                Delete
+                                            </a>';
                                     echo '</div>';
 
                                 echo '</div>';
@@ -387,6 +393,8 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         }
                     ?>
                 </div>
+            </div>
+
             </div>
             <!-- END CODING HERE -->
 
