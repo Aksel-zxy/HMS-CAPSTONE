@@ -369,10 +369,12 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                     // ✅ Updated image path
                                     if (!empty($row['image'])) {
                                         echo '<div style="text-align:center;">
-                                                <img src="' . htmlspecialchars($row['image']) . '"alt="Job Post Image" style="max-width: 100%; height: auto; margin-bottom: 10px;">
+                                                <img src="../uploads/job_pics/' . htmlspecialchars(basename($row['image'])) . '" 
+                                                    alt="Job Post Image" 
+                                                    style="max-width: 100%; height: auto; margin-bottom: 10px;">
                                             </div>';
                                     }
-
+                                    
                                     echo '<p><strong>Title:</strong> ' . htmlspecialchars($row['title']) . '</p>';
                                     echo '<p><strong>Position:</strong> ' . htmlspecialchars($row['job_position']) . '</p>';
                                     echo '<p style="text-align: justify;"><strong>Description:</strong> ' . htmlspecialchars($row['job_description']) . '</p>';
