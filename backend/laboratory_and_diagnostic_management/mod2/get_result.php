@@ -1,6 +1,6 @@
 <?php
 if (!isset($conn)) {
-    include __DIR__ . "/../../../../SQL/config.php";
+    include __DIR__ . "../../../../SQL/config.php";
 }
 
 $scheduleID = $_GET['scheduleID'] ?? null;
