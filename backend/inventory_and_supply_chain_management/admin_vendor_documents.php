@@ -26,10 +26,7 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </head>
 <body class="bg-light">
 
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <?php include 'inventory_sidebar.php'; ?>
-    </div>
+   
 
     <!-- Main Content -->
     <main class="admin-main">
@@ -72,6 +69,11 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
     </main>
+
+     <!-- Sidebar -->
+    <div class="sidebar">
+        <?php include 'inventory_sidebar.php'; ?>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
