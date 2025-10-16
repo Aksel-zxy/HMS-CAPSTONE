@@ -15,7 +15,7 @@ $currentPage = basename(parse_url($requestUri, PHP_URL_PATH));
     <link rel="stylesheet" href="assets/CSS/inventory_dashboard.css">
     <link rel="stylesheet" type="text/css" href="/HMS-CAPSTONE/backend/inventory_and_supply_chain_management/assets/CSS/inventory_dashboard.css"> 
 </head>
-<script>
+<style>
 
 body {
     font-family: "Nunito", "Segoe UI", Arial, sans-serif;
@@ -152,7 +152,7 @@ body {
 }
 
 
-</script>
+</style>
 <body>
 
     <div class="sidebar">
