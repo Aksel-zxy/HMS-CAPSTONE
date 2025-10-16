@@ -6,6 +6,7 @@ if (!defined("BASE_URL")) {
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+
 $inactive = 1800;
 if (isset($_SESSION['timeout'])) {
     $session_life = time() - $_SESSION['timeout'];
@@ -21,26 +22,20 @@ if (isset($_SESSION['timeout'])) {
 }
 $_SESSION['timeout'] = time();
 
-
-// MySQL settings
-
-$host     = "127.0.0.1";
+// ✅ MySQL settings for Docker Compose
+$host     = "mysql";        // Service name from docker-compose.yml
 $port     = "3306";
-$dbname   = "hmscapstone";
-$username = "root";
-$password = "";
+$dbname   = "mydb";         // Must match MYSQL_DATABASE
+$username = "user";         // Must match MYSQL_USER
+$password = "pass";         // Must match MYSQL_PASSWORD
 
-
-// mysqli connection
-
+// ✅ mysqli connection
 $conn = new mysqli($host, $username, $password, $dbname, $port);
 if ($conn->connect_error) {
     die("Connection failed (MySQLi): " . $conn->connect_error);
 }
 
-
-// PDO connection
-
+// ✅ PDO connection
 try {
     $pdo = new PDO(
         "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4",
