@@ -15,6 +15,17 @@ function markScheduleCompleted($conn, $scheduleID)
     $update->close();
 }
 
+/* ==============================
+   FUNCTION: Read Image as Blob
+============================== */
+function getImageBlob($fileInputName)
+{
+    if (!empty($_FILES[$fileInputName]['tmp_name'])) {
+        return file_get_contents($_FILES[$fileInputName]['tmp_name']);
+    }
+    return null;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $scheduleID = $_POST['scheduleID'] ?? null;
     $patientID  = $_POST['patientID'] ?? null;
@@ -43,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                    platelets, mcv, mch, mchc, remarks, created_at) 
                   VALUES (?, ?, 'CBC', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
 
-        $stmt = $conn->prepare($query) or die("Prepare failed: " . $conn->error);
+        $stmt = $conn->prepare($query);
         $stmt->bind_param(
             "iisssssssss",
             $scheduleID,
@@ -60,125 +71,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         if ($stmt->execute()) {
-            markScheduleCompleted($conn, $scheduleID); // ✅ update status
+            markScheduleCompleted($conn, $scheduleID);
             echo "<script>alert('CBC result saved successfully!'); window.location.href='../sample_processing.php';</script>";
         } else {
             echo "Error executing query: " . $stmt->error;
         }
+        $stmt->close();
     }
 
     /* ==============================
-       X-RAY RESULT
+       IMAGE-BASED TEST (X-ray, MRI, CT)
     ============================== */
-    elseif ($testType === "X-ray") {
+    elseif (in_array($testType, ['X-ray', 'MRI', 'CT'])) {
         $findings   = $_POST['findings'];
         $impression = $_POST['impression'];
         $remarks    = $_POST['remarks'];
 
-        $imagePath = "";
-        if (!empty($_FILES['xray_image']['name'])) {
-            $uploadDir = __DIR__ . "/../uploads/xray/";
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+        // Decide image input name
+        $fileInputName = strtolower(str_replace('-', '', $testType)) . '_image'; // e.g., xray_image, mri_image, ct_image
+        $imageBlob = getImageBlob($fileInputName);
 
-            $fileName   = time() . "_" . basename($_FILES['xray_image']['name']);
-            $targetPath = $uploadDir . $fileName;
+        // Decide which table
+        $tableMap = [
+            'X-ray' => 'dl_lab_xray',
+            'MRI'   => 'dl_lab_mri',
+            'CT'    => 'dl_lab_ct'
+        ];
+        $table = $tableMap[$testType];
 
-            if (move_uploaded_file($_FILES['xray_image']['tmp_name'], $targetPath)) {
-                $imagePath = "/HMS-CAPSTONE/backend/laboratory_and_diagnostic_management/user_panel/uploads/xray/" . $fileName;
-            } else {
-                die("Failed to upload X-ray image. PHP Error: " . $_FILES['xray_image']['error']);
-            }
+        $query = "INSERT INTO $table 
+                  (scheduleID, patientID, testType, findings, impression, remarks, image_blob, created_at)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+
+        $stmt = $conn->prepare($query);
+        $null = NULL; // for binding blob
+
+        // bind all parameters
+        $stmt->bind_param("iissssb", $scheduleID, $patientID, $testType, $findings, $impression, $remarks, $null);
+
+        // send blob data separately
+        if ($imageBlob !== null) {
+            $stmt->send_long_data(6, $imageBlob); // index 6 = 7th parameter (image_blob)
         }
-
-        $query = "INSERT INTO dl_lab_xray
-                  (scheduleID, patientID, testType, findings, impression, remarks, image_path, created_at) 
-                  VALUES (?, ?, 'X-ray', ?, ?, ?, ?, NOW())";
-
-        $stmt = $conn->prepare($query) or die("Prepare failed: " . $conn->error);
-        $stmt->bind_param("iissss", $scheduleID, $patientID, $findings, $impression, $remarks, $imagePath);
 
         if ($stmt->execute()) {
-            markScheduleCompleted($conn, $scheduleID); // ✅ update status
-            echo "<script>alert('X-ray result saved successfully!'); window.location.href='../sample_processing.php';</script>";
+            markScheduleCompleted($conn, $scheduleID);
+            echo "<script>alert('$testType result saved successfully!'); window.location.href='../sample_processing.php';</script>";
         } else {
-            echo "Error: " . $stmt->error;
-        }
-    }
-
-    /* ==============================
-       MRI RESULT
-    ============================== */
-    elseif ($testType === "MRI") {
-        $findings   = $_POST['findings'];
-        $impression = $_POST['impression'];
-        $remarks    = $_POST['remarks'];
-
-        $imagePath = "";
-        if (!empty($_FILES['mri_image']['name'])) {
-            $uploadDir = __DIR__ . "/../uploads/mri/";
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-
-            $fileName   = time() . "_" . basename($_FILES['mri_image']['name']);
-            $targetPath = $uploadDir . $fileName;
-
-            if (move_uploaded_file($_FILES['mri_image']['tmp_name'], $targetPath)) {
-                $imagePath = "/HMS-CAPSTONE/backend/laboratory_and_diagnostic_management/user_panel/uploads/mri/" . $fileName;
-            } else {
-                die("Failed to upload MRI image. PHP Error: " . $_FILES['mri_image']['error']);
-            }
+            echo "Error executing query: " . $stmt->error;
         }
 
-        $query = "INSERT INTO dl_lab_mri
-                  (scheduleID, patientID, testType, findings, impression, remarks, image_path, created_at) 
-                  VALUES (?, ?, 'MRI', ?, ?, ?, ?, NOW())";
-
-        $stmt = $conn->prepare($query) or die("Prepare failed: " . $conn->error);
-        $stmt->bind_param("iissss", $scheduleID, $patientID, $findings, $impression, $remarks, $imagePath);
-
-        if ($stmt->execute()) {
-            markScheduleCompleted($conn, $scheduleID); // ✅ update status
-            echo "<script>alert('MRI result saved successfully!'); window.location.href='../sample_processing.php';</script>";
-        } else {
-            echo "Error: " . $stmt->error;
-        }
-    }
-
-    /* ==============================
-       CT SCAN RESULT
-    ============================== */
-    elseif ($testType === "CT") {
-        $findings   = $_POST['findings'];
-        $impression = $_POST['impression'];
-        $remarks    = $_POST['remarks'];
-
-        $imagePath = "";
-        if (!empty($_FILES['ct_image']['name'])) {
-            $uploadDir = __DIR__ . "/../uploads/ct/";
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
-
-            $fileName   = time() . "_" . basename($_FILES['ct_image']['name']);
-            $targetPath = $uploadDir . $fileName;
-
-            if (move_uploaded_file($_FILES['ct_image']['tmp_name'], $targetPath)) {
-                $imagePath = "/HMS-CAPSTONE/backend/laboratory_and_diagnostic_management/user_panel/uploads/ct/" . $fileName;
-            } else {
-                die("Failed to upload CT image. PHP Error: " . $_FILES['ct_image']['error']);
-            }
-        }
-
-        $query = "INSERT INTO dl_lab_ct
-                  (scheduleID, patientID, testType, findings, impression, remarks, image_path, created_at) 
-                  VALUES (?, ?, 'CT', ?, ?, ?, ?, NOW())";
-
-        $stmt = $conn->prepare($query) or die("Prepare failed: " . $conn->error);
-        $stmt->bind_param("iissss", $scheduleID, $patientID, $findings, $impression, $remarks, $imagePath);
-
-        if ($stmt->execute()) {
-            markScheduleCompleted($conn, $scheduleID); // ✅ update status
-            echo "<script>alert('CT Scan result saved successfully!'); window.location.href='../sample_processing.php';</script>";
-        } else {
-            echo "Error: " . $stmt->error;
-        }
+        $stmt->close();
     }
 
     else {
