@@ -31,7 +31,8 @@ $rejectedApplicants = $applicantManager->getRejectedApplicants();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Rejected Leaves | HR Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMS | HR Management</title>
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
@@ -77,19 +78,27 @@ $rejectedApplicants = $applicantManager->getRejectedApplicants();
                             <?php foreach ($rejectedApplicants as $applicant): ?>
                                 <tr>
                                     <td><?= htmlspecialchars($applicant['applicant_id']) ?></td>
-                                    <td><?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['last_name']) ?></td>
+                                    <td><?= htmlspecialchars($applicant['first_name'] . ' ' . $applicant['middle_name'] . ' ' . $applicant['last_name'] . ' ' . $applicant['suffix_name']); ?></td>
                                     <td><?= htmlspecialchars($applicant['role']) ?></td>
                                     <td><?= htmlspecialchars($applicant['email']) ?></td>
-                                    <td><?= htmlspecialchars($applicant['contact_number']) ?></td>
+                                    <td><?= htmlspecialchars($applicant['phone']) ?></td>
                                     <td>
                                         <?php 
                                             $docs = $applicantManager->getApplicantDocuments($applicant['applicant_id']);
-                                            foreach ($docs as $doc): 
+                                            if (!empty($docs)) {
+                                                foreach ($docs as $doc): 
+                                                    $file = htmlspecialchars($doc['file_name'] ?? '#');
+                                                    $type = htmlspecialchars($doc['document_type'] ?? 'Other');
                                         ?>
-                                            <a href="<?= htmlspecialchars($doc['file_name']) ?>" target="_blank"><?= htmlspecialchars($doc['document_type']) ?></a><br>
-                                        <?php endforeach; ?>
+                                                    <a href="<?= $file ?>" target="_blank"><?= $type ?></a><br>
+                                        <?php 
+                                                endforeach; 
+                                            } else {
+                                                echo "No documents uploaded.";
+                                            }
+                                        ?>
                                     </td>
-                                    <td><?= htmlspecialchars($applicant['updated_at']) ?></td>
+                                    <td><?= htmlspecialchars($applicant['update_at']) ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>

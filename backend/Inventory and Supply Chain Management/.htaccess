@@ -1,0 +1,25 @@
+RewriteEngine On
+
+# Redirect clean URLs to PHP files
+RewriteRule ^home/?$ inventory_dashboard.php [L]
+RewriteRule ^inventory-stock/?$ inventory_management.php [L]
+RewriteRule ^batch-expiry/?$ batch&expiry.php [L]
+RewriteRule ^return-damage/?$ return_damage.php [L]
+
+RewriteRule ^vendor-registration/?$ vendor_application.php [L]
+RewriteRule ^vendors/?$ vendor_list.php [L]
+RewriteRule ^vendor-rating/?$ vendor_rating.php [L]
+RewriteRule ^contract-tracking/?$ admin_vendor_contracts.php [L]
+RewriteRule ^compliance-docs/?$ admin_vendor_documents.php [L]
+
+RewriteRule ^purchase-order/?$ purchase_order.php [L]
+RewriteRule ^purchase-request/?$ admin_purchase_requests.php [L]
+RewriteRule ^order-receive/?$ order_receive.php [L]
+RewriteRule ^po-status/?$ po_status_tracking.php [L]
+
+RewriteRule ^departments-budget/?$ budget_request.php [L]
+RewriteRule ^department-assets/?$ department_asset_mapping.php [L]
+RewriteRule ^maintenance-schedule/?$ preventive_maintenance.php [L]
+RewriteRule ^repair-maintenance/?$ repair_maintenance.php [L]
+RewriteRule ^asset-transfer/?$ asset_transfer.php [L]
+RewriteRule ^audit-logs/?$ audit_logs.php [L]

@@ -102,9 +102,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <a href="../Time & Attendance Module/daily_attendance_records.php" class="sidebar-link">Daily Attendance Records</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Time & Attendance Module/shift_management.php" class="sidebar-link">Shift Management</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="../Time & Attendance Module/attendance_records.php" class="sidebar-link">Attendance Reports</a>
                     </li>
                 </ul>
@@ -158,12 +155,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     </li>
                     <li class="sidebar-item">
                         <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="payslip_generation.php" class="sidebar-link">Payslip Generation</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="payroll_disbursement.php" class="sidebar-link">Payroll Disbursement</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="payroll_reports.php" class="sidebar-link">Payroll Reports</a>

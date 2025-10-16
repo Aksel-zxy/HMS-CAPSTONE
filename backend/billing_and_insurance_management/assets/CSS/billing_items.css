@@ -1,0 +1,147 @@
+/* billing_items.css */
+
+/* General Layout */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f8f9fa;
+}
+
+/* Container styling */
+.container {
+  max-width: 1200px;
+  margin: auto;
+}
+
+/* Headings */
+h2 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Table responsiveness */
+.table {
+  font-size: 0.9rem;
+}
+
+.table thead th {
+  white-space: nowrap;
+}
+
+.table td,
+.table th {
+  vertical-align: middle;
+}
+
+/* Service dropdown + button in row */
+form.d-flex {
+  flex-wrap: wrap;
+}
+
+form.d-flex select {
+  flex: 1 1 auto;
+  min-width: 220px;
+}
+
+form.d-flex button {
+  flex: 0 0 auto;
+}
+
+/* Totals section */
+.text-end {
+  font-size: 1rem;
+}
+
+/* Action buttons */
+.btn {
+  border-radius: 6px;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  .table {
+    font-size: 0.85rem;
+  }
+
+  .text-end {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+
+  .container {
+    padding: 15px;
+  }
+
+  h2 {
+    text-align: center;
+  }
+
+  form.d-flex {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mt-4.d-flex {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 10px;
+    background-color: #fff;
+  }
+
+  .table tbody tr td {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    padding: 6px 8px;
+  }
+
+  .table tbody tr td::before {
+    content: attr(data-label);
+    font-weight: bold;
+    color: #555;
+  }
+}
+
+@media (max-width: 480px) {
+  h2 {
+    font-size: 1.1rem;
+  }
+
+  .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .text-end {
+    text-align: center !important;
+  }
+}

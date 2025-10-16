@@ -1,0 +1,45 @@
+/* Make table responsive */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+}
+
+/* Sidebar behavior for mobile */
+@media (max-width: 768px) {
+  #sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    height: 100%;
+    width: 250px;
+    background: #fff;
+    transition: all 0.3s ease;
+    z-index: 9999;
+  }
+
+  #sidebar.collapsed {
+    left: 0;
+  }
+
+  .main {
+    margin-left: 0 !important;
+    width: 100%;
+  }
+}
+
+/* For small devices, stack search + button */
+@media (max-width: 576px) {
+  .d-flex.mt-4 {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #patientSearch {
+    width: 100%;
+  }
+
+  #Boton {
+    width: 100%;
+  }
+}

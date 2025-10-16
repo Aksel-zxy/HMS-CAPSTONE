@@ -23,7 +23,6 @@ if (!$user) {
 }
 
 $leaveNotif = new LeaveNotification($conn);
-
 $applicantObj = new Applicant($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -37,15 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $applicantObj->scheduleInterview($applicant_id, $interview_date, $notes);
 
             $applicantData = $applicantObj->getById($applicant_id);
-
             if ($applicantData && !empty($applicantData['email'])) {
-                $fullName = $applicantData['first_name'] . ' ' . $applicantData['middle_name'] . ' ' . $applicantData['last_name'] . ' ' . $applicantData['suffix_name'];
-                sendInterviewEmail(
-                    $applicantData['email'],
-                    $fullName,
-                    $interview_date
-                );
-            } 
+                $fullName = trim($applicantData['first_name'] . ' ' . $applicantData['middle_name'] . ' ' . $applicantData['last_name'] . ' ' . $applicantData['suffix_name']);
+                sendInterviewEmail($applicantData['email'], $fullName, $interview_date);
+            }
         }
 
         if ($_POST['action'] === 'update_status' && !empty($_POST['status'])) {
@@ -65,8 +59,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $applicants = $applicantObj->getAllApplicants();
-$pendingCount = $leaveNotif->getPendingLeaveCount();
+$actionableApplicants = [];
+foreach ($applicants as $app) {
+    $tracking = $applicantObj->getLatestTracking($app['applicant_id']);
+    $status = $tracking['status'] ?? 'Pending';
+    if (!in_array($status, ['Hired', 'Rejected'])) {
+        $actionableApplicants[] = $app;
+    }
+}
 
+$pendingCount = $leaveNotif->getPendingLeaveCount();
 ?>
 
 <!DOCTYPE html>
@@ -156,9 +158,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <a href="../Time & Attendance Module/daily_attendance_records.php" class="sidebar-link">Daily Attendance Records</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Time & Attendance Module/shift_management.php" class="sidebar-link">Shift Management</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="../Time & Attendance Module/attendance_records.php" class="sidebar-link">Attendance Reports</a>
                     </li>
                 </ul>
@@ -212,12 +211,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     </li>
                     <li class="sidebar-item">
                         <a href="../Payroll & Compensation Benifits Module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Payroll & Compensation Benifits Module/payslip_generation.php" class="sidebar-link">Payslip Generation</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Payroll & Compensation Benifits Module/payroll_disbursement.php" class="sidebar-link">Payroll Disbursement</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Payroll & Compensation Benifits Module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -275,83 +268,68 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 <table>
                     <thead>
                         <tr>
-                        <th>Name</th>
-                        <th>Specialization</th>
-                        <th>Email</th>
-                        <th>Contact Number</th>
-                        <th>Status</th>
-                        <th>Interview Date</th>
-                        <th>Notes</th>
-                        <th>Submitted Documents</th>
-                        <th>Actions</th>
+                            <th>Name</th>
+                            <th>Specialization</th>
+                            <th>Email</th>
+                            <th>Contact Number</th>
+                            <th>Status</th>
+                            <th>Interview Date</th>
+                            <th>Notes</th>
+                            <th>Submitted Documents</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($applicants as $row): ?>
-                            <?php 
-                                $tracking = $applicantObj->getLatestTracking($row['applicant_id']); 
-                                $documents = $applicantObj->getApplicantDocuments($row['applicant_id']); 
-                            ?>
-                            <tr>
-                                <td><?= htmlspecialchars($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name'] . ' ' . $row['suffix_name']); ?></td>
-                                <td><?= htmlspecialchars($row['specialization']); ?></td>
-                                <td><?= htmlspecialchars($row['email']); ?></td>
-                                <td><?= htmlspecialchars($row['phone']); ?></td>
-                                <td><?= $tracking['status'] ?? 'Pending'; ?></td>
-                                <td>
-                                    <?= isset($tracking['interview_date']) && $tracking['interview_date'] !== null
-                                        ? date("Y-m-d", strtotime($tracking['interview_date']))
-                                        : '-'; ?>
-                                </td>
-                                <td><?= $tracking['notes'] ?? '-'; ?></td>
-                                <td>
-                                    <?php if (!empty($documents)): ?>
-                                        <?php foreach ($documents as $docType => $files): ?>
-                                            <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $docType))); ?>:</strong><br>
-                                            <?php foreach ($files as $file): ?>
-                                                <a href="<?= htmlspecialchars($file['path']); ?>" target="_blank">
-                                                    <?= htmlspecialchars($file['name']); ?>
-                                                </a><br>
+                        <?php if (!empty($actionableApplicants)): ?>
+                            <?php foreach ($actionableApplicants as $row): ?>
+                                <?php 
+                                    $tracking = $applicantObj->getLatestTracking($row['applicant_id']); 
+                                    $documents = $applicantObj->getApplicantDocuments($row['applicant_id']); 
+                                    $currentStatus = $tracking['status'] ?? 'Pending';
+                                ?>
+                                <tr>
+                                    <td><?= htmlspecialchars(trim($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name'] . ' ' . $row['suffix_name'])); ?></td>
+                                    <td><?= htmlspecialchars($row['specialization']); ?></td>
+                                    <td><?= htmlspecialchars($row['email']); ?></td>
+                                    <td><?= htmlspecialchars($row['phone']); ?></td>
+                                    <td><?= $currentStatus; ?></td>
+                                    <td><?= isset($tracking['interview_date']) && $tracking['interview_date'] ? date("Y-m-d", strtotime($tracking['interview_date'])) : '-'; ?></td>
+                                    <td><?= $tracking['notes'] ?? '-'; ?></td>
+                                    <td>
+                                        <?php if (!empty($documents)): ?>
+                                            <?php foreach ($documents as $docType => $files): ?>
+                                                <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $docType))); ?>:</strong><br>
+                                                <?php foreach ($files as $file): ?>
+                                                    <a href="<?= htmlspecialchars($file['path']); ?>" target="_blank"><?= htmlspecialchars($file['name']); ?></a><br>
+                                                <?php endforeach; ?>
                                             <?php endforeach; ?>
-                                        <?php endforeach; ?>
-                                    <?php else: ?>
-                                        No documents
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <form method="POST" class="d-flex flex-column align-items-center gap-2">
-                                        <input type="hidden" name="applicant_id" value="<?= $row['applicant_id']; ?>">
-                                        
-                                        <!-- Date Input -->
-                                        <input type="hidden" name="applicant_id" value="<?= $row['applicant_id']; ?>"> <input type="date" name="interview_date" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
-                                        
-                                        <!-- Notes Input --> 
-                                        <input type="text" name="notes" placeholder="Notes (Optional)" class="form-control form-control-sm" style="max-width:200px; text-align:center;"> 
-                                        
-                                        <!-- Schedule Button --> 
-                                        <button type="submit" name="action" value="schedule_interview" class="btn btn-primary btn-sm" style="max-width:120px;"> Schedule </button>                                        
-                                        
-                                        <!-- Done Interview Button -->
-                                        <?php if (isset($tracking['interview_date']) && in_array($tracking['status'], ['Pending Interview', 'Scheduled'])): ?>
-                                            <button type="submit" name="action" value="done_interview" class="btn btn-warning btn-sm mt-1" style="max-width:120px;">
-                                                Done Interview
-                                            </button>
+                                        <?php else: ?>
+                                            No documents
                                         <?php endif; ?>
-
-                                        <!-- Hired & Rejected Buttons -->
-                                        <div class="d-flex gap-2 justify-content-center mt-1">
-                                            <button type="submit" name="action" value="update_status" class="btn btn-success btn-sm" title="Hired" onclick="this.form.status.value='Hired';">
-                                                <i class="fas fa-check"></i>
-                                            </button>
-                                            <button type="submit" name="action" value="update_status" class="btn btn-danger btn-sm" title="Rejected" onclick="this.form.status.value='Rejected';">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                            <input type="hidden" name="status" value="">
-                                        </div>
-                                    </form>
-                                </td>
+                                    </td>
+                                    <td>
+                                        <form method="POST" class="d-flex flex-column align-items-center gap-2">
+                                            <input type="hidden" name="applicant_id" value="<?= $row['applicant_id']; ?>">
+                                            <input type="date" name="interview_date" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
+                                            <input type="text" name="notes" placeholder="Notes (Optional)" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
+                                            <button type="submit" name="action" value="schedule_interview" class="btn btn-primary btn-sm" style="max-width:120px;">Schedule</button>
+                                            <?php if (isset($tracking['interview_date']) && in_array($currentStatus, ['Pending Interview', 'Scheduled'])): ?>
+                                                <button type="submit" name="action" value="done_interview" class="btn btn-warning btn-sm mt-1" style="max-width:120px;">Done Interview</button>
+                                            <?php endif; ?>
+                                            <div class="d-flex gap-2 justify-content-center mt-1">
+                                                <button type="submit" name="action" value="update_status" class="btn btn-success btn-sm" title="Hired" onclick="this.form.status.value='Hired';"><i class="fas fa-check"></i></button>
+                                                <button type="submit" name="action" value="update_status" class="btn btn-danger btn-sm" title="Rejected" onclick="this.form.status.value='Rejected';"><i class="fas fa-times"></i></button>
+                                                <input type="hidden" name="status" value="">
+                                            </div>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="9" style="text-align:center;">No applicants found.</td>
                             </tr>
-                        <?php endforeach; ?>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>

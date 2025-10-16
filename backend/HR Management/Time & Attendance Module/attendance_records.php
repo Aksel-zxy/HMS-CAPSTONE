@@ -25,6 +25,38 @@ if (!$user) {
 
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
+// Handle date range (weekly/monthly)
+$start_date = $_GET['start_date'] ?? date('Y-m-01'); // default: first day of month
+$end_date   = $_GET['end_date'] ?? date('Y-m-t');     // default: last day of month
+
+// Fetch attendance summary
+$sql = "SELECT e.employee_id,
+               CONCAT(e.first_name, ' ',
+                      IFNULL(e.middle_name,''), ' ',
+                      e.last_name,
+                      IF(e.suffix_name IS NOT NULL AND e.suffix_name != '', CONCAT(' ', e.suffix_name), '')
+               ) AS full_name,
+               SUM(CASE WHEN a.attendance_id IS NOT NULL 
+                        AND a.status IN ('Present','Undertime','Late','Overtime') 
+                        THEN 1 ELSE 0 END) AS days_present,
+               SUM(CASE WHEN a.status='On Leave' THEN 1 ELSE 0 END) AS days_on_leave,
+               SUM(a.working_hours) AS total_working_hours,
+               SUM(a.late_minutes) AS total_late,
+               SUM(a.undertime_minutes) AS total_undertime,
+               SUM(a.overtime_minutes) AS total_overtime,
+               SUM(CASE WHEN a.status='Absent' THEN 1 ELSE 0 END) AS days_absent
+        FROM hr_employees e
+        LEFT JOIN hr_daily_attendance a 
+               ON e.employee_id = a.employee_id
+               AND a.attendance_date BETWEEN ? AND ?
+        WHERE e.status='Active'
+        GROUP BY e.employee_id";
+
+$stmt = $conn->prepare($sql);
+$stmt->bind_param('ss', $start_date, $end_date);
+$stmt->execute();
+$result = $stmt->get_result();
+
 ?>
 
 <!DOCTYPE html>
@@ -37,9 +69,22 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="stylesheet" href="css/attendance_records.css">
 </head>
 
 <body>
+
+    <!----- Full-page Loader ----->
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -102,9 +147,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <a href="daily_attendance_records.php" class="sidebar-link">Daily Attendance Records</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="shift_management.php" class="sidebar-link">Shift Management</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="attendance_records.php" class="sidebar-link">Attendance Reports</a>
                     </li>
                 </ul>
@@ -160,12 +202,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <a href="../Payroll & Compensation Benifits Module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Payroll & Compensation Benifits Module/payslip_generation.php" class="sidebar-link">Payslip Generation</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Payroll & Compensation Benifits Module/payroll_disbursement.php" class="sidebar-link">Payroll Disbursement</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="../Payroll & Compensation Benifits Module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
                     </li>
                 </ul>
@@ -206,8 +242,54 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>ATTENDANCE RECORDS</h1> 
+            <div class="attendance">
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Attendance Reports</p>
+
+
+                <form method="GET" class="attendance-nav-inline">
+                    <label for="start_date">Start Date:</label>
+                    <input type="date" id="start_date" name="start_date" value="<?= $start_date ?>">
+
+                    <label for="end_date">End Date:</label>
+                    <input type="date" id="end_date" name="end_date" value="<?= $end_date ?>">
+
+                    <button type="submit">Filter</button>
+                </form>
+
+                <table id="AttendanceTable">
+                    <thead>
+                        <tr>
+                            <th>Employee ID</th>
+                            <th>Name</th>
+                            <th>Days Present</th>
+                            <th>Days Absent</th>
+                            <th>Days On Leave</th>
+                            <th>Total Working Hours</th>
+                            <th>Total Late (min)</th>
+                            <th>Total Undertime (min)</th>
+                            <th>Total Overtime (min)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while($row = $result->fetch_assoc()): ?>
+                        <tr>
+                            <td><?= $row['employee_id'] ?></td>
+                            <td><?= htmlspecialchars($row['full_name']) ?></td>
+                            <td><?= $row['days_present'] ?></td>
+                            <td><?= $row['days_absent'] ?></td>
+                            <td><?= $row['days_on_leave'] ?></td>
+                            <td><?= $row['total_working_hours'] ?></td>
+                            <td><?= $row['total_late'] ?></td>
+                            <td><?= $row['total_undertime'] ?></td>
+                            <td><?= $row['total_overtime'] ?></td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+
+                <!-- ----- Pagination Controls ----- -->
+                <div id="pagination" class="pagination"></div>
+
             </div>
             <!-- END CODING HERE -->
         </div>
@@ -220,10 +302,68 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <!----- End of Footer Content ----->
 
     <script>
+
+        window.addEventListener("load", function(){
+            setTimeout(function(){
+                document.getElementById("loading-screen").style.display = "none";
+            }, 2000);
+        });
+
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const table = document.getElementById("AttendanceTable");
+            const rows = table.querySelectorAll("tbody tr");
+            const pagination = document.getElementById("pagination");
+
+            let rowsPerPage = 10;
+            let currentPage = 1;
+            let totalPages = Math.ceil(rows.length / rowsPerPage);
+
+            function displayRows() {
+                rows.forEach((row, index) => {
+                    row.style.display =
+                    index >= (currentPage - 1) * rowsPerPage && index < currentPage * rowsPerPage
+                    ? ""
+                    : "none";
+                });
+            }
+
+            function updatePagination() {
+                pagination.innerHTML = ""; 
+
+                const createButton = (text, page, isDisabled = false, isActive = false) => {
+                    const button = document.createElement("button");
+                    button.textContent = text;
+                    if (isDisabled) button.disabled = true;
+                    if (isActive) button.classList.add("active");
+
+                    button.addEventListener("click", function () {
+                        currentPage = page;
+                        displayRows();
+                        updatePagination();
+                    });
+                    return button;
+                };
+
+                pagination.appendChild(createButton("First", 1, currentPage === 1));
+                pagination.appendChild(createButton("Previous", currentPage - 1, currentPage === 1));
+
+                for (let i = 1; i <= totalPages; i++) {
+                    pagination.appendChild(createButton(i, i, false, i === currentPage));
+                }
+
+                pagination.appendChild(createButton("Next", currentPage + 1, currentPage === totalPages));
+                pagination.appendChild(createButton("Last", totalPages, currentPage === totalPages));
+            }
+
+            displayRows();
+            updatePagination();
+        });
+
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
