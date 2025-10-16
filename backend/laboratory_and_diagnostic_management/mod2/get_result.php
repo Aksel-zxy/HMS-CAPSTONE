@@ -1,6 +1,6 @@
 <?php
 if (!isset($conn)) {
-    include __DIR__ . "../../../../SQL/config.php";
+    include __DIR__ . "/../../../../SQL/config.php";
 }
 
 $scheduleID = $_GET['scheduleID'] ?? null;
@@ -13,6 +13,7 @@ if (!$scheduleID || !$testType) {
 
 $testType = strtolower(trim($testType));
 
+// Determine table based on test type
 if (strpos($testType, "cbc") !== false || strpos($testType, "complete blood count") !== false) {
     $table = "dl_lab_cbc";
     $mode = "cbc";
@@ -30,7 +31,7 @@ if (strpos($testType, "cbc") !== false || strpos($testType, "complete blood coun
     exit;
 }
 
-// run query
+// Run query
 $query = "SELECT * FROM $table WHERE scheduleID = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $scheduleID);
@@ -44,20 +45,15 @@ if (!$data) {
 }
 
 // Map friendly names for display
-$displayName = '';
-if ($mode === "cbc") {
-    $displayName = "Complete Blood Count (CBC)";
-} elseif ($mode === "xray") {
-    $displayName = "X-Ray";
-} elseif ($mode === "mri") {
-    $displayName = "MRI Scan";
-} elseif ($mode === "ct") {
-    $displayName = "CT Scan";
-} else {
-    $displayName = ucfirst($testType);
-}
+$displayName = match ($mode) {
+    "cbc" => "Complete Blood Count (CBC)",
+    "xray" => "X-Ray",
+    "mri" => "MRI Scan",
+    "ct" => "CT Scan",
+    default => ucfirst($testType),
+};
 
-// render output
+// Render output
 echo "<h4 style='margin-bottom:15px; color:#198754; font-family:Arial, sans-serif;'>
         🧪 Test Result: {$displayName}
       </h4>";
@@ -79,15 +75,23 @@ if ($mode === "cbc") {
     </div>
     ";
 } else {
-    // MRI, CT, X-Ray share same structure
+    // MRI, CT, and X-Ray share same structure
     echo "
     <div class='table-responsive'>
       <table class='table table-bordered'>
         <tr><th>Findings</th><td>{$data['findings']}</td></tr>
         <tr><th>Impression</th><td>{$data['impression']}</td></tr>
         <tr><th>Remarks</th><td>{$data['remarks']}</td></tr>
-        <tr><th>Image</th><td><img src='{$data['image_path']}' style='max-width:100%; height:auto;'></td></tr>
-      </table>
-    </div>
     ";
+
+    // ✅ Display the image directly from the BLOB
+    if (!empty($data['image_blob'])) {
+        $base64Image = base64_encode($data['image_blob']);
+        echo "<tr><th>Image</th><td><img src='data:image/jpeg;base64,{$base64Image}' style='max-width:100%; height:auto;'></td></tr>";
+    } else {
+        echo "<tr><th>Image</th><td><em>No image uploaded.</em></td></tr>";
+    }
+
+    echo "</table></div>";
 }
+?>
