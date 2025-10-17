@@ -62,41 +62,77 @@ class LeaveApplication {
         return $allocatedDays - $usedDays;
     }
 
-    // ✅ Submit leave application
     public function submit($data, $file = null) {
-        $uploadPath = null;
+        try {
+            $uploadPath = null;
 
-        if ($file && $file['error'] === UPLOAD_ERR_OK) {
-            $upload_dir = 'uploads/';
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
+            // ✅ Check if a file is uploaded
+            if ($file && $file['error'] === UPLOAD_ERR_OK) {
+                // Use an absolute path (works on any server)
+                $upload_dir = __DIR__ . '/uploads/';
+
+                // ✅ Create uploads folder if missing
+                if (!is_dir($upload_dir)) {
+                    if (!mkdir($upload_dir, 0777, true)) {
+                        throw new Exception("Failed to create upload directory: $upload_dir");
+                    }
+                }
+
+                // ✅ Validate allowed file types
+                $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if (!in_array($ext, $allowed)) {
+                    throw new Exception("Invalid file type. Allowed: JPG, JPEG, PNG, PDF only.");
+                }
+
+                // ✅ Create a unique filename
+                $filename = uniqid('cert_', true) . '.' . $ext;
+                $filepath = $upload_dir . $filename;
+
+                // ✅ Move uploaded file
+                if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+                    throw new Exception("Failed to move uploaded file to: $filepath");
+                }
+
+                // ✅ Save relative path to DB (for displaying later)
+                $uploadPath = 'uploads/' . $filename;
             }
 
-            $filename = uniqid() . '_' . basename($file['name']);
-            $filepath = $upload_dir . $filename;
+            // ✅ Insert data into database
+            $stmt = $this->conn->prepare("
+                INSERT INTO hr_leave 
+                (employee_id, leave_type, leave_start_date, leave_end_date, leave_status, leave_reason, medical_cert)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
 
-            if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                $uploadPath = $filepath;
+            if (!$stmt) {
+                throw new Exception("Database prepare failed: " . $this->conn->error);
             }
+
+            $leave_status = 'Pending';
+
+            $stmt->bind_param(
+                "sssssss",
+                $data['employee_id'],
+                $data['leave_type'],
+                $data['leave_start_date'],
+                $data['leave_end_date'],
+                $leave_status,
+                $data['leave_reason'],
+                $uploadPath
+            );
+
+            if (!$stmt->execute()) {
+                throw new Exception("Database insert failed: " . $stmt->error);
+            }
+
+            return true; // ✅ Success
+
+        } catch (Exception $e) {
+            // Log or display the error safely (for debugging)
+            error_log($e->getMessage());
+            return false;
         }
-
-        $stmt = $this->conn->prepare("INSERT INTO hr_leave 
-            (employee_id, leave_type, leave_start_date, leave_end_date, leave_status, leave_reason, medical_cert)
-            VALUES (?, ?, ?, ?, ?, ?, ?)");
-
-        $leave_status = 'Pending';
-
-        $stmt->bind_param("sssssss",
-            $data['employee_id'],
-            $data['leave_type'],
-            $data['leave_start_date'],
-            $data['leave_end_date'],
-            $leave_status,
-            $data['leave_reason'],
-            $uploadPath
-        );
-
-        return $stmt->execute();
     }
 
 }

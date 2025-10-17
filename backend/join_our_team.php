@@ -37,7 +37,7 @@ $posts = $jobPost->getAllPosts();
                     <?php foreach ($posts as $row): ?>
                         <div class="job_post-item">
                             <?php if (!empty($row['image'])): ?>
-                                <img src="hr_management/recruitment_onboarding_module/css/pics/<?= htmlspecialchars($row['image']) ?>" alt="Job Post Image">
+                                <img src="hr_management/uploads/job_pics/<?= htmlspecialchars(basename($row['image'])) ?>" alt="Job Post Image" style="max-width: 100%; height: auto; margin-bottom: 10px;">
                                 <p style="font-size: 13px; margin-top: 5px; text-align: justify;">
                                     <span style="font-weight: bold; color: black;">Profession: </span><?= htmlspecialchars($row['profession']) ?><br>
                                     <span style="font-weight: bold; color: black;">Title: </span><?= htmlspecialchars($row['title']) ?><br>

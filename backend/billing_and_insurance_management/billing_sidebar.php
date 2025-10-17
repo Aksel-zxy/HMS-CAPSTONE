@@ -24,7 +24,7 @@ if (isset($_SESSION['user_id'])) {
     <link rel="stylesheet" type="text/css" href="/HMS-CAPSTONE/backend/billing_and_insurance_management/assets/CSS/billing_sidebar.css"> 
      <link rel="stylesheet" href="assets/CSS/billing_sidebar.css">
 </head>
-<script>
+<style>
 body {
     font-family: "Nunito", "Segoe UI", Arial, sans-serif;
     margin: 0;
@@ -235,7 +235,7 @@ body {
 }
 
 
-</script>
+</style>
 <body>
 
 <!-- Sidebar -->
