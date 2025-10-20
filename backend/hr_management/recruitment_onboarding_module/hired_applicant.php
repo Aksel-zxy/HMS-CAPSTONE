@@ -82,35 +82,19 @@ $hiredApplicants = $applicantManager->getHiredApplicants();
                                     <td><?= htmlspecialchars($applicant['phone']) ?></td>
                                     <td>
                                         <?php 
-                                            $docs = $applicantManager->getApplicantDocuments($applicant['applicant_id']);
-                                            if (!empty($docs)) {
-                                                $groupedDocs = [];
-                                                foreach ($docs as $doc) {
-                                                    $type = !empty($doc['document_type']) ? $doc['document_type'] : 'Others';
-
-                                                    $filePath = $doc['file_name'] ?? ($doc['document_path'] ?? ($doc['file_path'] ?? ''));
-                                                    
-                                                    if (!empty($filePath)) {
-                                                        $groupedDocs[$type][] = [
-                                                            'path' => htmlspecialchars($filePath),
-                                                            'name' => htmlspecialchars(basename($filePath))
-                                                        ];
-                                                    }
-                                                }
-                                                ?>
-
-                                                <?php foreach ($groupedDocs as $docType => $files): ?>
+                                            $documents = $applicantManager->getApplicantDocuments($applicant['applicant_id']);
+                                            if (!empty($documents)):
+                                                foreach ($documents as $docType => $files): ?>
                                                     <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $docType))); ?>:</strong><br>
                                                     <?php foreach ($files as $file): ?>
-                                                        <a href="<?= $file['path']; ?>" target="_blank"><?= $file['name']; ?></a><br>
+                                                        <a href="download_document.php?id=<?= htmlspecialchars($file['document_id']); ?>" target="_blank">
+                                                            <?= htmlspecialchars($file['document_type']); ?>
+                                                        </a><br>
                                                     <?php endforeach; ?>
                                                 <?php endforeach; ?>
-
-                                            <?php 
-                                            } else {
-                                                echo "No documents uploaded.";
-                                            }
-                                        ?>
+                                        <?php else: ?>
+                                            No documents
+                                        <?php endif; ?>
                                     </td>
                                     <td><?= htmlspecialchars($applicant['update_at']) ?></td>
                                 </tr>

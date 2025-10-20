@@ -267,7 +267,8 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                     <td><?= htmlspecialchars($row['total_days']) ?></td>
                                     <td>
                                         <?php if (!empty($row['medical_cert'])): ?>
-                                            <a href="<?= htmlspecialchars($row['medical_cert']) ?>" target="_blank">View</a>
+                                            <?php $leaveId = htmlspecialchars($row['leave_id']); ?>
+                                            <a href="download_med_cert.php?leave_id=<?= $leaveId ?>" target="_blank">View</a>
                                         <?php else: ?>
                                             <span class="text-muted">None</span>
                                         <?php endif; ?>

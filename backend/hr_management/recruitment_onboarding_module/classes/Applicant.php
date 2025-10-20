@@ -49,10 +49,9 @@ class Applicant {
         return $data;
     }
 
-    // Get applicant documents grouped by type.
     public function getApplicantDocuments($applicant_id) {
         $stmt = $this->conn->prepare("
-            SELECT document_type, file_path 
+            SELECT document_id, document_type
             FROM hr_applicant_documents 
             WHERE applicant_id = ?
         ");
@@ -64,8 +63,8 @@ class Applicant {
         while ($row = $result->fetch_assoc()) {
             $type = !empty($row['document_type']) ? $row['document_type'] : 'Others';
             $documents[$type][] = [
-                'path' => $row['file_path'],
-                'name' => basename($row['file_path'])
+                'document_id' => $row['document_id'],
+                'document_type' => $row['document_type'] ?? 'Others'
             ];
         }
 

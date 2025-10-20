@@ -15,9 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $specialization = $_POST['specialization'] ?? '';
     $status         = 'Pending';
 
-    $upload_dir = "applicants document/";
-    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-
+    // Insert applicant
     $stmt = $conn->prepare("INSERT INTO hr_applicant
         (first_name, middle_name, last_name, suffix_name, email, phone, address, profession, role, specialization, status, uploaded_at, date_applied)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
@@ -40,48 +38,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($stmt->execute()) {
         $applicant_id = $stmt->insert_id;
 
-        $specific_docs = [
-            'resume'        => 'Resume',
-            'application_letter'        => 'application_letter',
-            'government_id' => 'Government ID',
-            'id_picture'    => '2x2 Picture'
+        $all_docs = [
+            'resume'             => 'Resume',
+            'application_letter' => 'Application Letter',
+            'government_id'      => 'Government ID',
+            'id_picture'         => '2x2 Picture',
         ];
 
-        foreach ($specific_docs as $input_name => $doc_type) {
+        // Handle specific documents
+        foreach ($all_docs as $input_name => $doc_type) {
             if (!empty($_FILES[$input_name]['name']) && $_FILES[$input_name]['error'] === 0) {
-                $file_name = time() . "_" . basename($_FILES[$input_name]['name']);
-                $file_path = $upload_dir . $file_name;
-                move_uploaded_file($_FILES[$input_name]['tmp_name'], $file_path);
-
-                $stmt_doc = $conn->prepare(
-                    "INSERT INTO hr_applicant_documents (applicant_id, document_type, file_path, uploaded_at) VALUES (?, ?, ?, NOW())"
-                );
-                $stmt_doc->bind_param("iss", $applicant_id, $doc_type, $file_path);
+                $file_data = file_get_contents($_FILES[$input_name]['tmp_name']);
+                $stmt_doc = $conn->prepare("
+                    INSERT INTO hr_applicant_documents (applicant_id, document_type, file_blob, uploaded_at) 
+                    VALUES (?, ?, ?, NOW())
+                ");
+                // Bind as integer, string, blob
+                $stmt_doc->bind_param("iss", $applicant_id, $doc_type, $file_data);
+                $stmt_doc->send_long_data(2, $file_data); // index 2 = file_blob
                 $stmt_doc->execute();
             }
         }
 
+        // Handle other multiple documents
         if (!empty($_FILES['other_documents']['name'][0])) {
             foreach ($_FILES['other_documents']['tmp_name'] as $key => $tmp_name) {
                 if ($_FILES['other_documents']['error'][$key] === 0) {
-                    $file_name = time() . "_" . basename($_FILES['other_documents']['name'][$key]);
-                    $file_path = $upload_dir . $file_name;
-                    move_uploaded_file($tmp_name, $file_path);
-
+                    $file_data = file_get_contents($tmp_name);
                     $doc_type = $_POST['document_type'][$key] ?? 'Other';
 
-                    $stmt_doc = $conn->prepare(
-                        "INSERT INTO hr_applicant_documents (applicant_id, document_type, file_path, uploaded_at) VALUES (?, ?, ?, NOW())"
-                    );
-                    $stmt_doc->bind_param("iss", $applicant_id, $doc_type, $file_path);
+                    $stmt_doc = $conn->prepare("
+                        INSERT INTO hr_applicant_documents (applicant_id, document_type, file_blob, uploaded_at) 
+                        VALUES (?, ?, ?, NOW())
+                    ");
+                    $stmt_doc->bind_param("iss", $applicant_id, $doc_type, $file_data);
+                    $stmt_doc->send_long_data(2, $file_data);
                     $stmt_doc->execute();
                 }
             }
         }
 
         echo "<script>alert('Application submitted successfully!'); window.location.href='../../join_our_team.php';</script>";
+        exit;
+
     } else {
         echo "<script>alert('Failed to submit application.'); window.history.back();</script>";
+        exit;
     }
 }
 ?>

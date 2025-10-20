@@ -94,11 +94,11 @@ $rejectedLeaves = $leaveManager->getRejectedLeaves();
                                         <td>{$row['leave_reason']}</td>
                                         <td>{$row['leave_status']}</td>
                                         <td>";
-                                    if (!empty($row['medical_cert'])) {
-                                        echo "<a href='{$row['medical_cert']}' target='_blank'>View</a>";
-                                    } else {
-                                        echo "<span class='text-muted'>None</span>";
-                                    }
+                                        if (!empty($row['medical_cert'])) {
+                                            echo "<a href='download_med_cert.php?leave_id={$row['leave_id']}' target='_blank'>View</a>";
+                                        } else {
+                                            echo "<span class='text-muted'>None</span>";
+                                        }
                                     echo "</td><td>{$row['submit_at']}</td></tr>";
                                     $i++;
                                 }
