@@ -1,91 +1,61 @@
 <?php
 class JobManager {
     private $conn;
-    private $uploadDir = "../uploads/job_pics/"; // ✅ changed from css/pics/
-    private $allowedTypes = ['jpg', 'jpeg', 'png'];
-    private $maxFileSize = 2000000; // 2MB
 
     public function __construct($db) {
         $this->conn = $db;
-
-        // ✅ Ensure upload folder exists
-        if (!is_dir($this->uploadDir)) {
-            mkdir($this->uploadDir, 0777, true);
-        }
     }
 
-    // ✅ Add new job posting
+    // ✅ Add job post
     public function addJob($data, $file) {
-        $imagePath = null;
+        try {
+            $profession = trim($data['profession']);
+            $title = trim($data['title']);
+            $job_position = trim($data['job_position']);
+            $job_description = trim($data['job_description']);
+            $specialization = trim($data['specialization']);
+            $date_post = date("Y-m-d H:i:s");
 
-        if (!empty($file['name'])) {
-            $uploadResult = $this->handleImageUpload($file);
-            if ($uploadResult['status'] === false) {
-                return $uploadResult['message'];
+            // ✅ Handle image as base64
+            $imageData = null;
+            if ($file && $file['error'] === UPLOAD_ERR_OK) {
+                $imageTmp = file_get_contents($file['tmp_name']);
+                $imageData = base64_encode($imageTmp); // store as base64
             }
-            $imagePath = $uploadResult['filename'];
+
+            $stmt = $this->conn->prepare("
+                INSERT INTO hr_job (profession, title, job_position, job_description, specialization, date_post, image)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->bind_param("sssssss", $profession, $title, $job_position, $job_description, $specialization, $date_post, $imageData);
+
+            if ($stmt->execute()) {
+                return true;
+            } else {
+                return "Database error: " . $stmt->error;
+            }
+
+        } catch (Exception $e) {
+            return "Error: " . $e->getMessage();
         }
-
-        $stmt = $this->conn->prepare("
-            INSERT INTO hr_job (title, job_position, job_description, specialization, image)
-            VALUES (?, ?, ?, ?, ?)
-        ");
-        $stmt->bind_param(
-            "sssss",
-            $data['title'],
-            $data['job_position'],
-            $data['job_description'],
-            $data['specialization'],
-            $imagePath
-        );
-
-        if ($stmt->execute()) {
-            return true;
-        }
-        return "Failed to save job post: " . $this->conn->error;
-    }
-
-    // ✅ Fetch all job posts
-    public function getJobs() {
-        $result = $this->conn->query("SELECT * FROM hr_job ORDER BY date_post DESC");
-        return $result->fetch_all(MYSQLI_ASSOC);
     }
 
     // ✅ Delete job post
-    public function deleteJob($jobId) {
+    public function deleteJob($job_id) {
         $stmt = $this->conn->prepare("DELETE FROM hr_job WHERE job_id = ?");
-        $stmt->bind_param("i", $jobId);
+        $stmt->bind_param("i", $job_id);
         return $stmt->execute();
     }
 
-    // ✅ Handle image uploads safely
-    private function handleImageUpload($file) {
-        $targetFile = $this->uploadDir . basename($file["name"]);
-        $imageFileType = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
-
-        // Validate if file is an image
-        if (getimagesize($file["tmp_name"]) === false) {
-            return ['status' => false, 'message' => "File is not an image."];
+    // ✅ Display job post image (inline)
+    public function getJobImage($job_id) {
+        $stmt = $this->conn->prepare("SELECT image FROM hr_job WHERE job_id = ?");
+        $stmt->bind_param("i", $job_id);
+        $stmt->execute();
+        $stmt->bind_result($imageData);
+        if ($stmt->fetch() && $imageData) {
+            echo '<img src="data:image/jpeg;base64,' . htmlspecialchars($imageData) . '" alt="Job Image" style="max-width:100%; height:auto;">';
         }
-
-        // Check file size
-        if ($file["size"] > $this->maxFileSize) {
-            return ['status' => false, 'message' => "File size exceeds 2MB."];
-        }
-
-        // Check allowed file types
-        if (!in_array($imageFileType, $this->allowedTypes)) {
-            return ['status' => false, 'message' => "Only JPG, JPEG, PNG files are allowed."];
-        }
-
-        // Move uploaded file
-        if (!move_uploaded_file($file["tmp_name"], $targetFile)) {
-            return ['status' => false, 'message' => "Error uploading file. Check folder permissions."];
-        }
-
-        // Return relative path for saving in DB
-        return ['status' => true, 'filename' => "../uploads/job_pics/" . basename($file["name"])];
     }
 }
-
 

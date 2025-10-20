@@ -24,9 +24,9 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
       <link rel="stylesheet" href="assets/CSS/inventory_dashboard.css">
   
 </head>
+
 <body class="bg-light">
 
-   
 
     <!-- Main Content -->
     <main class="admin-main">
@@ -70,7 +70,7 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     </main>
 
-     <!-- Sidebar -->
+    <!-- Sidebar -->
     <div class="sidebar">
         <?php include 'inventory_sidebar.php'; ?>
     </div>

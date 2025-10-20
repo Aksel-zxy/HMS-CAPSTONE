@@ -260,7 +260,6 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
                             <th>Position Applied</th>
                             <th>Email</th>
                             <th>Contact</th>
-                            <th>Documents</th>
                             <th>Date Hired</th>
                             <th>Action</th>
                         </tr>
@@ -273,23 +272,6 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
                                     <td><?= htmlspecialchars($applicant['role']); ?></td>
                                     <td><?= htmlspecialchars($applicant['email']); ?></td>
                                     <td><?= htmlspecialchars($applicant['phone']); ?></td>
-                                    <td>
-                                        <?php
-                                            $docs = $applicantObj->getApplicantDocuments($applicant['applicant_id']);
-                                            if (!empty($docs) && is_array($docs)) {
-                                                foreach ($docs as $docType => $files) {
-                                                    echo '<strong>' . htmlspecialchars(ucfirst(str_replace('_', ' ', $docType))) . ':</strong><br>';
-                                                    foreach ($files as $file) {
-                                                        $filePath = htmlspecialchars($file['path']);
-                                                        $fileName = htmlspecialchars($file['name']);
-                                                        echo "<a href=\"$filePath\" target=\"_blank\">$fileName</a><br>";
-                                                    }
-                                                }
-                                            } else {
-                                                echo "No documents uploaded.";
-                                            }
-                                        ?>
-                                    </td>
                                     <td>
                                         <?php
                                             $latest = $applicantObj->getLatestTracking($applicant['applicant_id']);

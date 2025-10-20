@@ -55,7 +55,10 @@ if (isset($_GET['request_id'])) {
     }
 }
 
-$jobs = $jobManager->getJobs();
+if (isset($_GET['job_id'])) {
+    $jobManager->displayImage($_GET['job_id']);
+}
+
 $requests = $requestManager->getRequests();
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
@@ -328,6 +331,16 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <br />
                     <br />
 
+                    <label for="profession">Profession:</label>
+                    <select name="profession" id="profession" required>
+                        <option value="">----- Select Profession -----</option>
+                        <option value="Doctor">Doctor</option>
+                        <option value="Nurse">Nurse</option>
+                        <option value="Pharmacist">Pharmacist</option>
+                        <option value="Medical Technologist">Laboratorist</option>
+                        <option value="Administrative Staff">Accountant</option>
+                    </select>
+
                     <label for="title">Title:</label>
                     <input type="text" id="title" name="title" required>
                     <br />
@@ -347,7 +360,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <label for="image">Upload Image:</label>
                     <input type="file" id="image" name="image" required>
                     <br />
-                    <br />
 
                     <button type="submit">Submit</button>
 
@@ -360,21 +372,22 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 <h2>Job Posting</h2>
                 <div class="job_post-container">
                     <?php
-                        $result = $conn->query("SELECT * FROM hr_job");
+                        $result = $conn->query("SELECT * FROM hr_job ORDER BY date_post DESC");
 
                         if ($result->num_rows > 0) {
                             while ($row = $result->fetch_assoc()) {
                                 echo '<div class="job_post-item">';
 
-                                    // ✅ Updated image path
+                                    // ✅ Show image directly from DB
                                     if (!empty($row['image'])) {
                                         echo '<div style="text-align:center;">
-                                                <img src="../uploads/job_pics/' . htmlspecialchars(basename($row['image'])) . '" 
-                                                    alt="Job Post Image" 
+                                                <img src="data:image/jpeg;base64,' . htmlspecialchars($row['image']) . '" 
+                                                    alt="Job Post Image"
                                                     style="max-width: 100%; height: auto; margin-bottom: 10px;">
                                             </div>';
                                     }
-                                    
+
+                                    echo '<p><strong>Profession:</strong> ' . htmlspecialchars($row['profession']) . '</p>';
                                     echo '<p><strong>Title:</strong> ' . htmlspecialchars($row['title']) . '</p>';
                                     echo '<p><strong>Position:</strong> ' . htmlspecialchars($row['job_position']) . '</p>';
                                     echo '<p style="text-align: justify;"><strong>Description:</strong> ' . htmlspecialchars($row['job_description']) . '</p>';

@@ -8,6 +8,7 @@ class LeaveReport {
 
     public function fetchAll() {
         $sql = "SELECT 
+                    l.leave_id,  -- add this line
                     l.employee_id,
                     CONCAT(
                         e.first_name, ' ',
@@ -34,3 +35,4 @@ class LeaveReport {
         return $this->conn->query($sql);
     }
 }
+

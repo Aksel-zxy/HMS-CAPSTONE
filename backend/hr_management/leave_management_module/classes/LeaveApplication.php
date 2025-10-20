@@ -6,7 +6,7 @@ class LeaveApplication {
         $this->conn = $db;
     }
 
-    // ✅ Get single employee details (for gender filtering or form autofill)
+    // Get single employee details
     public function getEmployee($employee_id) {
         $stmt = $this->conn->prepare("
             SELECT employee_id, first_name, middle_name, last_name, suffix_name,
@@ -17,10 +17,10 @@ class LeaveApplication {
         $stmt->bind_param("i", $employee_id);
         $stmt->execute();
         $result = $stmt->get_result();
-        return $result->fetch_assoc(); // returns assoc array or null
+        return $result->fetch_assoc();
     }
 
-    // ✅ Get all employees (for dropdowns)
+    // Get all employees
     public function getAllEmployees() {
         $sql = "SELECT employee_id, first_name, middle_name, last_name, suffix_name, profession, role, department, gender 
                 FROM hr_employees
@@ -28,7 +28,7 @@ class LeaveApplication {
         return $this->conn->query($sql);
     }
 
-    // ✅ Get remaining leave days
+    // Get remaining leave days
     public function getRemainingDays($employee_id, $leave_type, $year) {
         $stmt = $this->conn->prepare("
             SELECT allocated_days 
@@ -40,10 +40,8 @@ class LeaveApplication {
         $stmt->bind_result($allocatedDays);
         $stmt->fetch();
         $stmt->close();
+        $allocatedDays = $allocatedDays ?? 0;
 
-        if (!$allocatedDays) $allocatedDays = 0;
-
-        // ✅ Get used days with +1
         $stmt2 = $this->conn->prepare("
             SELECT SUM(DATEDIFF(leave_end_date, leave_start_date) + 1) as used_days
             FROM hr_leave
@@ -56,49 +54,33 @@ class LeaveApplication {
         $stmt2->bind_result($usedDays);
         $stmt2->fetch();
         $stmt2->close();
-
-        if (!$usedDays) $usedDays = 0;
+        $usedDays = $usedDays ?? 0;
 
         return $allocatedDays - $usedDays;
     }
 
+    // Submit leave with optional medical certificate (stored as BLOB)
     public function submit($data, $file = null) {
         try {
-            $uploadPath = null;
+            $fileContent = null;
 
-            // ✅ Check if a file is uploaded
+            // If a file is uploaded
             if ($file && $file['error'] === UPLOAD_ERR_OK) {
-                // Use an absolute path (works on any server)
-                $upload_dir = __DIR__ . '/uploads/';
-
-                // ✅ Create uploads folder if missing
-                if (!is_dir($upload_dir)) {
-                    if (!mkdir($upload_dir, 0777, true)) {
-                        throw new Exception("Failed to create upload directory: $upload_dir");
-                    }
-                }
-
-                // ✅ Validate allowed file types
-                $allowed = ['jpg', 'jpeg', 'png', 'pdf'];
+                $allowed = ['jpg','jpeg','png','pdf','docx'];
                 $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+
                 if (!in_array($ext, $allowed)) {
-                    throw new Exception("Invalid file type. Allowed: JPG, JPEG, PNG, PDF only.");
+                    throw new Exception("Invalid file type. Allowed: JPG, JPEG, PNG, PDF, DOCX.");
                 }
 
-                // ✅ Create a unique filename
-                $filename = uniqid('cert_', true) . '.' . $ext;
-                $filepath = $upload_dir . $filename;
-
-                // ✅ Move uploaded file
-                if (!move_uploaded_file($file['tmp_name'], $filepath)) {
-                    throw new Exception("Failed to move uploaded file to: $filepath");
+                // Read file content as BLOB
+                $fileContent = file_get_contents($file['tmp_name']);
+                if ($fileContent === false) {
+                    throw new Exception("Failed to read uploaded file.");
                 }
-
-                // ✅ Save relative path to DB (for displaying later)
-                $uploadPath = 'uploads/' . $filename;
             }
 
-            // ✅ Insert data into database
+            // Prepare insert query
             $stmt = $this->conn->prepare("
                 INSERT INTO hr_leave 
                 (employee_id, leave_type, leave_start_date, leave_end_date, leave_status, leave_reason, medical_cert)
@@ -106,33 +88,37 @@ class LeaveApplication {
             ");
 
             if (!$stmt) {
-                throw new Exception("Database prepare failed: " . $this->conn->error);
+                throw new Exception("Prepare failed: " . $this->conn->error);
             }
 
             $leave_status = 'Pending';
 
+            // 'b' in bind_param for BLOB
             $stmt->bind_param(
-                "sssssss",
+                "ssssssb",
                 $data['employee_id'],
                 $data['leave_type'],
                 $data['leave_start_date'],
                 $data['leave_end_date'],
                 $leave_status,
                 $data['leave_reason'],
-                $uploadPath
+                $fileContent
             );
 
-            if (!$stmt->execute()) {
-                throw new Exception("Database insert failed: " . $stmt->error);
+            // For BLOBs, need send_long_data
+            if ($fileContent) {
+                $stmt->send_long_data(6, $fileContent); // index 6 = 7th parameter (medical_cert)
             }
 
-            return true; // ✅ Success
+            if (!$stmt->execute()) {
+                throw new Exception("Insert failed: " . $stmt->error);
+            }
+
+            return true;
 
         } catch (Exception $e) {
-            // Log or display the error safely (for debugging)
             error_log($e->getMessage());
             return false;
         }
     }
-
 }

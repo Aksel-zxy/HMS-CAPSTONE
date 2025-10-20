@@ -16,9 +16,9 @@ class LeaveManager {
 
     private function getLeavesByStatus($status) {
         $sql = "
-            SELECT l.*, 
-                   e.first_name, e.middle_name, e.last_name, e.suffix_name,
-                   e.profession, e.role, e.department
+            SELECT l.leave_id, l.*, 
+                e.first_name, e.middle_name, e.last_name, e.suffix_name,
+                e.profession, e.role, e.department
             FROM hr_leave l
             INNER JOIN hr_employees e ON l.employee_id = e.employee_id
             WHERE l.leave_status = ?

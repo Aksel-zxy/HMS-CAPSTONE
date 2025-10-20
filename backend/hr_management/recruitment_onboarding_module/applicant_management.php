@@ -313,7 +313,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                             <?php foreach ($documents as $docType => $files): ?>
                                                 <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $docType))); ?>:</strong><br>
                                                 <?php foreach ($files as $file): ?>
-                                                    <a href="<?= htmlspecialchars($file['path']); ?>" target="_blank"><?= htmlspecialchars($file['name']); ?></a><br>
+                                                    <a href="download_document.php?id=<?= $file['document_id'] ?>" target="_blank">
+                                                        <?= htmlspecialchars($file['document_type']); ?>
+                                                    </a>
+                                                    <br />
                                                 <?php endforeach; ?>
                                             <?php endforeach; ?>
                                         <?php else: ?>
