@@ -129,7 +129,7 @@ class Login
                 switch ($_SESSION['role']) {
                     case '0':
                         $_SESSION['superadmin'] = true;
-                        header("Location: " . BASE_URL . "backend/superadmin_dashboard.php");
+                        header("Location: " . BASE_URL . "backend/doctor_and_nurse_management.php");
                         break;
                     case '1':
                         $_SESSION['hr'] = true;
