@@ -42,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data[$field] = $conn->real_escape_string($_POST[$field] ?? '');
     }
 
+    // Handle "Others" specialization
     $specialization = $_POST['specialization'] ?? '';
     if ($specialization === "Others") {
         $specialization = $_POST['otherSpecialization'] ?? '';
@@ -50,41 +51,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $updateSuccess = $employeeObj->update($employeeId, $data);
 
+    // Document types mapping
     $documentTypes = [
-            'resume'              => 'Resume',
-            'license_id'          => 'License ID',
-            'board_certificate'        => 'Board Rating & Certificate of Passing',
-            'diploma'              => 'Diploma',
-            'nbi_clearance'       => 'NBI/Police Clearance',
-            'government_id'       => 'Government ID',
-            'birth_certificate'   => 'Birth Certificate',
-            'good_moral'          => 'Certificate of Good Moral',
-            'application_letter'  => 'Application Letter',
-            'medical_certificate' => 'Medical Certificate',
-            'tor'          => 'Transcript of Records',
-            'id_picture'          => 'ID Picture'
+        'resume'              => 'Resume',
+        'license_id'          => 'License ID',
+        'board_certificate'   => 'Board Rating & Certificate of Passing',
+        'diploma'             => 'Diploma',
+        'government_id'       => 'Government ID',
+        'application_letter'  => 'Application Letter',
+        'tor'                 => 'Transcript of Records',
+        'id_picture'          => 'ID Picture'
     ];
 
     foreach ($documentTypes as $fieldName => $docType) {
-        if (!empty($_FILES[$fieldName]['name'])) {
+        if (!empty($_FILES[$fieldName]['name']) && $_FILES[$fieldName]['error'] === 0) {
             $fileTmp  = $_FILES[$fieldName]['tmp_name'];
-            $fileName = time() . '_' . basename($_FILES[$fieldName]['name']);
-            $targetDir = 'employees document/';
-            if (!is_dir($targetDir)) {
-                mkdir($targetDir, 0777, true);
-            }
-            $targetPath = $targetDir . $fileName;
+            $fileSize = $_FILES[$fieldName]['size'];
 
-            if (move_uploaded_file($fileTmp, $targetPath)) {
-                $stmt = $conn->prepare("
-                    INSERT INTO hr_employees_documents (employee_id, document_type, file_path)
-                    VALUES (?, ?, ?)
-                    ON DUPLICATE KEY UPDATE file_path = VALUES(file_path)
-                ");
-                $stmt->bind_param("sss", $employeeId, $docType, $targetPath);
-                $stmt->execute();
-                $stmt->close();
-            }
+            // Optional: max 5MB limit
+            if ($fileSize > 5242880) continue;
+
+            // Read file as binary
+            $fileData = file_get_contents($fileTmp);
+
+            $stmt = $conn->prepare("
+                INSERT INTO hr_employees_documents (employee_id, document_type, file_blob)
+                VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE file_blob = VALUES(file_blob)
+            ");
+
+            $null = NULL; // placeholder for blob
+            $stmt->bind_param("ssb", $employeeId, $docType, $null);
+            $stmt->send_long_data(2, $fileData);
+            $stmt->execute();
+            $stmt->close();
         }
     }
 
