@@ -96,7 +96,7 @@ if ($patient_id > 0 && $billing_id) {
     }
 }
 
-// ======================= DIAGNOSTIC RESULTS + PRICES =======================
+// ======================= DIAGNOSTIC RESULTS =======================
 $dl_services = [];
 if ($patient_id > 0) {
     $stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID = ? AND status = 'Completed'");
@@ -105,11 +105,9 @@ if ($patient_id > 0) {
     $res = $stmt->get_result();
 
     while ($row = $res->fetch_assoc()) {
-        // Break apart comma-separated list
         $services = array_map('trim', explode(',', $row['result']));
         foreach ($services as $svcName) {
             if (!empty($svcName)) {
-                // Find corresponding service details in dl_services
                 $stmt2 = $conn->prepare("SELECT serviceName, description, price FROM dl_services WHERE serviceName = ?");
                 $stmt2->bind_param("s", $svcName);
                 $stmt2->execute();
@@ -123,7 +121,6 @@ if ($patient_id > 0) {
                     ];
                     $total_charges += floatval($svcRes['price']);
                 } else {
-                    // Fallback if not found in dl_services table
                     $dl_services[] = [
                         'service_name' => $svcName,
                         'description'  => 'Diagnostic/Lab Service (Completed on ' . date('F j, Y', strtotime($row['resultDate'])) . ')',
@@ -181,6 +178,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         if ($stmt->execute()) {
+            // --- NEW: create a corresponding journal entry so the payment appears in Journal ---
+            $receipt_id = $stmt->insert_id;
+            $created_by = $_SESSION['username'] ?? 'System';
+            $je_module = "billing";
+            $je_reference = $txn_id;
+            $je_desc = "Payment received for Patient ID {$patient_id}. Receipt TXN: {$txn_id}. Method: {$payment_method}. Amount: ₱" . number_format($grand_total, 2);
+
+            $stmtJe = $conn->prepare("
+                INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by)
+                VALUES (NOW(), ?, ?, ?, 'Posted', ?)
+            ");
+            if ($stmtJe) {
+                $stmtJe->bind_param("ssss", $je_module, $je_desc, $je_reference, $created_by);
+                $stmtJe->execute();
+
+                // insert corresponding journal entry lines
+                $je_id = $stmtJe->insert_id;
+
+                $payment_account = 'Cash';
+                if (stripos($payment_method, 'bank') !== false) $payment_account = 'Bank';
+                if (stripos($payment_method, 'gcash') !== false) $payment_account = 'Cash';
+
+                $amount_cash = floatval($total_out_of_pocket);
+                $amount_insurance = floatval($insurance_covered);
+
+                $stmtLine = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit) VALUES (?, ?, ?, ?)");
+                if ($stmtLine) {
+                    $zero = 0.0;
+
+                    // --- Patient payment ---
+                    if ($amount_cash > 0) {
+                        $account_name = $payment_account;
+                        $debit = $amount_cash;
+                        $credit = $zero;
+                        $stmtLine->bind_param("isdd", $je_id, $account_name, $debit, $credit);
+                        $stmtLine->execute();
+
+                        $account_name = 'Accounts Receivable';
+                        $debit = $zero;
+                        $credit = $amount_cash;
+                        $stmtLine->bind_param("isdd", $je_id, $account_name, $debit, $credit);
+                        $stmtLine->execute();
+                    }
+
+                    // --- Insurance coverage ---
+                    if ($amount_insurance > 0) {
+                        $account_name = 'Accounts Receivable - Insurance';
+                        $debit = $amount_insurance;
+                        $credit = $zero;
+                        $stmtLine->bind_param("isdd", $je_id, $account_name, $debit, $credit);
+                        $stmtLine->execute();
+
+                        $account_name = 'Accounts Receivable';
+                        $debit = $zero;
+                        $credit = $amount_insurance;
+                        $stmtLine->bind_param("isdd", $je_id, $account_name, $debit, $credit);
+                        $stmtLine->execute();
+                    }
+
+                    $stmtLine->close();
+                }
+
+                $stmtJe->close();
+            }
+
             echo "<script>alert('Payment recorded successfully!'); window.location='billing_records.php';</script>";
             exit;
         } else {
@@ -264,7 +326,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
 </div>
 
-<!-- Keep your modal and JS below -->
+<!-- PAYMENT MODAL -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST">
+        <div class="modal-header">
+          <h5 class="modal-title" id="paymentModalLabel">Select Payment Method</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body text-center">
+          <input type="hidden" name="payment_method" id="payment_method">
+          <div class="d-flex flex-wrap gap-3 justify-content-center mb-4">
+            <div class="payment-card" data-value="GCash">
+              <i class="bi bi-phone text-primary"></i><br><span>GCash</span>
+            </div>
+            <div class="payment-card" data-value="Bank">
+              <i class="bi bi-bank text-success"></i><br><span>Bank</span>
+            </div>
+            <div class="payment-card" data-value="Card">
+              <i class="bi bi-credit-card text-warning"></i><br><span>Card</span>
+            </div>
+            <div class="payment-card" data-value="Cash">
+              <i class="bi bi-cash-coin text-success"></i><br><span>Cash</span>
+            </div>
+          </div>
+
+          <div id="gcash_box" class="payment-extra" style="display:none;">
+            <img src="<?= $qrImageSrc ?>" alt="GCash QR" class="img-fluid mb-3">
+            <input type="text" class="form-control" name="payment_reference_gcash" placeholder="Enter GCash Reference Number">
+          </div>
+          <div id="bank_box" class="payment-extra" style="display:none;">
+            <input type="text" class="form-control" name="payment_reference_bank" placeholder="Enter Bank Transaction ID">
+          </div>
+          <div id="card_box" class="payment-extra" style="display:none;">
+            <input type="text" class="form-control" name="payment_reference_card" placeholder="Enter Card Transaction ID">
+          </div>
+          <div id="cash_box" class="payment-extra" style="display:none;">
+            <p>No reference required for cash payments.</p>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" name="make_payment" class="btn btn-primary">Confirm Payment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.querySelectorAll('.payment-card').forEach(card => {
