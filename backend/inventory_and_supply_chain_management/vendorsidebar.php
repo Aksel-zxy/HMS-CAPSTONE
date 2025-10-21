@@ -7,7 +7,7 @@
     <link rel="stylesheet" type="text/css" href="assets/css/vendorsidebar.css">
     <link rel="stylesheet" type="text/css" href="/HMS-CAPSTONE/backend/inventory_and_supply_chain_management/assets/CSS/vendorsidebar.css"> 
 </head>
-<script>
+<style>
 body {
     font-family: Arial, sans-serif;
     margin: 0;
@@ -132,7 +132,7 @@ body {
 }
 
 
-</script>
+</style>
 <body>
 
 <div class="sidebar">
