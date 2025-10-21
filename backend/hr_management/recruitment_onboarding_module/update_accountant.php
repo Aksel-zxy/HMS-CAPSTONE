@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    // ✅ Collect all employee info
     $fields = [
         'first_name', 'middle_name', 'last_name', 'suffix_name', 'gender', 'date_of_birth',
         'contact_number', 'email', 'citizenship', 'house_no', 'barangay', 'city',
@@ -44,39 +45,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $updateSuccess = $employeeObj->update($employeeId, $data);
 
+    // ✅ Define document types
     $documentTypes = [
-            'resume'              => 'Resume',
-            'diploma'              => 'Diploma',
-            'nbi_clearance'       => 'NBI/Police Clearance',
-            'government_id'       => 'Government ID',
-            'birth_certificate'   => 'Birth Certificate',
-            'good_moral'          => 'Certificate of Good Moral',
-            'application_letter'  => 'Application Letter',
-            'medical_certificate' => 'Medical Certificate',
-            'tor'          => 'Transcript of Records',
-            'id_picture'          => 'ID Picture'
+        'resume'             => 'Resume',
+        'diploma'            => 'Diploma',
+        'government_id'      => 'Government ID',
+        'application_letter' => 'Application Letter',
+        'tor'                => 'Transcript of Records',
+        'id_picture'         => 'ID Picture'
     ];
 
+    // ✅ Save uploaded documents as BLOB
     foreach ($documentTypes as $fieldName => $docType) {
-        if (!empty($_FILES[$fieldName]['name'])) {
+        if (!empty($_FILES[$fieldName]['name']) && $_FILES[$fieldName]['error'] === 0) {
             $fileTmp  = $_FILES[$fieldName]['tmp_name'];
-            $fileName = time() . '_' . basename($_FILES[$fieldName]['name']);
-            $targetDir = 'employees document/';
-            if (!is_dir($targetDir)) {
-                mkdir($targetDir, 0777, true);
-            }
-            $targetPath = $targetDir . $fileName;
+            $fileSize = $_FILES[$fieldName]['size'];
 
-            if (move_uploaded_file($fileTmp, $targetPath)) {
-                $stmt = $conn->prepare("
-                    INSERT INTO hr_employees_documents (employee_id, document_type, file_path)
-                    VALUES (?, ?, ?)
-                    ON DUPLICATE KEY UPDATE file_path = VALUES(file_path)
-                ");
-                $stmt->bind_param("sss", $employeeId, $docType, $targetPath);
-                $stmt->execute();
-                $stmt->close();
-            }
+            // limit 5MB
+            if ($fileSize > 5242880) continue;
+
+            $fileData = file_get_contents($fileTmp);
+
+            $stmt = $conn->prepare("
+                INSERT INTO hr_employees_documents (employee_id, document_type, file_blob)
+                VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE file_blob = VALUES(file_blob)
+            ");
+
+            $null = NULL; // for blob binding
+            $stmt->bind_param("ssb", $employeeId, $docType, $null);
+            $stmt->send_long_data(2, $fileData);
+            $stmt->execute();
+            $stmt->close();
         }
     }
 

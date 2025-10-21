@@ -453,23 +453,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Diploma:</label>
                     <input type="file" name="diploma" accept=".pdf,.jpg,.jpeg,.png">
 
-                    <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>NBI/Police Clearance:</label>
-                    <input type="file" name="nbi_clearance" accept=".pdf,.jpg,.jpeg,.png">
-
                     <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Government ID:</label>
                     <input type="file" name="government_id" accept=".pdf,.jpg,.jpeg,.png">
 
-                    <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Birth Certificate:</label>
-                    <input type="file" name="birth_certificate" accept=".pdf,.jpg,.jpeg,.png">
-
-                    <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Certificate of Good Moral:</label>
-                    <input type="file" name="good_moral" accept=".pdf,.jpg,.jpeg,.png">
-
                     <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Application Letter:</label>
                     <input type="file" name="application_letter" accept=".pdf,.jpg,.jpeg,.png">
-
-                    <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Medical Certificate:</label>
-                    <input type="file" name="medical_certificate" accept=".pdf,.jpg,.jpeg,.png">
 
                     <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Transcription of Records:</label>
                     <input type="file" name="tor" accept=".pdf,.jpg,.jpeg,.png">

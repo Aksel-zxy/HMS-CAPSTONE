@@ -29,19 +29,33 @@ if (!$employee) {
     die("Employee not found.");
 }
 
+// ✅ Get all uploaded documents (BLOBs)
 $documentsResult = $pharmacistObj->getEmployeeDocuments($employeeId);
 $documents = $documentsResult->fetch_all(MYSQLI_ASSOC);
 
 $uploadedDocs = [];
 foreach ($documents as $doc) {
-    $uploadedDocs[$doc['document_type']] = $doc['file_path'];
+    if (!empty($doc['document_type']) && !empty($doc['file_blob'])) {
+        $uploadedDocs[$doc['document_type']] = $doc['file_blob'];
+    }
 }
 
+// ✅ Prepare ID Picture
 $docType = 'ID Picture';
-$photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
-    ? str_replace(' ', '%20', $uploadedDocs[$docType]) 
-    : 'css/pics/favicon.ico';
+$photoSrc = 'css/pics/favicon.ico'; // default image
 
+if (isset($uploadedDocs[$docType])) {
+    // detect MIME type
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = finfo_buffer($finfo, $uploadedDocs[$docType]);
+    finfo_close($finfo);
+
+    if (strpos($mime, 'image') !== false) {
+        // convert to base64 for inline display
+        $base64 = base64_encode($uploadedDocs[$docType]);
+        $photoSrc = "data:$mime;base64,$base64";
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -212,12 +226,8 @@ $photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
                                     'License ID',
                                     'Board Rating & Certificate of Passing',
                                     'Diploma',
-                                    'NBI/Police Clearance',
                                     'Government ID',
-                                    'Birth Certificate',
-                                    'Certificate of Good Moral',
                                     'Application Letter',
-                                    'Medical Certificate',
                                     'Transcript of Records',
                                     'ID Picture'
                                 ];
@@ -225,13 +235,9 @@ $photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
                                 $uploadedDocs = [];
                                 if (!empty($documents)) {
                                     foreach ($documents as $doc) {
-                                        $path = $doc['document_path'] 
-                                            ?? $doc['file_path'] 
-                                            ?? $doc['path'] 
-                                            ?? null;
-
-                                        if (!empty($doc['document_type']) && !empty($path)) {
-                                            $uploadedDocs[$doc['document_type']] = $path;
+                                        if (!empty($doc['document_type']) && !empty($doc['file_blob'])) {
+                                            // store document_id to generate view link
+                                            $uploadedDocs[$doc['document_type']] = $doc['document_id'];
                                         }
                                     }
                                 }
@@ -241,7 +247,9 @@ $photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
                                     <div>
                                         <strong><?= htmlspecialchars($docType); ?>:</strong>
                                         <?php if (isset($uploadedDocs[$docType])): ?>
-                                            <a href="<?= htmlspecialchars($uploadedDocs[$docType]); ?>" target="_blank">View</a>
+                                            <a href="view_document.php?id=<?= urlencode($uploadedDocs[$docType]); ?>" target="_blank">
+                                                View Document
+                                            </a>
                                         <?php else: ?>
                                             <span style="color: red;">No Uploaded</span>
                                         <?php endif; ?>
@@ -460,7 +468,6 @@ $photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
                         <h4 style="font-weight: bold;">Uploaded Documents</h4> 
                     </center>
 
-
                     <!-- ----- Show all existing documents if any ----- -->
                     <?php
                         $requiredDocs = [
@@ -468,12 +475,8 @@ $photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
                             'License ID',
                             'Board Rating & Certificate of Passing',
                             'Diploma',
-                            'NBI/Police Clearance',
                             'Government ID',
-                            'Birth Certificate',
-                            'Certificate of Good Moral',
                             'Application Letter',
-                            'Medical Certificate',
                             'Transcript of Records',
                             'ID Picture'
                         ];
@@ -481,8 +484,10 @@ $photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
                         $uploadedDocs = [];
                         if (!empty($documents)) {
                             foreach ($documents as $doc) {
-                                $path = $doc['document_path'] ?? $doc['file_path'] ?? null;
-                                $uploadedDocs[$doc['document_type']] = $path;
+                                // Store document_id for each uploaded file (no more path)
+                                if (!empty($doc['document_type']) && !empty($doc['file_blob'])) {
+                                    $uploadedDocs[$doc['document_type']] = $doc['document_id'];
+                                }
                             }
                         }
                     ?>
@@ -494,9 +499,11 @@ $photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
                                 <td>:</td>
                                 <td>
                                     <?php if (!empty($uploadedDocs[$docType])): ?>
-                                        <a class="link-btn" href="<?= htmlspecialchars($uploadedDocs[$docType]) ?>" target="_blank">View Document</a>
-                                            <br />
-                                            <br />
+                                        <!-- View Document link now points to the viewer script -->
+                                        <a class="link-btn" href="view_document.php?id=<?= urlencode($uploadedDocs[$docType]); ?>" target="_blank">
+                                            View Document
+                                        </a>
+                                        <br /><br />
                                         <span class="badge badge-ok">Uploaded</span>
                                     <?php else: ?>
                                         <span class="badge badge-missing">No Uploaded</span>
@@ -528,30 +535,17 @@ $photoSrc = isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])
                     <label>Diploma:</label>
                     <input type="file" name="diploma" accept=".pdf,.jpg,.jpeg,.png">
 
-                    <label>NBI/Police Clearance:</label>
-                    <input type="file" name="nbi_clearance" accept=".pdf,.jpg,.jpeg,.png">
-
                     <label>Government ID:</label>
                     <input type="file" name="government_id" accept=".pdf,.jpg,.jpeg,.png">
 
-                    <label>Birth Certificate:</label>
-                    <input type="file" name="birth_certificate" accept=".pdf,.jpg,.jpeg,.png">
-
-                    <label>Certificate of Good Moral:</label>
-                    <input type="file" name="good_moral" accept=".pdf,.jpg,.jpeg,.png">
-
                     <label>Application Letter:</label>
                     <input type="file" name="application_letter" accept=".pdf,.jpg,.jpeg,.png">
-
-                    <label>Medical Certificate:</label>
-                    <input type="file" name="medical_certificate" accept=".pdf,.jpg,.jpeg,.png">
 
                     <label>Transcription of Records:</label>
                     <input type="file" name="tor" accept=".pdf,.jpg,.jpeg,.png">
 
                     <label>2x2 Formal Picture:</label>
                     <input type="file" name="id_picture" accept=".pdf,.jpg,.jpeg,.png">
-
 
                     <button type="submit">Save Changes</button>
                 </form>
