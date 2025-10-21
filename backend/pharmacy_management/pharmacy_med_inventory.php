@@ -443,16 +443,16 @@ $notifCount = $notif->notifCount;
                                                 data-dosage="<?= htmlspecialchars($row['dosage']) ?>"
                                                 data-stock="<?= $row['stock_quantity'] ?>"
                                                 data-unit="<?= htmlspecialchars($row['unit']) ?>"
-                                                data-price="<?= $row['unit_price'] ?>">Edit</button>
+                                                data-price="<?= $row['unit_price'] ?>">Update</button>
 
                                             <!-- Delete Button Form -->
-                                            <form action="update_medicine.php" method="POST" style="display:inline;">
+                                            <!-- <form action="update_medicine.php" method="POST" style="display:inline;">
                                                 <input type="hidden" name="med_id" value="<?= $row['med_id'] ?>">
                                                 <button type="submit" name="delete" class="btn btn-danger btn-sm"
                                                     onclick="return confirm('Are you sure you want to delete this medicine?');">
                                                     Delete
                                                 </button>
-                                            </form>
+                                            </form> -->
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
