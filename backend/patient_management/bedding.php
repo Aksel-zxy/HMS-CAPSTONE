@@ -40,7 +40,7 @@ if (!$user) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Bedding</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="assets/css/bedding.css">
+    <link rel="stylesheet" href="patient_management/assets/css/bedding.css">
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
