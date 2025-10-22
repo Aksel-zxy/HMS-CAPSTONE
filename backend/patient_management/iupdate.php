@@ -235,49 +235,45 @@ if ($medical_history) {
                 </form>
 
             </div>
-            <script>
-            const toggler = document.querySelector(".toggler-btn");
-            toggler.addEventListener("click", function() {
-                document.querySelector("#sidebar").classList.toggle("collapsed");
-            });
-            </script>
-            <script src="assets/Bootstrap/all.min.js"></script>
-            <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-            <script src="assets/Bootstrap/fontawesome.min.js"></script>
-            <script src="assets/Bootstrap/jq.js"></script>
+        </div>
+    </div>
+    <script src="assets/Bootstrap/all.min.js"></script>
+    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="assets/Bootstrap/jq.js"></script>
 
-            <script>
-            function toggleStep(step) {
-                if (step === 1) {
-                    // Step 1 visible
-                    document.getElementById("step1").classList.remove("d-none");
-                    document.getElementById("step2").classList.add("d-none");
+    <script>
+    function toggleStep(step) {
+        if (step === 1) {
+            // Step 1 visible
+            document.getElementById("step1").classList.remove("d-none");
+            document.getElementById("step2").classList.add("d-none");
 
-                    // Enable required only for step 1 fields
-                    document.querySelectorAll("#step1 [required]").forEach(el => el.setAttribute("required", "true"));
-                    document.querySelectorAll("#step2 [required]").forEach(el => el.removeAttribute("required"));
+            // Enable required only for step 1 fields
+            document.querySelectorAll("#step1 [required]").forEach(el => el.setAttribute("required", "true"));
+            document.querySelectorAll("#step2 [required]").forEach(el => el.removeAttribute("required"));
 
-                    document.getElementById("nextBtn").classList.remove("d-none");
-                    document.getElementById("prevBtn").classList.add("d-none");
-                    document.getElementById("submitBtn").classList.add("d-none");
-                } else {
-                    // Step 2 visible
-                    document.getElementById("step1").classList.add("d-none");
-                    document.getElementById("step2").classList.remove("d-none");
+            document.getElementById("nextBtn").classList.remove("d-none");
+            document.getElementById("prevBtn").classList.add("d-none");
+            document.getElementById("submitBtn").classList.add("d-none");
+        } else {
+            // Step 2 visible
+            document.getElementById("step1").classList.add("d-none");
+            document.getElementById("step2").classList.remove("d-none");
 
-                    // Enable required only for step 2 fields
-                    document.querySelectorAll("#step2 [required]").forEach(el => el.setAttribute("required", "true"));
-                    document.querySelectorAll("#step1 [required]").forEach(el => el.removeAttribute("required"));
+            // Enable required only for step 2 fields
+            document.querySelectorAll("#step2 [required]").forEach(el => el.setAttribute("required", "true"));
+            document.querySelectorAll("#step1 [required]").forEach(el => el.removeAttribute("required"));
 
-                    document.getElementById("nextBtn").classList.add("d-none");
-                    document.getElementById("prevBtn").classList.remove("d-none");
-                    document.getElementById("submitBtn").classList.remove("d-none");
-                }
-            }
+            document.getElementById("nextBtn").classList.add("d-none");
+            document.getElementById("prevBtn").classList.remove("d-none");
+            document.getElementById("submitBtn").classList.remove("d-none");
+        }
+    }
 
-            document.getElementById("nextBtn").addEventListener("click", () => toggleStep(2));
-            document.getElementById("prevBtn").addEventListener("click", () => toggleStep(1));
-            </script>
+    document.getElementById("nextBtn").addEventListener("click", () => toggleStep(2));
+    document.getElementById("prevBtn").addEventListener("click", () => toggleStep(1));
+    </script>
 </body>
 
 </html>

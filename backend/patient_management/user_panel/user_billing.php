@@ -8,7 +8,7 @@ include_once '../class/caller.php';
 
 
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'patient') {
-    header('Location: login.php');
+    header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
 }
 
@@ -188,19 +188,20 @@ try {
 
                     <tbody>
                         <?php 
-                    if ($balance && $balance->num_rows > 0) {
-                        while ($row = $balance->fetch_assoc()) {
-                            echo "<tr>
-                                <td class='text-center'>" . htmlspecialchars($row['serviceName']) . "</td>
-                                <td class='text-center'>₱" . number_format($row['price'], 2) . "</td>
-                                <td class='text-center'>" . htmlspecialchars($row['status']) . "</td>
-                            </tr>";
+                        if (!empty($balance) && is_array($balance)) {
+                            foreach ($balance as $row) {
+                                echo "<tr>
+                                    <td class='text-center'>" . htmlspecialchars($row['serviceName']) . "</td>
+                                    <td class='text-center'>₱" . number_format($row['price'], 2) . "</td>
+                                    <td class='text-center'>Completed</td>
+                                </tr>";
+                            }
+                        } else {
+                            echo "<tr><td colspan='3' class='text-center'>No services found.</td></tr>";
                         }
-                    } else {
-                        echo "<tr><td colspan='3' class='text-center'>No services found.</td></tr>";
-                    }
-                    ?>
+                        ?>
                     </tbody>
+
 
 
                 </table>
