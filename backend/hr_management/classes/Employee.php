@@ -45,9 +45,14 @@ class Employee {
         $types = "";
 
         foreach ($data as $key => $value) {
-            $set[] = "$key = ?";
-            $params[] = $value;
-            $types .= "s";
+            // ✅ Convert empty string or null to SQL NULL
+            if ($value === '' || $value === null) {
+                $set[] = "$key = NULL";
+            } else {
+                $set[] = "$key = ?";
+                $params[] = $value;
+                $types .= "s";
+            }
         }
 
         $params[] = $employeeId;
@@ -56,9 +61,15 @@ class Employee {
         $sql = "UPDATE hr_employees SET " . implode(", ", $set) . " WHERE employee_id = ?";
         $stmt = $this->conn->prepare($sql);
 
-        if (!$stmt) return false;
+        if (!$stmt) {
+            return false;
+        }
 
-        $stmt->bind_param($types, ...$params);
+        // ✅ Bind parameters only if there are actual values (non-null)
+        if (!empty($params)) {
+            $stmt->bind_param($types, ...$params);
+        }
+
         return $stmt->execute();
     }
 
