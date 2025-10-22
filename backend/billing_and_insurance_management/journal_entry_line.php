@@ -180,7 +180,8 @@ $total_credit = array_sum(array_column($lines, 'credit'));
 
     <div class="actions">
         <button id="openModal" class="btn-secondary">+ Add Line</button>
-        <a href="edit_journal_entry.php?id=<?= $entry['entry_id'] ?>" class="btn-primary">Edit Entry</a>
+        <!-- Open the journal_entry page and request its modal to open for this entry -->
+        <a href="journal_entry.php?open_edit=<?= (int)$entry['entry_id'] ?>" class="btn-primary">Edit Entry</a>
         <?php if ($entry['status'] === 'Draft'): ?>
             <a href="post_journal_entry.php?id=<?= $entry['entry_id'] ?>" class="btn-success"
                onclick="return confirm('Post this entry? This action cannot be undone.');">Post Entry</a>

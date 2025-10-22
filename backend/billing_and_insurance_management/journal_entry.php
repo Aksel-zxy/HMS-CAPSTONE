@@ -95,6 +95,17 @@ $entries = $result->fetch_all(MYSQLI_ASSOC);
 $total_entries = count($entries);
 $total_posted = count(array_filter($entries, fn($e) => $e['status'] === 'Posted'));
 $total_draft = $total_entries - $total_posted;
+
+// Build a minimal entries map for JS (id => needed fields)
+$__entries_map = [];
+foreach ($entries as $e) {
+    $__entries_map[$e['entry_id']] = [
+        'module' => $e['module'],
+        'reference' => $e['reference'],
+        'description' => $e['description'],
+        'status' => $e['status']
+    ];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -296,6 +307,24 @@ document.querySelectorAll('.btn-more').forEach(btn=>{
     });
 });
 window.addEventListener('click', ()=>{document.querySelectorAll('.dropdown-actions').forEach(dd=>dd.classList.remove('open'));});
+
+// Expose entries data to JS and auto-open modal if ?open_edit=ID is present
+const entriesData = <?= json_encode($__entries_map, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP) ?>;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get('open_edit');
+    if (openId && entriesData[openId]) {
+        const d = entriesData[openId];
+        // call existing function to populate and show modal
+        openEditModal(openId, d.module ?? '', d.reference ?? '', d.description ?? '', d.status ?? 'Draft');
+
+        // remove open_edit from URL without reloading
+        params.delete('open_edit');
+        const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+        history.replaceState(null, '', newUrl);
+    }
+});
 </script>
 
 </body>
