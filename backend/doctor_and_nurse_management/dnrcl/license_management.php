@@ -54,7 +54,7 @@ $modal_docs = [];
 $modal_emp_id = $_GET['view_docs'] ?? null;
 if ($modal_emp_id) {
     $doc_query = "
-        SELECT d.document_id, d.document_type, d.file_path, d.uploaded_at
+        SELECT d.document_id, d.document_type, d.file_blob, d.uploaded_at
         FROM hr_employees_documents d
         WHERE d.employee_id = ?
         ORDER BY d.uploaded_at DESC
