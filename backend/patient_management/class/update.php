@@ -13,17 +13,24 @@ $patient = $patientObj->getPatientById($patient_id);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $dob = $_POST["dob"] ?? '';
+    // --- Handle Date of Birth Safely ---
+    $dob = trim($_POST["dob"] ?? '');
 
-    // If only year provided (YYYY), append -01-01
-    if (preg_match('/^\d{4}$/', $dob)) {
-        $dob .= '-01-01';
-    }
+    if (!empty($dob)) {
+        // If only year provided (YYYY), append "-01-01"
+        if (preg_match('/^\d{4}$/', $dob)) {
+            $dob .= '-01-01';
+        }
 
-    if (empty($dob)) {
+        // If not in valid YYYY-MM-DD format after that, nullify
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
+            $dob = null;
+        }
+    } else {
         $dob = null;
     }
 
+    // --- Prepare updated data ---
     $updatedData = [
         'fname'            => $_POST["fname"] ?? '',
         'mname'            => $_POST["mname"] ?? '',
@@ -70,19 +77,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
         }
 
+        // Commit if everything is successful
         $conn->commit();
         header("Location: ../Patient Management/inpatient.php?success=1");
         exit();
 
     } catch (Exception $e) {
+        // Rollback if there’s an error
         $conn->rollback();
         $error = "Failed to update patient: " . $e->getMessage();
         error_log($error);
 
+        // Safely show error in browser console
         echo "<script>console.error(" . json_encode($error) . ");</script>";
 
-        
-        echo "<p style='color:red;'>$error</p>";
+        // Optional visible error message
+        echo "<p style='color:red; font-weight:bold;'>$error</p>";
     }
 }
 ?>
