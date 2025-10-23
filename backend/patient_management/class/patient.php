@@ -98,12 +98,20 @@ public function insertPatient($data) {
 }
 
     public function updatePatient($patient_id, $data) {
-    $stmt = $this->conn->prepare(" UPDATE patientinfo SET fname=?, mname=?, lname=?, address=?, dob=?, age=?, gender=?, civil_status=?,
+    // Validate and sanitize dob to ensure it's in YYYY-MM-DD format or null
+    if (isset($data['dob']) && $data['dob'] !== null) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data['dob'])) {
+            $data['dob'] = null; // Set to null if invalid format
+        }
+    }
+
+    $stmt = $this->conn->prepare("UPDATE patientinfo SET fname=?, mname=?, lname=?, address=?, dob=?, age=?, gender=?, civil_status=?,
      phone_number=?, email=?, admission_type=?, attending_doctor=? WHERE patient_id=?");
 
-     if (!$stmt){
+    if (!$stmt) {
         die("Prepare failed: " . $this->conn->error);
-     }
+    }
+
     $stmt->bind_param("ssssissssssii", 
         $data['fname'], $data['mname'], $data['lname'], $data['address'], 
         $data['dob'], $data['age'], $data['gender'], $data['civil_status'], 
@@ -111,12 +119,13 @@ public function insertPatient($data) {
         $patient_id
     );
 
-    if(!$stmt->execute()){
+    if (!$stmt->execute()) {
         die("Execute failed: " . $stmt->error);
     }
-    
-        return true;
-    }
+
+    $stmt->close();
+    return true;
+}
 
     public function getPatientOrFail($patient_id) {
         if (empty($patient_id)) {
