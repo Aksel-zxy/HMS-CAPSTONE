@@ -11,13 +11,13 @@ if (!$patient_id) {
 
 $patient = $patientObj->getPatientById($patient_id);
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
- 
     $dob = $_POST["dob"] ?? '';
 
+    // If only year provided (YYYY), append -01-01
     if (preg_match('/^\d{4}$/', $dob)) {
-        $dob = $dob . '-01-01';
+        $dob .= '-01-01';
     }
 
     if (empty($dob)) {
@@ -78,7 +78,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $conn->rollback();
         $error = "Failed to update patient: " . $e->getMessage();
         error_log($error);
-        echo "<script>console.error('{$error}');</script>";
+
+        echo "<script>console.error(" . json_encode($error) . ");</script>";
+
+        
+        echo "<p style='color:red;'>$error</p>";
     }
 }
 ?>
