@@ -54,7 +54,7 @@ $modal_docs = [];
 $modal_emp_id = $_GET['view_docs'] ?? null;
 if ($modal_emp_id) {
     $doc_query = "
-        SELECT d.document_id, d.document_type, d.file_path, d.uploaded_at
+        SELECT d.document_id, d.document_type, d.file_blob, d.uploaded_at
         FROM hr_employees_documents d
         WHERE d.employee_id = ?
         ORDER BY d.uploaded_at DESC
@@ -311,8 +311,8 @@ if ($modal_emp_id) {
                             <td><?= htmlspecialchars($doc['document_type']); ?></td>
                             <td>
                              <td>
-    <?php if (!empty($doc['file_path'])): ?>
-        <a href="../../HR Management/Recruitment & Onboarding Module/applicants document"<?= urlencode($doc['file_path']); ?>
+    <?php if (!empty($doc['file_blob'])): ?>
+        <a href="view_document.php?id=<?= urlencode($doc['document_id']); ?>" 
            target="_blank" 
            class="btn btn-info btn-sm">View File</a>
     <?php else: ?>

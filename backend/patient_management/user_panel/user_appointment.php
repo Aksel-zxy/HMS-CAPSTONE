@@ -8,7 +8,7 @@ include_once '../class/caller.php';
 
 
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'patient') {
-    header('Location: login.php');
+    header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
 }
 

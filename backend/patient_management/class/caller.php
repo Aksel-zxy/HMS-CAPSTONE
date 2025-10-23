@@ -221,21 +221,21 @@ public function getDoctors() {
             ct.findings AS ct_findings,
             ct.impression AS ct_impression,
             ct.remarks AS ct_remarks,
-            ct.image_path AS ct_image,
+            ct.image_blob AS ct_image,
 
             -- MRI
             mri.testType AS mri_test,
             mri.findings AS mri_findings,
             mri.impression AS mri_impression,
             mri.remarks AS mri_remarks,
-            mri.image_path AS mri_image,
+            mri.image_blob AS mri_image,
 
             -- X-Ray
             x.testType AS xray_test,
             x.findings AS xray_findings,
             x.impression AS xray_impression,
             x.remarks AS xray_remarks,
-            x.image_path AS xray_image
+            x.image_blob AS xray_image
 
         FROM patientinfo p
         LEFT JOIN dl_lab_cbc c   ON p.patient_id = c.patientID

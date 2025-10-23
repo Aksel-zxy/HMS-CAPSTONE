@@ -8,7 +8,7 @@ include_once '../class/caller.php';
 
 
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'patient') {
-    header('Location: login.php');
+    header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
 }
 
@@ -213,22 +213,23 @@ try {
 
                             </tr>
                         </thead>
+                        <!-- KAILANGAN I FIX-->
                         <tbody>
-                            <?php if (!empty($history)): ?>
+                            <?php if (!empty($history) && is_array($history)): ?>
                             <tr style="border-bottom:1px solid #f1f1f1; transition:background 0.2s;"
                                 onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
                                 <td style="padding:12px; text-align:center;">
-                                    <?= htmlspecialchars($history['diagnosis_date']) ?>
+                                    <?= htmlspecialchars($history['diagnosis_date'] ?? '') ?>
                                 </td>
                                 <td style="padding:12px; text-align:center;">
-                                    <?= htmlspecialchars($history['condition_name']) ?></td>
-
-                                <td style="padding:12px; text-align:center;"><?= htmlspecialchars($history['notes']) ?>
+                                    <?= htmlspecialchars($history['condition_name'] ?? '') ?>
                                 </td>
-
+                                <td style="padding:12px; text-align:center;">
+                                    <?= htmlspecialchars($history['notes'] ?? '') ?>
+                                </td>
                                 <td style="text-align:center;">
                                     <a class="btn btn-sm"
-                                        href="../Patient Management/discharged.php?patient_id=<?= $history['patient_id'] ?>"
+                                        href="../Patient Management/discharged.php?patient_id=<?= htmlspecialchars($history['patient_id'] ?? '') ?>"
                                         style="padding:6px 12px; border-radius:6px; font-size:13px; background:red; border:none; color:#fff; cursor:pointer;">
                                         Download
                                     </a>
@@ -243,6 +244,7 @@ try {
                             </tr>
                             <?php endif; ?>
                         </tbody>
+
                     </table>
                 </div>
 

@@ -40,4 +40,85 @@
     }
 }
 
+/* ---------- Card Container ---------- */
+.card {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 6px;
+    box-shadow: 0 8px 10px rgba(0, 0, 0, 1);
+    border: 1px solid #ccc;
+    max-width: 1000px;
+    width: 100%;
+    margin: 0 auto;
+}
 
+/* ---------- Form ---------- */
+.card h3 {
+    text-align: center;
+    color: #0047ab;
+    margin-bottom: 30px;
+    font-weight: bold;
+    font-size: 25px;
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+label {
+    display: block;
+    font-weight: 600;
+    color: #333;
+    font-size: 15px;
+}
+
+input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+    transition: all 0.3s ease;
+}
+
+select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+    transition: all 0.3s ease;
+}
+
+.result-box {
+    background: #eef4fa;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #2a4d69;
+}
+
+bttn {
+    padding: 10px;
+    background-color: #0047ab;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    width: 100%;
+    border-radius: 5px;
+    text-align: center;
+}
+
+bttn:hover {
+    background-color: #0096c7;
+    transition: background-color 0.3s;
+    font-weight: bold;
+}
+
+@media(max-width: 700px){
+    .grid{ grid-template-columns: 1fr; }
+}
