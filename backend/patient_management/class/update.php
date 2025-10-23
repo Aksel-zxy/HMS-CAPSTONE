@@ -15,16 +15,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Handle Date of Birth Safely ---
     $dob = trim($_POST["dob"] ?? '');
-
     if (!empty($dob)) {
-        // If only year provided (YYYY), append "-01-01"
-        if (preg_match('/^\d{4}$/', $dob)) {
-            $dob .= '-01-01';
-        }
-
-        // If not in valid YYYY-MM-DD format after that, nullify
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
-            $dob = null;
+        try {
+            $date = new DateTime($dob);
+            $dob = $date->format('Y-m-d');
+        } catch (Exception $e) {
+            if (preg_match('/^\d{4}$/', $dob)) {
+                $dob = $dob . '-01-01';
+            } else {
+                $dob = null;
+            }
         }
     } else {
         $dob = null;
