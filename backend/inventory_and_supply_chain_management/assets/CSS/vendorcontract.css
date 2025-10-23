@@ -1,88 +1,28 @@
-/* Main content area beside the sidebar */
+/* Push content aside for sidebar */
 .vendor-main {
-    margin-left: 250px; /* Match sidebar width */
+    margin-left: 260px; /* same as sidebar width */
     padding: 30px;
     min-height: 100vh;
     background-color: #f8f9fa;
-    transition: margin-left 0.3s ease-in-out;
-    position: relative;
-    z-index: 1;
 }
 
 /* Contract card */
 .contract {
-    background: #ffffff;
+    background: #fff;
     border-radius: 10px;
     border: 1px solid #ddd;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
-    padding: 25px 30px;
-    margin-bottom: 30px;
-    transition: box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
-}
-
-.contract:hover {
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-    transform: translateY(-2px);
 }
 
 /* Headings */
 .contract h2 {
-    font-weight: 700;
-    color: #222;
-    margin-bottom: 20px;
-}
-
-/* Paragraphs and text inside contract */
-.contract p {
-    color: #444;
-    line-height: 1.6;
-    margin-bottom: 15px;
+    font-weight: bold;
 }
 
 /* Signature section */
 .signature {
     margin-top: 60px;
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 30px;
 }
 
 .signature div {
     font-size: 14px;
-    color: #555;
-    text-align: center;
-}
-
-.signature div span {
-    display: block;
-    margin-top: 5px;
-    font-weight: 600;
-    border-top: 1px solid #ccc;
-    padding-top: 4px;
-}
-
-/* Responsive adjustments */
-@media (max-width: 991px) {
-    .vendor-main {
-        margin-left: 200px;
-        padding: 20px;
-    }
-}
-
-@media (max-width: 768px) {
-    .vendor-main {
-        margin-left: 0;
-        padding: 20px;
-    }
-
-    .contract {
-        padding: 20px;
-    }
-
-    .signature {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 20px;
-    }
 }

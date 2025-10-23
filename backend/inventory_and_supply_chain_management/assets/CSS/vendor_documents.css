@@ -1,118 +1,18 @@
-/* General Reset */
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f4f4f4;
-}
-
-/* Sidebar */
-.sidebar {
-    width: 250px;
-    height: 100vh;
-    background: whitesmoke;
-    color: black;
-    position: fixed;
-    left: 0;
-    top: 0;
-    overflow-y: auto;
-    transition: all 0.3s ease-in-out;
-    z-index: 1000; /* Ensures sidebar stays on top of main content */
-    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-}
-
-.sidebar .logo-container {
-    text-align: center;
-    padding: 20px;
-}
-
-.sidebar .logo-container img {
-    width: 80px;
-    height: auto;
-    border-radius: 50%;
-}
-
-.sidebar .logo-container h2 {
-    margin-top: 10px;
-    font-size: 18px;
-    font-weight: bold;
-}
-
-.sidebar .nav {
-    padding: 10px;
-}
-
-.menu {
-    margin-bottom: 20px;
-}
-
-.menu .title {
-    font-size: 16px;
-    font-weight: bold;
-    padding: 10px;
-    background: #34495e;
-    border-radius: 5px;
-    color: white;
-}
-
-.menu ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.menu ul li {
-    padding: 10px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.menu ul li a {
-    text-decoration: none;
-    color: black;
-    display: block;
-    transition: 0.3s;
-}
-
-.menu ul li a:hover {
-    background: #0084ff;
-    color: white;
-    border-radius: 5px;
-}
-
-/* Active sidebar (collapsed) */
-.sidebar.active {
-    width: 60px;
-}
-
-.sidebar.active .menu .title,
-.sidebar.active .menu ul li a .text {
-    display: none;
-}
-
-.sidebar.active .menu ul li a {
-    text-align: center;
-    padding: 10px;
-}
-
-/* Main Content Area */
-.vendor-main,
-.admin-main {
-    margin-left: 250px; /* matches sidebar width */
+/* Push main content aside for sidebar */
+.vendor-main {
+    margin-left: 260px; /* Same width as .vendor-sidebar */
     padding: 20px;
     min-height: 100vh;
     background-color: #f8f9fa;
-    transition: margin-left 0.3s ease-in-out;
-    position: relative;
-    z-index: 1;
 }
 
-/* Collapsed sidebar content shift */
-.sidebar.active ~ .vendor-main,
-.sidebar.active ~ .admin-main {
-    margin-left: 60px;
+/* Improve card visuals */
+.card {
+    border-radius: 10px;
+    overflow: hidden;
 }
 
-/* Table Improvements */
+/* Table improvements */
 .table th, 
 .table td {
     vertical-align: middle;
@@ -124,42 +24,29 @@ body {
     font-weight: 600;
 }
 
-/* Buttons */
+/* Button styling */
 .btn-sm {
     padding: 5px 12px;
     border-radius: 6px;
 }
 
-/* Cards */
-.card {
-    border-radius: 10px;
-    overflow: hidden;
-}
+        .admin-main {
+            margin-left: 250px; /* width of the sidebar */
+            padding: 20px;
+            transition: margin-left 0.3s ease-in-out;
+        }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .sidebar {
-        width: 200px;
-    }
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .admin-main {
+                margin-left: 200px;
+                padding: 15px;
+            }
+        }
 
-    .vendor-main,
-    .admin-main {
-        margin-left: 200px;
-        padding: 15px;
-    }
-}
-
-@media (max-width: 480px) {
-    .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-        z-index: 1000;
-    }
-
-    .vendor-main,
-    .admin-main {
-        margin-left: 0;
-        padding: 10px;
-    }
-}
+        @media (max-width: 480px) {
+            .admin-main {
+                margin-left: 0;
+                padding: 10px;
+            }
+        }
