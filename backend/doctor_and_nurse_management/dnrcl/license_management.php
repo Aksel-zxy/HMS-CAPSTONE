@@ -312,7 +312,7 @@ if ($modal_emp_id) {
                             <td>
                              <td>
     <?php if (!empty($doc['file_blob'])): ?>
-        <a href="../../hr_management/recruitment_onboarding_module/view_document.php"<?= urlencode($doc['file_blob']); ?>
+        <a href="view_document.php?id=<?= urlencode($doc['document_id']); ?>" 
            target="_blank" 
            class="btn btn-info btn-sm">View File</a>
     <?php else: ?>
