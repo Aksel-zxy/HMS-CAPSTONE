@@ -88,7 +88,7 @@ if ($medical_history) {
                             <label class="col-sm-3 col-form-label">Date of Birth</label>
                             <div class="col-sm-6">
                                 <input type="date" class="form-control" id="dob" name="dob"
-                                    value="<?= $patient['dob']; ?>">
+                                    value="<?= date('Y-m-d', strtotime($patient['dob'])); ?>">
                             </div>
                         </div>
                         <div class="row mb-3">
