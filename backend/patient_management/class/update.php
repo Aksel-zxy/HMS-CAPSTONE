@@ -13,22 +13,7 @@ $patient = $patientObj->getPatientById($patient_id);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // --- Handle Date of Birth Safely ---
-    $dob = trim($_POST["dob"] ?? '');
-    if (!empty($dob)) {
-        try {
-            $date = new DateTime($dob);
-            $dob = $date->format('Y-m-d');
-        } catch (Exception $e) {
-            if (preg_match('/^\d{4}$/', $dob)) {
-                $dob = $dob . '-01-01';
-            } else {
-                $dob = null;
-            }
-        }
-    } else {
-        $dob = null;
-    }
+   
 
     // --- Prepare updated data ---
     $updatedData = [
@@ -37,9 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'lname'            => $_POST["lname"] ?? '',
         'address'          => $_POST["address"] ?? '',
         'age'              => (int)($_POST["age"] ?? 0),
-        'dob'              => $dob,
+        'dob'              => $_POST["dob"],
         'gender'           => $_POST["gender"] ?? '',
-        'civil_status'     => $_POST["civil_status"] ?? '',
+        'civil_status'     => $_POST["civil_status"] ?? '', 
         'phone_number'     => $_POST["phone_number"] ?? '',
         'email'            => $_POST["email"] ?? '',
         'admission_type'   => $_POST["admission_type"] ?? '',
