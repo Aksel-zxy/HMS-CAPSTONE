@@ -1,9 +1,10 @@
 /* vendor_products.css */
 
-/* Wrapper for layout */
+/* Wrapper layout */
 .vendor-wrapper {
     display: flex;
     min-height: 100vh;
+    background-color: #fdfdfd;
 }
 
 /* Sidebar */
@@ -17,81 +18,108 @@
     border-right: 1px solid #dee2e6;
     overflow-y: auto;
     z-index: 1000;
+    transition: all 0.3s ease-in-out;
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.05);
 }
 
-/* Main content */
+/* Main content beside sidebar */
 .vendor-main {
-    margin-left: 250px;   /* Shift content to right */
+    margin-left: 250px; /* same as sidebar width */
     flex: 1;
     padding: 20px;
-    background-color: #fdfdfd;
+    background-color: #ffffff;
+    min-height: 100vh;
     overflow-x: auto;
+    position: relative;
+    z-index: 1; /* keep content above page background, below sidebar */
+    transition: margin-left 0.3s ease-in-out;
 }
 
-/* Product Table */
+/* Table Styling */
 .vendor-main .table th,
 .vendor-main .table td {
     vertical-align: middle;
     white-space: nowrap;
+    text-align: center;
 }
 
-/* Product Images */
+.vendor-main .table th {
+    background-color: #f1f1f1;
+    font-weight: 600;
+}
+
+/* Product Images - Uniform Size */
 .vendor-main table img {
-    max-width: 60px;
-    height: auto;
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+/* Optional thumbnail class */
+.product-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
     border-radius: 6px;
 }
 
 /* Page Headings */
 .vendor-main h3 {
     font-weight: 600;
+    color: #333;
 }
 
 /* Buttons */
 .vendor-main .btn-sm {
     margin-right: 5px;
+    border-radius: 6px;
 }
 
-/* Product Images - Uniform Size */
-.vendor-main table img {
-    width: 80px;         
-    height: 80px;        
-    object-fit: cover;    
-    border-radius: 6px;   
-}
-        .product-thumb {
-            width: 60px;
-            height: 60px;
-            object-fit: cover;
-            border-radius: 6px;
-        }
-        .table td { vertical-align: middle; }
-        /* small responsive tweak for the search row */
-        @media (max-width: 576px) {
-            .vendor-main .row.g-2 > .col-md-6,
-            .vendor-main .row.g-2 > .col-md-4,
-            .vendor-main .row.g-2 > .col-md-2 { width: 100%; }
-        }
-
-
-/* Mobile Responsiveness */
-@media (max-width: 768px) {
+/* Mobile Responsive Fixes */
+@media (max-width: 991px) {
     .vendor-sidebar {
         width: 200px;
     }
+
     .vendor-main {
         margin-left: 200px;
     }
 }
 
-@media (max-width: 576px) {
+/* Tablet and mobile screens */
+@media (max-width: 768px) {
     .vendor-sidebar {
         position: relative;
         width: 100%;
         height: auto;
         border-right: none;
+        border-bottom: 1px solid #dee2e6;
+        box-shadow: none;
     }
+
     .vendor-main {
         margin-left: 0;
+        margin-top: 0;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 576px) {
+    .vendor-sidebar {
+        width: 100%;
+        height: auto;
+    }
+
+    .vendor-main {
+        margin-left: 0;
+        margin-top: 0;
+    }
+
+    /* Stack search/filter rows */
+    .vendor-main .row.g-2 > .col-md-6,
+    .vendor-main .row.g-2 > .col-md-4,
+    .vendor-main .row.g-2 > .col-md-2 {
+        width: 100%;
     }
 }
