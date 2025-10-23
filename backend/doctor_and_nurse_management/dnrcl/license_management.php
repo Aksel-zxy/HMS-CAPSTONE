@@ -311,8 +311,8 @@ if ($modal_emp_id) {
                             <td><?= htmlspecialchars($doc['document_type']); ?></td>
                             <td>
                              <td>
-    <?php if (!empty($doc['file_path'])): ?>
-        <a href="../../HR Management/Recruitment & Onboarding Module/applicants document"<?= urlencode($doc['file_path']); ?>
+    <?php if (!empty($doc['file_blob'])): ?>
+        <a href="../../HR Management/Recruitment & Onboarding Module/applicants document"<?= urlencode($doc['file_blob']); ?>
            target="_blank" 
            class="btn btn-info btn-sm">View File</a>
     <?php else: ?>
