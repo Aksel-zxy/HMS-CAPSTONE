@@ -12,13 +12,25 @@ if (!$patient_id) {
 $patient = $patientObj->getPatientById($patient_id);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+
+ 
+    $dob = $_POST["dob"] ?? '';
+
+    if (preg_match('/^\d{4}$/', $dob)) {
+        $dob = $dob . '-01-01';
+    }
+
+    if (empty($dob)) {
+        $dob = null;
+    }
+
     $updatedData = [
         'fname'            => $_POST["fname"] ?? '',
         'mname'            => $_POST["mname"] ?? '',
         'lname'            => $_POST["lname"] ?? '',
         'address'          => $_POST["address"] ?? '',
         'age'              => (int)($_POST["age"] ?? 0),
-        'dob'              => $_POST["dob"] ?? '',
+        'dob'              => $dob,
         'gender'           => $_POST["gender"] ?? '',
         'civil_status'     => $_POST["civil_status"] ?? '',
         'phone_number'     => $_POST["phone_number"] ?? '',
@@ -30,43 +42,38 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $conn->begin_transaction();
 
     try {
-        // Update patient table
+        // Update patient info
         $updateResult = $patientObj->updatePatient($patient_id, $updatedData);
 
         if (!$updateResult) {
             throw new Exception("Failed to update patient information.");
         }
 
-        // Try updating medical history
+        // Update medical history if provided
         if (!empty($_POST['condition_name']) || !empty($_POST['diagnosis_date']) || !empty($_POST['notes'])) {
-            try {
-                $stmt = $conn->prepare("
-                    UPDATE p_previous_medical_records 
-                    SET condition_name = ?, diagnosis_date = ?, notes = ? 
-                    WHERE patient_id = ?
-                ");
-                $stmt->bind_param(
-                    "sssi",
-                    $_POST['condition_name'],
-                    $_POST['diagnosis_date'],
-                    $_POST['notes'],
-                    $patient_id
-                );
+            $stmt = $conn->prepare("
+                UPDATE p_previous_medical_records 
+                SET condition_name = ?, diagnosis_date = ?, notes = ? 
+                WHERE patient_id = ?
+            ");
+            $stmt->bind_param(
+                "sssi",
+                $_POST['condition_name'],
+                $_POST['diagnosis_date'],
+                $_POST['notes'],
+                $patient_id
+            );
 
-                if (!$stmt->execute()) {
-                    throw new Exception("Medical history update failed: " . $stmt->error);
-                }
-                $stmt->close();
-
-            } catch (Exception $mhErr) {
-                error_log($mhErr->getMessage());
-                echo "<script>console.error('{$mhErr->getMessage()}');</script>";
+            if (!$stmt->execute()) {
+                throw new Exception("Medical history update failed: " . $stmt->error);
             }
+            $stmt->close();
         }
 
         $conn->commit();
         header("Location: ../Patient Management/inpatient.php?success=1");
         exit();
+
     } catch (Exception $e) {
         $conn->rollback();
         $error = "Failed to update patient: " . $e->getMessage();
