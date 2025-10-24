@@ -175,30 +175,16 @@ $notifCount = $notif->notifCount;
             </li>
 
             <li class="sidebar-item">
-                <a class="sidebar-link position-relative" data-bs-toggle="collapse" href="#prescriptionMenu" role="button" aria-expanded="false" aria-controls="prescriptionMenu">
+                <a href="pharmacy_prescription.php" class="sidebar-link position-relative">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-file-prescription" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
                         <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
                     <span style="font-size: 18px;">Prescription</span>
                     <?php if ($pendingCount > 0): ?>
-                        <span class="notif-dot"></span>
+                        <span class="notif-badge"><?php echo $pendingCount; ?></span>
                     <?php endif; ?>
                 </a>
-
-                <ul class="collapse list-unstyled ms-3" id="prescriptionMenu">
-                    <li>
-                        <a href="pharmacy_prescription.php" class="sidebar-link position-relative">
-                            View Prescriptions
-                            <?php if ($pendingCount > 0): ?>
-                                <span class="notif-badge"><?php echo $pendingCount; ?></span>
-                            <?php endif; ?>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="pharmacy_add_prescription.php" class="sidebar-link">Add Prescription</a>
-                    </li>
-                </ul>
             </li>
 
             <li class="sidebar-item">
@@ -364,19 +350,7 @@ $notifCount = $notif->notifCount;
                             </div>
                         </div>
 
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3">
-                                <h6 style="font-weight: 700;">Dispensed Medicines Today</h6>
-                                <h3><?= $dispensedToday ?></h3>
-                            </div>
-                        </div>
 
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3">
-                                <h6 style="font-weight: 700;">Total Stocks</h6>
-                                <h3><?= $totalStocks ?></h3>
-                            </div>
-                        </div>
 
                         <!-- Download Button -->
                         <div class="col-md-12 d-flex justify-content-end mt-3">
@@ -424,96 +398,6 @@ $notifCount = $notif->notifCount;
                         </div>
                     </div>
 
-                    <!-- Stock Thresholds -->
-                    <div class="row mb-4">
-                        <!-- High Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3">
-                                <h6 style="font-weight: 700; color: green;">High Stock</h6>
-
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start">
-                                        <?php if (!empty($highStock)): ?>
-                                            <?php foreach ($highStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-success"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Near Low Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3">
-                                <h6 style="font-weight: 700; color: #ffc107;">Near Low Stock</h6>
-
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start">
-                                        <?php if (!empty($nearLowStock)): ?>
-                                            <?php foreach ($nearLowStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-warning text-dark"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row mb-4">
-                        <!-- Low Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3">
-                                <h6 style="font-weight: 700; color: orange;">Low Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start">
-                                        <?php if (!empty($lowStock)): ?>
-                                            <?php foreach ($lowStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-danger"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- No Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3">
-                                <h6 style="font-weight: 700; color: red;">No Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start">
-                                        <?php if (!empty($noStock)): ?>
-                                            <?php foreach ($noStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-secondary"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
 
 
