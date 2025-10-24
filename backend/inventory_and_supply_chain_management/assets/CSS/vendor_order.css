@@ -1,0 +1,248 @@
+/* ==============================
+   Vendor Orders Page Styling
+   ============================== */
+
+/* Reset and base layout */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Nunito", "Segoe UI", Arial, sans-serif;
+    background-color: #F5F6F7;
+    margin: 0;
+    padding: 0;
+    color: #333;
+    overflow-x: hidden;
+}
+
+/* ==============================
+   Layout Wrapper
+   ============================== */
+
+/* Prevent the sidebar (from vendorsidebar.php) from overlapping the main content */
+.main-content {
+    margin-left: 250px; /* same width as sidebar */
+    padding: 30px;
+    transition: all 0.3s ease-in-out;
+    min-height: 100vh;
+    overflow-x: auto;
+}
+
+/* ==============================
+   Responsive Adjustments
+   ============================== */
+
+/* Medium screens (tablets, small laptops) */
+@media (max-width: 992px) {
+    .main-content {
+        margin-left: 220px;
+        padding: 20px;
+    }
+}
+
+/* Small screens (phones & small tablets) */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 200px;
+    }
+
+    .main-content {
+        margin-left: 200px;
+        padding: 20px;
+    }
+}
+
+/* Extra small screens (mobile phones) */
+@media (max-width: 576px) {
+    .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+    }
+
+    h2 {
+        font-size: 1.2rem;
+        text-align: center;
+    }
+
+    .nav-tabs {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+        border-radius: 0;
+    }
+
+    .table th,
+    .table td {
+        font-size: 0.85rem;
+        padding: 8px;
+    }
+
+    .btn {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+
+    .badge {
+        font-size: 0.75rem;
+    }
+}
+
+/* ==============================
+   Page Header
+   ============================== */
+.main-content h2 {
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 25px;
+}
+
+/* ==============================
+   Tabs
+   ============================== */
+.nav-tabs {
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.nav-tabs .nav-link {
+    color: #6e768e;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+    color: #00acc1;
+    border-bottom: 3px solid #00acc1;
+    background: transparent;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #00acc1;
+}
+
+/* ==============================
+   Tables
+   ============================== */
+.table {
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.table th {
+    background: #00acc1;
+    color: #fff;
+    font-weight: 600;
+    text-align: center;
+    vertical-align: middle;
+}
+
+.table td {
+    text-align: center;
+    vertical-align: middle;
+    color: #555;
+}
+
+.table .btn {
+    padding: 5px 10px;
+    font-size: 0.875rem;
+}
+
+/* ==============================
+   Badges
+   ============================== */
+.badge {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+    border-radius: 12px;
+}
+
+.badge.bg-warning {
+    background-color: #ffb74d !important;
+    color: #fff;
+}
+
+.badge.bg-success {
+    background-color: #66bb6a !important;
+    color: #fff;
+}
+
+/* ==============================
+   Modal Styling
+   ============================== */
+.modal-content {
+    border-radius: 12px;
+}
+
+.modal-header {
+    background: #00acc1;
+    color: #fff;
+    border-bottom: none;
+}
+
+.modal-title {
+    font-weight: 600;
+}
+
+.modal-body {
+    background: #fafafa;
+}
+
+/* ==============================
+   Buttons
+   ============================== */
+.btn-primary {
+    background: #00acc1;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background: #0097a7;
+}
+
+.btn-success {
+    background: #4caf50;
+    border: none;
+}
+
+.btn-success:hover {
+    background: #43a047;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    border: none;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+/* ==============================
+   Scrollbar Tweaks (Mobile)
+   ============================== */
+.table::-webkit-scrollbar {
+    height: 6px;
+}
+
+.table::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 10px;
+}
