@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Manila');
 include '../../SQL/config.php';
 require_once 'class/patient.php';
 
@@ -13,7 +14,21 @@ $patient = $patientObj->getPatientById($patient_id);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-   
+    // ✅ FIXED DOB HANDLING (bulletproof and version-safe)
+    $dob = trim($_POST["dob"] ?? '');
+
+    if ($dob === '') {
+        $dob = null;
+    } elseif (preg_match('/^\d{4}$/', $dob)) {
+        // Year only (e.g., "2013")
+        $dob = $dob . '-01-01';
+    } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
+        // Already a valid YYYY-MM-DD
+        $dob = $dob;
+    } else {
+        // Invalid format or parsing error
+        $dob = null;
+    }
 
     // --- Prepare updated data ---
     $updatedData = [
@@ -22,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'lname'            => $_POST["lname"] ?? '',
         'address'          => $_POST["address"] ?? '',
         'age'              => (int)($_POST["age"] ?? 0),
-        'dob'              => $_POST["dob"],
+        'dob'              => $dob, // ✅ uses the cleaned DOB
         'gender'           => $_POST["gender"] ?? '',
         'civil_status'     => $_POST["civil_status"] ?? '', 
         'phone_number'     => $_POST["phone_number"] ?? '',
