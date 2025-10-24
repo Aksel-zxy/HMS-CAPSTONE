@@ -21,15 +21,11 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <title>Vendor Documents</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/vendorsidebar.css"> <!-- Sidebar styles -->
     <link rel="stylesheet" href="assets/css/vendor_documents.css"> <!-- Page-specific styles -->
 </head>
 <body class="bg-light">
 
-    <!-- Sidebar -->
-    <div class="vendor-sidebar">
-        <?php include 'vendorsidebar.php'; ?>
-    </div>
+
 
     <!-- Main Content -->
     <main class="vendor-main p-4">
@@ -70,6 +66,11 @@ $documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
     </main>
+
+        <!-- Sidebar -->
+    <div class="vendor-sidebar">
+        <?php include 'vendorsidebar.php'; ?>
+    </div>
 
 </body>
 </html>
