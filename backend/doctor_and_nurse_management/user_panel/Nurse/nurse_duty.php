@@ -167,8 +167,6 @@ $dutyStmt->close();
                 <th>Bed ID</th>
                 <th>Nurse Assistant</th>
                 <th>Procedure</th>
-                <th>Equipment</th>
-                <th>Tools</th>
                 <th>Notes</th>
             </tr>
         </thead>
@@ -181,19 +179,6 @@ $dutyStmt->close();
                         <td><?= htmlspecialchars($duty['bed_id']) ?></td>
                         <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
                         <td><?= htmlspecialchars($duty['procedure']) ?></td>
-                        <td><?= htmlspecialchars($duty['equipment']) ?></td>
-                        <td>
-                            <?php
-                            $tools = $duty['tools'];
-                            if ($tools && ($decoded = json_decode($tools, true))) {
-                                foreach ($decoded as $tool) {
-                                    echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")<br>";
-                                }
-                            } else {
-                                echo htmlspecialchars($tools);
-                            }
-                            ?>
-                        </td>
                         <td><?= htmlspecialchars($duty['notes']) ?></td>
                     </tr>
                 <?php endforeach; ?>
