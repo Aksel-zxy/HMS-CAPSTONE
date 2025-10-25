@@ -81,6 +81,19 @@ $completedOrders = $completedStmt->fetchAll(PDO::FETCH_ASSOC);
     <link href="assets/css/vendor_orders.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/vendor_orders.css">
 </head>
+
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+}
+
+.container, .main-content {
+    margin-left: 270px; /* Keeps content clear of sidebar */
+}
+
+</style>
+
 <body>
 
 <div class="vendor-sidebar">

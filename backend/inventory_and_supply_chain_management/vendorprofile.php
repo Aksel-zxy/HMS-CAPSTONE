@@ -65,49 +65,75 @@ function e($str) {
   <title>Vendor Profile</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/vendorsidebar.css">
+
+  <style>
+    /* Sidebar spacing */
+    .vendor-main {
+        margin-left: 270px; /* leave space for sidebar */
+        padding-top: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .vendor-main {
+            margin-left: 0;
+        }
+    }
+
+    /* Optional: fix sidebar */
+    .vendor-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        overflow-y: auto;
+    }
+  </style>
 </head>
 <body class="bg-light">
 
+<!-- Sidebar -->
 <div class="vendor-sidebar">
-        <?php include 'vendorsidebar.php'; ?>
+    <?php include 'vendorsidebar.php'; ?>
+</div>
+
+<!-- Main Content -->
+<div class="vendor-main">
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="mb-0">Vendor Profile</h2>
+      <a href="vendors_list.php" class="btn btn-outline-secondary btn-sm">Back</a>
     </div>
 
-
-<div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="mb-0">Vendor Profile</h2>
-    <a href="vendors_list.php" class="btn btn-outline-secondary btn-sm">Back</a>
-  </div>
-
-  <?php if (isset($_GET['updated'])): ?>
-    <?php if ($_GET['updated'] === '1'): ?>
-      <div class="alert alert-success">Profile updated successfully.</div>
-    <?php else: ?>
-      <div class="alert alert-danger">Update failed.</div>
+    <?php if (isset($_GET['updated'])): ?>
+      <?php if ($_GET['updated'] === '1'): ?>
+        <div class="alert alert-success">Profile updated successfully.</div>
+      <?php else: ?>
+        <div class="alert alert-danger">Update failed.</div>
+      <?php endif; ?>
     <?php endif; ?>
-  <?php endif; ?>
 
-  <div class="card shadow-sm">
-    <div class="card-header d-flex justify-content-between align-items-center">
-      <strong><?= e($vendor['company_name']) ?></strong>
-      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal">Edit Profile</button>
-    </div>
-    <div class="card-body">
-      <table class="table table-bordered">
-        <tr><th>Registration Number</th><td><?= e($vendor['registration_number']) ?></td></tr>
-        <tr><th>Company Name</th><td><?= e($vendor['company_name']) ?></td></tr>
-        <tr><th>Company Address</th><td><?= nl2br(e($vendor['company_address'])) ?></td></tr>
-        <tr><th>Contact Name</th><td><?= e($vendor['contact_name']) ?></td></tr>
-        <tr><th>Contact Title</th><td><?= e($vendor['contact_title']) ?></td></tr>
-        <tr><th>Phone</th><td><?= e($vendor['phone']) ?></td></tr>
-        <tr><th>Email</th><td><?= e($vendor['email']) ?></td></tr>
-        <tr><th>TIN/VAT</th><td><?= e($vendor['tin_vat']) ?></td></tr>
-        <tr><th>Primary Categories</th><td><?= e($vendor['primary_product_categories']) ?></td></tr>
-        <tr><th>Country</th><td><?= e($vendor['country']) ?></td></tr>
-        <tr><th>Website</th><td><?= e($vendor['website']) ?></td></tr>
-        <tr><th>Status</th><td><?= e($vendor['status']) ?></td></tr>
-        <tr><th>Created At</th><td><?= e($vendor['created_at']) ?></td></tr>
-      </table>
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong><?= e($vendor['company_name']) ?></strong>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal">Edit Profile</button>
+      </div>
+      <div class="card-body">
+        <table class="table table-bordered">
+          <tr><th>Registration Number</th><td><?= e($vendor['registration_number']) ?></td></tr>
+          <tr><th>Company Name</th><td><?= e($vendor['company_name']) ?></td></tr>
+          <tr><th>Company Address</th><td><?= nl2br(e($vendor['company_address'])) ?></td></tr>
+          <tr><th>Contact Name</th><td><?= e($vendor['contact_name']) ?></td></tr>
+          <tr><th>Contact Title</th><td><?= e($vendor['contact_title']) ?></td></tr>
+          <tr><th>Phone</th><td><?= e($vendor['phone']) ?></td></tr>
+          <tr><th>Email</th><td><?= e($vendor['email']) ?></td></tr>
+          <tr><th>TIN/VAT</th><td><?= e($vendor['tin_vat']) ?></td></tr>
+          <tr><th>Primary Categories</th><td><?= e($vendor['primary_product_categories']) ?></td></tr>
+          <tr><th>Country</th><td><?= e($vendor['country']) ?></td></tr>
+          <tr><th>Website</th><td><?= e($vendor['website']) ?></td></tr>
+          <tr><th>Status</th><td><?= e($vendor['status']) ?></td></tr>
+          <tr><th>Created At</th><td><?= e($vendor['created_at']) ?></td></tr>
+        </table>
+      </div>
     </div>
   </div>
 </div>
