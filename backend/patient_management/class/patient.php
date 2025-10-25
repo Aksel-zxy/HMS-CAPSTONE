@@ -112,7 +112,7 @@ public function insertPatient($data) {
         die("Prepare failed: " . $this->conn->error);
     }
 
-    $stmt->bind_param( "sssssissssiii", 
+    $stmt->bind_param( "sssssisssssii", 
         $data['fname'], $data['mname'], $data['lname'], $data['address'], 
         $data['dob'], $data['age'], $data['gender'], $data['civil_status'], 
         $data['phone_number'], $data['email'], $data['admission_type'], $data['attending_doctor'],
