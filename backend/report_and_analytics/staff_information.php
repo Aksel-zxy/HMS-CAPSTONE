@@ -393,7 +393,7 @@
 
         async function loadEmployees() {
             try {
-                const res = await fetch("http://localhost:5288/employee/getStaffInformation");
+                const res = await fetch("https://bsis-03.keikaizen.xyz/employee/getStaffInformation");
                 if (!res.ok) throw new Error("Failed to fetch data");
                 const data = await res.json();
 

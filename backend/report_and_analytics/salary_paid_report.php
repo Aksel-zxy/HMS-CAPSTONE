@@ -81,7 +81,7 @@
             async function loadReport() {
                 const month = document.getElementById("month").value;
                 const year = document.getElementById("year").value;
-                const url = `http://localhost:5288/payroll/getHospitalMonthlyPayrollReport/${month}/${year}`;
+                const url = `https://bsis-03.keikaizen.xyz/payroll/getHospitalMonthlyPayrollReport/${month}/${year}`;
 
                 try {
                     const response = await fetch(url, {

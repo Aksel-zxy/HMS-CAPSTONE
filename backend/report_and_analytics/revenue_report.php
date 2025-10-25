@@ -11,190 +11,138 @@
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
     <style>
+        /* === BLACK & WHITE PROFESSIONAL THEME === */
         body {
-            background-color: #f0f8ff;
+            background-color: #f7f7f7;
+            color: #212121;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             padding: 20px;
         }
 
         .report-container {
-            max-width: 800px;
-            margin: 20px auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 5px 25px rgba(0, 0, 100, 0.1);
+            max-width: 900px;
+            margin: 30px auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.08);
             overflow: hidden;
+            border: 1px solid #e0e0e0;
         }
 
+        /* Header */
         .report-header {
-            background: linear-gradient(135deg, #1a75bc 0%, #0d47a1 100%);
-            color: white;
-            padding: 25px;
+            background: #000;
+            color: #fff;
+            padding: 30px;
             text-align: center;
             position: relative;
         }
 
-        .report-body {
-            padding: 30px;
+        .report-header h1 {
+            font-weight: 600;
+            letter-spacing: 1px;
         }
 
+        /* Year Selector */
+        .year-selector {
+            background: transparent;
+            border: 1px solid #fff;
+            color: #fff;
+            border-radius: 5px;
+            padding: 6px 12px;
+            font-size: 1rem;
+            margin-top: 10px;
+        }
+
+        .year-selector option {
+            color: #000;
+        }
+
+        /* Main Content */
+        .report-body {
+            padding: 40px;
+        }
+
+        /* Revenue Cards */
         .revenue-card {
             border: none;
-            border-radius: 12px;
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            background: #000;
+            color: #fff;
+            padding: 25px;
+            text-align: center;
             transition: all 0.3s ease;
-            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-            color: white;
             margin: 20px 0;
         }
 
         .revenue-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 12px 20px rgba(0, 100, 0, 0.2);
+            background: #1a1a1a;
+            transform: translateY(-4px);
         }
 
         .amount {
             font-weight: 700;
-            font-size: 2.5rem;
-            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+            font-size: 2.2rem;
         }
 
         .card-title {
-            font-size: 1.3rem;
-            margin-bottom: 15px;
+            font-size: 1.2rem;
             opacity: 0.9;
         }
 
         .hospital-icon {
             font-size: 3rem;
-            margin-bottom: 15px;
-            opacity: 0.8;
+            opacity: 0.85;
+            margin-bottom: 10px;
         }
 
-        .report-date {
-            color: #666;
-            font-style: italic;
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .year-selector {
-            background-color: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            border-radius: 5px;
-            padding: 8px 15px;
-            font-size: 1rem;
-            margin-top: 15px;
-            width: 150px;
-            text-align: center;
-        }
-
-        .year-selector option {
-            color: #333;
-        }
-
+        /* Section Title */
         .section-title {
-            color: #1a75bc;
-            border-bottom: 2px solid #1a75bc;
-            padding-bottom: 10px;
+            color: #000;
+            border-bottom: 2px solid #000;
+            padding-bottom: 8px;
             margin: 25px 0 15px 0;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
+        /* Quarter List */
         .quarter-item {
-            border-left: 4px solid #1a75bc;
+            border-left: 4px solid #000;
             padding: 15px;
             margin-bottom: 15px;
-            background-color: #f9f9f9;
+            background-color: #fafafa;
             border-radius: 0 8px 8px 0;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
         }
 
         .quarter-item:hover {
-            background-color: #e8f4ff;
+            background-color: #f0f0f0;
             transform: translateX(5px);
         }
 
         .quarter-title {
             font-weight: 600;
-            color: #1a75bc;
+            color: #000;
             margin-bottom: 5px;
         }
 
         .quarter-amount {
             font-size: 1.4rem;
             font-weight: 700;
-            color: #2E7D32;
+            color: #212121;
         }
 
-        .filter-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .filter-label {
-            color: white;
-            margin-right: 10px;
-            font-weight: 500;
-        }
-
-        .loading-indicator {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-            margin-left: 10px;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .error-message {
-            color: #ff4d4d;
-            background-color: #ffe6e6;
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            display: none;
-        }
-
-        .data-loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .quarter-loading {
-            min-height: 80px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .quarter-loading::after {
-            content: "Loading...";
-            color: #1a75bc;
-            font-style: italic;
-        }
-
-        /* UPDATED STYLES FOR BREAKDOWN MODAL */
+        /* Modal */
         .breakdown-modal .modal-content {
-            border-radius: 15px;
-            overflow: hidden;
+            border-radius: 12px;
+            border: 1px solid #d0d0d0;
         }
 
         .breakdown-modal .modal-header {
-            background: linear-gradient(135deg, #1a75bc 0%, #0d47a1 100%);
-            color: white;
+            background: #000;
+            color: #fff;
             border-bottom: none;
         }
 
@@ -203,31 +151,26 @@
         }
 
         .breakdown-modal .close {
-            color: white;
+            color: #fff;
             opacity: 0.8;
         }
 
-        .breakdown-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
+        /* Table */
         .breakdown-table th {
-            background-color: #f2f6fc;
+            background-color: #f4f4f4;
             font-weight: 600;
-            color: #2c3e50;
+            color: #000;
             padding: 12px;
-            text-align: left;
-            border-bottom: 2px solid #dee2e6;
+            border-bottom: 2px solid #e0e0e0;
         }
 
         .breakdown-table td {
             padding: 12px;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid #e0e0e0;
         }
 
         .breakdown-table tr:hover {
-            background-color: #f8f9fa;
+            background-color: #fafafa;
         }
 
         .breakdown-amount {
@@ -237,21 +180,40 @@
         }
 
         .breakdown-positive {
-            color: #2e7d32;
-        }
-
-        .breakdown-loading {
-            text-align: center;
-            padding: 30px;
-            color: #6c757d;
+            color: #000;
         }
 
         .breakdown-total {
             font-weight: 700;
-            background-color: #e8f4ff;
+            background-color: #f4f4f4;
         }
 
-        /* Remove chart styles as they're not needed */
+        /* Error / Loading States */
+        .error-message {
+            color: #b71c1c;
+            background-color: #fce4e4;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        .loading-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.2);
+            border-radius: 50%;
+            border-top-color: #000;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 
@@ -633,7 +595,7 @@
                 breakdownModal.show();
 
                 // Fetch data from the API endpoint
-                fetch(`http://localhost:5288/journal/getQuarterThreeRevenueDetails/${year}`)
+                fetch(`https://bsis-03.keikaizen.xyz/journal/getQuarterThreeRevenueDetails/${year}`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error('Network response was not ok');
@@ -719,7 +681,7 @@
             loadingIndicator.style.display = 'inline-block';
 
             // Fetch available years from the API endpoint
-            fetch('http://localhost:5288/journal/availableYears')
+            fetch('https://bsis-03.keikaizen.xyz/journal/availableyears')
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok');
@@ -791,7 +753,7 @@
                 setQuarterLoadingState();
 
                 // Fetch revenue data for the selected year
-                fetch(`http://localhost:5288/journal/getYearRevenue/${year}`)
+                fetch(`https://bsis-03.keikaizen.xyz/journal/getYearRevenue/${year}`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error('Network response was not ok');
@@ -823,7 +785,7 @@
 
                 // Fetch data for each quarter
                 quarters.forEach(quarter => {
-                    fetch(`http://localhost:5288/journal/getQuarterRevenues/${year}/${quarter}`)
+                    fetch(`https://bsis-03.keikaizen.xyz/journal/getQuarterRevenues/${year}/${quarter}`)
                         .then(response => {
                             if (!response.ok) {
                                 throw new Error(`Network response for Q${quarter} was not ok`);

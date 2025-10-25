@@ -117,7 +117,7 @@ include 'header.php'
 
             // Fetch available dates
             async function loadDates() {
-                const res = await fetch("http://localhost:5288/employee/dates");
+                const res = await fetch("https://bsis-03.keikaizen.xyz/employee/dates");
                 const dates = await res.json();
                 dates.forEach(date => {
                     const option = document.createElement("option");
@@ -129,7 +129,7 @@ include 'header.php'
 
             // Fetch attendance data for selected date
             async function loadAttendance(date) {
-                const res = await fetch(`http://localhost:5288/employee/attendanceReport/${date}`);
+                const res = await fetch(`https://bsis-03.keikaizen.xyz/employee/attendanceReport/${date}`);
                 const data = await res.json();
 
                 // Update chart

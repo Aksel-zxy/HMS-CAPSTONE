@@ -1,187 +1,113 @@
 <?php
-/*
-include '../../SQL/config.php';
-
-if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-    */
+include 'header.php'
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Dashboard</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <title>Pharmacy Sales Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
     <style>
-        body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
+        /* ==== MAIN CONTENT AREA ==== */
+        .report-container {
+            flex: 1;
+            padding: 30px;
+            background-color: #f8f9fc;
+            min-height: 100vh;
+            overflow-y: auto;
         }
 
-        .report-card {
-            transition: all 0.3s ease;
-            border-radius: 14px;
-            background: #fff;
-            border: 1px solid #e6e6e6;
-        }
-
-        .report-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 25px;
-        }
-
-        .link-section {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .link-section a {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #000;
-        }
-
-        .link-section a:hover {
-            background: #000;
-            color: #fff;
-            transform: translateY(-3px);
-        }
-
-        hr {
-            border-top: 1px solid #000;
-            opacity: 0.3;
-        }
-
-        /* Available Doctors Section */
-        .doctor-card {
-            border: 1px solid #000;
+        /* Header */
+        .report-header {
+            background: #ffffff;
+            padding: 20px 25px;
             border-radius: 10px;
-            background-color: #fff;
-            transition: all 0.25s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
         }
 
-        .doctor-card:hover {
-            transform: translateY(-5px);
-            background-color: #f1f1f1;
-        }
-
-        .doctor-avatar-placeholder {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #e9ecef;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #000;
+        .report-header h4 {
             font-weight: 600;
-            font-size: 1.1rem;
-            text-transform: uppercase;
+            color: #2c3e50;
         }
 
-        .btn-view {
-            border: 1px solid #000;
-            background: #000;
-            color: #fff;
-            border-radius: 20px;
-            padding: 5px 14px;
-            font-size: 0.85rem;
+        #reportDate {
+            font-size: 14px;
+            color: #6c757d;
         }
 
-        .btn-view:hover {
-            background: #fff;
-            color: #000;
+        /* Filter Bar */
+        .filter-bar {
+            background: #ffffff;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 25px;
         }
 
-        .btn-collapse {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
+        .filter-bar .form-label {
             font-weight: 500;
-            transition: all 0.3s;
-            border: 1px solid #000;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+            color: #495057;
         }
 
-        .btn-collapse:hover {
-            background: #000;
-            color: #fff;
+        .filter-bar .form-select {
+            min-width: 120px;
         }
 
-        .modal-header {
-            background: #000;
-            color: #fff;
+        .filter-bar button {
+            padding: 6px 15px;
+            border-radius: 6px;
         }
 
-        .table thead {
-            background: #000;
-            color: #fff;
+        /* Summary Cards */
+        .summary-card {
+            border: none;
+            border-radius: 15px;
+            background: linear-gradient(145deg, #ffffff, #f1f3f6);
+            box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.05), -3px -3px 8px rgba(255, 255, 255, 0.8);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .list-group-item {
-            border-color: #ddd;
+        .summary-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 5px 5px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-card h5 {
+            color: #6c757d;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .summary-card h2 {
+            color: #0d6efd;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .report-container {
+                padding: 15px;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
         }
     </style>
+
 </head>
 
 <body>
     <div class="d-flex">
-        <!-- SIDEBAR -->
-        <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
-
             <div class="sidebar-logo mt-3">
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
@@ -363,7 +289,7 @@ if (!$user) {
             </li>
 
             <li class="sidebar-item">
-                <a href="../report_and_analytics/report_dashboard.php" class="sidebar-link">
+                <a href="report_dashboard.php" class="sidebar-link">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="bi bi-building" viewBox="0 0 16 16" style="margin-bottom: 7px;">
                         <path
@@ -375,114 +301,207 @@ if (!$user) {
                     <span style="font-size: 18px;">Report and Analytics</span>
                 </a>
             </li>
-
-
         </aside>
+        <div class="report-container">
+            <div class="report-header d-flex justify-content-between align-items-center">
+                <h4> Pharmacy Sales Report</h4>
+                <span id="reportDate"></span>
+            </div>
 
-        <!-- MAIN CONTENT -->
-        <div class="main w-100">
-            <div class="container my-5">
-                <div class="text-center mb-4">
-                    <h4 class="fw-bold"> Reports Dashboard</h4>
+            <!-- Filter bar -->
+            <div class="filter-bar d-flex align-items-center justify-content-between flex-wrap">
+                <div class="d-flex align-items-center gap-3">
+                    <div>
+                        <label for="monthSelect" class="form-label mb-0">Month:</label>
+                        <select id="monthSelect" class="form-select form-select-sm">
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="yearSelect" class="form-label mb-0">Year:</label>
+                        <select id="yearSelect" class="form-select form-select-sm"></select>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-sm" id="loadBtn">
+                    <i class="bi bi-search"></i> Load Report
+                </button>
+            </div>
+
+            <div class="p-4">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card summary-card text-center p-3">
+                            <h5>Total Transactions</h5>
+                            <h2 id="totalTransactions">0</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card summary-card text-center p-3">
+                            <h5>Total Sales</h5>
+                            <h2 id="totalSales">₱0.00</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card summary-card text-center p-3">
+                            <h5>Top Selling Item</h5>
+                            <h2 id="topItem">—</h2>
+                        </div>
+                    </div>
                 </div>
 
-                <h5 class="text-center mb-4">Select a Report</h5>
-
-                <!-- Reports Grid -->
-                <div class="grid-container mb-5">
-                    <a href="daily_attendance_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-calendar-check" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Daily Attendance Report</h5>
-                        </div>
-                    </a>
-
-
-                    <a href="month_insurance_claim_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-file-earmark-medical" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Insurance Claim Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="paycycle_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-clock-history" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Paycycle Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="revenue_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-bar-chart-line" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Revenue Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="salary_paid_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-wallet2" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Monthly Payroll Summary</h5>
-                        </div>
-                    </a>
-
-                    <a href="shift_and_duty.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Shift & Duty Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="leave_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Month Leave Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="staff_information.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Staff Information Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="doctor_specialization_and_eval_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Active Doctor Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="performance_and_evaluation.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Employee Performance report</h5>
-                        </div>
-                    </a>
-
-                    <a href="pharmacy_sales_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-capsule" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Hospital Rx Sales Report </h5>
-                        </div>
-                    </a>
-
-
-                    <a href="department_budget_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-cash-coin" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Department Budget Report </h5>
-                        </div>
-                    </a>
+                <div class="table-responsive">
+                    <table class="table align-middle table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Item ID</th>
+                                <th>Quantity</th>
+                                <th>Payment Method</th>
+                                <th>Total Amount</th>
+                                <th>Billing Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="salesTable">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted">Select month and year to load report.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-
-                <hr class="my-5">
             </div>
         </div>
-    </div>
 
-    </script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            const yearSelect = document.getElementById("yearSelect");
+            const monthSelect = document.getElementById("monthSelect");
+            const loadBtn = document.getElementById("loadBtn");
+            const reportDate = document.getElementById("reportDate");
+            const tableBody = document.getElementById("salesTable");
+            const paginationContainer = document.createElement("div");
+            paginationContainer.classList.add("d-flex", "justify-content-center", "my-3");
+            tableBody.parentElement.after(paginationContainer);
+
+            let allData = [];
+            let currentPage = 1;
+            const itemsPerPage = 10;
+
+            // Populate year dropdown
+            const currentYear = new Date().getFullYear();
+            for (let y = currentYear - 5; y <= currentYear + 5; y++) {
+                const option = document.createElement("option");
+                option.value = y;
+                option.textContent = y;
+                if (y === currentYear) option.selected = true;
+                yearSelect.appendChild(option);
+            }
+
+            // Load report data
+            async function loadSalesReport(month, year) {
+                const url = `https://bsis-03.keikaizen.xyz/billing/getMonthPharmacySalesReport/${month}/${year}`;
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Loading...</td></tr>`;
+
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const report = await response.json();
+
+                    allData = report.items || [];
+                    currentPage = 1;
+                    renderTable();
+
+                    // Update summary
+                    document.getElementById("totalTransactions").innerText = report.totalTransactions ?? allData.length;
+                    document.getElementById("totalSales").innerText = "₱" + (report.totalSales ?? 0).toLocaleString(undefined, {
+                        minimumFractionDigits: 2
+                    });
+                    document.getElementById("topItem").innerText = report.topSellingItem || "—";
+                    reportDate.innerText = `${monthSelect.options[month - 1].text} ${year}`;
+                } catch (err) {
+                    console.error(err);
+                    tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">
+                Failed to load report data.
+            </td></tr>`;
+                }
+            }
+
+            // Render table based on pagination
+            function renderTable() {
+                tableBody.innerHTML = "";
+
+                if (!allData.length) {
+                    tableBody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">No data available.</td></tr>`;
+                    paginationContainer.innerHTML = "";
+                    return;
+                }
+
+                const start = (currentPage - 1) * itemsPerPage;
+                const end = start + itemsPerPage;
+                const pageData = allData.slice(start, end);
+
+                pageData.forEach(item => {
+                    tableBody.innerHTML += `
+                <tr>
+                    <td>${item.itemId}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.paymentMethod}</td>
+                    <td>₱${(item.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td>${new Date(item.billingDate).toLocaleDateString()}</td>
+                </tr>`;
+                });
+
+                renderPagination();
+            }
+
+            // Render pagination buttons
+            function renderPagination() {
+                const totalPages = Math.ceil(allData.length / itemsPerPage);
+                paginationContainer.innerHTML = "";
+
+                if (totalPages <= 1) return;
+
+                const pagination = document.createElement("ul");
+                pagination.classList.add("pagination");
+
+                for (let i = 1; i <= totalPages; i++) {
+                    const li = document.createElement("li");
+                    li.classList.add("page-item");
+                    if (i === currentPage) li.classList.add("active");
+
+                    const btn = document.createElement("button");
+                    btn.classList.add("page-link");
+                    btn.textContent = i;
+                    btn.addEventListener("click", () => {
+                        currentPage = i;
+                        renderTable();
+                    });
+
+                    li.appendChild(btn);
+                    pagination.appendChild(li);
+                }
+
+                paginationContainer.appendChild(pagination);
+            }
+
+            // Event listener
+            loadBtn.addEventListener("click", () => {
+                const month = parseInt(monthSelect.value);
+                const year = parseInt(yearSelect.value);
+                loadSalesReport(month, year);
+            });
+        </script>
+
+    </div>
 </body>
 
 </html>
