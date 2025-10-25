@@ -535,7 +535,7 @@ $nurses = $controller->getAllNurses();
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="doctor_profile.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 448 512">
                         <!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
@@ -546,7 +546,7 @@ $nurses = $controller->getAllNurses();
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
                         <!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
@@ -557,7 +557,7 @@ $nurses = $controller->getAllNurses();
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
                         <!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
@@ -568,7 +568,7 @@ $nurses = $controller->getAllNurses();
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
                         <!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
@@ -578,11 +578,6 @@ $nurses = $controller->getAllNurses();
                     <span style="font-size: 18px;">Notification Alerts</span>
                 </a>
             </li>
-
-
-
-
-
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
