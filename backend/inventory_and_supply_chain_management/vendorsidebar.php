@@ -5,171 +5,180 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Supplier Portal</title>
     <link rel="stylesheet" type="text/css" href="assets/css/vendorsidebar.css">
-    <link rel="stylesheet" type="text/css" href="/HMS-CAPSTONE/backend/inventory_and_supply_chain_management/assets/CSS/vendorsidebar.css"> 
+    <!-- Include only one stylesheet link -->
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Nunito", "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #F5F6F7;
+            color: #6e768e;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 250px;
+            height: 100vh;
+            background: #fff;
+            color: #6e768e;
+            position: fixed;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+            border-right: 1px solid #e0e0e0;
+            transition: all 0.3s ease-in-out;
+        }
+
+        /* Logo */
+        .sidebar .logo-container {
+            text-align: center;
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .sidebar .logo-container img {
+            max-width: 100px;
+            height: auto;
+        }
+
+        /* Section Titles */
+        .menu .title {
+            font-size: .6875rem;
+            font-weight: 600;
+            padding: 10px 20px;
+            text-transform: uppercase;
+            color: #6e768e;
+            letter-spacing: .05em;
+        }
+
+        /* Menu items */
+        .menu ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .menu ul li a,
+        .dropdown-btn {
+            display: block;
+            width: 100%;
+            padding: .625rem 1.625rem;
+            font-size: .95rem;
+            text-decoration: none;
+            background: none;
+            border: none;
+            text-align: left;
+            cursor: pointer;
+            font-family: "Nunito", sans-serif;
+            color: #6e768e;
+            transition: color 0.3s, background 0.3s;
+        }
+
+        /* Hover + active state */
+        .menu ul li a:hover,
+        .dropdown-btn:hover,
+        .dropdown-btn.active {
+            color: #00acc1;
+            background: #f0f0f0;
+        }
+
+        /* Dropdown caret */
+        .dropdown-btn {
+            position: relative;
+            padding-right: 30px;
+        }
+
+        .dropdown-btn::after {
+            content: "";
+            border: solid;
+            border-width: 0 .075rem .075rem 0;
+            display: inline-block;
+            padding: 2px;
+            position: absolute;
+            right: 1.5rem;
+            top: 1.2rem;
+            transform: rotate(45deg);
+            transition: transform 0.2s ease-out, color 0.2s;
+            color: #6e768e;
+        }
+
+        .dropdown-btn[aria-expanded="true"]::after {
+            transform: rotate(-135deg);
+            color: #00acc1;
+        }
+
+        /* Dropdown container */
+        .dropdown-container {
+            display: none;
+            flex-direction: column;
+            margin-left: .5rem;
+        }
+
+        .dropdown-container a {
+            padding: .5rem 2rem;
+            font-size: .9rem;
+            color: #6e768e;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .dropdown-container a:hover {
+            color: #00acc1;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 200px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+        }
+    </style>
 </head>
-<style>
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f4f4f4;
-}
 
-.sidebar {
-    width: 250px;
-    height: 100vh;
-    background: whitesmoke;
-    color: black;
-    position: fixed;
-    left: 0;
-    top: 0;
-    overflow-y: auto; 
-    transition: all 0.3s ease-in-out;
-}
-
-.sidebar .logo-container {
-    text-align: center;
-    padding: 20px;
-}
-
-.sidebar .logo-container img {
-    width: 80px;
-    height: auto;
-    border-radius: 50%;
-}
-
-.sidebar .logo-container h2 {
-    margin-top: 10px;
-    font-size: 18px;
-    font-weight: bold;
-}
-
-.sidebar .nav {
-    padding: 10px;
-}
-
-.menu {
-    margin-bottom: 20px;
-}
-
-.menu .title {
-    font-size: 16px;
-    font-weight: bold;
-    padding: 10px;
-    background: #34495e;
-    border-radius: 5px;
-}
-
-.menu ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.menu p {
-   color: white;
-    font-size: 14px;
-    padding: 10px;
-}
-
-.menu ul li {
-    padding: 10px;
-    border-bottom: 1px solid rgba(187, 159, 159, 0.1);
-}
-
-.menu ul li a {
-    text-decoration: none;
-    color: black;
-    display: block;
-    transition: 0.3s;
-}
-
-.menu ul li a:hover {
-    background: #0084ff;
-    border-radius: 5px;
-}
-
-.sidebar.active {
-    width: 60px;
-}
-
-.sidebar.active .menu .title, 
-.sidebar.active .menu ul li a .text {
-    display: none;
-}
-
-.sidebar.active .menu ul li a {
-    text-align: center;
-    padding: 10px;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .sidebar {
-        width: 200px;
-    }
-    .sidebar.active {
-        width: 50px;
-    }
-}
-
-@media (max-width: 480px) {
-    .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
-    }
-    .sidebar .menu-btn {
-        text-align: left;
-        padding: 15px;
-    }
-    .sidebar .nav {
-        display: none;
-    }
-    .sidebar.active .nav {
-        display: block;
-    }
-}
-
-
-</style>
 <body>
+    <div class="sidebar">
+        <div class="logo-container">
+            <img src="assets/image/logo-dark.png" alt="Logo"> 
+            <h2>Supplier Portal</h2>
+        </div>
 
-<div class="sidebar">
-    <div class="logo-container">
-        <img src="assets/image/logo-dark.png" alt="Logo"> 
-        <h2>Supplier Portal</h2>
+        <nav class="nav">
+            <div class="menu">
+                <p class="title">Main Menu</p>
+                <ul>
+                    <li><a href="vendor_orders.php">Orders</a></li>
+                    <li><a href="vendor_products.php">Product List</a></li>
+                    <li><a href="vendor_return_request.php">Return Request</a></li>
+                    <li><a href="vendor_documents.php">View Compliance Document</a></li>
+                    <li><a href="vendorcontract.php">Contract & Agreement</a></li>
+                    <li><a href="v_rating.php">Rating</a></li>
+                </ul>
+            </div>
+
+            <div class="menu">
+                <p class="title">Account</p>
+                <ul>
+                    <li><a href="vendorprofile.php">View Profile</a></li>
+                    <li>
+                        <a href="vlogout.php" onclick="return confirm('Are you sure you want to log out?');" aria-label="Logout">
+                            <i class="icon ph-bold ph-sign-out"></i> Log Out
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
     </div>
-
-    <nav class="nav">
-        <div class="menu">
-            <p class="title">Main Menu</p>
-            <ul>
-                
-                <li><a href="vendor_orders.php"><span class="text">Orders</span></a></li>
-                <li><a href="vendor_products.php"><span class="text">Product List</span></a></li>
-                <li><a href="vendor_return_request.php"><span class="text">Return Request</span></a></li>
-                <li><a href="vendor_documents.php"><span class="text">View Compliance Document</span></a></li>
-                <li><a href="vendorcontract.php"><span class="text">Contract & Agreement</span></a></li>
-
-                <li><a href="v_rating.php"><span class="text">Rating</span></a></li>
-            </ul>
-        </div>
-
-        <div class="menu">
-            <p class="title">Account</p>
-            <ul>
-                <li><a href="vendorprofile.php"><span class="text">View Profile</span></a></li>
-                <li>
-                    <a href="vlogout.php" onclick="return confirm('Are you sure you want to log out?');" aria-label="Logout">
-                        <i class="icon ph-bold ph-sign-out"></i>
-                        <span class="text">Log Out</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
-    </nav>
-</div>
-
 </body>
 </html>

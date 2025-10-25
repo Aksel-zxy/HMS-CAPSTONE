@@ -57,8 +57,9 @@ if ($patient_id > 0) {
     $billing_id = $res['latest_billing_id'] ?? null;
 }
 
-// ======================= INSURANCE =======================
-if ($patient_id > 0 && $billing_id) {
+// ======================= INSURANCE (FIXED SECTION) =======================
+// --- FIX: Deduct approved insurance even if total_bill = 0 ---
+if ($patient_id > 0) {
     $stmt = $conn->prepare("
         SELECT insurance_company, SUM(covered_amount) AS total_covered
         FROM insurance_requests
@@ -134,6 +135,8 @@ if ($patient_id > 0) {
 
 // ======================= TOTALS =======================
 $grand_total = $total_charges - $total_discount;
+
+// --- FIX: Ensure insurance coverage applies to total, not ignored ---
 $total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
 // ======================= PAYMENT PROCESSING =======================
@@ -178,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         if ($stmt->execute()) {
-            // --- NEW: create a corresponding journal entry so the payment appears in Journal ---
+            // --- Journal Entry Creation ---
             $receipt_id = $stmt->insert_id;
             $created_by = $_SESSION['username'] ?? 'System';
             $je_module = "billing";
@@ -192,8 +195,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($stmtJe) {
                 $stmtJe->bind_param("ssss", $je_module, $je_desc, $je_reference, $created_by);
                 $stmtJe->execute();
-
-                // insert corresponding journal entry lines
                 $je_id = $stmtJe->insert_id;
 
                 $payment_account = 'Cash';
