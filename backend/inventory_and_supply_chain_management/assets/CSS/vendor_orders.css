@@ -22,13 +22,16 @@ body {
    Layout Wrapper
    ============================== */
 
-/* Prevent the sidebar (from vendorsidebar.php) from overlapping the main content */
+/* Keep content clear of the fixed sidebar */
 .main-content {
-    margin-left: 250px; /* same width as sidebar */
+    margin-left: 250px; /* Match sidebar width */
     padding: 30px;
     transition: all 0.3s ease-in-out;
     min-height: 100vh;
     overflow-x: auto;
+    position: relative;
+    background: #F5F6F7;
+    z-index: 1; /* Ensures it stays under the sidebar visually */
 }
 
 /* ==============================
@@ -74,6 +77,7 @@ body {
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    width: 100%;
 }
 
 .table th {
@@ -227,35 +231,23 @@ body {
 /* Medium screens (tablets, small laptops) */
 @media (max-width: 992px) {
     .main-content {
-        margin-left: 220px;
-        padding: 20px;
+        margin-left: 220px; /* match sidebar width */
+        padding: 25px;
     }
 }
 
 /* Small screens (phones & small tablets) */
 @media (max-width: 768px) {
-    .sidebar {
-        width: 200px;
-    }
-
     .main-content {
-        margin-left: 200px;
+        margin-left: 200px; /* match sidebar width */
         padding: 20px;
     }
 }
 
 /* Extra small screens (mobile phones) */
 @media (max-width: 576px) {
-    .sidebar {
-        position: relative;
-        width: 100%;
-        height: auto;
-        border-right: none;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
     .main-content {
-        margin-left: 0;
+        margin-left: 0; /* sidebar becomes full-width on mobile */
         padding: 15px;
     }
 
