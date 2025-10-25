@@ -264,7 +264,6 @@ $result = $attendanceRecords->getDailyRecords($date);
                     <thead>
                         <tr>
                             <th>Employee ID</th>
-                            <th>Full Name</th>
                             <th>Date</th>
                             <th>Time In</th>
                             <th>Time Out</th>
