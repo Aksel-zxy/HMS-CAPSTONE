@@ -24,14 +24,15 @@ body {
 
 /* Keep content clear of the fixed sidebar */
 .main-content {
-    margin-left: 250px; /* Match sidebar width */
+    margin-left: 250px; /* Match global sidebar width */
     padding: 30px;
     transition: all 0.3s ease-in-out;
     min-height: 100vh;
     overflow-x: auto;
     position: relative;
-    background: #F5F6F7;
-    z-index: 1; /* Ensures it stays under the sidebar visually */
+    background: #fff;
+    z-index: 1;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.03);
 }
 
 /* ==============================
@@ -78,24 +79,26 @@ body {
     overflow: hidden;
     box-shadow: 0 3px 10px rgba(0,0,0,0.08);
     width: 100%;
+    margin-top: 15px;
+}
+
+.table th,
+.table td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 14px 16px;
+    font-size: 0.95rem;
+    white-space: nowrap;
 }
 
 .table th {
     background: #00acc1;
     color: #fff;
     font-weight: 600;
-    text-align: center;
-    vertical-align: middle;
-    padding: 14px 16px;
-    font-size: 0.95rem;
 }
 
 .table td {
-    text-align: center;
-    vertical-align: middle;
     color: #555;
-    padding: 14px 16px;
-    font-size: 0.95rem;
 }
 
 .table tbody tr:hover {
@@ -103,10 +106,12 @@ body {
     transition: background 0.3s ease;
 }
 
+/* Order actions buttons */
 .table .btn {
-    padding: 5px 10px;
+    padding: 6px 12px;
     font-size: 0.875rem;
     border-radius: 8px;
+    font-weight: 600;
 }
 
 /* ==============================
@@ -213,7 +218,7 @@ body {
 }
 
 /* ==============================
-   Scrollbar Tweaks (Mobile)
+   Scrollbar Tweaks
    ============================== */
 .table::-webkit-scrollbar {
     height: 6px;
@@ -231,7 +236,7 @@ body {
 /* Medium screens (tablets, small laptops) */
 @media (max-width: 992px) {
     .main-content {
-        margin-left: 220px; /* match sidebar width */
+        margin-left: 220px;
         padding: 25px;
     }
 }
@@ -239,7 +244,7 @@ body {
 /* Small screens (phones & small tablets) */
 @media (max-width: 768px) {
     .main-content {
-        margin-left: 200px; /* match sidebar width */
+        margin-left: 200px;
         padding: 20px;
     }
 }
@@ -247,11 +252,11 @@ body {
 /* Extra small screens (mobile phones) */
 @media (max-width: 576px) {
     .main-content {
-        margin-left: 0; /* sidebar becomes full-width on mobile */
+        margin-left: 0;
         padding: 15px;
     }
 
-    h2 {
+    .main-content h2 {
         font-size: 1.2rem;
         text-align: center;
     }
@@ -282,5 +287,10 @@ body {
 
     .badge {
         font-size: 0.75rem;
+    }
+
+    .status-legend {
+        justify-content: center;
+        text-align: center;
     }
 }

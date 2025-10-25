@@ -5,14 +5,34 @@
 
 /* === Main Content Wrapper === */
 .vendor-main {
-    margin-left: 260px; /* Match sidebar width */
+    margin-left: 260px; /* Match fixed sidebar width */
     padding: 30px 40px;
     min-height: 100vh;
     background-color: #f8f9fa;
     transition: margin-left 0.3s ease-in-out, background-color 0.3s ease;
+    position: relative;
+    z-index: 1; /* ensures sidebar stays above it */
+}
+
+/* Ensure main content never slides under sidebar */
+.vendor-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    background-color: #ffffff;
+    border-right: 1px solid #dee2e6;
+    z-index: 100; /* above .vendor-main */
+    overflow-y: auto;
 }
 
 /* Adjust when sidebar is collapsed */
+#sidebar.collapsed {
+    width: 0;
+    overflow: hidden;
+}
+
 #sidebar.collapsed + .vendor-main {
     margin-left: 0;
 }
@@ -139,9 +159,12 @@
 
 /* Tablets (≤992px) */
 @media (max-width: 992px) {
+    .vendor-sidebar {
+        width: 220px;
+    }
     .vendor-main {
-        margin-left: 200px;
-        padding: 20px 25px;
+        margin-left: 220px;
+        padding: 25px;
     }
 
     .card-body {
@@ -156,6 +179,10 @@
 
 /* Phones (≤768px) */
 @media (max-width: 768px) {
+    .vendor-sidebar {
+        width: 200px;
+    }
+
     .vendor-main {
         margin-left: 0;
         padding: 15px;
@@ -181,7 +208,16 @@
 
 /* Small Phones (≤480px) */
 @media (max-width: 480px) {
+    .vendor-sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+
     .vendor-main {
+        margin-left: 0;
         padding: 10px;
     }
 
