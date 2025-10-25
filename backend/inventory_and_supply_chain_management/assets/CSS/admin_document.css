@@ -1,0 +1,26 @@
+:root {
+    --sidebar-width: 250px;
+}
+
+/* Main Content Wrapper */
+.admin-main {
+    margin-left: var(--sidebar-width);
+    padding: 30px;
+    min-height: 100vh;
+    background: #F5F6F7;
+    transition: margin-left 0.3s ease;
+    overflow-x: auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    :root { --sidebar-width: 200px; }
+}
+
+@media (max-width: 480px) {
+    :root { --sidebar-width: 0; }
+    .admin-main {
+        margin-top: 10px;
+        padding: 15px;
+    }
+}
