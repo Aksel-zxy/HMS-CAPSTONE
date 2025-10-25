@@ -1,6 +1,7 @@
 <?php
 include '../../../../SQL/config.php';
 
+// Allow only logged-in doctors
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
     header('Location: login.php');
     exit();
@@ -11,32 +12,27 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// Fetch user details from database
-$query = "SELECT * FROM hr_employees WHERE employee_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['employee_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
-// Only fetch schedule for the logged-in doctor
-$modal_schedules = [];
 $employee_id = $_SESSION['employee_id'];
-$stmt = $conn->prepare("SELECT * FROM shift_scheduling WHERE employee_id = ? ORDER BY week_start DESC");
-$stmt->bind_param("i", $employee_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) {
-    $modal_schedules[] = $row;
-}
 
-// Define days of the week
-$days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+// Fetch doctor info
+$employeeQuery = $conn->prepare("
+    SELECT employee_id, first_name, middle_name, last_name, role, department, specialization, profession, status
+    FROM hr_employees
+    WHERE employee_id = ?
+");
+$employeeQuery->bind_param("i", $employee_id);
+$employeeQuery->execute();
+$employee = $employeeQuery->get_result()->fetch_assoc();
+
+// Fetch clinical profile
+$profileQuery = $conn->prepare("
+    SELECT clinical_status, preferred_shift, max_hours_per_week, onboarding_date, last_updated
+    FROM clinical_profiles
+    WHERE employee_id = ?
+");
+$profileQuery->bind_param("i", $employee_id);
+$profileQuery->execute();
+$profile = $profileQuery->get_result()->fetch_assoc();
 ?>
 
 <!DOCTYPE html>
@@ -142,55 +138,41 @@ $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Su
                 </div>
             </div>
             <!-- START CODING HERE -->
-           
+            <div class="container-fluid">
+    <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px;
+               border-bottom:2px solid #0d6efd; padding-bottom:8px;">
+        🧑‍⚕️ My Clinical Profile
+    </h2>
 
-             <div class="container-fluid">
-                <h2 class="schedule-title">🧑‍⚕️My Schedule</h2>
-                <?php if (!empty($modal_schedules)): ?>
-                    <?php foreach ($modal_schedules as $modal_schedule): ?>
-                        <div class="mb-4 border rounded p-3 schedule-list-view">
-                            <h6 class="schedule-date">Week: <?= htmlspecialchars($modal_schedule['week_start']) ?></h6>
-                            <table class="table table-bordered bg-white schedule-calendar-table">
-                                <thead>
-                                    <tr class="schedule-table-header">
-                                        <th>Day</th>
-                                        <th>Start Time</th>
-                                        <th>End Time</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($days as $day): ?>
-                                        <?php $prefix = strtolower(substr($day, 0, 3)); ?>
-                                        <tr>
-                                            <td><?= $day ?></td>
-                                            <td>
-                                                <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
-                                                    ---
-                                                <?php else: ?>
-                                                    <?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
-                                                    ---
-                                                <?php else: ?>
-                                                    <?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <?= htmlspecialchars($modal_schedule[$prefix . '_status'] ?? '') ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <div class="alert alert-info mt-4">No schedule found for you.</div>
-                <?php endif; ?>
-            </div>
+    <?php if ($employee): ?>
+        <table class="table table-bordered table-striped">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Role</th>
+                    <th>Department</th>
+                    <th>Specialization</th>
+                    <th>Clinical Status</th>
+                    <th>Preferred Shift</th>
+                    <th>Max Hours/Week</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><?= htmlspecialchars($employee['first_name']." ".$employee['last_name']) ?></td>
+                    <td><?= htmlspecialchars($employee['role']) ?></td>
+                    <td><?= htmlspecialchars($employee['department']) ?></td>
+                    <td><?= htmlspecialchars($employee['specialization']) ?></td>
+                    <td><?= htmlspecialchars($profile['clinical_status'] ?? 'Not Registered') ?></td>
+                    <td><?= htmlspecialchars($profile['preferred_shift'] ?? '-') ?></td>
+                    <td><?= htmlspecialchars($profile['max_hours_per_week'] ?? '-') ?></td>
+                </tr>
+            </tbody>
+        </table>
+    <?php else: ?>
+        <div class="alert alert-warning">No employee data found.</div>
+    <?php endif; ?>
+</div>
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
