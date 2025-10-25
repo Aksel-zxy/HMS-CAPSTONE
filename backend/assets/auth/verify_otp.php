@@ -148,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </div>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../Bootstrap/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

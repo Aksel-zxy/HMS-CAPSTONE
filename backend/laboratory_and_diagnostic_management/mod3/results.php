@@ -336,11 +336,11 @@ $allPatients = $patient->getAllPatients();
                     });
                 });
             </script>
-            <script src="../assets/javascript/test_process.js"></script>
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
             <script src="../assets/Bootstrap/fontawesome.min.js"></script>
             <script src="../assets/Bootstrap/jq.js"></script>
+            <script src="../assets/javascript/test_process.js"></script>
 </body>
 
 </html>
