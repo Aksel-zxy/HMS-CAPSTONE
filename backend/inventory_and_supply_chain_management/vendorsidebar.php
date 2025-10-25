@@ -7,143 +7,169 @@
     <link rel="stylesheet" type="text/css" href="assets/css/vendorsidebar.css">
     <!-- Include only one stylesheet link -->
     <style>
-        * {
-            box-sizing: border-box;
-        }
+       /* ============================
+   Sidebar Styling (Fixed)
+   ============================ */
 
-        body {
-            font-family: "Nunito", "Segoe UI", Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #F5F6F7;
-            color: #6e768e;
-        }
+* {
+    box-sizing: border-box;
+}
 
-        /* Sidebar */
-        .sidebar {
-            width: 250px;
-            height: 100vh;
-            background: #fff;
-            color: #6e768e;
-            position: fixed;
-            left: 0;
-            top: 0;
-            overflow-y: auto;
-            border-right: 1px solid #e0e0e0;
-            transition: all 0.3s ease-in-out;
-        }
+body {
+    font-family: "Nunito", "Segoe UI", Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #F5F6F7;
+    color: #6e768e;
+}
 
-        /* Logo */
-        .sidebar .logo-container {
-            text-align: center;
-            padding: 20px;
-            border-bottom: 1px solid #e0e0e0;
-        }
+/* Sidebar container */
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    background: #fff;
+    color: #6e768e;
+    position: fixed;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+    border-right: 1px solid #e0e0e0;
+    transition: all 0.3s ease-in-out;
+    z-index: 1000; /* ensures sidebar stays above main content */
+}
 
-        .sidebar .logo-container img {
-            max-width: 100px;
-            height: auto;
-        }
+/* Logo section */
+.sidebar .logo-container {
+    text-align: center;
+    padding: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
 
-        /* Section Titles */
-        .menu .title {
-            font-size: .6875rem;
-            font-weight: 600;
-            padding: 10px 20px;
-            text-transform: uppercase;
-            color: #6e768e;
-            letter-spacing: .05em;
-        }
+.sidebar .logo-container img {
+    max-width: 100px;
+    height: auto;
+}
 
-        /* Menu items */
-        .menu ul {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-        }
+.sidebar .logo-container h2 {
+    font-size: 1rem;
+    margin-top: 10px;
+    color: #333;
+}
 
-        .menu ul li a,
-        .dropdown-btn {
-            display: block;
-            width: 100%;
-            padding: .625rem 1.625rem;
-            font-size: .95rem;
-            text-decoration: none;
-            background: none;
-            border: none;
-            text-align: left;
-            cursor: pointer;
-            font-family: "Nunito", sans-serif;
-            color: #6e768e;
-            transition: color 0.3s, background 0.3s;
-        }
+/* Menu titles */
+.menu .title {
+    font-size: .6875rem;
+    font-weight: 600;
+    padding: 10px 20px;
+    text-transform: uppercase;
+    color: #6e768e;
+    letter-spacing: .05em;
+}
 
-        /* Hover + active state */
-        .menu ul li a:hover,
-        .dropdown-btn:hover,
-        .dropdown-btn.active {
-            color: #00acc1;
-            background: #f0f0f0;
-        }
+/* Menu items */
+.menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
 
-        /* Dropdown caret */
-        .dropdown-btn {
-            position: relative;
-            padding-right: 30px;
-        }
+.menu ul li a,
+.dropdown-btn {
+    display: block;
+    width: 100%;
+    padding: .625rem 1.625rem;
+    font-size: .95rem;
+    text-decoration: none;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-family: "Nunito", sans-serif;
+    color: #6e768e;
+    transition: color 0.3s, background 0.3s;
+}
 
-        .dropdown-btn::after {
-            content: "";
-            border: solid;
-            border-width: 0 .075rem .075rem 0;
-            display: inline-block;
-            padding: 2px;
-            position: absolute;
-            right: 1.5rem;
-            top: 1.2rem;
-            transform: rotate(45deg);
-            transition: transform 0.2s ease-out, color 0.2s;
-            color: #6e768e;
-        }
+/* Hover and active */
+.menu ul li a:hover,
+.dropdown-btn:hover,
+.dropdown-btn.active {
+    color: #00acc1;
+    background: #f0f0f0;
+}
 
-        .dropdown-btn[aria-expanded="true"]::after {
-            transform: rotate(-135deg);
-            color: #00acc1;
-        }
+/* Dropdown caret */
+.dropdown-btn {
+    position: relative;
+    padding-right: 30px;
+}
 
-        /* Dropdown container */
-        .dropdown-container {
-            display: none;
-            flex-direction: column;
-            margin-left: .5rem;
-        }
+.dropdown-btn::after {
+    content: "";
+    border: solid;
+    border-width: 0 .075rem .075rem 0;
+    display: inline-block;
+    padding: 2px;
+    position: absolute;
+    right: 1.5rem;
+    top: 1.2rem;
+    transform: rotate(45deg);
+    transition: transform 0.2s ease-out, color 0.2s;
+    color: #6e768e;
+}
 
-        .dropdown-container a {
-            padding: .5rem 2rem;
-            font-size: .9rem;
-            color: #6e768e;
-            text-decoration: none;
-            transition: color 0.3s;
-        }
+.dropdown-btn[aria-expanded="true"]::after {
+    transform: rotate(-135deg);
+    color: #00acc1;
+}
 
-        .dropdown-container a:hover {
-            color: #00acc1;
-        }
+/* Dropdown container */
+.dropdown-container {
+    display: none;
+    flex-direction: column;
+    margin-left: .5rem;
+}
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 200px;
-            }
-        }
+.dropdown-container a {
+    padding: .5rem 2rem;
+    font-size: .9rem;
+    color: #6e768e;
+    text-decoration: none;
+    transition: color 0.3s;
+}
 
-        @media (max-width: 480px) {
-            .sidebar {
-                width: 100%;
-                height: auto;
-                position: relative;
-            }
-        }
+.dropdown-container a:hover {
+    color: #00acc1;
+}
+
+/* ============================
+   Responsive Layout Fix
+   ============================ */
+
+/* Tablet screens */
+@media (max-width: 992px) {
+    .sidebar {
+        width: 220px;
+    }
+}
+
+/* Small tablets and large phones */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 200px;
+    }
+}
+
+/* Mobile view */
+@media (max-width: 576px) {
+    .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
+    }
+}
+
     </style>
 </head>
 
