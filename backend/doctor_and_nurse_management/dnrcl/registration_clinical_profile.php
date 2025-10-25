@@ -324,8 +324,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endwhile; ?>
                 </tbody>
             </table>
-  
-</div>
+            </div>
            
             <!-- END CODING HERE -->
         </div>
