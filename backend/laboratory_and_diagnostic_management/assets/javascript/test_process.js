@@ -152,13 +152,20 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  // When any modal fully closes, restore focus to the opener
+  // Apply fix to all modals
   document.querySelectorAll(".modal").forEach((modal) => {
+    // 1️ Before the modal hides, blur any focused element inside it
+    modal.addEventListener("hide.bs.modal", function () {
+      if (document.activeElement && modal.contains(document.activeElement)) {
+        document.activeElement.blur();
+      }
+    });
+
+    // 2️ After fully hidden, restore focus to opener or body
     modal.addEventListener("hidden.bs.modal", function () {
       if (lastTriggerButton && document.body.contains(lastTriggerButton)) {
         lastTriggerButton.focus();
       } else {
-        // If no opener exists, safely clear focus
         document.body.focus();
       }
     });
