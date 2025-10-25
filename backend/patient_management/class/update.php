@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Commit if everything is successful
         $conn->commit();
-        header("Location: ../Patient Management/inpatient.php?success=1");
+        header("Location: ../patient_management/inpatient.php?success=1");
         exit();
 
     } catch (Exception $e) {
