@@ -222,21 +222,20 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <form method="post" class="row g-3">
                         <input type="hidden" name="action" value="schedule">
                         <div class="col-md-4">
-    <label class="form-label">Select Equipment</label>
-    <select name="inventory_id" class="form-select" required>
-        <?php
-        // Get IDs of equipment already scheduled
-        $scheduled_ids = array_column($schedules, 'inventory_id');
-        foreach ($equipment as $eq):
-            $disabled = in_array($eq['id'], $scheduled_ids) ? "disabled" : "";
-        ?>
-            <option value="<?= $eq['id'] ?>" <?= $disabled ?>>
-                <?= htmlspecialchars($eq['item_name']) ?>
-                <?= $disabled ? "(Already Scheduled)" : "" ?>
-            </option>
-        <?php endforeach; ?>
-    </select>
-</div>
+                            <label class="form-label">Select Equipment</label>
+                            <select name="inventory_id" class="form-select" required>
+                                <?php
+                                $scheduled_ids = array_column($schedules, 'inventory_id');
+                                foreach ($equipment as $eq):
+                                    $disabled = in_array($eq['id'], $scheduled_ids) ? "disabled" : "";
+                                ?>
+                                    <option value="<?= $eq['id'] ?>" <?= $disabled ?>>
+                                        <?= htmlspecialchars($eq['item_name']) ?>
+                                        <?= $disabled ? "(Already Scheduled)" : "" ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
 
                         <div class="col-md-3">
                             <label class="form-label">Maintenance Day (1-31)</label>
@@ -278,6 +277,60 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal<?= $s['id'] ?>">Delete</button>
                                     </td>
                                 </tr>
+
+                                <!-- Edit Modal -->
+                                <div class="modal fade" id="editModal<?= $s['id'] ?>" tabindex="-1">
+                                  <div class="modal-dialog">
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="edit_schedule">
+                                        <input type="hidden" name="schedule_id" value="<?= $s['id'] ?>">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Edit Schedule - <?= htmlspecialchars($s['item_name']) ?></h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Maintenance Day</label>
+                                                    <input type="number" name="maintenance_day" class="form-control" min="1" max="31" value="<?= $s['maintenance_day'] ?>" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Remarks</label>
+                                                    <textarea name="remarks" class="form-control"><?= htmlspecialchars($s['remarks']) ?></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                  </div>
+                                </div>
+
+                                <!-- Delete Modal -->
+                                <div class="modal fade" id="deleteModal<?= $s['id'] ?>" tabindex="-1">
+                                  <div class="modal-dialog">
+                                    <form method="post">
+                                        <input type="hidden" name="action" value="delete_schedule">
+                                        <input type="hidden" name="schedule_id" value="<?= $s['id'] ?>">
+                                        <div class="modal-content">
+                                            <div class="modal-header bg-danger text-white">
+                                                <h5 class="modal-title">Delete Schedule</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                Are you sure you want to delete the schedule for <strong><?= htmlspecialchars($s['item_name']) ?></strong>?
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-danger">Delete</button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                  </div>
+                                </div>
+
                             <?php endforeach; endif; ?>
                         </tbody>
                     </table>
