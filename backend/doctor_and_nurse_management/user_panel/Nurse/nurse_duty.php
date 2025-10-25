@@ -29,9 +29,19 @@ if (!$user) {
 
 // Fetch duty assignments assigned to this nurse
 $dutyQuery = "
-    SELECT duty_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes
-    FROM duty_assignments
-    WHERE nurse_assistant = ?
+    SELECT 
+        d.duty_id,
+        d.doctor_id,
+        CONCAT(e.first_name, ' ', e.middle_name, ' ', e.last_name, ' ', e.suffix_name) AS doctor_name,
+        d.bed_id,
+        d.nurse_assistant,
+        d.`procedure`,
+        d.equipment,
+        d.tools,
+        d.notes
+    FROM duty_assignment AS d
+    LEFT JOIN hr_employees AS e ON d.doctor_id = e.employee_id
+    WHERE d.nurse_assistant = ?
 ";
 $dutyStmt = $conn->prepare($dutyQuery);
 $dutyStmt->bind_param("i", $nurse_id);
@@ -163,9 +173,9 @@ $dutyStmt->close();
         <thead class="table-info">
             <tr>
                 <th>Duty ID</th>
-                <th>Doctor ID</th>
+                <th>Doctor Name</th>
                 <th>Bed ID</th>
-                <th>Nurse Assistant</th>
+                <!-- <th>Nurse Assistant</th> -->
                 <th>Procedure</th>
                 <th>Notes</th>
             </tr>
@@ -175,15 +185,17 @@ $dutyStmt->close();
                 <?php foreach ($duties as $duty): ?>
                     <tr>
                         <td><?= htmlspecialchars($duty['duty_id']) ?></td>
-                        <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
+                        <td><?= htmlspecialchars($duty['doctor_name']) ?></td>
                         <td><?= htmlspecialchars($duty['bed_id']) ?></td>
-                        <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
+                        <!-- <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td> -->
                         <td><?= htmlspecialchars($duty['procedure']) ?></td>
                         <td><?= htmlspecialchars($duty['notes']) ?></td>
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>
-                <tr><td colspan="8" class="text-center text-muted">No duty assignments found.</td></tr>
+                <tr>
+                    <td colspan="6" class="text-center text-muted">No duty assignments found.</td>
+                </tr>
             <?php endif; ?>
         </tbody>
     </table>
