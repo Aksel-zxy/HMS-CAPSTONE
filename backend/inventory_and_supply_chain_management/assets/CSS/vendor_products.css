@@ -1,30 +1,34 @@
-/* vendor_products.css */
-
-/* Wrapper for layout */
+/* ==============================
+   Layout Wrapper
+   ============================== */
 .vendor-wrapper {
     display: flex;
+    flex-wrap: nowrap;
     min-height: 100vh;
+    background: #fdfdfd;
 }
 
-/* Sidebar */
+/* ==============================
+   Sidebar
+   ============================== */
 .vendor-sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 250px;
-    height: 100vh;
+    flex: 0 0 250px;
     background: #f8f9fa;
     border-right: 1px solid #dee2e6;
     overflow-y: auto;
-    z-index: 1000;
+    height: 100vh;
+    position: sticky; /* instead of fixed */
+    top: 0;
+    z-index: 100; /* lower than modals */
 }
 
-/* Main content */
+/* ==============================
+   Main Content
+   ============================== */
 .vendor-main {
-    margin-left: 250px;   /* Shift content to right */
     flex: 1;
     padding: 20px;
-    background-color: #fdfdfd;
+    background: #fff;
     overflow-x: auto;
 }
 
@@ -37,14 +41,10 @@
 
 /* Product Images */
 .vendor-main table img {
-    max-width: 60px;
-    height: auto;
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
     border-radius: 6px;
-}
-
-/* Page Headings */
-.vendor-main h3 {
-    font-weight: 600;
 }
 
 /* Buttons */
@@ -52,46 +52,40 @@
     margin-right: 5px;
 }
 
-/* Product Images - Uniform Size */
-.vendor-main table img {
-    width: 80px;         
-    height: 80px;        
-    object-fit: cover;    
-    border-radius: 6px;   
-}
-        .product-thumb {
-            width: 60px;
-            height: 60px;
-            object-fit: cover;
-            border-radius: 6px;
-        }
-        .table td { vertical-align: middle; }
-        /* small responsive tweak for the search row */
-        @media (max-width: 576px) {
-            .vendor-main .row.g-2 > .col-md-6,
-            .vendor-main .row.g-2 > .col-md-4,
-            .vendor-main .row.g-2 > .col-md-2 { width: 100%; }
-        }
+/* ==============================
+   Responsive Adjustments
+   ============================== */
 
-
-/* Mobile Responsiveness */
+/* Tablet */
 @media (max-width: 768px) {
     .vendor-sidebar {
-        width: 200px;
-    }
-    .vendor-main {
-        margin-left: 200px;
+        flex: 0 0 200px;
     }
 }
 
+/* Mobile */
 @media (max-width: 576px) {
+    .vendor-wrapper {
+        flex-direction: column;
+    }
+
     .vendor-sidebar {
-        position: relative;
+        flex: 0 0 auto;
         width: 100%;
         height: auto;
+        position: relative;
         border-right: none;
+        border-bottom: 1px solid #dee2e6;
     }
+
     .vendor-main {
+        flex: 1 0 auto;
         margin-left: 0;
+        padding: 15px;
+    }
+
+    /* make search inputs stack */
+    .vendor-main .row.g-2 > [class^="col-"] {
+        width: 100%;
     }
 }
