@@ -248,19 +248,24 @@ $allPatients = $patient->getAllPatients();
                                             <td style="padding:12px;text-align:center;"><?= htmlspecialchars($test['serviceName']) ?></td>
                                             <td style="padding:12px;text-align:center;">
                                                 <?php
-                                                if (strtolower($status) === 'completed') {
+                                                if ($status === 'completed' && !empty($test['received_by'])) {
                                                     echo "Delivered";
-                                                } else {
+                                                } elseif ($status === 'processing') {
                                                     echo "Not yet received";
+                                                } else {
+                                                    echo ucfirst($status);
                                                 }
                                                 ?>
                                             </td>
+
                                             <td style="padding:12px;text-align:center;">
-                                                <?php if ($status === 'completed'): ?>
-                                                    <?= $test['received_by'] ? " Dr. " . htmlspecialchars($test['received_by']) : "Delivered (no name)" ?>
-                                                <?php else: ?>
-                                                    -
-                                                <?php endif; ?>
+                                                <?php
+                                                if ($status === 'completed' && !empty($test['received_by'])) {
+                                                    echo "Dr. " . htmlspecialchars($test['received_by']);
+                                                } else {
+                                                    echo "-";
+                                                }
+                                                ?>
                                             </td>
                                         </tr>
                             <?php
@@ -275,12 +280,60 @@ $allPatients = $patient->getAllPatients();
                     </table>
                 </div>
             </div>
-           
+            <!-- MODAL AREA -->
+            <div class="modal fade" id="viewResultModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title" id="modalTitle">Laboratory Result</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" id="resultContent">
+                            <p class="text-center text-muted">Loading result...</p>
+                        </div>
+                        <div class="modal-footer d-flex justify-content-between">
+                            <button id="prevResult" class="btn btn-outline-success">⟨ Prev</button>
+                            <button id="nextResult" class="btn btn-outline-success">Next ⟩</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Impression Modal -->
+            <div class="modal fade" id="aiImpressionModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <!-- Header -->
+                        <div class="modal-header" style="background: linear-gradient(90deg, #4facfe, #00f2fe); color: #fff;">
+                            <h5 class="modal-title">Remarks</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+
+                        <!-- Body -->
+                        <div class="modal-body">
+                            <pre id="impressionText" class="p-3 bg-light rounded border" style="font-family: 'Arial', sans-serif; font-size:14px;">
+                                Loading...
+                            </pre>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="modal-footer d-flex justify-content-between">
+                            <button class="btn btn-outline-primary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <!----- End of Main Content ----->
             <script>
-                const toggler = document.querySelector(".toggler-btn");
-                toggler.addEventListener("click", function() {
-                    document.querySelector("#sidebar").classList.toggle("collapsed");
+                document.addEventListener("DOMContentLoaded", function() {
+                    const impressionButtons = document.querySelectorAll(".ai-impression-btn");
+                    const impressionText = document.getElementById("impressionText");
+
+                    impressionButtons.forEach((btn) => {
+                        btn.addEventListener("click", function() {
+                            const impression = this.getAttribute("data-impression") || "⚠️ No remarks available.";
+                            impressionText.textContent = impression;
+                        });
+                    });
                 });
             </script>
             <script src="../assets/javascript/test_process.js"></script>
