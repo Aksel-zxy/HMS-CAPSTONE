@@ -63,7 +63,7 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
 <title>Inventory Management</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="assets/css/inventory_management.css" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/Inventory_dashboard.css">
+<link rel="stylesheet" href="assets/css/inventory_dashboard.css">
 </head>
 <body class="bg-light">
     
