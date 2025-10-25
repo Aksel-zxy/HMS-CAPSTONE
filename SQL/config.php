@@ -24,9 +24,9 @@ $_SESSION['timeout'] = time();
 
 // MySQL settings
 
-$host     = getenv('DB_HOST') ?: "127.0.0.1";   
-$port     = getenv('DB_PORT') ?: "3306";        
-$dbname   = getenv('DB_NAME') ?: "hmscapstone"; 
+$host     = getenv('DB_HOST') ?: "127.0.0.1";
+$port     = getenv('DB_PORT') ?: "3306";
+$dbname   = getenv('DB_NAME') ?: "hmscapstone";
 $username = getenv('DB_USERNAME') ?: "root";
 $password = getenv('DB_PASSWORD') ?: "";
 

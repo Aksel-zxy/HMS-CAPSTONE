@@ -1,29 +1,5 @@
 <?php
-
-include '../../SQL/config.php';
-
-if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
+include 'header.php'
 ?>
 
 <!DOCTYPE html>
@@ -32,153 +8,33 @@ if (!$user) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Dashboard</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-
+    <title>Department Budget Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
+            background-color: #f8f9fa;
         }
 
-        .report-card {
-            transition: all 0.3s ease;
-            border-radius: 14px;
+        .summary-card {
+            border-left: 5px solid #0d6efd;
             background: #fff;
-            border: 1px solid #e6e6e6;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
 
-        .report-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 25px;
-        }
-
-        .link-section {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .link-section a {
-            text-decoration: none;
-            color: #000;
+        .table-container {
             background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #000;
-        }
-
-        .link-section a:hover {
-            background: #000;
-            color: #fff;
-            transform: translateY(-3px);
-        }
-
-        hr {
-            border-top: 1px solid #000;
-            opacity: 0.3;
-        }
-
-        /* Available Doctors Section */
-        .doctor-card {
-            border: 1px solid #000;
-            border-radius: 10px;
-            background-color: #fff;
-            transition: all 0.25s ease;
-        }
-
-        .doctor-card:hover {
-            transform: translateY(-5px);
-            background-color: #f1f1f1;
-        }
-
-        .doctor-avatar-placeholder {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #e9ecef;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #000;
-            font-weight: 600;
-            font-size: 1.1rem;
-            text-transform: uppercase;
-        }
-
-        .btn-view {
-            border: 1px solid #000;
-            background: #000;
-            color: #fff;
-            border-radius: 20px;
-            padding: 5px 14px;
-            font-size: 0.85rem;
-        }
-
-        .btn-view:hover {
-            background: #fff;
-            color: #000;
-        }
-
-        .btn-collapse {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            border: 1px solid #000;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-collapse:hover {
-            background: #000;
-            color: #fff;
-        }
-
-        .modal-header {
-            background: #000;
-            color: #fff;
-        }
-
-        .table thead {
-            background: #000;
-            color: #fff;
-        }
-
-        .list-group-item {
-            border-color: #ddd;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
 
 <body>
     <div class="d-flex">
-        <!-- SIDEBAR -->
+        <!----- Sidebar ----->
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
 
@@ -378,110 +234,140 @@ if (!$user) {
 
 
         </aside>
+        <!----- End of Sidebar ----->
+        <div class="container py-4">
+            <h2 class="mb-4 text-center">Department Budget Report</h2>
 
-        <!-- MAIN CONTENT -->
-        <div class="main w-100">
-            <div class="container my-5">
-                <div class="text-center mb-4">
-                    <h4 class="fw-bold"> Reports Dashboard</h4>
+            <!-- Year Selector -->
+            <div class="mb-4 text-center">
+                <label for="yearSelector" class="form-label fw-semibold me-2">Select Year:</label>
+                <select id="yearSelector" class="form-select d-inline-block w-auto">
+                    <option value="" selected disabled>-- Choose Year --</option>
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                </select>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="row mb-4 text-center" id="summaryCards" style="display:none;">
+                <div class="col-md-4 mb-3">
+                    <div class="summary-card">
+                        <h6>Total Allocated</h6>
+                        <h4 id="totalAllocated">₱0</h4>
+                    </div>
                 </div>
-
-                <h5 class="text-center mb-4">Select a Report</h5>
-
-                <!-- Reports Grid -->
-                <div class="grid-container mb-5">
-                    <a href="daily_attendance_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-calendar-check" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Daily Attendance Report</h5>
-                        </div>
-                    </a>
-
-
-                    <a href="month_insurance_claim_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-file-earmark-medical" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Insurance Claim Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="paycycle_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-clock-history" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Paycycle Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="revenue_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-bar-chart-line" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Revenue Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="salary_paid_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-wallet2" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Monthly Payroll Summary</h5>
-                        </div>
-                    </a>
-
-                    <a href="shift_and_duty.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Shift & Duty Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="leave_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Month Leave Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="staff_information.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Staff Information Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="doctor_specialization_and_eval_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Active Doctor Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="performance_and_evaluation.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Employee Performance report</h5>
-                        </div>
-                    </a>
-
-                    <a href="pharmacy_sales_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-capsule" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Hospital Rx Sales Report </h5>
-                        </div>
-                    </a>
-
-
-                    <a href="department_budget_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-cash-coin" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Department Budget Report </h5>
-                        </div>
-                    </a>
+                <div class="col-md-4 mb-3">
+                    <div class="summary-card">
+                        <h6>Total Requested</h6>
+                        <h4 id="totalRequested">₱0</h4>
+                    </div>
                 </div>
+                <div class="col-md-4 mb-3">
+                    <div class="summary-card">
+                        <h6>Total Approved</h6>
+                        <h4 id="totalApproved">₱0</h4>
+                    </div>
+                </div>
+            </div>
 
-                <hr class="my-5">
+            <!-- Table -->
+            <div class="table-container" id="tableContainer" style="display:none;">
+                <h5 class="mb-3">Monthly Breakdown</h5>
+                <table class="table table-striped align-middle text-center">
+                    <thead class="table-primary">
+                        <tr>
+                            <th>Month</th>
+                            <th>Requested Amount</th>
+                            <th>Allocated Budget</th>
+                            <th>Approved Amount</th>
+                            <th>Status</th>
+                            <th>Request Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budgetTableBody">
+                        <tr>
+                            <td colspan="6">Please select a year to view data.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
+    <script>
+        const yearSelector = document.getElementById('yearSelector');
+        const totalAllocated = document.getElementById('totalAllocated');
+        const totalRequested = document.getElementById('totalRequested');
+        const totalApproved = document.getElementById('totalApproved');
+        const budgetTableBody = document.getElementById('budgetTableBody');
+        const summaryCards = document.getElementById('summaryCards');
+        const tableContainer = document.getElementById('tableContainer');
 
+        async function loadBudgetData(year) {
+            const endpoint = `https://bsis-03.keikaizen.xyz/billing/getYearDepartmentBudgetDetails/${year}`;
+            budgetTableBody.innerHTML = `<tr><td colspan="6">Loading data for ${year}...</td></tr>`;
+            summaryCards.style.display = "none";
+            tableContainer.style.display = "block";
+
+            try {
+                const response = await fetch(endpoint);
+                if (!response.ok) throw new Error(`Failed to fetch data (${response.status})`);
+
+                const data = await response.json();
+
+                // Update summary totals
+                totalAllocated.textContent = `₱${(data.totalAllocated || 0).toLocaleString()}`;
+                totalRequested.textContent = `₱${(data.totalRequested || 0).toLocaleString()}`;
+                totalApproved.textContent = `₱${(data.totalApproved || 0).toLocaleString()}`;
+                summaryCards.style.display = "flex";
+
+                // Populate table
+                if (!data.budgets || data.budgets.length === 0) {
+                    budgetTableBody.innerHTML = `<tr><td colspan="6">No data found for ${year}</td></tr>`;
+                    return;
+                }
+
+                budgetTableBody.innerHTML = "";
+                data.budgets.forEach(budget => {
+                    const monthName = new Date(budget.month).toLocaleString('default', {
+                        month: 'long'
+                    });
+                    const row = `
+          <tr>
+            <td>${monthName}</td>
+            <td>₱${budget.requested_amount.toLocaleString()}</td>
+            <td>₱${budget.allocated_budget.toLocaleString()}</td>
+            <td>₱${budget.approved_amount.toLocaleString()}</td>
+            <td><span class="badge bg-${getStatusColor(budget.status)}">${budget.status}</span></td>
+            <td>${new Date(budget.request_date).toLocaleDateString()}</td>
+          </tr>`;
+                    budgetTableBody.insertAdjacentHTML('beforeend', row);
+                });
+
+            } catch (error) {
+                console.error(error);
+                budgetTableBody.innerHTML = `<tr><td colspan="6" class="text-danger">Error loading data.</td></tr>`;
+            }
+        }
+
+        function getStatusColor(status) {
+            switch (status) {
+                case "Approved":
+                    return "success";
+                case "Rejected":
+                    return "danger";
+                case "Pending":
+                    return "warning";
+                default:
+                    return "secondary";
+            }
+        }
+
+        // Event listener for year selection
+        yearSelector.addEventListener('change', () => {
+            const selectedYear = yearSelector.value;
+            if (selectedYear) loadBudgetData(selectedYear);
+        });
     </script>
 </body>
 

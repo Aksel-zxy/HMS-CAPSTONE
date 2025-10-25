@@ -1,29 +1,8 @@
 <?php
-
-include '../../SQL/config.php';
-
-if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
+$user = [
+    'fname' => 'Test',
+    'lname' => 'User'
+];
 ?>
 
 <!DOCTYPE html>
@@ -32,28 +11,24 @@ if (!$user) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Dashboard</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
     <style>
-        body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
-        }
-
         .report-card {
-            transition: all 0.3s ease;
-            border-radius: 14px;
-            background: #fff;
-            border: 1px solid #e6e6e6;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border-radius: 12px;
+            /* Using a slightly darker shadow for dashboard tiles */
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            height: 100%;
+            /* Ensure all tiles are the same height */
         }
 
         .report-card:hover {
             transform: translateY(-6px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
         }
 
         .card-title {
@@ -61,124 +36,52 @@ if (!$user) {
             font-weight: 600;
         }
 
-        .grid-container {
+        /* The performance view is a full-width container, so we don't use the simple grid-container here */
+        /* .grid-container {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 25px;
-        }
-
-        .link-section {
-            display: flex;
-            justify-content: center;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 20px;
-            margin-bottom: 30px;
+        } */
+
+        body {
+            background: #f8f9fa;
         }
 
-        .link-section a {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #000;
+        /* Custom styles for the table and badges to maintain a premium/clean look */
+        .table-performance-header th {
+            background-color: #343a40 !important;
+            /* Darker header */
+            color: white;
         }
 
-        .link-section a:hover {
-            background: #000;
-            color: #fff;
-            transform: translateY(-3px);
+        .performance-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
         }
 
-        hr {
-            border-top: 1px solid #000;
-            opacity: 0.3;
+        /* Custom badge colors for scores */
+        .badge-score-excellent {
+            background-color: #198754 !important;
         }
 
-        /* Available Doctors Section */
-        .doctor-card {
-            border: 1px solid #000;
-            border-radius: 10px;
-            background-color: #fff;
-            transition: all 0.25s ease;
+        .badge-score-proficient {
+            background-color: #0dcaf0 !important;
         }
 
-        .doctor-card:hover {
-            transform: translateY(-5px);
-            background-color: #f1f1f1;
+        .badge-score-needs {
+            background-color: #ffc107 !important;
+            color: #212529 !important;
         }
 
-        .doctor-avatar-placeholder {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #e9ecef;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #000;
-            font-weight: 600;
-            font-size: 1.1rem;
-            text-transform: uppercase;
-        }
-
-        .btn-view {
-            border: 1px solid #000;
-            background: #000;
-            color: #fff;
-            border-radius: 20px;
-            padding: 5px 14px;
-            font-size: 0.85rem;
-        }
-
-        .btn-view:hover {
-            background: #fff;
-            color: #000;
-        }
-
-        .btn-collapse {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            border: 1px solid #000;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-collapse:hover {
-            background: #000;
-            color: #fff;
-        }
-
-        .modal-header {
-            background: #000;
-            color: #fff;
-        }
-
-        .table thead {
-            background: #000;
-            color: #fff;
-        }
-
-        .list-group-item {
-            border-color: #ddd;
+        .badge-score-unsatisfactory {
+            background-color: #dc3545 !important;
         }
     </style>
 </head>
 
 <body>
     <div class="d-flex">
-        <!-- SIDEBAR -->
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
 
@@ -379,109 +282,136 @@ if (!$user) {
 
         </aside>
 
-        <!-- MAIN CONTENT -->
-        <div class="main w-100">
+        <div class="main">
             <div class="container my-5">
-                <div class="text-center mb-4">
-                    <h4 class="fw-bold"> Reports Dashboard</h4>
+                <h2 class="text-center mb-5 fw-bold text-dark">Employee Performance & Evaluation REPORT</h2>
+
+                <div class="row mb-5 text-center g-4">
+                    <div class="col-md-4">
+                        <div class="card report-card bg-primary text-white p-2">
+                            <div class="card-body">
+                                <i class="bi bi-people-fill h4 mb-2"></i>
+                                <h5>Total Employees Evaluated</h5>
+                                <h3 id="totalEmployees" class="display-6 fw-bold">125</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card report-card bg-success text-white p-2">
+                            <div class="card-body">
+                                <i class="bi bi-bar-chart-line-fill h4 mb-2"></i>
+                                <h5>Avg. Performance Score</h5>
+                                <h3 id="averageScore" class="display-6 fw-bold">4.1 / 5</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card report-card bg-warning text-dark p-2">
+                            <div class="card-body">
+                                <i class="bi bi-exclamation-triangle-fill h4 mb-2"></i>
+                                <h5>Low Performers (&lt; 3.0)</h5>
+                                <h3 id="lowPerformers" class="display-6 fw-bold">8</h3>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <h5 class="text-center mb-4">Select a Report</h5>
-
-                <!-- Reports Grid -->
-                <div class="grid-container mb-5">
-                    <a href="daily_attendance_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-calendar-check" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Daily Attendance Report</h5>
-                        </div>
-                    </a>
-
-
-                    <a href="month_insurance_claim_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-file-earmark-medical" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Insurance Claim Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="paycycle_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-clock-history" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Paycycle Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="revenue_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-bar-chart-line" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Revenue Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="salary_paid_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-wallet2" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Monthly Payroll Summary</h5>
-                        </div>
-                    </a>
-
-                    <a href="shift_and_duty.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Shift & Duty Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="leave_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Month Leave Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="staff_information.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Staff Information Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="doctor_specialization_and_eval_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Active Doctor Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="performance_and_evaluation.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Employee Performance report</h5>
-                        </div>
-                    </a>
-
-                    <a href="pharmacy_sales_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-capsule" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Hospital Rx Sales Report </h5>
-                        </div>
-                    </a>
-
-
-                    <a href="department_budget_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-cash-coin" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Department Budget Report </h5>
-                        </div>
-                    </a>
+                <div class="card performance-card">
+                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center p-3">
+                        <h5 class="mb-0 fw-light">Detailed Employee Performance Data</h5>
+                    </div>
+                    <div class="card-body p-0 table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead class="table-performance-header">
+                                <tr>
+                                    <th>Employee ID</th>
+                                    <th>Average Score</th>
+                                    <th>Performance Level</th>
+                                    <th>Evaluation Period</th>
+                                    <th>No. of Evaluations</th>
+                                    <th>Last Evaluated</th>
+                                </tr>
+                            </thead>
+                            <tbody id="performanceTableBody">
+                                <tr>
+                                    <td>E-001</td>
+                                    <td><span class="badge badge-score-excellent p-2">4.8</span></td>
+                                    <td>Excellent</td>
+                                    <td>2024 Q3</td>
+                                    <td>3</td>
+                                    <td>2024-09-30</td>
+                                </tr>
+                                <tr>
+                                    <td>E-002</td>
+                                    <td><span class="badge badge-score-needs p-2">3.1</span></td>
+                                    <td>Needs Improvement</td>
+                                    <td>2024 Q3</td>
+                                    <td>2</td>
+                                    <td>2024-08-15</td>
+                                </tr>
+                                <tr>
+                                    <td>E-003</td>
+                                    <td><span class="badge badge-score-proficient p-2">4.2</span></td>
+                                    <td>Proficient</td>
+                                    <td>2024 Q3</td>
+                                    <td>4</td>
+                                    <td>2024-09-30</td>
+                                </tr>
+                                <tr>
+                                    <td>E-004</td>
+                                    <td><span class="badge badge-score-unsatisfactory p-2">2.5</span></td>
+                                    <td>Unsatisfactory</td>
+                                    <td>2024 Q2</td>
+                                    <td>1</td>
+                                    <td>2024-06-30</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer text-muted bg-light border-top-0 rounded-bottom-4">
+                        <small>Data reflects cumulative performance up to the most recent evaluation period.</small>
+                    </div>
                 </div>
-
-                <hr class="my-5">
             </div>
         </div>
     </div>
 
+    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script>
+        // Placeholder JavaScript for populating the data.
+        // You would use an AJAX call here to fetch the actual employee data.
+
+        function getScoreBadgeClass(score) {
+            if (score >= 4.5) return 'badge-score-excellent';
+            if (score >= 3.5) return 'badge-score-proficient';
+            if (score >= 3.0) return 'badge-score-needs';
+            return 'badge-score-unsatisfactory';
+        }
+
+        // This function will be called when you load your data
+        function renderPerformanceData(employeeData) {
+            const tableBody = document.getElementById('performanceTableBody');
+            tableBody.innerHTML = ''; // Clear existing data
+
+            employeeData.forEach(employee => {
+                const score = employee.average_score || 0;
+                const badgeClass = getScoreBadgeClass(score);
+
+                const row = `
+                    <tr>
+                        <td>${employee.employee_id}</td>
+                        <td>${employee.employee_name || 'N/A'}</td>
+                        <td><span class="badge ${badgeClass} p-2">${score.toFixed(1)}</span></td>
+                        <td>${employee.performance_level || 'N/A'}</td>
+                        <td>${employee.evaluation_period || 'N/A'}</td>
+                        <td>${employee.number_of_evaluations || 0}</td>
+                        <td>${employee.last_evaluated || 'N/A'}</td>
+                        <td><button class="btn btn-sm btn-info text-white">Details</button></td>
+                    </tr>
+                `;
+                tableBody.insertAdjacentHTML('beforeend', row);
+            });
+        }
     </script>
 </body>
 
