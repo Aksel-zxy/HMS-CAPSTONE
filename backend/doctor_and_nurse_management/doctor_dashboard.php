@@ -38,6 +38,27 @@ class DoctorDashboard {
 
 $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
+
+$query = "
+    SELECT profession, COUNT(*) AS total
+    FROM hr_employees
+    WHERE profession IN ('Doctor', 'Nurse')
+    GROUP BY profession
+";
+$result = $conn->query($query);
+
+$doctorCount = 0;
+$nurseCount  = 0;
+
+if ($result->num_rows > 0) {
+    while ($row = $result->fetch_assoc()) {
+        if (strtolower($row['profession']) === 'doctor') {
+            $doctorCount = $row['total'];
+        } elseif (strtolower($row['profession']) === 'nurse') {
+            $nurseCount = $row['total'];
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -125,75 +146,12 @@ $user = $dashboard->user;
                 </ul>
             </li>
 
-              <li class="sidebar-item">
+            <li class="sidebar-item">
                 <a href="doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                    <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M96 96C113.7 96 128 110.3 128 128L128 464C128 472.8 135.2 480 144 480L544 480C561.7 480 576 494.3 576 512C576 529.7 561.7 544 544 544L144 544C99.8 544 64 508.2 64 464L64 128C64 110.3 78.3 96 96 96zM208 288C225.7 288 240 302.3 240 320L240 384C240 401.7 225.7 416 208 416C190.3 416 176 401.7 176 384L176 320C176 302.3 190.3 288 208 288zM352 224L352 384C352 401.7 337.7 416 320 416C302.3 416 288 401.7 288 384L288 224C288 206.3 302.3 192 320 192C337.7 192 352 206.3 352 224zM432 256C449.7 256 464 270.3 464 288L464 384C464 401.7 449.7 416 432 416C414.3 416 400 401.7 400 384L400 288C400 270.3 414.3 256 432 256zM576 160L576 384C576 401.7 561.7 416 544 416C526.3 416 512 401.7 512 384L512 160C512 142.3 526.3 128 544 128C561.7 128 576 142.3 576 160z"/></svg>
                     <span style="font-size: 18px;">Performance and Evaluation</span>
                 </a>
-            </li>
-
-
-
-        <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#doctor"
-                                 aria-expanded="true" aria-controls="auth">
-                  <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M320 72C253.7 72 200 125.7 200 192C200 258.3 253.7 312 320 312C386.3 312 440 258.3 440 192C440 125.7 386.3 72 320 72zM380 384.8C374.6 384.3 369 384 363.4 384L276.5 384C270.9 384 265.4 384.3 259.9 384.8L259.9 452.3C276.4 459.9 287.9 476.6 287.9 495.9C287.9 522.4 266.4 543.9 239.9 543.9C213.4 543.9 191.9 522.4 191.9 495.9C191.9 476.5 203.4 459.8 219.9 452.3L219.9 393.9C157 417 112 477.6 112 548.6C112 563.7 124.3 576 139.4 576L500.5 576C515.6 576 527.9 563.7 527.9 548.6C527.9 477.6 482.9 417.1 419.9 394L419.9 431.4C443.2 439.6 459.9 461.9 459.9 488L459.9 520C459.9 531 450.9 540 439.9 540C428.9 540 419.9 531 419.9 520L419.9 488C419.9 477 410.9 468 399.9 468C388.9 468 379.9 477 379.9 488L379.9 520C379.9 531 370.9 540 359.9 540C348.9 540 339.9 531 339.9 520L339.9 488C339.9 461.9 356.6 439.7 379.9 431.4L379.9 384.8z"/></svg>
-                    <span style="font-size: 18px;">Doctor Panel</span>
-                </a>
-
-                <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                  <li class="sidebar-item">
-                        <a href="doctor_panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
-                  </li>
-                  <li class="sidebar-item">
-                        <a href="doctor_panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
-                    </li>
-                        <li class="sidebar-item">
-                        <a href="doctor_panel/prescription.php" class="sidebar-link">Prescription</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">License & Compliance Viewer</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Upload Renewal Documents</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notification Alerts</a>
-                    </li>
-                </ul>
-            </li>
-
-                <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#nurse"
-                                 aria-expanded="true" aria-controls="auth">
-                  <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M192 108.9C192 96.2 199.5 84.7 211.2 79.6L307.2 37.6C315.4 34 324.7 34 332.9 37.6L428.9 79.6C440.5 84.7 448 96.2 448 108.9L448 208C448 278.7 390.7 336 320 336C249.3 336 192 278.7 192 208L192 108.9zM400 192L288.4 192L288 192L240 192L240 208C240 252.2 275.8 288 320 288C364.2 288 400 252.2 400 208L400 192zM304 80L304 96L288 96C283.6 96 280 99.6 280 104L280 120C280 124.4 283.6 128 288 128L304 128L304 144C304 148.4 307.6 152 312 152L328 152C332.4 152 336 148.4 336 144L336 128L352 128C356.4 128 360 124.4 360 120L360 104C360 99.6 356.4 96 352 96L336 96L336 80C336 75.6 332.4 72 328 72L312 72C307.6 72 304 75.6 304 80zM238.6 387C232.1 382.1 223.4 380.8 216 384.2C154.6 412.4 111.9 474.4 111.9 546.3C111.9 562.7 125.2 576 141.6 576L498.2 576C514.6 576 527.9 562.7 527.9 546.3C527.9 474.3 485.2 412.3 423.8 384.2C416.4 380.8 407.7 382.1 401.2 387L334.2 437.2C325.7 443.6 313.9 443.6 305.4 437.2L238.4 387z"/></svg>
-                    <span style="font-size: 18px;">Nurse Panel</span>
-                </a>
-
-                <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="nurse_panel/my_nurse_schedule.php" class="sidebar-link">My Schedule</a>
-                    </li>
-                     <li class="sidebar-item">
-                        <a href="nurse_panel/nurse_duty.php" class="sidebar-link">Nurse Duty</a>
-                    </li>
-                      <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">License & Compliance Viewer</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Upload Renewal Documents</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notification Alerts</a>
-                    </li>
-                </ul>
             </li>
 
         </aside>
@@ -234,11 +192,24 @@ $user = $dashboard->user;
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>BASAHIN PO YUNG MGA COMMENT SDE PARA DI MALIGAW</h1> <br>
-                <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
-                <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
-                <H1>CHAT LANG PO KAY ROBERT</H1>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;">
+                <!-- Doctors Box -->
+                <div style="background:#fff; border-radius:14px; padding:25px; box-shadow:0 3px 10px rgba(0,0,0,0.06); text-align:center;">
+                    <h2 style="font-size:18px; color:#333; margin-bottom:10px;">Doctors</h2>
+                    <p style="color:#888; font-size:13px; margin-bottom:20px;">Total number of doctors</p>
+                    <div style="font-size:48px; font-weight:700; color:#0d6efd;">
+                        <?php echo $doctorCount; ?>
+                    </div>
+                </div>
+
+                <!-- Nurses Box -->
+                <div style="background:#fff; border-radius:14px; padding:25px; box-shadow:0 3px 10px rgba(0,0,0,0.06); text-align:center;">
+                    <h2 style="font-size:18px; color:#333; margin-bottom:10px;">Nurses</h2>
+                    <p style="color:#888; font-size:13px; margin-bottom:20px;">Total number of nurses</p>
+                    <div style="font-size:48px; font-weight:700; color:#198754;">
+                        <?php echo $nurseCount; ?>
+                    </div>
+                </div>
             </div>
             <!-- END CODING HERE -->
         </div>

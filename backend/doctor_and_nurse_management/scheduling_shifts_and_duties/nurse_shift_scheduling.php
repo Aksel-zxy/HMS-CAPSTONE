@@ -256,66 +256,6 @@ if (isset($_GET['view_sched_id'])) {
                 </a>
             </li>
 
-
-
-        <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#doctor"
-                                 aria-expanded="true" aria-controls="auth">
-                  <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M320 72C253.7 72 200 125.7 200 192C200 258.3 253.7 312 320 312C386.3 312 440 258.3 440 192C440 125.7 386.3 72 320 72zM380 384.8C374.6 384.3 369 384 363.4 384L276.5 384C270.9 384 265.4 384.3 259.9 384.8L259.9 452.3C276.4 459.9 287.9 476.6 287.9 495.9C287.9 522.4 266.4 543.9 239.9 543.9C213.4 543.9 191.9 522.4 191.9 495.9C191.9 476.5 203.4 459.8 219.9 452.3L219.9 393.9C157 417 112 477.6 112 548.6C112 563.7 124.3 576 139.4 576L500.5 576C515.6 576 527.9 563.7 527.9 548.6C527.9 477.6 482.9 417.1 419.9 394L419.9 431.4C443.2 439.6 459.9 461.9 459.9 488L459.9 520C459.9 531 450.9 540 439.9 540C428.9 540 419.9 531 419.9 520L419.9 488C419.9 477 410.9 468 399.9 468C388.9 468 379.9 477 379.9 488L379.9 520C379.9 531 370.9 540 359.9 540C348.9 540 339.9 531 339.9 520L339.9 488C339.9 461.9 356.6 439.7 379.9 431.4L379.9 384.8z"/></svg>
-                    <span style="font-size: 18px;">Doctor Panel</span>
-                </a>
-
-                <ul id="doctor" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                  <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
-                  </li>
-                  <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Doctor Duty</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">License & Compliance Viewer</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Upload Renewal Documents</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notification Alerts</a>
-                    </li>
-                </ul>
-            </li>
-
-                <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#nurse"
-                                 aria-expanded="true" aria-controls="auth">
-                  <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M192 108.9C192 96.2 199.5 84.7 211.2 79.6L307.2 37.6C315.4 34 324.7 34 332.9 37.6L428.9 79.6C440.5 84.7 448 96.2 448 108.9L448 208C448 278.7 390.7 336 320 336C249.3 336 192 278.7 192 208L192 108.9zM400 192L288.4 192L288 192L240 192L240 208C240 252.2 275.8 288 320 288C364.2 288 400 252.2 400 208L400 192zM304 80L304 96L288 96C283.6 96 280 99.6 280 104L280 120C280 124.4 283.6 128 288 128L304 128L304 144C304 148.4 307.6 152 312 152L328 152C332.4 152 336 148.4 336 144L336 128L352 128C356.4 128 360 124.4 360 120L360 104C360 99.6 356.4 96 352 96L336 96L336 80C336 75.6 332.4 72 328 72L312 72C307.6 72 304 75.6 304 80zM238.6 387C232.1 382.1 223.4 380.8 216 384.2C154.6 412.4 111.9 474.4 111.9 546.3C111.9 562.7 125.2 576 141.6 576L498.2 576C514.6 576 527.9 562.7 527.9 546.3C527.9 474.3 485.2 412.3 423.8 384.2C416.4 380.8 407.7 382.1 401.2 387L334.2 437.2C325.7 443.6 313.9 443.6 305.4 437.2L238.4 387z"/></svg>
-                    <span style="font-size: 18px;">Nurse Panel</span>
-                </a>
-
-                <ul id="nurse" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
-                    </li>
-                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Nurse Duty</a>
-                    </li>
-                      <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">License & Compliance Viewer</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Upload Renewal Documents</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notification Alerts</a>
-                    </li>
-                </ul>
-            </li>
-
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
