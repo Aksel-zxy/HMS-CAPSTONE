@@ -9,8 +9,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // ✅ Use 'request_date' instead of 'created_at'
     $sql = "INSERT INTO insurance_requests 
-            (patient_id, insurance_company, insurance_number, relationship_to_insured, status, request_date)
-            VALUES (?, ?, ?, ?, 'Pending', NOW())";
+        (patient_id, insurance_company, insurance_number, relationship_to_insured, total_bill, status, request_date)
+        VALUES (?, ?, ?, ?, ?, 'Pending', NOW())";
     
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("isss", $patient_id, $insurance_company, $insurance_number, $relationship);
