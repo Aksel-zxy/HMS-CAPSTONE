@@ -1,110 +1,154 @@
-
+/* ===== Global Styles ===== */
 body {
     font-family: "Segoe UI", Arial, sans-serif;
-    background-color: #f8f9fa;
+    background-color: #f4f6f9;
     margin: 0;
     padding: 0;
+    color: #333;
+    font-size: 16px;
+    line-height: 1.6;
 }
 
-
+/* ===== Main Content ===== */
 .main-content {
     margin-left: 260px; /* matches sidebar width */
-    padding: 20px 30px;
+    padding: 40px 50px;
     transition: all 0.3s ease-in-out;
+    min-height: 100vh;
 }
-
 
 @media (max-width: 992px) {
     .main-content {
         margin-left: 0;
-        padding: 15px;
+        padding: 20px;
     }
 }
 
-
+/* ===== Headings ===== */
 h2 {
     font-weight: 700;
-    color: #333;
-    margin-bottom: 20px;
+    color: #222;
+    margin-bottom: 25px;
+    font-size: 30px;
 }
 
-
+/* ===== Card Styles ===== */
 .card {
-    border-radius: 0.75rem;
+    border-radius: 12px;
     border: none;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     background-color: #fff;
     text-align: center;
-    padding: 1rem;
+    padding: 1.5rem;
     transition: all 0.3s ease;
+    cursor: default;
 }
 
 .card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-5px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
 }
 
 .card h5 {
-    font-size: 1rem;
+    font-size: 1.1rem;
     font-weight: 600;
     color: #555;
+    margin-bottom: 0.5rem;
 }
 
 .card h3 {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
     font-weight: 700;
     margin-top: 0.3rem;
+    color: #222;
 }
 
-/* Colors for summary cards */
+/* ===== Colors for Summary Cards ===== */
 .bg-primary {
     background-color: #007bff !important;
-    color: #fff;
+    color: #fff !important;
 }
 
 .bg-success {
     background-color: #28a745 !important;
-    color: #fff;
+    color: #fff !important;
 }
 
 .bg-warning {
     background-color: #ffc107 !important;
-    color: #000;
+    color: #212529 !important;
 }
 
 .bg-info {
     background-color: #17a2b8 !important;
-    color: #fff;
+    color: #fff !important;
 }
 
-
+/* ===== Chart Container ===== */
 .chart-container {
     background: #fff;
-    border-radius: 0.75rem;
-    padding: 20px;
-    margin-top: 20px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    border-radius: 12px;
+    padding: 25px 30px;
+    margin-top: 25px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+.chart-container:hover {
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
 
 canvas {
     width: 100% !important;
-    height: 380px !important;
+    height: 420px !important;
 }
 
-/* Grid layout for charts */
+/* ===== Dashboard Grid Layout ===== */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 25px;
+    margin-top: 25px;
 }
 
-
-
-@media (max-width: 992px) {
+/* ===== Responsive Design ===== */
+@media (max-width: 1200px) {
     .dashboard-grid {
         grid-template-columns: 1fr;
     }
 
     .card h3 {
-        font-size: 1.3rem;
+        font-size: 1.5rem;
     }
+
+    .main-content {
+        padding: 25px;
+    }
+}
+
+@media (min-width: 1600px) {
+    body {
+        font-size: 18px;
+    }
+
+    .card h3 {
+        font-size: 2rem;
+    }
+
+    .chart-container {
+        padding: 35px 40px;
+    }
+
+    h2 {
+        font-size: 32px;
+    }
+
+    .dashboard-grid {
+        gap: 30px;
+    }
+}
+
+/* ===== Smooth Animations ===== */
+* {
+    transition: all 0.25s ease-in-out;
 }

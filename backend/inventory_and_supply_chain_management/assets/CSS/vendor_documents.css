@@ -1,75 +1,183 @@
-/* ==============================
+/* ============================================
    Base Layout
-   ============================== */
+============================================ */
 body {
     font-family: "Nunito", "Segoe UI", Arial, sans-serif;
     background-color: #f8f9fa;
     margin: 0;
     padding: 0;
     color: #333;
+    line-height: 1.6;
 }
 
-/* Wrapper that holds sidebar + main content */
+/* Wrapper for sidebar + main content */
 .vendor-wrapper {
     display: flex;
     flex-wrap: nowrap;
     min-height: 100vh;
+    background-color: #f8f9fa;
 }
 
-/* ==============================
+/* ============================================
    Sidebar
-   ============================== */
+============================================ */
 .vendor-sidebar {
     flex: 0 0 250px;
-    background: #fff;
+    background: #ffffff;
     border-right: 1px solid #dee2e6;
     position: sticky;
     top: 0;
     height: 100vh;
     overflow-y: auto;
     z-index: 10;
+    transition: all 0.3s ease-in-out;
 }
 
-/* ==============================
+/* Sidebar links */
+.vendor-sidebar a {
+    display: block;
+    padding: 12px 20px;
+    color: #495057;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+    border-left: 3px solid transparent;
+}
+
+.vendor-sidebar a:hover,
+.vendor-sidebar a.active {
+    background-color: #e9f3ff;
+    color: #007bff;
+    border-left-color: #007bff;
+}
+
+/* Sidebar section title */
+.vendor-sidebar .menu-title {
+    padding: 10px 20px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #868e96;
+    font-weight: 600;
+}
+
+/* ============================================
    Main Content
-   ============================== */
+============================================ */
 .vendor-main {
     flex: 1;
-    padding: 30px;
+    padding: 40px;
     background-color: #f8f9fa;
     overflow-x: auto;
+    transition: padding 0.3s ease-in-out;
 }
 
-/* ==============================
-   Card & Table Styling
-   ============================== */
+.vendor-main h1,
+.vendor-main h2 {
+    color: #212529;
+    font-weight: 700;
+    margin-bottom: 25px;
+}
+
+/* ============================================
+   Card Styling
+============================================ */
 .card {
     border-radius: 10px;
+    border: none;
+    background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
     overflow: hidden;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
-.table th, 
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.card-header {
+    background-color: #f9fafb;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #343a40;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.card-body {
+    padding: 1.25rem 1.5rem;
+}
+
+/* ============================================
+   Table Styling
+============================================ */
+.table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+}
+
+.table th,
 .table td {
     text-align: center;
     vertical-align: middle;
+    padding: 12px 10px;
+    font-size: 0.95rem;
+    color: #495057;
 }
 
 .table th {
     background-color: #f1f1f1;
     font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
 }
 
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* ============================================
+   Buttons
+============================================ */
 .btn-sm {
     padding: 5px 12px;
     border-radius: 6px;
+    font-size: 0.875rem;
+    transition: all 0.2s ease-in-out;
 }
 
-/* ==============================
-   Responsive Adjustments
-   ============================== */
+.btn-sm:hover {
+    transform: translateY(-2px);
+}
 
-/* Tablet view */
+/* ============================================
+   Scrollbar (Subtle)
+============================================ */
+.vendor-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.vendor-sidebar::-webkit-scrollbar-thumb {
+    background-color: #ced4da;
+    border-radius: 10px;
+}
+
+/* ============================================
+   Responsive Design
+============================================ */
+
+/* 992px (Large Tablet / Small Laptop) */
+@media (max-width: 992px) {
+    .vendor-sidebar {
+        flex: 0 0 220px;
+    }
+    .vendor-main {
+        padding: 25px;
+    }
+}
+
+/* 768px (Tablet) */
 @media (max-width: 768px) {
     .vendor-sidebar {
         flex: 0 0 200px;
@@ -79,7 +187,7 @@ body {
     }
 }
 
-/* Mobile view */
+/* 576px (Mobile) */
 @media (max-width: 576px) {
     .vendor-wrapper {
         flex-direction: column;
@@ -101,7 +209,15 @@ body {
         font-size: 0.85rem;
     }
 
-    .table th, .table td {
+    .table th,
+    .table td {
         white-space: nowrap;
     }
+}
+
+/* ============================================
+   Smooth Transitions
+============================================ */
+* {
+    transition: all 0.25s ease-in-out;
 }

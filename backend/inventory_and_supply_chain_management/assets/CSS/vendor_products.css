@@ -1,4 +1,24 @@
 /* ==============================
+   Vendor Dashboard Styling
+   ============================== */
+
+/* Reset and base layout */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Nunito", "Segoe UI", Arial, sans-serif;
+    background-color: #F5F6F7;
+    margin: 0;
+    padding: 0;
+    color: #333;
+    overflow-x: hidden;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+/* ==============================
    Layout Wrapper
    ============================== */
 .vendor-wrapper {
@@ -17,9 +37,25 @@
     border-right: 1px solid #dee2e6;
     overflow-y: auto;
     height: 100vh;
-    position: sticky; /* instead of fixed */
+    position: sticky; /* keeps it visible while scrolling */
     top: 0;
     z-index: 100; /* lower than modals */
+    padding: 20px 0;
+}
+
+.vendor-sidebar a {
+    display: block;
+    padding: 12px 20px;
+    color: #333;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.vendor-sidebar a:hover,
+.vendor-sidebar a.active {
+    background-color: #00acc1;
+    color: #fff;
 }
 
 /* ==============================
@@ -27,16 +63,77 @@
    ============================== */
 .vendor-main {
     flex: 1;
-    padding: 20px;
+    padding: 30px;
     background: #fff;
     overflow-x: auto;
+    transition: all 0.3s ease-in-out;
+    min-height: 100vh;
 }
 
-/* Product Table */
+/* ==============================
+   Page Header
+   ============================== */
+.vendor-main h2 {
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 25px;
+}
+
+/* ==============================
+   Tabs
+   ============================== */
+.nav-tabs {
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.nav-tabs .nav-link {
+    color: #6e768e;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s ease;
+    border-radius: 8px 8px 0 0;
+}
+
+.nav-tabs .nav-link.active {
+    color: #00acc1;
+    border-bottom: 3px solid #00acc1;
+    background: transparent;
+}
+
+.nav-tabs .nav-link:hover {
+    color: #00acc1;
+    background-color: rgba(0, 172, 193, 0.05);
+}
+
+/* ==============================
+   Tables
+   ============================== */
+.vendor-main .table {
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    margin-top: 15px;
+}
+
 .vendor-main .table th,
 .vendor-main .table td {
+    text-align: center;
     vertical-align: middle;
     white-space: nowrap;
+    padding: 14px 16px;
+    font-size: 0.95rem;
+}
+
+.vendor-main .table th {
+    background: #00acc1;
+    color: #fff;
+    font-weight: 600;
+}
+
+.vendor-main .table tbody tr:hover {
+    background-color: rgba(0, 172, 193, 0.06);
+    transition: background 0.3s ease;
 }
 
 /* Product Images */
@@ -53,6 +150,111 @@
 }
 
 /* ==============================
+   Badges
+   ============================== */
+.badge {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.badge.bg-warning {
+    background-color: #ffb74d !important;
+    color: #fff;
+}
+
+.badge.bg-success {
+    background-color: #66bb6a !important;
+    color: #fff;
+}
+
+.badge.bg-primary {
+    background-color: #00acc1 !important;
+    color: #fff;
+}
+
+.badge.bg-danger {
+    background-color: #ef5350 !important;
+    color: #fff;
+}
+
+/* ==============================
+   Modal Styling
+   ============================== */
+.modal-content {
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.modal-header {
+    background: #00acc1;
+    color: #fff;
+    border-bottom: none;
+}
+
+.modal-title {
+    font-weight: 600;
+}
+
+.modal-body {
+    background: #fafafa;
+}
+
+/* ==============================
+   Buttons
+   ============================== */
+.btn {
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.25s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+.btn-primary {
+    background: #00acc1;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #0097a7;
+}
+
+.btn-success {
+    background: #4caf50;
+    border: none;
+}
+
+.btn-success:hover {
+    background: #43a047;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    border: none;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+/* ==============================
+   Scrollbar Tweaks
+   ============================== */
+.vendor-main .table::-webkit-scrollbar {
+    height: 6px;
+}
+
+.vendor-main .table::-webkit-scrollbar-thumb {
+    background-color: #ccc;
+    border-radius: 10px;
+}
+
+/* ==============================
    Responsive Adjustments
    ============================== */
 
@@ -60,6 +262,10 @@
 @media (max-width: 768px) {
     .vendor-sidebar {
         flex: 0 0 200px;
+    }
+
+    .vendor-main {
+        padding: 20px;
     }
 }
 
@@ -84,7 +290,40 @@
         padding: 15px;
     }
 
-    /* make search inputs stack */
+    .vendor-main h2 {
+        font-size: 1.2rem;
+        text-align: center;
+    }
+
+    .nav-tabs {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .vendor-main .table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+        border-radius: 0;
+    }
+
+    .vendor-main .table th,
+    .vendor-main .table td {
+        font-size: 0.85rem;
+        padding: 8px;
+    }
+
+    .btn {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+
+    .badge {
+        font-size: 0.75rem;
+    }
+
+    /* Stack search filters */
     .vendor-main .row.g-2 > [class^="col-"] {
         width: 100%;
     }

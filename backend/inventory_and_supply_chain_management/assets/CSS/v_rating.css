@@ -1,57 +1,219 @@
-/* Ensure main content doesn't overlap fixed sidebar */
+/* =====================================
+   Vendor Dashboard Main Layout
+   Optimized for 1920×1080
+===================================== */
+
+/* === Main Content Wrapper === */
 .vendor-main {
-    margin-left: 260px; /* Width of vendor sidebar */
-    padding: 20px;
+    margin-left: 260px; /* Match sidebar width */
+    padding: 30px 40px;
     min-height: 100vh;
     background-color: #f8f9fa;
-    transition: margin-left 0.3s ease-in-out;
+    transition: margin-left 0.3s ease-in-out, background-color 0.3s ease;
 }
 
-/* Card styling for rating summary */
+/* Adjust when sidebar is collapsed */
+#sidebar.collapsed + .vendor-main {
+    margin-left: 0;
+}
+
+/* === Headings === */
+.vendor-main h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #343a40;
+    margin-bottom: 25px;
+}
+
+/* =====================================
+   Card Styling
+===================================== */
 .card {
+    border-radius: 12px;
+    border: none;
+    background-color: #ffffff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background-color: #f9fafb;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #343a40;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.card-body {
+    padding: 1.25rem 1.5rem;
+}
+
+/* =====================================
+   Rating Stars
+===================================== */
+.bi-star-fill,
+.bi-star-half,
+.bi-star {
+    font-size: 1.2rem;
+    color: #fbbf24; /* Bootstrap warning yellow tone */
+    margin: 0 2px;
+    transition: transform 0.2s ease;
+}
+
+.bi-star-fill:hover,
+.bi-star-half:hover,
+.bi-star:hover {
+    transform: scale(1.15);
+}
+
+/* =====================================
+   Tables
+===================================== */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
     border-radius: 10px;
     overflow: hidden;
 }
 
-/* Table improvements */
 .table th,
 .table td {
     vertical-align: middle;
     text-align: center;
+    padding: 12px 10px;
+    font-size: 0.95rem;
 }
 
 .table th {
     background-color: #f1f1f1;
     font-weight: 600;
+    color: #495057;
 }
 
-/* Feedback card adjustments */
-.card-header {
-    font-weight: 600;
-    font-size: 1rem;
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+    transition: background 0.2s ease;
 }
 
-/* Star icons */
-.bi-star-fill, .bi-star-half, .bi-star {
-    font-size: 1.1rem;
-}
-
-/* Alert box */
+/* =====================================
+   Alert Boxes
+===================================== */
 .alert {
-    margin-top: 20px;
+    margin-top: 25px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-align: center;
+    padding: 12px 15px;
+    transition: all 0.3s ease;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
+.alert-success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.alert-danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+/* =====================================
+   Responsive Adjustments
+===================================== */
+
+/* Tablets (≤992px) */
+@media (max-width: 992px) {
     .vendor-main {
         margin-left: 200px;
-        padding: 15px;
+        padding: 20px 25px;
+    }
+
+    .card-body {
+        padding: 1rem;
+    }
+
+    .table th,
+    .table td {
+        font-size: 0.9rem;
     }
 }
 
-@media (max-width: 480px) {
+/* Phones (≤768px) */
+@media (max-width: 768px) {
     .vendor-main {
         margin-left: 0;
+        padding: 15px;
+    }
+
+    .card-header {
+        font-size: 0.95rem;
+        text-align: center;
+    }
+
+    .table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+        border-radius: 8px;
+    }
+
+    .table th,
+    .table td {
+        padding: 10px 8px;
+    }
+}
+
+/* Small Phones (≤480px) */
+@media (max-width: 480px) {
+    .vendor-main {
         padding: 10px;
     }
+
+    .vendor-main h2 {
+        font-size: 1.25rem;
+        margin-bottom: 15px;
+    }
+
+    .card {
+        border-radius: 8px;
+    }
+
+    .card-header {
+        font-size: 0.9rem;
+    }
+
+    .table th,
+    .table td {
+        font-size: 0.85rem;
+        padding: 8px;
+    }
+
+    .bi-star-fill,
+    .bi-star-half,
+    .bi-star {
+        font-size: 1rem;
+    }
+}
+
+/* =====================================
+   Smooth Transitions
+===================================== */
+* {
+    transition: all 0.25s ease-in-out;
 }

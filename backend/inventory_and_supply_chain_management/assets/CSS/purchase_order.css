@@ -1,8 +1,14 @@
-/* === Container & Row === */
+/* =====================================
+   Responsive Product Card Grid Styling
+   Optimized for 1920×1080 Dashboards
+===================================== */
+
+/* === Grid Container & Columns === */
 .row > .col-md-3 {
     display: flex;
-    align-items: stretch; /* Make all columns same height */
-    margin-bottom: 15px; /* slightly smaller spacing */
+    align-items: stretch;
+    margin-bottom: 20px; /* comfortable spacing */
+    transition: all 0.2s ease-in-out;
 }
 
 /* === Card === */
@@ -11,22 +17,31 @@
     flex-direction: column;
     width: 100%;
     height: 100%;
-    border-radius: 10px;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.08);
-    transition: transform 0.2s;
+    border-radius: 12px;
+    background-color: #fff;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    cursor: pointer;
 }
 
 .card:hover {
-    transform: translateY(-3px);
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* === Card Image === */
 .card img {
     width: 100%;
-    height: 140px; /* smaller uniform height */
+    height: 160px;
     object-fit: cover;
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    transition: transform 0.3s ease;
+}
+
+.card:hover img {
+    transform: scale(1.05);
 }
 
 /* === Card Body === */
@@ -35,79 +50,96 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 2px; /* smaller padding */
+    padding: 10px 12px;
 }
 
-/* === Card Title & Description === */
+/* === Title & Description === */
 .card-title {
-    min-height: 35px; /* smaller title height */
+    font-size: 1rem;
     font-weight: 600;
+    color: #333;
     text-align: center;
     margin-bottom: 8px;
-    font-size: 0.95rem; /* slightly smaller font */
+    min-height: 36px;
 }
 
 .card p.small {
-    min-height: 40px; /* smaller description height */
-    font-size: 0.85rem;
+    font-size: 0.9rem;
+    color: #666;
     text-align: center;
+    min-height: 40px;
+    margin-bottom: 8px;
 }
 
-/* === Add to Cart Button === */
-.card-body .btn {
-    width: 100%;
-    margin-top: 8px;
-    font-size: 0.85rem; /* smaller button text */
-}
-
-/* === Price styling === */
+/* === Price Styling === */
 .card-body p strong {
     display: block;
     text-align: center;
-    margin-bottom: 8px;
-    font-size: 1rem; /* slightly smaller price */
+    font-size: 1.05rem;
     color: #198754; /* Bootstrap green */
+    margin-bottom: 8px;
 }
 
-/* === Responsive Adjustments === */
+/* === Button === */
+.card-body .btn {
+    width: 100%;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 6px;
+    margin-top: 8px;
+    transition: all 0.25s ease;
+}
 
-/* Large desktops */
+.card-body .btn:hover {
+    transform: translateY(-2px);
+}
+
+/* ===============================
+   Responsive Layout Adjustments
+=============================== */
+
+/* Large Desktops (≥1200px) */
 @media (min-width: 1200px) {
     .row > .col-md-3 {
-        flex: 0 0 25%; /* 4 cards per row */
+        flex: 0 0 25%;
         max-width: 25%;
     }
     .card img {
-        height: 140px;
+        height: 180px;
     }
 }
 
-/* Medium devices (tablets) */
+/* Medium Devices (768px–1199px) */
 @media (max-width: 1199px) and (min-width: 768px) {
     .row > .col-md-3 {
-        flex: 0 0 50%; /* 2 cards per row */
+        flex: 0 0 50%;
         max-width: 50%;
+    }
+    .card img {
+        height: 150px;
+    }
+}
+
+/* Small Devices (≤767px) */
+@media (max-width: 767px) {
+    .row > .col-md-3 {
+        flex: 0 0 100%;
+        max-width: 100%;
     }
     .card img {
         height: 130px;
     }
 }
 
-/* Small devices (phones) */
-@media (max-width: 767px) {
-    .row > .col-md-3 {
-        flex: 0 0 100%; /* 1 card per row */
-        max-width: 100%;
-    }
-    .card img {
-        height: 120px;
-    }
-}
-
-/* Extra small devices */
+/* Extra Small Devices (≤480px) */
 @media (max-width: 480px) {
+    .card {
+        border-radius: 8px;
+    }
     .card img {
-        height: 100px;
+        height: 110px;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
     }
     .card-title {
         font-size: 0.9rem;
@@ -124,4 +156,28 @@
     .card-body p strong {
         font-size: 0.95rem;
     }
+}
+
+/* Ultra-Wide Screens (≥1600px) */
+@media (min-width: 1600px) {
+    .card img {
+        height: 200px;
+    }
+    .card-title {
+        font-size: 1.05rem;
+    }
+    .card p.small {
+        font-size: 0.95rem;
+    }
+    .card-body p strong {
+        font-size: 1.1rem;
+    }
+    .card-body .btn {
+        font-size: 0.95rem;
+    }
+}
+
+/* === Global Transition Smoothing === */
+* {
+    transition: all 0.25s ease-in-out;
 }
