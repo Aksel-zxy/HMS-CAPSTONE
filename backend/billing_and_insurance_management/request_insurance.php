@@ -11,9 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $sql = "INSERT INTO insurance_requests 
         (patient_id, insurance_company, insurance_number, relationship_to_insured, total_bill, status, request_date)
         VALUES (?, ?, ?, ?, ?, 'Pending', NOW())";
-    
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("isss", $patient_id, $insurance_company, $insurance_number, $relationship);
+
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("isssd", $patient_id, $insurance_company, $insurance_number, $relationship, $total_bill);
 
     if ($stmt->execute()) {
         echo "<script>alert('Insurance request submitted successfully!'); window.location='patient_billing.php';</script>";
