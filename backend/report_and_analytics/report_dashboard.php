@@ -1,5 +1,5 @@
 <?php
-/*
+
 include '../../SQL/config.php';
 
 if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
@@ -23,7 +23,7 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
-    */
+
 ?>
 
 <!DOCTYPE html>
