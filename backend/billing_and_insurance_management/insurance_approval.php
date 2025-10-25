@@ -122,7 +122,7 @@ $result = $conn->query($sql);
                                     <a href="total_bill.php?patient_id=<?= $row['patient_id'] ?>" 
                                        target="_blank" 
                                        class="btn btn-secondary w-100 mb-1">
-                                        View Total Bill
+                                       Clinical Abstract
                                     </a>
                                 <?php else: ?>
                                     <button class="btn btn-secondary w-100 mb-1" disabled>No Bill Available</button>
