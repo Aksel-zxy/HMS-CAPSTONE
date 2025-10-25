@@ -131,24 +131,25 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // --- Remarks Modal (safe for missing elements) ---
   const remarksModal = document.getElementById("remarksModal");
-  if (remarksModal) {
-    remarksModal.addEventListener("show.bs.modal", function (event) {
-      const button = event.relatedTarget;
-      if (!button) return;
+if (remarksModal) {
+  remarksModal.addEventListener("show.bs.modal", function (event) {
+    const button = event.relatedTarget;
 
-      const patientID = button.getAttribute("data-patientid") || "";
-      const scheduleIDs = button.getAttribute("data-scheduleids") || "";
-      const testList = button.getAttribute("data-testlist") || "";
+    // Get data from button
+    const patientID = button.getAttribute("data-patientid");
+    const scheduleIDs = button.getAttribute("data-scheduleids");
+    const testList = button.getAttribute("data-testlist");
 
-      const patientInput = document.getElementById("remarksPatientID");
-      const scheduleInput = document.getElementById("remarksScheduleIDs");
-      const testListInput = document.getElementById("remarksTestList");
+    // Fill modal hidden inputs
+    const pid = document.getElementById("remarksPatientID");
+    const sid = document.getElementById("remarksScheduleIDs");
+    const tlist = document.getElementById("remarksTestList");
 
-      if (patientInput) patientInput.value = patientID;
-      if (scheduleInput) scheduleInput.value = scheduleIDs;
-      if (testListInput) testListInput.value = testList;
-    });
-  }
+    if (pid) pid.value = patientID;
+    if (sid) sid.value = scheduleIDs;
+    if (tlist) tlist.value = testList;
+  });
+}
 
   // --- Search Filtering (safe for missing inputs) ---
   const searchInput = document.getElementById("searchInput");
