@@ -39,7 +39,7 @@ $dutyQuery = "
         d.equipment,
         d.tools,
         d.notes
-    FROM duty_assignment AS d
+    FROM duty_assignments AS d
     LEFT JOIN hr_employees AS e ON d.doctor_id = e.employee_id
     WHERE d.nurse_assistant = ?
 ";
