@@ -226,7 +226,21 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == '1') {
     <link rel="stylesheet" type="text/css" href="assets/css/vendorsidebar.css">
     <link rel="stylesheet" type="text/css" href="assets/css/vendor_products.css">
     <style>
-        /* Ensure uniform thumbnails */
+    /* Ensure uniform thumbnails */
+    body {
+        font-family: Arial, sans-serif;
+    }
+
+    .vendor-main {
+        margin-left: 270px; /* Prevent overlap with sidebar */
+    }
+
+    @media (max-width: 768px) {
+        .vendor-main {
+            margin-left: 0; /* On smaller screens, sidebar may collapse */
+        }
+    }
+
 
     </style>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

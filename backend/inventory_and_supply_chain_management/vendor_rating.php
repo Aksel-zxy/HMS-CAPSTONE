@@ -59,7 +59,24 @@ function displayStars($avg) {
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/inventory_dashboard.css">
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+    }
+
+    .container {
+        margin-left: 270px; /* Prevent overlap with sidebar */
+    }
+
+    @media (max-width: 768px) {
+        .container {
+            margin-left: 0; /* On smaller screens, remove the margin */
+        }
+    }
+</style>
 </head>
+
 <body class="bg-light">
 
 
