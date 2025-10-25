@@ -22,14 +22,15 @@ body {
    Sidebar
 ============================================ */
 .vendor-sidebar {
-    flex: 0 0 250px;
+    width: 250px;
     background: #ffffff;
     border-right: 1px solid #dee2e6;
-    position: sticky;
+    position: fixed; /* changed from sticky → fixed */
     top: 0;
+    left: 0;
     height: 100vh;
     overflow-y: auto;
-    z-index: 10;
+    z-index: 100; /* keep sidebar above content */
     transition: all 0.3s ease-in-out;
 }
 
@@ -66,10 +67,11 @@ body {
 ============================================ */
 .vendor-main {
     flex: 1;
+    margin-left: 250px; /* ensures main content stays beside sidebar */
     padding: 40px;
     background-color: #f8f9fa;
     overflow-x: auto;
-    transition: padding 0.3s ease-in-out;
+    transition: margin-left 0.3s ease-in-out, padding 0.3s ease-in-out;
 }
 
 .vendor-main h1,
@@ -170,9 +172,10 @@ body {
 /* 992px (Large Tablet / Small Laptop) */
 @media (max-width: 992px) {
     .vendor-sidebar {
-        flex: 0 0 220px;
+        width: 220px;
     }
     .vendor-main {
+        margin-left: 220px;
         padding: 25px;
     }
 }
@@ -180,9 +183,10 @@ body {
 /* 768px (Tablet) */
 @media (max-width: 768px) {
     .vendor-sidebar {
-        flex: 0 0 200px;
+        width: 200px;
     }
     .vendor-main {
+        margin-left: 200px;
         padding: 20px;
     }
 }
@@ -194,14 +198,15 @@ body {
     }
 
     .vendor-sidebar {
+        position: relative;
         width: 100%;
         height: auto;
-        position: relative;
         border-right: none;
         border-bottom: 1px solid #dee2e6;
     }
 
     .vendor-main {
+        margin-left: 0;
         padding: 15px;
     }
 

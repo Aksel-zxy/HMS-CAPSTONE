@@ -1,5 +1,5 @@
 /* ==============================
-   Vendor Dashboard Styling
+   Vendor Products Page Styling
    ============================== */
 
 /* Reset and base layout */
@@ -21,53 +21,17 @@ body {
 /* ==============================
    Layout Wrapper
    ============================== */
-.vendor-wrapper {
-    display: flex;
-    flex-wrap: nowrap;
-    min-height: 100vh;
-    background: #fdfdfd;
-}
 
-/* ==============================
-   Sidebar
-   ============================== */
-.vendor-sidebar {
-    flex: 0 0 250px;
-    background: #f8f9fa;
-    border-right: 1px solid #dee2e6;
-    overflow-y: auto;
-    height: 100vh;
-    position: sticky; /* keeps it visible while scrolling */
-    top: 0;
-    z-index: 100; /* lower than modals */
-    padding: 20px 0;
-}
-
-.vendor-sidebar a {
-    display: block;
-    padding: 12px 20px;
-    color: #333;
-    text-decoration: none;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.vendor-sidebar a:hover,
-.vendor-sidebar a.active {
-    background-color: #00acc1;
-    color: #fff;
-}
-
-/* ==============================
-   Main Content
-   ============================== */
+/* Keep main content aligned next to fixed sidebar */
 .vendor-main {
-    flex: 1;
+    margin-left: 250px; /* match global sidebar width */
     padding: 30px;
-    background: #fff;
-    overflow-x: auto;
     transition: all 0.3s ease-in-out;
+    background: #fff;
     min-height: 100vh;
+    overflow-x: auto;
+    position: relative;
+    z-index: 1;
 }
 
 /* ==============================
@@ -114,6 +78,7 @@ body {
     overflow: hidden;
     box-shadow: 0 3px 10px rgba(0,0,0,0.08);
     margin-top: 15px;
+    width: 100%;
 }
 
 .vendor-main .table th,
@@ -144,7 +109,7 @@ body {
     border-radius: 6px;
 }
 
-/* Buttons */
+/* Buttons inside tables */
 .vendor-main .btn-sm {
     margin-right: 5px;
 }
@@ -258,35 +223,26 @@ body {
    Responsive Adjustments
    ============================== */
 
-/* Tablet */
-@media (max-width: 768px) {
-    .vendor-sidebar {
-        flex: 0 0 200px;
-    }
-
+/* Medium screens (tablets, small laptops) */
+@media (max-width: 992px) {
     .vendor-main {
+        margin-left: 220px; /* match sidebar width */
+        padding: 25px;
+    }
+}
+
+/* Small screens (phones & small tablets) */
+@media (max-width: 768px) {
+    .vendor-main {
+        margin-left: 200px; /* narrower sidebar */
         padding: 20px;
     }
 }
 
-/* Mobile */
+/* Extra small screens (mobile phones) */
 @media (max-width: 576px) {
-    .vendor-wrapper {
-        flex-direction: column;
-    }
-
-    .vendor-sidebar {
-        flex: 0 0 auto;
-        width: 100%;
-        height: auto;
-        position: relative;
-        border-right: none;
-        border-bottom: 1px solid #dee2e6;
-    }
-
     .vendor-main {
-        flex: 1 0 auto;
-        margin-left: 0;
+        margin-left: 0; /* sidebar stacks above */
         padding: 15px;
     }
 
@@ -323,7 +279,7 @@ body {
         font-size: 0.75rem;
     }
 
-    /* Stack search filters */
+    /* Stack search filters or controls */
     .vendor-main .row.g-2 > [class^="col-"] {
         width: 100%;
     }
