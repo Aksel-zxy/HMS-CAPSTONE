@@ -200,13 +200,13 @@ class Login
 
             switch ($employee['profession']) {
                 case 'Doctor':
-                    header("Location: doctor_and_nurse_management/user_panel/user_doctor.php");
+                    header("Location: doctor_and_nurse_management/user_panel/Doctor/my_doctor_schedule.php");
                     break;
                 case 'Pharmacist':
                     header("Location: pharmacy_management/user_panel/user_pharmacist.php");
                     break;
                 case 'Nurse':
-                    header("Location: doctor_and_nurse_management/user_panel/user_nurse.php");
+                    header("Location: doctor_and_nurse_management/user_panel/Nurse/my_nurse_schedule.php");
                     break;
                 case 'Accountant':
                     header("Location: billing_and_insurance_management/user_panel/user_accountant.php");
