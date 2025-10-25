@@ -238,66 +238,48 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     Salary Computation
                 </h3>
 
-                <div class="grid">
-                    <div>
-                        <label for="employee_id">Employee</label>
-                        <select name="employee_id" id="employee_id" required>
-                            <option value="">----- Select Employee -----</option>
-                            <?php foreach ($employees as $emp): ?>
-                                <option value="<?php echo $emp['employee_id']; ?>" data-profession="<?php echo $emp['profession']; ?>">
-                                    <?php echo htmlspecialchars($emp['full_name']); ?> &nbsp;&nbsp;&nbsp; (Employee ID: <?php echo $emp['employee_id']; ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label>Rate (per day)</label>
-                        <input type="number" id="rate" readonly>
-                    </div>
-
-                    <div>
-                        <label>Days Worked</label>
-                        <input type="number" id="daysWorked">
-                    </div>
-
-                    <div>
-                        <label>Overtime Hours</label>
-                        <input type="number" id="otHours">
-                    </div>
-
-                    <div>
-                        <label>Allowances</label>
-                        <input type="number" id="allowances">
-                    </div>
-
-                    <div>
-                        <label>Bonuses</label>
-                        <input type="number" id="bonuses">
-                    </div>
-
-                    <div>
-                        <label>SSS Deduction</label>
-                        <input type="number" id="sss" readonly>
-                    </div>
-
-                    <div>
-                        <label>PhilHealth Deduction</label>
-                        <input type="number" id="philhealth" readonly>
-                    </div>
-
-                    <div>
-                        <label>Pag-IBIG Deduction</label>
-                        <input type="number" id="pagibig" readonly>
-                    </div>
-
-                    <div>
-                        <label>Absence Deduction</label>
-                        <input type="number" id="absence" readonly>
-                    </div>
-
-                    <bttn type="button" onclick="computeSalary()">Compute Salary</bttn>
+            <div class="grid">
+                <div>
+                    <label for="employee_id">Employee</label>
+                    <select id="employee_id" required>
+                        <option value="">----- Select Employee -----</option>
+                        <?php foreach ($employees as $emp): ?>
+                            <option value="<?= $emp['employee_id'] ?>" data-profession="<?= $emp['profession'] ?>">
+                                <?= htmlspecialchars($emp['full_name']) ?> (ID: <?= $emp['employee_id'] ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
+
+                <div>
+                    <label>Month</label>
+                    <select id="salaryMonth">
+                        <?php for($m=1; $m<=12; $m++): ?>
+                            <option value="<?= str_pad($m,2,'0',STR_PAD_LEFT) ?>"><?= date('F', mktime(0,0,0,$m,1)) ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+
+                <div><label>Rate (per day)</label><input type="number" id="rate" readonly value="0"></div>
+                <div><label>Days Worked</label><input type="number" id="daysWorked" value="0"></div>
+                <div><label>Overtime Hours</label><input type="number" id="otHours" value="0"></div>
+                <div><label>Allowances</label><input type="number" id="allowances" value="0"></div>
+                <div><label>Bonuses</label><input type="number" id="bonuses" value="0"></div>
+                <div><label>SSS Deduction</label><input type="number" id="sss" readonly value="0"></div>
+                <div><label>PhilHealth Deduction</label><input type="number" id="philhealth" readonly value="0"></div>
+                <div><label>Pag-IBIG Deduction</label><input type="number" id="pagibig" readonly value="0"></div>
+                <div><label>Absence Deduction</label><input type="number" id="absence" readonly value="0"></div>
+
+                <bttn type="button"  style="font-size: 25px;" onclick="computeSalary()">Compute Salary</bttn>
+
+            </div>
+
+            <br />
+            <br />
+            
+            <center>
+                <bttn type="submit" name="savePayrollBtn">Save Payroll</bttn>
+            </center>
 
                 <div class="result-box" id="resultBox">
                     Gross Pay: ₱0.00 
@@ -331,31 +313,36 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
 
-        // Salary computation elements
+        // Elements
         const employeeSelect = document.getElementById('employee_id');
         const rateInput = document.getElementById('rate');
         const daysWorkedInput = document.getElementById('daysWorked');
         const otHoursInput = document.getElementById('otHours');
 
-        // Map professions to per-day rate from PHP
-        const professionRates = <?php echo json_encode($perDayRates); ?>;
+        // Per-day rates from PHP
+        const professionRates = <?= json_encode($perDayRates) ?>;
 
-        // Update rate and fetch attendance when employee changes
-        employeeSelect.addEventListener('change', function() {
-            const selectedOption = this.selectedOptions[0];
-            const profession = selectedOption.dataset.profession;
-            rateInput.value = (professionRates[profession] || 0).toFixed(2);
+        // Update rate and attendance
+        employeeSelect.addEventListener('change', updateRateAndAttendance);
+        document.getElementById('salaryMonth').addEventListener('change', updateRateAndAttendance);
 
-            const employeeId = this.value;
-            if(!employeeId) return;
+        function updateRateAndAttendance() {
+            const employeeId = employeeSelect.value;
+            const month = document.getElementById('salaryMonth').value;
+            if (!employeeId) return;
 
-            fetch(`get_attendance.php?employee_id=${employeeId}`)
+            const profession = employeeSelect.selectedOptions[0]?.dataset.profession || '';
+            // Limit rate to 2 decimal places
+            const rate = professionRates[profession] ? parseFloat(professionRates[profession]).toFixed(2) : "0.00";
+            rateInput.value = rate;
+
+            fetch(`get_attendance.php?employee_id=${employeeId}&month=${month}`)
                 .then(res => res.json())
                 .then(data => {
                     daysWorkedInput.value = data.days_worked || 0;
                     otHoursInput.value = data.overtime_hours || 0;
                 });
-        });
+        }
 
         function computeSalary() {
             const rate = parseFloat(rateInput.value) || 0;
@@ -364,21 +351,19 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             const allowances = parseFloat(document.getElementById('allowances').value) || 0;
             const bonuses = parseFloat(document.getElementById('bonuses').value) || 0;
 
-            // Automatic government deductions based on profession
             const profession = employeeSelect.selectedOptions[0]?.dataset.profession || '';
             let sss = 0, philhealth = 0, pagibig = 100;
-            switch (profession) {
-                case 'Doctor': sss = 2250; philhealth = 1250; break;
-                case 'Nurse': sss = 1350; philhealth = 750; break;
-                case 'Pharmacist': sss = 1800; philhealth = 1000; break;
-                case 'Laboratorist': sss = 1035; philhealth = 575; break;
-                case 'Accountant': sss = 1125; philhealth = 625; break;
-                default:
-                    sss = rate * daysWorked * 0.045;
-                    philhealth = rate * daysWorked * 0.025;
+
+            switch(profession) {
+                case 'Doctor': sss=2250; philhealth=1250; break;
+                case 'Nurse': sss=1350; philhealth=750; break;
+                case 'Pharmacist': sss=1800; philhealth=1000; break;
+                case 'Laboratorist': sss=1035; philhealth=575; break;
+                case 'Accountant': sss=1125; philhealth=625; break;
+                default: sss = rate*daysWorked*0.045; philhealth = rate*daysWorked*0.025;
             }
 
-            const workingDays = 26; // default working days
+            const workingDays = 26;
             const absence = Math.max(0, workingDays - daysWorked) * rate;
 
             const basicPay = rate * daysWorked;
@@ -393,8 +378,9 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             document.getElementById('absence').value = absence.toFixed(2);
 
             document.getElementById('resultBox').innerText =
-                `Gross Pay: ₱${grossPay.toFixed(2)}  |  Total Deductions: ₱${totalDeductions.toFixed(2)}  |  Net Pay: ₱${netPay.toFixed(2)}`;
+                `Gross Pay: ₱${grossPay.toFixed(2)} | Total Deductions: ₱${totalDeductions.toFixed(2)} | Net Pay: ₱${netPay.toFixed(2)}`;
         }
+
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

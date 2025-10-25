@@ -55,8 +55,8 @@ class Salary {
                 SUM(overtime_minutes) / 60 AS overtime_hours
             FROM hr_daily_attendance
             WHERE employee_id = ? 
-              AND attendance_date BETWEEN ? AND ?
-              AND status IN ('Present', 'Overtime')
+            AND DATE(attendance_date) BETWEEN ? AND ?
+            AND status IN ('Present', 'Overtime', 'Undertime')
         ");
         $stmt->bind_param("iss", $employee_id, $start_date, $end_date);
         $stmt->execute();
