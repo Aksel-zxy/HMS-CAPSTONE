@@ -6,6 +6,9 @@ $sql = "
 SELECT 
     p.patient_id,
     CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
+    p.address,
+    p.dob,
+    p.phone_number,
     COALESCE(ir.status, 'N/A') AS insurance_status,
     (
         SELECT pr.status 
@@ -13,7 +16,14 @@ SELECT
         WHERE pr.patient_id = p.patient_id
         ORDER BY pr.created_at DESC 
         LIMIT 1
-    ) AS payment_status
+    ) AS payment_status,
+    (
+        SELECT pr.receipt_id 
+        FROM patient_receipt pr 
+        WHERE pr.patient_id = p.patient_id
+        ORDER BY pr.created_at DESC 
+        LIMIT 1
+    ) AS latest_receipt_id
 FROM patientinfo p
 LEFT JOIN insurance_requests ir 
     ON p.patient_id = ir.patient_id
@@ -45,7 +55,6 @@ ORDER BY p.lname ASC, p.fname ASC
 
 $result = $conn->query($sql);
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -80,6 +89,7 @@ $result = $conn->query($sql);
                             <?php 
                                 $insuranceStatus = $row['insurance_status'] ?? 'N/A';
                                 $paymentStatus = $row['payment_status'] ?? 'Pending';
+                                $receipt_id = $row['latest_receipt_id'] ?? 0;
                                 $disableBill = ($insuranceStatus === 'Pending') || ($paymentStatus === 'Paid');
                                 $showInsuranceButton = ($insuranceStatus === 'N/A');
                                 $rowClass = $insuranceStatus === 'Pending' ? 'pending-insurance' : '';
@@ -91,8 +101,8 @@ $result = $conn->query($sql);
                                         <span class="badge bg-warning text-dark">Pending</span>
                                     <?php elseif ($insuranceStatus === 'Approved'): ?>
                                         <span class="badge bg-success">Approved</span>
-                                    <?php elseif ($insuranceStatus === 'Rejected'): ?>
-                                        <span class="badge bg-danger">Rejected</span>
+                                    <?php elseif ($insuranceStatus === 'Rejected' || $insuranceStatus === 'Declined'): ?>
+                                        <span class="badge bg-danger">Declined</span>
                                     <?php else: ?>
                                         <span class="badge bg-secondary">N/A</span>
                                     <?php endif; ?>
@@ -106,6 +116,23 @@ $result = $conn->query($sql);
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex justify-content-end gap-2 align-items-center flex-wrap">
+
+                                        <!-- ✅ View Total Bill (Before Generating Bill) -->
+                                        <?php if (!$receipt_id): ?>
+                                            <a href="total_bill.php?patient_id=<?= $row['patient_id']; ?>" 
+                                               class="btn btn-secondary btn-sm" 
+                                               target="_blank">
+                                               View Total Bill
+                                            </a>
+                                        <?php else: ?>
+                                            <a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" 
+                                               target="_blank" 
+                                               class="btn btn-secondary btn-sm">
+                                               View Total Bill
+                                            </a>
+                                        <?php endif; ?>
+
+                                        <!-- ✅ Generate Bill -->
                                         <?php if ($disableBill): ?>
                                             <button class="btn btn-success btn-sm" disabled>
                                                 <?= $paymentStatus === 'Paid' ? 'Already Paid' : 'Generate Bill'; ?>
@@ -123,6 +150,7 @@ $result = $conn->query($sql);
                                             </a>
                                         <?php endif; ?>
 
+                                        <!-- ✅ Insurance Request Button -->
                                         <?php if ($showInsuranceButton): ?>
                                             <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">
                                                 Insurance Request
@@ -130,7 +158,7 @@ $result = $conn->query($sql);
                                         <?php endif; ?>
                                     </div>
 
-                                    <!-- Insurance Modal -->
+                                    <!-- ✅ Insurance Modal -->
                                     <?php if ($showInsuranceButton): ?>
                                     <div class="modal fade" id="insuranceModal<?= $row['patient_id'] ?>" tabindex="-1">
                                         <div class="modal-dialog">
@@ -145,15 +173,38 @@ $result = $conn->query($sql);
                                                         <input type="text" value="<?= htmlspecialchars($row['full_name']); ?>" class="form-control" readonly>
                                                     </div>
                                                     <input type="hidden" name="patient_id" value="<?= $row['patient_id'] ?>">
+
+                                                    <div class="mb-3">
+                                                        <label>Date of Birth:</label>
+                                                        <input type="text" value="<?= htmlspecialchars($row['dob']); ?>" class="form-control" readonly>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label>Address:</label>
+                                                        <input type="text" value="<?= htmlspecialchars($row['address']); ?>" class="form-control" readonly>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <label>Contact Number:</label>
+                                                        <input type="text" value="<?= htmlspecialchars($row['phone_number']); ?>" class="form-control" readonly>
+                                                    </div>
+
                                                     <div class="mb-3">
                                                         <label>Insurance Company</label>
                                                         <input type="text" name="insurance_company" class="form-control" required>
                                                     </div>
+
                                                     <div class="mb-3">
                                                         <label>Insurance Number</label>
                                                         <input type="text" name="insurance_number" class="form-control" required>
                                                     </div>
+
+                                                    <div class="mb-3">
+                                                        <label>Relationship to Insured</label>
+                                                        <input type="text" name="relationship_to_insured" class="form-control" required>
+                                                    </div>
                                                 </div>
+
                                                 <div class="modal-footer">
                                                     <button type="submit" class="btn btn-primary">Send Request</button>
                                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

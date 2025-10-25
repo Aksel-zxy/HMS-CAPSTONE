@@ -141,3 +141,28 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 });
+// Fix for accessibility warning: focus retained on hidden modal element
+document.addEventListener("DOMContentLoaded", function () {
+  const aiModal = document.getElementById("aiImpressionModal");
+  let lastTriggerBtn = null;
+
+  // Track which button opened the modal
+  document.querySelectorAll(".ai-impression-btn").forEach((btn) => {
+    btn.addEventListener("click", function () {
+      lastTriggerBtn = this;
+    });
+  });
+
+  // When modal fully closes, return focus to the opener
+  if (aiModal) {
+    aiModal.addEventListener("hidden.bs.modal", function () {
+      if (lastTriggerBtn) {
+        lastTriggerBtn.focus();
+      } else {
+        // fallback: focus any visible button to avoid warning
+        const fallback = document.querySelector(".ai-impression-btn");
+        if (fallback) fallback.focus();
+      }
+    });
+  }
+});

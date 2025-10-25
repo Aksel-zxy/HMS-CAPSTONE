@@ -32,7 +32,7 @@ if (!$user) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Laboratorist</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/user.css">
 </head>
@@ -107,9 +107,7 @@ if (!$user) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid">
-                <h1>BASAHIN PO YUNG MGA COMMENT SA CODE PARA DI MALIGAW</h1> <br>
-                <h1>PALITAN NA LANG YUNG LAMAN NG SIDEBAR NA ANGKOP SA MODULE MO</h1> <br>
-                <H1>TANONG KA PO SA GC KUNG NALILITO</H1>
+               <h1>N/A</h1>
             </div>
             <!-- END CODING HERE -->
         </div>
