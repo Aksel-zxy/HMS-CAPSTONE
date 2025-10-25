@@ -12,6 +12,19 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
+// Fetch user details from database
+$query = "SELECT * FROM hr_employees WHERE employee_id = ?";
+$stmt = $conn->prepare($query);
+$stmt->bind_param("i", $_SESSION['employee_id']);
+$stmt->execute();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
+
+if (!$user) {
+    echo "No user found.";
+    exit();
+}
+
 $employee_id = $_SESSION['employee_id'];
 
 // Fetch doctor info
