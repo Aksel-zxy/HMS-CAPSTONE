@@ -30,7 +30,7 @@ if (!$user) {
 // Fetch duty assignments assigned to this nurse
 $dutyQuery = "
     SELECT duty_id, doctor_id, bed_id, nurse_assistant, `procedure`, equipment, tools, notes
-    FROM duty_assignment
+    FROM duty_assignments
     WHERE nurse_assistant = ?
 ";
 $dutyStmt = $conn->prepare($dutyQuery);
