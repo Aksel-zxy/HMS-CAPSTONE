@@ -1,88 +1,125 @@
 /* ==============================
    General Page Styling
+   Optimized for 1920x1080
 ============================== */
 body {
     font-family: "Segoe UI", Arial, sans-serif;
-    background-color: #f8f9fa;
+    background-color: #f4f6f9;
     margin: 0;
     padding: 0;
+    color: #333;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 40px 50px;
 }
 
 /* ==============================
    Modal Styling
 ============================== */
 .modal-content {
-    border-radius: 12px;
+    border-radius: 14px;
     overflow: hidden;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
     border: none;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+    background-color: #fff;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Modal Header */
+.modal-content:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28);
+}
+
+/* ===== Modal Header ===== */
 .modal-header {
     background: linear-gradient(135deg, #007bff, #0056b3);
     color: #fff;
     border-bottom: none;
-    padding: 1rem 1.5rem;
+    padding: 1.25rem 1.75rem;
+    align-items: center;
 }
 
 .modal-title {
-    font-size: 1.2rem;
-    font-weight: bold;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
 }
 
-/* Modal Body */
+/* ===== Modal Body ===== */
 .modal-body {
     background-color: #ffffff;
     color: #333;
-    padding: 1.5rem;
-    font-size: 0.95rem;
+    padding: 1.75rem;
+    font-size: 1rem;
+    line-height: 1.7;
 }
 
-/* Modal Footer */
+/* ===== Modal Footer ===== */
 .modal-footer {
-    background-color: #f1f1f1;
+    background-color: #f1f3f5;
     border-top: none;
-    padding: 1rem 1.5rem;
+    padding: 1.25rem 1.75rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 /* ==============================
    Buttons
 ============================== */
+.btn {
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 0.95rem;
+    padding: 0.5rem 1rem;
+    transition: all 0.25s ease-in-out;
+    cursor: pointer;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+}
+
+/* Primary Button */
 .btn-primary {
     background-color: #007bff;
-    border: none;
-    transition: background 0.3s ease;
+    color: #fff;
 }
 
 .btn-primary:hover {
     background-color: #0056b3;
 }
 
+/* Success Button */
 .btn-success {
     background-color: #28a745;
-    border: none;
-    transition: background 0.3s ease;
+    color: #fff;
 }
 
 .btn-success:hover {
     background-color: #1e7e34;
 }
 
+/* Danger Button */
 .btn-danger {
     background-color: #dc3545;
-    border: none;
-    transition: background 0.3s ease;
+    color: #fff;
 }
 
 .btn-danger:hover {
     background-color: #a71d2a;
 }
 
+/* Secondary Button */
 .btn-secondary {
     background-color: #6c757d;
-    border: none;
-    transition: background 0.3s ease;
+    color: #fff;
 }
 
 .btn-secondary:hover {
@@ -90,14 +127,91 @@ body {
 }
 
 /* ==============================
+   Table Styling
+============================== */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    margin-top: 20px;
+}
+
+.table th, .table td {
+    border: 1px solid #dee2e6;
+    padding: 14px 16px;
+    text-align: left;
+}
+
+.table th {
+    background-color: #f1f3f5;
+    color: #333;
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+}
+
+.table td {
+    vertical-align: middle;
+    font-size: 0.9rem;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* ==============================
+   Tabs (Optional Navigation)
+============================== */
+.nav-tabs {
+    border-bottom: 2px solid #dee2e6;
+    margin-bottom: 20px;
+}
+
+.nav-tabs .nav-link {
+    border-radius: 0.5rem 0.5rem 0 0;
+    font-weight: 500;
+    color: #495057;
+    transition: all 0.2s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    background-color: #e9ecef;
+    color: #0d6efd;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+/* ==============================
    Responsive Design
 ============================== */
+@media (max-width: 1200px) {
+    .container {
+        padding: 30px;
+    }
+
+    .modal-body {
+        font-size: 0.95rem;
+    }
+}
+
 @media (max-width: 992px) {
     .container {
-        padding: 1rem;
+        padding: 1.5rem;
     }
+
     .table {
         font-size: 0.9rem;
+    }
+
+    .modal-dialog {
+        max-width: 85%;
+        margin: auto;
     }
 }
 
@@ -106,11 +220,13 @@ body {
         max-width: 90%;
         margin: auto;
     }
+
     .table {
         display: block;
         overflow-x: auto;
         white-space: nowrap;
     }
+
     .nav-tabs .nav-link {
         font-size: 0.9rem;
         padding: 0.5rem 0.75rem;
@@ -121,18 +237,56 @@ body {
     .modal-dialog {
         max-width: 95%;
     }
+
     .modal-header,
     .modal-footer {
         padding: 0.75rem 1rem;
     }
+
     .modal-body {
         padding: 1rem;
     }
+
     .btn {
         font-size: 0.85rem;
         padding: 0.4rem 0.75rem;
     }
+
     .table {
         font-size: 0.85rem;
     }
+}
+
+/* ==============================
+   1920x1080 Optimization
+============================== */
+@media (min-width: 1600px) {
+    body {
+        font-size: 18px;
+    }
+
+    .modal-title {
+        font-size: 1.4rem;
+    }
+
+    .table th, .table td {
+        padding: 16px 18px;
+        font-size: 1rem;
+    }
+
+    .btn {
+        font-size: 1rem;
+        padding: 0.55rem 1.1rem;
+    }
+
+    .container {
+        padding: 50px 70px;
+    }
+}
+
+/* ==============================
+   Global Smooth Transitions
+============================== */
+* {
+    transition: all 0.25s ease-in-out;
 }

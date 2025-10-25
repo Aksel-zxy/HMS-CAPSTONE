@@ -1,28 +1,229 @@
-/* Push content aside for sidebar */
+/* ==============================
+   Global Base Styles
+   ============================== */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Nunito", "Segoe UI", Arial, sans-serif;
+    background-color: #F5F6F7;
+    margin: 0;
+    padding: 0;
+    color: #333;
+    overflow-x: hidden;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+/* ==============================
+   Layout Wrapper
+   ============================== */
+.vendor-wrapper {
+    display: flex;
+    flex-wrap: nowrap;
+    min-height: 100vh;
+    background: #fff;
+}
+
+/* ==============================
+   Sidebar
+   ============================== */
+.vendor-sidebar {
+    flex: 0 0 260px;
+    background: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    overflow-y: auto;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 20px 0;
+}
+
+.vendor-sidebar a {
+    display: block;
+    padding: 12px 20px;
+    color: #333;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.vendor-sidebar a:hover,
+.vendor-sidebar a.active {
+    background-color: #00acc1;
+    color: #fff;
+}
+
+/* ==============================
+   Main Content (Shared for All Vendor Pages)
+   ============================== */
 .vendor-main {
+    flex: 1;
     margin-left: 260px; /* same as sidebar width */
     padding: 30px;
     min-height: 100vh;
     background-color: #f8f9fa;
+    overflow-x: auto;
+    transition: all 0.3s ease-in-out;
 }
 
-/* Contract card */
+.vendor-main h2 {
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 25px;
+}
+
+/* ==============================
+   Vendor Contract Page
+   ============================== */
 .contract {
     background: #fff;
     border-radius: 10px;
     border: 1px solid #ddd;
+    padding: 30px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-/* Headings */
 .contract h2 {
     font-weight: bold;
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #00acc1;
+}
+
+.contract p {
+    color: #555;
+    line-height: 1.8;
+    margin-bottom: 15px;
 }
 
 /* Signature section */
 .signature {
     margin-top: 60px;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
 }
 
 .signature div {
     font-size: 14px;
+    text-align: center;
+    margin-top: 30px;
+}
+
+.signature-line {
+    width: 200px;
+    border-top: 1px solid #333;
+    margin: 0 auto 10px;
+}
+
+/* ==============================
+   Tables (Optional, Shared)
+   ============================== */
+.table {
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    margin-top: 20px;
+}
+
+.table th,
+.table td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 14px;
+    white-space: nowrap;
+}
+
+.table th {
+    background: #00acc1;
+    color: #fff;
+    font-weight: 600;
+}
+
+/* ==============================
+   Buttons
+   ============================== */
+.btn {
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.25s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+.btn-primary {
+    background: #00acc1;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #0097a7;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    border: none;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+/* ==============================
+   Responsive Design
+   ============================== */
+
+/* Tablet */
+@media (max-width: 768px) {
+    .vendor-sidebar {
+        flex: 0 0 200px;
+    }
+
+    .vendor-main {
+        margin-left: 200px;
+        padding: 20px;
+    }
+}
+
+/* Mobile */
+@media (max-width: 576px) {
+    .vendor-wrapper {
+        flex-direction: column;
+    }
+
+    .vendor-sidebar {
+        flex: 0 0 auto;
+        width: 100%;
+        height: auto;
+        position: relative;
+        border-right: none;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .vendor-main {
+        margin-left: 0;
+        padding: 15px;
+    }
+
+    .contract {
+        padding: 20px;
+    }
+
+    .contract h2 {
+        font-size: 1.25rem;
+        text-align: center;
+    }
+
+    .signature {
+        flex-direction: column;
+        align-items: center;
+        gap: 30px;
+    }
 }

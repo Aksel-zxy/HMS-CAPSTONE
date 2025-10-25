@@ -1,68 +1,200 @@
 /* =============================
    Inventory Management Styling
+   Optimized for 1920x1080
    ============================= */
 
-/* General container spacing */
+/* ===== Base Styles ===== */
 body {
     font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f6f9;
+    color: #333;
+    font-size: 16px;
+    margin: 0;
+    padding: 30px;
+    line-height: 1.6;
 }
 
-/* Headings */
+/* ===== Headings ===== */
 h2 {
     font-weight: 700;
-    color: #333;
+    color: #222;
+    margin-bottom: 25px;
+    font-size: 28px;
 }
 
-/* Table Styling */
+/* ===== Table Styling ===== */
 .table {
-    border-radius: 0.5rem;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    background: #fff;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th, .table td {
+    padding: 14px 16px;
+    border: 1px solid #dee2e6;
+    text-align: left;
 }
 
 .table th {
     white-space: nowrap;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    background-color: #f1f3f5;
+    color: #333;
 }
 
 .table td {
     vertical-align: middle;
-    font-size: 0.88rem;
+    font-size: 0.9rem;
 }
 
-/* Badges for quantities */
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* ===== Badges for Quantities ===== */
 .badge {
-    font-size: 0.8rem;
-    padding: 0.5em 0.7em;
+    font-size: 0.85rem;
+    padding: 0.45em 0.75em;
     border-radius: 0.4rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
 }
 
-/* Modal improvements */
+.badge.bg-success {
+    background-color: #d4edda !important;
+    color: #155724 !important;
+}
+
+.badge.bg-warning {
+    background-color: #fff3cd !important;
+    color: #856404 !important;
+}
+
+.badge.bg-danger {
+    background-color: #f8d7da !important;
+    color: #721c24 !important;
+}
+
+/* ===== Modal Styling ===== */
 .modal-content {
-    border-radius: 0.75rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    border-radius: 0.8rem;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+    border: none;
+    background: #fff;
+}
+
+.modal-header {
+    border-bottom: 1px solid #dee2e6;
+    padding: 1rem 1.5rem;
 }
 
 .modal-title {
     font-weight: 600;
+    font-size: 1.1rem;
 }
 
-/* Form Controls */
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid #dee2e6;
+    padding: 1rem 1.5rem;
+}
+
+/* ===== Form Controls ===== */
 form .form-control,
 form .form-select {
     border-radius: 0.5rem;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+    border: 1px solid #ced4da;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+form .form-control:focus,
+form .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    outline: none;
 }
 
 form button {
     border-radius: 0.5rem;
+    font-weight: 500;
+    font-size: 0.95rem;
 }
 
-/* Responsive Tweaks */
+/* ===== Tabs ===== */
+.nav-tabs {
+    border-bottom: 2px solid #dee2e6;
+    margin-bottom: 20px;
+}
+
+.nav-tabs .nav-link {
+    border-radius: 0.5rem 0.5rem 0 0;
+    font-weight: 500;
+    color: #495057;
+    transition: all 0.2s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    background-color: #e9ecef;
+    color: #0d6efd;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+/* ===== Buttons ===== */
+.btn {
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 0.45rem 0.9rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+}
+
+.btn-primary {
+    background-color: #0d6efd;
+    border: none;
+}
+
+.btn-primary:hover {
+    background-color: #0b5ed7;
+}
+
+.btn-success {
+    background-color: #28a745;
+    border: none;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border: none;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+/* ===== Responsive Table Tweaks ===== */
 @media (max-width: 992px) {
     .table thead {
-        display: none; /* Hide table header on small screens */
+        display: none;
     }
 
     .table, .table tbody, .table tr, .table td {
@@ -71,45 +203,64 @@ form button {
     }
 
     .table tr {
-        margin-bottom: 1rem;
+        margin-bottom: 1.2rem;
         border: 1px solid #dee2e6;
-        border-radius: 0.5rem;
+        border-radius: 0.6rem;
         background: #fff;
-        padding: 0.8rem;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        padding: 1rem;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
     }
 
     .table td {
         text-align: right;
         padding-left: 50%;
         position: relative;
+        border: none;
+        border-bottom: 1px solid #eee;
     }
 
     .table td::before {
         content: attr(data-label);
         position: absolute;
         left: 0.75rem;
-        top: 0.75rem;
+        top: 0.8rem;
         font-weight: 600;
         color: #555;
         text-align: left;
     }
+
+    .table td:last-child {
+        border-bottom: none;
+    }
 }
 
-/* Tabs */
-.nav-tabs .nav-link {
-    border-radius: 0.5rem 0.5rem 0 0;
-    font-weight: 500;
+/* ===== 1920x1080 Optimization ===== */
+@media (min-width: 1600px) {
+    body {
+        font-size: 18px;
+        padding: 40px;
+    }
+
+    .table th, .table td {
+        padding: 16px 18px;
+        font-size: 1rem;
+    }
+
+    .modal-content {
+        border-radius: 1rem;
+    }
+
+    h2 {
+        font-size: 32px;
+    }
+
+    .btn {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+    }
 }
 
-.nav-tabs .nav-link.active {
-    background-color: #0d6efd;
-    color: #fff;
-}
-
-/* Buttons */
-.btn {
-    font-size: 0.85rem;
-    font-weight: 500;
-    padding: 0.4rem 0.8rem;
+/* ===== Smooth Transitions ===== */
+* {
+    transition: all 0.25s ease-in-out;
 }

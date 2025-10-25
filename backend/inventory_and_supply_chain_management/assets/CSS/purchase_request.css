@@ -1,82 +1,182 @@
-/* style.css */
+/* =====================================
+   Form Page Styling - Optimized for 1080p
+   ===================================== */
 body {
     font-family: "Poppins", sans-serif;
-    background: #f3f4f6;
+    background: linear-gradient(135deg, #e3e9f0, #f8fafc);
     margin: 0;
     padding: 0;
+    color: #333;
+    line-height: 1.5;
 }
 
+/* ===== Container ===== */
 .container {
-    width: 500px;
-    margin: 60px auto;
-    background: #fff;
-    padding: 30px 40px;
-    border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    width: 520px;
+    margin: 80px auto;
+    background: #ffffff;
+    padding: 40px 50px;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
 }
 
+.container:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+
+/* ===== Heading ===== */
 h2 {
     text-align: center;
-    margin-bottom: 20px;
-    color: #333;
+    margin-bottom: 25px;
+    color: #1f2937;
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
 }
 
+/* ===== Form Group ===== */
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 18px;
 }
 
+/* ===== Labels ===== */
 label {
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     font-weight: 600;
-    color: #444;
+    color: #374151;
+    font-size: 0.95rem;
 }
 
+/* ===== Input Fields ===== */
 input[type="text"],
 input[type="number"],
 input[type="month"],
 textarea {
     width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
     font-size: 15px;
+    background-color: #f9fafb;
+    transition: all 0.25s ease;
 }
 
+input:focus,
+textarea:focus {
+    border-color: #2563eb;
+    background-color: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+    outline: none;
+}
+
+/* ===== Textarea ===== */
 textarea {
     resize: vertical;
+    min-height: 100px;
 }
 
+/* ===== Buttons ===== */
 .btn {
     width: 100%;
     background: #2563eb;
     color: white;
-    padding: 10px;
-    font-size: 16px;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: 600;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: all 0.3s ease;
 }
 
 .btn:hover {
     background: #1e40af;
+    transform: translateY(-2px);
 }
 
+.btn:active {
+    background: #1e3a8a;
+    transform: translateY(0);
+}
+
+/* ===== Alerts ===== */
 .alert {
-    padding: 10px;
-    border-radius: 8px;
-    margin-bottom: 15px;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
     text-align: center;
-    font-weight: bold;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
 }
 
 .alert.success {
     background: #d1fae5;
     color: #065f46;
+    border: 1px solid #a7f3d0;
 }
 
 .alert.error {
     background: #fee2e2;
     color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+/* ===== Responsive Adjustments ===== */
+@media (max-width: 992px) {
+    .container {
+        width: 80%;
+        margin: 60px auto;
+        padding: 30px 35px;
+    }
+}
+
+@media (max-width: 768px) {
+    .container {
+        width: 90%;
+        padding: 25px 30px;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    label {
+        font-size: 0.9rem;
+    }
+
+    .btn {
+        font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        width: 95%;
+        padding: 20px;
+        border-radius: 10px;
+    }
+
+    h2 {
+        font-size: 1.25rem;
+    }
+
+    input,
+    textarea {
+        font-size: 14px;
+        padding: 10px 12px;
+    }
+
+    .btn {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+}
+
+/* ===== Smooth Transitions ===== */
+* {
+    transition: all 0.25s ease-in-out;
 }
