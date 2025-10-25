@@ -8,7 +8,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['batch_id'], $_POST['e
     $batch_id = intval($_POST['batch_id']);
     $expiry_date = $_POST['expiry_date'];
 
-    // Update the existing batch with expiry date only
     $stmt = $pdo->prepare("UPDATE medicine_batches SET expiration_date = ? WHERE id = ?");
     $stmt->execute([$expiry_date, $batch_id]);
 
@@ -23,29 +22,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
     $dispose_id = intval($_POST['dispose_id']);
     $dispose_qty = intval($_POST['dispose_qty']); 
 
-    // Fetch batch
-    $stmt = $pdo->prepare("SELECT * FROM medicine_batches WHERE id=?");
+    // Fetch batch from database, join vendor_products to get item_name and price
+    $stmt = $pdo->prepare("
+        SELECT mb.*, vp.item_name, vp.price
+        FROM medicine_batches mb
+        JOIN vendor_products vp ON mb.item_id = vp.id
+        WHERE mb.id = ?
+    ");
     $stmt->execute([$dispose_id]);
     $batch = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($batch && $dispose_qty > 0 && $dispose_qty <= $batch['quantity']) {
-        // Log disposed quantity
-        $stmt = $pdo->prepare("INSERT INTO disposed_medicines (batch_id, batch_no, item_name, quantity, price, expiration_date) 
-                               VALUES (?, ?, ?, ?, ?, ?)");
+        $price = isset($batch['price']) ? $batch['price'] : 0;
+        $item_name = isset($batch['item_name']) ? $batch['item_name'] : "Unknown";
+
+        // Insert disposed record
+        $stmt = $pdo->prepare("INSERT INTO disposed_medicines 
+            (batch_id, batch_no, item_id, item_name, quantity, price, expiration_date) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $batch['id'],
             $batch['batch_no'],
-            $batch['item_name'] ?? '', 
+            $batch['item_id'],
+            $item_name,
             $dispose_qty,
-            $batch['price'] ?? 0,
+            $price,
             $batch['expiration_date']
         ]);
 
-        // Update or delete batch
-        $stmt = $pdo->prepare("UPDATE medicine_batches SET quantity = quantity - ? WHERE id = ?");
-        $stmt->execute([$dispose_qty, $batch['id']]);
-        if ($batch['quantity'] - $dispose_qty <= 0) {
-            $stmt = $pdo->prepare("DELETE FROM medicine_batches WHERE id=?");
+        // Update quantity or delete batch if zero
+        $new_qty = $batch['quantity'] - $dispose_qty;
+        if ($new_qty > 0) {
+            $stmt = $pdo->prepare("UPDATE medicine_batches SET quantity = ? WHERE id = ?");
+            $stmt->execute([$new_qty, $batch['id']]);
+        } else {
+            $stmt = $pdo->prepare("DELETE FROM medicine_batches WHERE id = ?");
             $stmt->execute([$batch['id']]);
         }
     }
@@ -72,19 +83,18 @@ $new_delivered = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // ===============================
 $stmt = $pdo->prepare("
     SELECT 
+        mb.id AS batch_id,
         mb.item_id,
         vp.item_name,
         vp.price,
         vp.unit_type,
         vp.pcs_per_box,
-        SUM(mb.quantity) AS total_pcs,
-        COUNT(mb.id) AS boxes_count,
-        GROUP_CONCAT(mb.batch_no SEPARATOR ', ') AS batch_numbers,
+        mb.quantity,
+        mb.batch_no,
         mb.expiration_date
     FROM medicine_batches mb
     JOIN vendor_products vp ON mb.item_id = vp.id
     WHERE mb.expiration_date IS NOT NULL
-    GROUP BY mb.item_id, mb.expiration_date
     ORDER BY vp.item_name, mb.expiration_date
 ");
 $stmt->execute();
@@ -149,7 +159,7 @@ $disposed = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="container">
     <h2 class="mb-4">Batch & Expiry Tracking - Medicines</h2>
 
-    <!-- Alert -->
+    <!-- Expiry Alerts -->
     <?php if (!empty($seven_days_alert)): ?>
         <div class="alert alert-warning">
             <h6><strong>⚠️ Expiry Alerts</strong></h6>
@@ -177,42 +187,6 @@ $disposed = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </ul>
 
     <div class="tab-content border p-3 bg-white rounded-bottom">
-        <!-- New Delivered -->
-        <div class="tab-pane fade" id="newDelivered">
-            <?php if (empty($new_delivered)): ?>
-                <p class="text-muted">No new medicines awaiting expiry date.</p>
-            <?php else: ?>
-                <table class="table table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>ID</th>
-                            <th>Item Name</th>
-                            <th>Quantity (pcs)</th>
-                            <th>Unit</th>
-                            <th>Set Expiry</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($new_delivered as $row): ?>
-                            <tr>
-                                <td><?= $row['id'] ?></td>
-                                <td><?= htmlspecialchars($row['item_name']) ?></td>
-                                <td><?= $row['quantity'] ?></td>
-                                <td><?= $row['unit_type'] ?></td>
-                                <td>
-                                    <form method="post">
-                                        <input type="hidden" name="batch_id" value="<?= $row['id'] ?>">
-                                        <input type="date" name="expiry_date" class="form-control" required>
-                                        <button type="submit" class="btn btn-success btn-sm mt-1">Set</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php endif; ?>
-        </div>
-
         <!-- Medicine Stocks -->
         <div class="tab-pane fade show active" id="medicineStocks">
             <h5>Medicine Stocks</h5>
@@ -220,9 +194,8 @@ $disposed = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <thead class="table-light">
                     <tr>
                         <th>Item Name</th>
-                        <th>Boxes</th>
-                        <th>Total Pieces</th>
-                        <th>Batch Numbers</th>
+                        <th>Quantity (pcs)</th>
+                        <th>Batch No</th>
                         <th>Expiration Date</th>
                         <th>Status</th>
                         <th>Action</th>
@@ -232,16 +205,16 @@ $disposed = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php foreach (array_merge($expired, $near_expiry, $safe) as $row): ?>
                         <tr class="<?= $row['row_class'] ?>">
                             <td><?= htmlspecialchars($row['item_name']) ?></td>
-                            <td><?= $row['boxes_count'] ?></td>
-                            <td><?= $row['total_pcs'] ?></td>
-                            <td><?= $row['batch_numbers'] ?></td>
+                            <td><?= $row['quantity'] ?></td>
+                            <td><?= $row['batch_no'] ?></td>
                             <td><?= $row['expiration_date'] ?></td>
                             <td><?= $row['status'] ?></td>
                             <td>
                                 <?php if ($row['status'] === 'Expired'): ?>
                                     <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#disposeModal" 
-                                        data-id="<?= $row['item_id'] ?>" data-name="<?= htmlspecialchars($row['item_name']) ?>" 
-                                        data-qty="<?= $row['total_pcs'] ?>">Dispose</button>
+                                        data-id="<?= $row['batch_id'] ?>" 
+                                        data-name="<?= htmlspecialchars($row['item_name']) ?>" 
+                                        data-qty="<?= $row['quantity'] ?>">Dispose</button>
                                 <?php else: ?>
                                     <span class="text-muted">-</span>
                                 <?php endif; ?>
@@ -289,28 +262,28 @@ $disposed = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 </div>
 
-<!-- Dispose Confirmation Modal -->
+<!-- Dispose Modal -->
 <div class="modal fade" id="disposeModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title">Confirm Disposal</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure you want to dispose <strong id="medicineName"></strong>?</p>
-        <div class="mb-2">
-            <label for="disposeQty" class="form-label">Quantity to Dispose:</label>
-            <input type="number" min="1" class="form-control" id="disposeQty" name="dispose_qty">
+      <form method="post">
+        <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title">Confirm Disposal</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-      </div>
-      <div class="modal-footer">
-        <form method="post" id="disposeForm">
+        <div class="modal-body">
+            <p>Are you sure you want to dispose <strong id="medicineName"></strong>?</p>
+            <div class="mb-2">
+                <label for="disposeQty" class="form-label">Quantity to Dispose:</label>
+                <input type="number" min="1" class="form-control" id="disposeQty" name="dispose_qty" required>
+            </div>
+        </div>
+        <div class="modal-footer">
             <input type="hidden" name="dispose_id" id="disposeId">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             <button type="submit" class="btn btn-danger">Dispose</button>
-        </form>
-      </div>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -320,15 +293,16 @@ $disposed = $stmt->fetchAll(PDO::FETCH_ASSOC);
 var disposeModal = document.getElementById('disposeModal');
 disposeModal.addEventListener('show.bs.modal', function (event) {
     var button = event.relatedTarget;
-    var itemId = button.getAttribute('data-id');
+    var batchId = button.getAttribute('data-id');
     var itemName = button.getAttribute('data-name');
     var qty = button.getAttribute('data-qty');
 
-    document.getElementById('disposeId').value = itemId;
+    document.getElementById('disposeId').value = batchId;
     document.getElementById('medicineName').textContent = itemName;
     document.getElementById('disposeQty').value = qty;
     document.getElementById('disposeQty').max = qty;
 });
 </script>
+
 </body>
 </html>

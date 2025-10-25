@@ -110,5 +110,13 @@ $payment = $stmt->fetch(PDO::FETCH_ASSOC);
     </div>
 </div>
 
+<!-- Home Button -->
+<div class="mt-4">
+    <a href="../../inventory_and_supply_chain_management/order_receive.php" class="btn btn-primary">
+        🏠 Back to Orders
+    </a>
+</div>
+
+
 </body>
 </html>
