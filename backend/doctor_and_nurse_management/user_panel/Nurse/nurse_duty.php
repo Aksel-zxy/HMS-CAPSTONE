@@ -1,6 +1,7 @@
 <?php
 include '../../../../SQL/config.php';
 
+// Allow only logged-in nurses
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Nurse') {
     header('Location: login.php');
     exit();
@@ -11,10 +12,12 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// Fetch user details from database
+$nurse_id = $_SESSION['employee_id'];
+
+// Fetch nurse info
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['employee_id']);
+$stmt->bind_param("i", $nurse_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
@@ -24,6 +27,23 @@ if (!$user) {
     exit();
 }
 
+// Fetch duty assignments assigned to this nurse
+$dutyQuery = "
+    SELECT duty_id, doctor_id, bed_id, nurse_assistant, procedure, equipment, tools, notes
+    FROM duty_assignment
+    WHERE nurse_assistant = ?
+";
+$dutyStmt = $conn->prepare($dutyQuery);
+$dutyStmt->bind_param("i", $nurse_id);
+$dutyStmt->execute();
+$dutyResult = $dutyStmt->get_result();
+
+$duties = [];
+while ($row = $dutyResult->fetch_assoc()) {
+    $duties[] = $row;
+}
+
+$dutyStmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -63,7 +83,7 @@ if (!$user) {
                 <a href="doctor_duty.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                   <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M160 96C160 78.3 174.3 64 192 64L448 64C465.7 64 480 78.3 480 96C480 113.7 465.7 128 448 128L418.5 128L428.8 262.1C465.9 283.3 494.6 318.5 507 361.8L510.8 375.2C513.6 384.9 511.6 395.2 505.6 403.3C499.6 411.4 490 416 480 416L160 416C150 416 140.5 411.3 134.5 403.3C128.5 395.3 126.5 384.9 129.3 375.2L133 361.8C145.4 318.5 174 283.3 211.2 262.1L221.5 128L192 128C174.3 128 160 113.7 160 96zM288 464L352 464L352 576C352 593.7 337.7 608 320 608C302.3 608 288 593.7 288 576L288 464z"/></svg>
-                    <span style="font-size: 18px;">Doctor Duty</span>
+                    <span style="font-size: 18px;">Nurse Duty</span>
                 </a>
             </li>
              <li class="sidebar-item">
@@ -134,54 +154,55 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-             <div class="container-fluid">
-            <h2   style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">📋My Duties</h2>
-            <table class="table table-bordered table-hover duty-table">
-                <thead class="table-info">
-                    <tr>
-                        <th>Duty ID</th>
-                        <th>Doctor ID</th>
-                        <th>Bed ID</th>
-                        <th>Nurse Assistant</th>
-                        <th>Procedure</th>
-                        <th>Equipment</th>
-                        <th>Tools</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($duties)): ?>
-                        <?php foreach ($duties as $duty): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($duty['duty_id']) ?></td>
-                                <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
-                                <td><?= htmlspecialchars($duty['bed_id']) ?></td>
-                                <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
-                                <td><?= htmlspecialchars($duty['procedure']) ?></td>
-                                <td><?= htmlspecialchars($duty['equipment']) ?></td>
-                                <td>
-                                    <?php
-                                    $tools = $duty['tools'];
-                                    if ($tools && ($decoded = json_decode($tools, true))) {
-                                        foreach ($decoded as $tool) {
-                                            echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")<br>";
-                                        }
-                                    } else {
-                                        echo htmlspecialchars($tools);
-                                    }
-                                    ?>
-                                </td>
-                                <td><?= htmlspecialchars($duty['notes']) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="8">No duty assignments found.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
+        <div class="container-fluid">
+    <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
+        📋 My Duties
+    </h2>
 
-           
+    <table class="table table-bordered table-hover duty-table">
+        <thead class="table-info">
+            <tr>
+                <th>Duty ID</th>
+                <th>Doctor ID</th>
+                <th>Bed ID</th>
+                <th>Nurse Assistant</th>
+                <th>Procedure</th>
+                <th>Equipment</th>
+                <th>Tools</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (!empty($duties)): ?>
+                <?php foreach ($duties as $duty): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($duty['duty_id']) ?></td>
+                        <td><?= htmlspecialchars($duty['doctor_id']) ?></td>
+                        <td><?= htmlspecialchars($duty['bed_id']) ?></td>
+                        <td><?= htmlspecialchars($duty['nurse_assistant']) ?></td>
+                        <td><?= htmlspecialchars($duty['procedure']) ?></td>
+                        <td><?= htmlspecialchars($duty['equipment']) ?></td>
+                        <td>
+                            <?php
+                            $tools = $duty['tools'];
+                            if ($tools && ($decoded = json_decode($tools, true))) {
+                                foreach ($decoded as $tool) {
+                                    echo htmlspecialchars($tool['name']) . " (Qty: " . htmlspecialchars($tool['qty']) . ")<br>";
+                                }
+                            } else {
+                                echo htmlspecialchars($tools);
+                            }
+                            ?>
+                        </td>
+                        <td><?= htmlspecialchars($duty['notes']) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <tr><td colspan="8" class="text-center text-muted">No duty assignments found.</td></tr>
+            <?php endif; ?>
+        </tbody>
+    </table>
+</div>
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->

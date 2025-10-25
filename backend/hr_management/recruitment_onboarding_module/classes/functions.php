@@ -14,13 +14,13 @@ function sendInterviewEmail($toEmail, $toName, $interviewDate) {
         $mail->isSMTP();
         $mail->Host = 'smtp.gmail.com'; // Email server ng provider mo
         $mail->SMTPAuth = true;
-        $mail->Username = 'capstone.project4101@gmail.com';  // Ilagay email mo
-        $mail->Password = 'xbld micl wmmd mrnk';   // Ilagay password / app password
+        $mail->Username = 'capstoneproject744@gmail.com';  // Ilagay email mo
+        $mail->Password = 'dqzw kkxo adbo pwry';   // Ilagay password / app password
         $mail->SMTPSecure = 'tls';
         $mail->Port = 587;
 
         //Recipients
-        $mail->setFrom('capstone.project4101@gmail.com', 'Dr. Eduardo V. Roquero Memorial Hospital');
+        $mail->setFrom('capstoneproject744@gmail.com', 'Dr. Eduardo V. Roquero Memorial Hospital');
         $mail->addAddress($toEmail, $toName);
 
         //Content
