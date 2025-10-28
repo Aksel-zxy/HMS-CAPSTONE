@@ -134,7 +134,7 @@ if (!$user) {
                 </ul>
             </li>
             <li class="sidebar-item">
-                <a href="../configuration_page/price.php" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#configuration"
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#configuration"
                     aria-expanded="true" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-tools" viewBox="0 0 16 16">
                         <path d="M1 0 0 1l2.2 3.081a1 1 0 0 0 .815.419h.07a1 1 0 0 1 .708.293l2.675 2.675-2.617 2.654A3.003 3.003 0 0 0 0 13a3 3 0 1 0 5.878-.851l2.654-2.617.968.968-.305.914a1 1 0 0 0 .242 1.023l3.27 3.27a.997.997 0 0 0 1.414 0l1.586-1.586a.997.997 0 0 0 0-1.414l-3.27-3.27a1 1 0 0 0-1.023-.242L10.5 9.5l-.96-.96 2.68-2.643A3.005 3.005 0 0 0 16 3c0-.269-.035-.53-.102-.777l-2.14 2.141L12 4l-.364-1.757L13.777.102a3 3 0 0 0-3.675 3.68L7.462 6.46 4.793 3.793a1 1 0 0 1-.293-.707v-.071a1 1 0 0 0-.419-.814L1 0Zm9.646 10.646a.5.5 0 0 1 .708 0l2.914 2.915a.5.5 0 0 1-.707.707l-2.915-2.914a.5.5 0 0 1 0-.708ZM3 11l.471.242.529.026.287.445.445.287.026.529L5 13l-.242.471-.026.529-.445.287-.287.445-.529.026L3 15l-.471-.242L2 14.732l-.287-.445L1.268 14l-.026-.529L1 13l.242-.471.026-.529.445-.287.287-.445.529-.026L3 11Z" />
@@ -190,7 +190,7 @@ if (!$user) {
             <!-- START CODING HERE -->
              <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
-                    ⚙️ Laboratory & Diagnostic Equipment and Maintenance Schedule
+                    ⚙️ Configuration Page - Laboratory & Diagnostic Equipment Prices
                 </h2>
 
                 <!-- Search box -->
@@ -202,32 +202,7 @@ if (!$user) {
 
                 <!-- Table container -->
                 <div style="height:600px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
-                    <table id="machineTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
-                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
-                            <tr>
-                                <th style="padding:12px; text-align:center;">#</th>
-                                <th style="padding:12px; text-align:center;">Machine Name</th>
-                                <th style="padding:12px; text-align:center;">Machine Type</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($labDiagnosticEquipments)): ?>
-                                <?php foreach ($labDiagnosticEquipments as $row): ?>
-                                    <tr style="border-bottom:1px solid #f1f1f1;">
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['machine_id']) ?></td>
-                                        <td style="padding:12px; text-align:left;"><?= htmlspecialchars($row['machine_name']) ?></td>
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['machine_type']) ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="3" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
-                                        🧾 No Laboratory or Diagnostic equipment found
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                    <h1>CONFIGURE PRICE</h1>
                 </div>
             </div>
             <!----- End of Main Content ----->
