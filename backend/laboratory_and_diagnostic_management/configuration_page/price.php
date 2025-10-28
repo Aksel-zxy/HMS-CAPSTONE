@@ -141,7 +141,7 @@ if (!$user) {
                     </svg>
                     <span style="font-size: 18px;">Configuration</span>
                 </a>
-                <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <!-- <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
                         <a href="lab_equip.php" class="sidebar-link">Laboratory Price Configuration</a>
                     </li>
@@ -151,7 +151,7 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
-                </ul>
+                </ul> -->
             </li>
         </aside>
         <!----- End of Sidebar ----->
@@ -202,32 +202,7 @@ if (!$user) {
 
                 <!-- Table container -->
                 <div style="height:600px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
-                    <table id="machineTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
-                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
-                            <tr>
-                                <th style="padding:12px; text-align:center;">#</th>
-                                <th style="padding:12px; text-align:center;">Machine Name</th>
-                                <th style="padding:12px; text-align:center;">Machine Type</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($labDiagnosticEquipments)): ?>
-                                <?php foreach ($labDiagnosticEquipments as $row): ?>
-                                    <tr style="border-bottom:1px solid #f1f1f1;">
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['machine_id']) ?></td>
-                                        <td style="padding:12px; text-align:left;"><?= htmlspecialchars($row['machine_name']) ?></td>
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['machine_type']) ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="3" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
-                                        🧾 No Laboratory or Diagnostic equipment found
-                                    </td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                    <h1>CONFIGURE PRICE</h1>
                 </div>
             </div>
             <!----- End of Main Content ----->
