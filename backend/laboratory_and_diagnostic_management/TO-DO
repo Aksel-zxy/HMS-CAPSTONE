@@ -1,3 +1,14 @@
-SHOW RESULT PATIENT ADMIN SIDE
-VALIDATE ADMIN SIDE
-UPDATE STATUS
+Configuration for price
+AI Scheduling (Xray, MRI, and CT Scan rooms availability)
+Different laboratory test (x-ray chest, legs.)
+
+For Lab:
+Equipment Availability
+Operation
+Room
+Doctor
+Patient Availability
+
+Configuration result not hard coded
+result basis depends on age of patient
+add email/copy for patient

@@ -1,7 +1,6 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
-require_once "oop3/machine.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -141,9 +140,9 @@ if (!$user) {
                     </svg>
                     <span style="font-size: 18px;">Configuration</span>
                 </a>
-                <!-- <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="lab_equip.php" class="sidebar-link">Laboratory Price Configuration</a>
+                        <a href="price.php" class="sidebar-link">Laboratory Price Configuration</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
@@ -151,7 +150,7 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
-                </ul> -->
+                </ul>
             </li>
         </aside>
         <!----- End of Sidebar ----->
@@ -188,20 +187,20 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
                     ⚙️ Configuration Page - Laboratory & Diagnostic Equipment Prices
                 </h2>
 
-                <!-- Search box -->
+                <!-- Search box
                 <div class="col-md-3 mb-3">
                     <input type="text" id="searchMachineInput" class="form-control"
                         style="width:300px; border-radius:20px; padding:8px 15px;"
                         placeholder="🔍 Search machine type or name...">
-                </div>
+                </div> -->
 
                 <!-- Table container -->
-                <div style="height:600px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+                <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
                     <h1>CONFIGURE PRICE</h1>
                 </div>
             </div>
