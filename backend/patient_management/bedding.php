@@ -1,6 +1,5 @@
 <?php
 include '../../SQL/config.php';
-
 include_once 'class/caller.php';
 
 $callerobj = new Caller($conn);
@@ -40,7 +39,7 @@ if (!$user) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Bedding</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="patient_management/assets/css/bedding.css">
+
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
@@ -100,6 +99,18 @@ if (!$user) {
         /* green overlay */
     }
 
+    .seat-name.empty {
+        height: 18px;
+        /* keeps seats aligned even when no name */
+    }
+
+    .seat-name {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: black;
+    }
+
     .seat.Occupied::after {
         background-color: #dc3545;
         /* red overlay */
@@ -124,6 +135,7 @@ if (!$user) {
         color: #333;
         margin-top: 0.5rem;
     }
+
 
     @media (max-width: 575.98px) {
         .seat {
@@ -214,7 +226,7 @@ if (!$user) {
                         <path
                             d="M64 96C81.7 96 96 110.3 96 128L96 352L320 352L320 224C320 206.3 334.3 192 352 192L512 192C565 192 608 235 608 288L608 512C608 529.7 593.7 544 576 544C558.3 544 544 529.7 544 512L544 448L96 448L96 512C96 529.7 81.7 544 64 544C46.3 544 32 529.7 32 512L32 128C32 110.3 46.3 96 64 96zM144 256C144 220.7 172.7 192 208 192C243.3 192 272 220.7 272 256C272 291.3 243.3 320 208 320C172.7 320 144 291.3 144 256z" />
                     </svg>
-                    <span style="font-size: 18px;">Bedding</span>
+                    <span style="font-size: 18px;">Bedding & Linen</span>
                 </a>
             </li>
 
@@ -289,41 +301,72 @@ if (!$user) {
 
             <!-- START CODING HERE -->
             <div class="container py-5">
-                <h1 class="mb-4 text-center text-primary">Room Layout Overview</h1>
+                <div class="justify-content-center">
+                    <h1 class="mb-4 text-center text-primary">Room Layout Overview</h1>
+                </div>
+                <div class="d-flex justify-content-end">
+
+                    <button class="btn btn-primary mb-4" onclick="openMoveModal()">
+                        Transfer Bed
+                    </button>
+
+                </div>
+                <div id="modalContainer"></div>
+
                 <div class="row gy-4 justify-content-center">
 
                     <?php foreach ($rooms as $room_number => $beds): ?>
                     <div class="col-12 col-md-5 col-lg-4">
                         <div class="room-card text-center">
-                            <div class="seats">
+
+
+
+                            <!-- ROOM NUMBER BELOW NAME -->
+                            <div class="room-header room-header-top">
+                                Room <?php echo $room_number; ?>
+                            </div>
+
+                            <div class="seats mt-2">
+
                                 <?php foreach ($beds as $bed): ?>
                                 <?php
-                                            // Determine seat class based on status
-                                            $seatClass = '';
-                                            if ($bed['status'] == 'Occupied') {
-                                                $seatClass = 'Occupied';
-                                            } elseif ($bed['status'] == 'Available') {
-                                                $seatClass = 'Available';
-                                            } elseif ($bed['status'] == 'Under Maintenance') {
-                                                $seatClass = 'Maintenance';
-                                            }
-                                        ?>
-                                <div class="seat <?php echo $seatClass; ?>" title="<?php 
-                                                if ($bed['status'] == 'Occupied' && !empty($bed['fname'])) {
-                                                    echo 'Occupied by: ' . $bed['fname'] . ' ' . $bed['lname'];
-                                                } elseif ($bed['status'] == 'Under Maintenance') {
-                                                    echo 'Under Maintenance (Bed ' . $bed['bed_number'] . ')';
-                                                } else {
-                                                    echo 'Available (Bed ' . $bed['bed_number'] . ')';
-                                                }
-                                            ?>">
+                            $seatClass = ($bed['status'] == 'Occupied') ? 'Occupied' :
+                                        (($bed['status'] == 'Available') ? 'Available' : 'Maintenance');
+                        ?>
+
+                                <div class="seat-wrapper">
+
+                                    <!-- NAME ABOVE SEAT -->
+                                    <?php if ($bed['status'] == 'Occupied' && !empty($bed['fname'])): ?>
+                                    <div class="seat-name">
+                                        <?php echo $bed['fname'] . ' ' . $bed['lname']; ?>
+                                    </div>
+                                    <?php else: ?>
+                                    <div class="seat-name empty"></div>
+                                    <?php endif; ?>
+
+                                    <!-- SEAT ICON -->
+                                    <div class="seat <?php echo $seatClass; ?>" title="<?php 
+                                        if ($bed['status'] == 'Occupied') {
+                                            echo 'Occupied by: ' . $bed['fname'] . ' ' . $bed['lname'];
+                                        } elseif ($bed['status'] == 'Under Maintenance') {
+                                            echo 'Under Maintenance (Bed ' . $bed['bed_number'] . ')';
+                                        } else {
+                                            echo 'Available (Bed ' . $bed['bed_number'] . ')';
+                                        }
+                                         ?>">
+                                    </div>
+
                                 </div>
                                 <?php endforeach; ?>
 
-                                <div class="room-header">Room <?php echo $room_number; ?></div>
                             </div>
+
+
                         </div>
                     </div>
+
+
                     <?php endforeach; ?>
 
                 </div>
@@ -339,6 +382,19 @@ if (!$user) {
     toggler.addEventListener("click", function() {
         document.querySelector("#sidebar").classList.toggle("collapsed");
     });
+
+    function openMoveModal() {
+        fetch('move.php')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('modalContainer').innerHTML = html;
+
+                const modal = new bootstrap.Modal(
+                    document.getElementById('moveModal')
+                );
+                modal.show();
+            });
+    }
     </script>
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
