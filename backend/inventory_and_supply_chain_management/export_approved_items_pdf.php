@@ -1,5 +1,5 @@
 <?php
-require('../../inventory_and_supply_chain_management/fpdf/fpdf.php');
+require('../inventory_and_supply_chain_management/fpdf/fpdf.php');
 include '../../SQL/config.php';
 
 // ================= FILTERS =================
