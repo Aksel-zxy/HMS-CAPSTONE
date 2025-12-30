@@ -5,12 +5,60 @@ include '../../SQL/config.php';
 if (isset($_POST['action'])) {
     $request_id = $_POST['id'];
 
-    if ($_POST['action'] === 'approve') {
-        $stmt = $pdo->prepare("UPDATE department_request SET status='Approved' WHERE id=?");
-        $stmt->execute([$request_id]);
-    } elseif ($_POST['action'] === 'reject') {
-        $stmt = $pdo->prepare("UPDATE department_request SET status='Rejected' WHERE id=?");
-        $stmt->execute([$request_id]);
+    // Fetch the request first
+    $check = $pdo->prepare("SELECT * FROM department_request WHERE id=?");
+    $check->execute([$request_id]);
+    $request = $check->fetch(PDO::FETCH_ASSOC);
+
+    if ($request) {
+        $items = json_decode($request['items'], true);
+        if (!is_array($items)) $items = [];
+
+        if ($_POST['action'] === 'approve') {
+            $approved_qty = 0;
+            $grand_total = 0;
+
+            // Update approved quantity for each item
+            foreach ($items as &$item) {
+                $item['approved_quantity'] = $item['approved_quantity'] ?? $item['quantity'];
+                $approved_qty += $item['approved_quantity'];
+                $grand_total += $item['approved_quantity'] * $item['price'];
+            }
+            unset($item); // break reference
+
+            // ✅ Ensure department_id is valid
+            $stmtDept = $pdo->prepare("SELECT department_id FROM departments WHERE department_name = ? LIMIT 1");
+            $stmtDept->execute([$request['department']]);
+            $department_id = $stmtDept->fetchColumn();
+
+            if (!$department_id) {
+                // Insert missing department
+                $insertDept = $pdo->prepare("INSERT INTO departments (department_name) VALUES (?)");
+                $insertDept->execute([$request['department']]);
+                $department_id = $pdo->lastInsertId();
+            }
+
+            // Update database
+            $stmt = $pdo->prepare("
+                UPDATE department_request 
+                SET status='Approved', 
+                    items=:items_json, 
+                    total_approved_items=:approved_qty,
+                    grand_total=:grand_total,
+                    department_id=:department_id
+                WHERE id=:id
+            ");
+            $stmt->execute([
+                ':items_json' => json_encode($items, JSON_UNESCAPED_UNICODE),
+                ':approved_qty' => $approved_qty,
+                ':grand_total' => $grand_total,
+                ':department_id' => $department_id,
+                ':id' => $request_id
+            ]);
+        } elseif ($_POST['action'] === 'reject') {
+            $stmt = $pdo->prepare("UPDATE department_request SET status='Rejected' WHERE id=?");
+            $stmt->execute([$request_id]);
+        }
     }
 }
 
@@ -44,7 +92,6 @@ $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <title>Admin - Department Requests</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/inventory_dashboard.css">
 <style>
 body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
 .main-content { margin-left: 260px; padding: 30px; }
@@ -60,7 +107,7 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
     <?php include 'inventory_sidebar.php'; ?>
 </div>
 
-<!-- ✅ Single Modal (Dynamic Content Loaded Here) -->
+<!-- ✅ Single Modal -->
 <div class="modal fade" id="viewItemsModal" tabindex="-1" aria-labelledby="viewItemsLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -109,7 +156,8 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
                         <th>ID</th>
                         <th>Department</th>
                         <th>Requested By (User ID)</th>
-                        <th>Total Items</th>
+                        <th>Total Requested Items</th>
+                        <th>Total Approved Items</th>
                         <th>Status</th>
                         <th>Requested At</th>
                         <th>Items</th>
@@ -118,10 +166,8 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
                 </thead>
                 <tbody>
                 <?php foreach ($requests as $r): 
-                    // Normalize items to array for JS
                     $itemsArray = json_decode($r['items'], true);
                     if (!is_array($itemsArray)) $itemsArray = [];
-                    // Convert object to array if needed
                     if (array_keys($itemsArray) !== range(0, count($itemsArray) - 1)) {
                         $itemsArray = array_values($itemsArray);
                     }
@@ -131,6 +177,7 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
                         <td><?= htmlspecialchars($r['department']) ?></td>
                         <td><?= htmlspecialchars($r['user_id']) ?></td>
                         <td class="text-center"><?= $r['total_items'] ?></td>
+                        <td class="text-center"><?= $r['total_approved_items'] ?? 0 ?></td>
                         <td class="text-center">
                             <?php if ($r['status'] == 'Pending'): ?>
                                 <span class="badge bg-warning text-dark">Pending</span>
@@ -175,7 +222,6 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-// ✅ Handle View Button Click
 document.querySelectorAll('.view-items-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const department = btn.dataset.dept;
@@ -183,31 +229,34 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
         try {
             items = JSON.parse(btn.dataset.items || '[]');
             if (!Array.isArray(items)) items = Object.values(items);
-        } catch(e) {
-            console.error('Invalid JSON:', e);
-        }
+        } catch(e) { console.error(e); }
 
         let html = '';
         if (items.length > 0) {
-            html += `
-                <table class="table table-bordered">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Item Name</th>
-                            <th>Description</th>
-                            <th>Quantity</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
+            html += `<table class="table table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Item Name</th>
+                                <th>Description</th>
+                                <th>Requested Quantity</th>
+                                <th>Approved Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
             items.forEach(item => {
-                html += `
-                    <tr>
-                        <td>${item.name || ''}</td>
-                        <td>${item.description || item.desc || ''}</td>
-                        <td>${item.quantity || item.qty || 0}</td>
-                    </tr>
-                `;
+                const approved = item.approved_quantity ?? item.quantity ?? 0;
+                const requested = item.quantity ?? 0;
+                const price = item.price ?? 0;
+                html += `<tr>
+                            <td>${item.name || ''}</td>
+                            <td>${item.description || item.desc || ''}</td>
+                            <td>${requested}</td>
+                            <td>${approved}</td>
+                            <td>₱${parseFloat(price).toFixed(2)}</td>
+                            <td>₱${(approved*price).toFixed(2)}</td>
+                         </tr>`;
             });
             html += `</tbody></table>`;
         } else {
@@ -222,5 +271,6 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
     });
 });
 </script>
+
 </body>
 </html>
