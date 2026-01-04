@@ -1,11 +1,11 @@
 <?php
 include '../../SQL/config.php';
 
-// ✅ Handle Approve / Reject Actions
+// Handle Approve / Reject Actions
 if (isset($_POST['action'])) {
     $request_id = $_POST['id'];
 
-    // Fetch the request first
+    // Fetch the request
     $check = $pdo->prepare("SELECT * FROM department_request WHERE id=?");
     $check->execute([$request_id]);
     $request = $check->fetch(PDO::FETCH_ASSOC);
@@ -18,31 +18,34 @@ if (isset($_POST['action'])) {
             $approved_qty = 0;
             $grand_total = 0;
 
-            // Update approved quantity for each item
-            foreach ($items as &$item) {
-                $item['approved_quantity'] = $item['approved_quantity'] ?? $item['quantity'];
-                $approved_qty += $item['approved_quantity'];
-                $grand_total += $item['approved_quantity'] * $item['price'];
-            }
-            unset($item); // break reference
+            // Read approved quantities from POST
+            $approved_quantities = $_POST['approved_quantity'] ?? [];
 
-            // ✅ Ensure department_id is valid
+            foreach ($items as $index => &$item) {
+                $approved = isset($approved_quantities[$index]) ? (int)$approved_quantities[$index] : ($item['approved_quantity'] ?? $item['quantity']);
+                // Validation: cannot approve more than requested
+                $approved = min($approved, $item['quantity']);
+                $item['approved_quantity'] = $approved;
+                $approved_qty += $approved;
+                $grand_total += $approved * $item['price'];
+            }
+            unset($item);
+
+            // Ensure department_id exists
             $stmtDept = $pdo->prepare("SELECT department_id FROM departments WHERE department_name = ? LIMIT 1");
             $stmtDept->execute([$request['department']]);
             $department_id = $stmtDept->fetchColumn();
-
             if (!$department_id) {
-                // Insert missing department
                 $insertDept = $pdo->prepare("INSERT INTO departments (department_name) VALUES (?)");
                 $insertDept->execute([$request['department']]);
                 $department_id = $pdo->lastInsertId();
             }
 
-            // Update database
+            // Update request
             $stmt = $pdo->prepare("
-                UPDATE department_request 
-                SET status='Approved', 
-                    items=:items_json, 
+                UPDATE department_request
+                SET status='Approved',
+                    items=:items_json,
                     total_approved_items=:approved_qty,
                     grand_total=:grand_total,
                     department_id=:department_id
@@ -62,9 +65,9 @@ if (isset($_POST['action'])) {
     }
 }
 
-// ✅ Filters
+// Filters
 $statusFilter = $_GET['status'] ?? 'All';
-$searchDept   = $_GET['search_dept'] ?? '';
+$searchDept = $_GET['search_dept'] ?? '';
 
 $query = "SELECT * FROM department_request WHERE 1=1";
 $params = [];
@@ -98,16 +101,18 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
 .card { border-radius: 12px; box-shadow: 0 5px 18px rgba(0,0,0,0.08); }
 .table thead th { background-color: #1e293b; color: #fff; }
 .modal-header { background-color: #2563eb; color: white; }
+input.approved-qty { width: 70px; }
+.grand-total { font-weight: bold; text-align: right; margin-top: 10px; }
+.total-approved { font-weight: bold; text-align: right; margin-top: 5px; }
 </style>
 </head>
 <body>
 
-<!-- ✅ Sidebar -->
 <div class="main-sidebar">
     <?php include 'inventory_sidebar.php'; ?>
 </div>
 
-<!-- ✅ Single Modal -->
+<!-- Modal for Viewing & Editing Approved Quantities -->
 <div class="modal fade" id="viewItemsModal" tabindex="-1" aria-labelledby="viewItemsLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -122,12 +127,10 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
     </div>
 </div>
 
-<!-- ✅ Main Content -->
 <div class="main-content">
     <div class="card p-4 bg-white">
         <h2 class="mb-4 text-primary"><i class="bi bi-clipboard-check"></i> Department Requests</h2>
 
-        <!-- ✅ Filters -->
         <form method="get" class="row g-3 mb-4">
             <div class="col-md-3">
                 <select name="status" class="form-select">
@@ -144,11 +147,10 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
                 <button class="btn btn-primary w-100"><i class="bi bi-search"></i> Filter</button>
             </div>
             <div class="col-md-2">
-                <a href="admin_department_requests.php" class="btn btn-secondary w-100"><i class="bi bi-arrow-clockwise"></i> Reset</a>
+                <a href="department_request.php" class="btn btn-secondary w-100"><i class="bi bi-arrow-clockwise"></i> Reset</a>
             </div>
         </form>
 
-        <!-- ✅ Requests Table -->
         <div class="table-responsive">
             <table class="table table-bordered table-hover align-middle">
                 <thead class="text-center">
@@ -192,17 +194,13 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
                             <button class="btn btn-info btn-sm view-items-btn"
                                 data-id="<?= $r['id'] ?>"
                                 data-dept="<?= htmlspecialchars($r['department']) ?>"
-                                data-items='<?= htmlspecialchars(json_encode($itemsArray), ENT_QUOTES) ?>'>
+                                data-items='<?= htmlspecialchars(json_encode($itemsArray), ENT_QUOTES) ?>'
+                                data-status="<?= $r['status'] ?>">
                                 <i class="bi bi-eye"></i> View
                             </button>
                         </td>
                         <td class="text-center">
                             <?php if ($r['status'] == 'Pending'): ?>
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="id" value="<?= $r['id'] ?>">
-                                    <input type="hidden" name="action" value="approve">
-                                    <button class="btn btn-success btn-sm"><i class="bi bi-check2-circle"></i> Approve</button>
-                                </form>
                                 <form method="post" class="d-inline">
                                     <input type="hidden" name="id" value="<?= $r['id'] ?>">
                                     <input type="hidden" name="action" value="reject">
@@ -222,9 +220,39 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+function updateTotals() {
+    const rows = document.querySelectorAll('#approveItemsForm tbody tr');
+    let grandTotal = 0;
+    let totalApproved = 0;
+    rows.forEach(row => {
+        const approvedInput = row.querySelector('input.approved-qty');
+        const priceCell = row.cells[4];
+        const requestedQty = parseInt(row.cells[2].textContent) || 0;
+        if (approvedInput && priceCell) {
+            let approved = parseInt(approvedInput.value) || 0;
+            // Validation: cannot exceed requested quantity
+            if (approved > requestedQty) {
+                approved = requestedQty;
+                approvedInput.value = approved;
+            } else if (approved < 0) {
+                approved = 0;
+                approvedInput.value = 0;
+            }
+            const price = parseFloat(priceCell.textContent.replace('₱','')) || 0;
+            row.cells[5].textContent = '₱' + (approved * price).toFixed(2);
+            grandTotal += approved * price;
+            totalApproved += approved;
+        }
+    });
+    document.getElementById('grandTotalDisplay').textContent = 'Grand Total: ₱' + grandTotal.toFixed(2);
+    document.getElementById('totalApprovedDisplay').textContent = 'Total Approved Items: ' + totalApproved;
+}
+
 document.querySelectorAll('.view-items-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const department = btn.dataset.dept;
+        const requestId = btn.dataset.id;
+        const status = btn.dataset.status;
         let items = [];
         try {
             items = JSON.parse(btn.dataset.items || '[]');
@@ -233,7 +261,10 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
 
         let html = '';
         if (items.length > 0) {
-            html += `<table class="table table-bordered">
+            html += `<form id="approveItemsForm" method="post">
+                        <input type="hidden" name="id" value="${requestId}">
+                        <input type="hidden" name="action" value="approve">
+                        <table class="table table-bordered">
                         <thead class="table-light">
                             <tr>
                                 <th>Item Name</th>
@@ -245,20 +276,34 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
                             </tr>
                         </thead>
                         <tbody>`;
-            items.forEach(item => {
-                const approved = item.approved_quantity ?? item.quantity ?? 0;
+            items.forEach((item, idx) => {
                 const requested = item.quantity ?? 0;
+                const approved = item.approved_quantity ?? requested;
                 const price = item.price ?? 0;
                 html += `<tr>
                             <td>${item.name || ''}</td>
                             <td>${item.description || item.desc || ''}</td>
                             <td>${requested}</td>
-                            <td>${approved}</td>
-                            <td>₱${parseFloat(price).toFixed(2)}</td>
-                            <td>₱${(approved*price).toFixed(2)}</td>
+                            <td>`;
+                if (status === 'Pending') {
+                    html += `<input type="number" class="form-control approved-qty" name="approved_quantity[${idx}]" value="${approved}" min="0" max="${requested}">`;
+                } else {
+                    html += approved;
+                }
+                html += `</td>
+                         <td>₱${parseFloat(price).toFixed(2)}</td>
+                         <td>₱${(approved*price).toFixed(2)}</td>
                          </tr>`;
             });
-            html += `</tbody></table>`;
+            html += `</tbody></table>
+                     <div class="d-flex justify-content-between mt-2 align-items-center">
+                        <div>
+                            <div class="total-approved" id="totalApprovedDisplay"></div>
+                            <div class="grand-total" id="grandTotalDisplay"></div>
+                        </div>
+                        <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle"></i> Approve</button>
+                     </div>
+                     </form>`;
         } else {
             html = `<p class="text-center text-muted">No items found for this request.</p>`;
         }
@@ -266,6 +311,26 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
         document.getElementById('viewItemsLabel').innerHTML = `📦 Request from ${department}`;
         document.getElementById('modalBody').innerHTML = html;
 
+        document.querySelectorAll('input.approved-qty').forEach(input => {
+            input.addEventListener('input', updateTotals);
+        });
+
+        // Prevent form submission if approved > requested
+        const form = document.getElementById('approveItemsForm');
+        form.addEventListener('submit', (e) => {
+            let invalid = false;
+            document.querySelectorAll('#approveItemsForm tbody tr').forEach(row => {
+                const approved = parseInt(row.querySelector('input.approved-qty').value) || 0;
+                const requested = parseInt(row.cells[2].textContent) || 0;
+                if (approved > requested) invalid = true;
+            });
+            if (invalid) {
+                alert('Approved quantity cannot exceed requested quantity!');
+                e.preventDefault();
+            }
+        });
+
+        updateTotals();
         const modal = new bootstrap.Modal(document.getElementById('viewItemsModal'));
         modal.show();
     });
