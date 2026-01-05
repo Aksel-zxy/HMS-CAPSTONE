@@ -141,9 +141,9 @@ if (!$user) {
                     </svg>
                     <span style="font-size: 18px;">Configuration</span>
                 </a>
-                <!-- <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="lab_equip.php" class="sidebar-link">Laboratory Price Configuration</a>
+                        <a href="../configuration_page/price.php" class="sidebar-link">Laboratory Price Configuration</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
@@ -151,7 +151,7 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
-                </ul> -->
+                </ul>
             </li>
         </aside>
         <!----- End of Sidebar ----->
