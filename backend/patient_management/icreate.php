@@ -136,7 +136,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                                 <!-- Color of the Eyes -->
                                 <label class="col-sm-3 col-form-label">Color of the Eyes</label>
                                 <div class="col-sm-9">
-                                    <input type="text" class="form-control" name="Coe">
+                                    <input type="text" class="form-control" name="coe">
                                 </div>
 
                             </div>
@@ -262,13 +262,13 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
         }
 
 
-        // ✅ Check if age is -1
+
         if (parseInt(age, 10) < 0) {
             alert("Invalid Date of Birth.");
             return false;
         }
 
-        return true; // ✅ All good
+        return true;
     }
 
     document.addEventListener("DOMContentLoaded", function() {

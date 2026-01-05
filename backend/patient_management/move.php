@@ -15,50 +15,27 @@ $beds = $CallerObj->getAvailableBeds();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Move Patient</title>
-
-    <!-- Bootstrap CSS -->
+    <title>HMS | Patient Management</title>
+    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-
-    <style>
-    body {
-        background: #f1f4f9;
-        height: 100vh;
-        overflow: hidden;
-    }
-
-    .slide-in {
-        animation: slideIn 0.8s ease forwards;
-    }
-
-    @keyframes slideIn {
-        from {
-            transform: translateY(-30px);
-            opacity: 0;
-        }
-
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
-    }
-    </style>
+    <link rel="stylesheet" href="assets/CSS/super.css">
+    <link rel="stylesheet" href="assets/CSS/move.css">
 </head>
 
-<body class="d-flex align-items-center justify-content-center">
+<body>
 
     <!-- Transfer Patient Modal -->
-    <div class="modal fade show" id="moveModal" style="display:block;" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="moveModal" tabindex="-1" aria-labelledby="moveModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg slide-in">
 
                 <div class="modal-header">
                     <h5 class="modal-title">Transfer Patient</h5>
-                    <a href="patient_dashboard.php" class="btn-close"></a>
+                    <a href="bedding.php" class="btn-close"></a>
                 </div>
 
                 <div class="modal-body">
-                    <!-- Fixed: Add action to submit normally -->
+
                     <form id="movePatientForm" method="POST" action="class/transfer.php">
 
                         <div class="mb-3">
@@ -112,8 +89,7 @@ $beds = $CallerObj->getAvailableBeds();
         </div>
     </div>
 
-    <!-- Bootstrap JS -->
-    <script src="assets/JS/bootstrap.bundle.min.js"></script>
+
 
     <script>
     const patientInput = document.getElementById('patient_search');
@@ -141,7 +117,10 @@ $beds = $CallerObj->getAvailableBeds();
         }
     });
     </script>
-
+    <script src="assets/Bootstrap/all.min.js"></script>
+    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="assets/Bootstrap/jq.js"></script>
 
 </body>
 

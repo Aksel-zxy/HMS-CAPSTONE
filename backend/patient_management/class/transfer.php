@@ -54,12 +54,12 @@ try {
     }
 
     $conn->commit();
-    header("Location: ../bedding.php?status=success&message=" . urlencode("Patient bed updated successfully"));
+    header("Location: ../bedding.php?status=1&message=" . urlencode("Patient bed updated successfully"));
     exit();
 
 } catch (Exception $e) {
     $conn->rollback();
-    header("Location: ../bedding.php?status=error&message=" . urlencode($e->getMessage()));
+    header("Location: ../bedding.php?status=0&message=" . urlencode($e->getMessage()));
     exit();
 }
 
