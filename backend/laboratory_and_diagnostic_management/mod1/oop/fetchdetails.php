@@ -1,5 +1,20 @@
 <?php
 require_once __DIR__ . '../../../../../SQL/config.php';
+require_once 'roommanager.php';
+
+// Enable error reporting for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+/**
+ * Show JS alert and exit
+ */
+function alertAndExit($message)
+{
+    echo "<script>alert(" . json_encode($message) . "); history.back();</script>";
+    exit;
+}
 
 class Patient
 {
@@ -11,32 +26,17 @@ class Patient
     {
         $this->conn = $db;
     }
+
     public function getAllPatients()
     {
         $query = "
-        SELECT p.*, a.appointment_id, a.appointment_date, a.notes, a.purpose, a.status
-        FROM {$this->patientTable} p
-        INNER JOIN {$this->appointmentsTable} a 
-            ON p.patient_id = a.patient_id
-        WHERE a.purpose = 'laboratory'
-    ";
-        $result = $this->conn->query($query);
-        return $result->fetch_all(MYSQLI_ASSOC);
-    }
-
-    public function getPatientById($id)
-    {
-        $stmt = $this->conn->prepare("
-            SELECT p.*, a.*
+            SELECT p.*, a.appointment_id, a.appointment_date, a.notes, a.purpose, a.status
             FROM {$this->patientTable} p
             INNER JOIN {$this->appointmentsTable} a 
                 ON p.patient_id = a.patient_id
-            WHERE p.patient_id = ?
-        ");
-        $stmt->bind_param("i", $id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        return $result->fetch_assoc();
+            WHERE a.purpose = 'laboratory'
+        ";
+        return $this->conn->query($query)->fetch_all(MYSQLI_ASSOC);
     }
 }
 
@@ -54,26 +54,67 @@ class Schedule
         $scheduleDate = date('Y-m-d', strtotime($schedule_datetime));
         $scheduleTime = date('H:i:s', strtotime($schedule_datetime));
 
-        // Get service name
-        $stmtService = $this->conn->prepare("SELECT serviceName FROM dl_services WHERE serviceID = ?");
+        // Get service details including room_type
+        $stmtService = $this->conn->prepare("
+            SELECT serviceName, room_type 
+            FROM dl_services 
+            WHERE serviceID = ?
+        ");
+        if (!$stmtService) {
+            alertAndExit("Database Error: " . $this->conn->error);
+        }
         $stmtService->bind_param("i", $service_id);
-        $stmtService->execute();
-        $resultService = $stmtService->get_result();
-        $serviceName = $resultService->fetch_assoc()['serviceName'] ?? null;
+        if (!$stmtService->execute()) {
+            alertAndExit("Database Error: " . $stmtService->error);
+        }
+        $service = $stmtService->get_result()->fetch_assoc();
         $stmtService->close();
 
-        if (!$serviceName) return false;
+        if (!$service) {
+            alertAndExit("Service not found.");
+        }
 
-        // Insert into dl_schedule (with appointment_id ✅)
+        // Get available room
+        $roomManager = new RoomManager($this->conn);
+        $room = $roomManager->getAvailableRoom($service['room_type']);
+
+        if (!$room) {
+            alertAndExit("No available room for this service.");
+        }
+
+        $roomID = (int)$room['roomID'];
+
+        // Insert schedule
         $stmt = $this->conn->prepare("
-        INSERT INTO dl_schedule (appointment_id, patientID, serviceName, employee_id, scheduleDate, scheduleTime, status) 
-        VALUES (?, ?, ?, ?, ?, ?, 'Processing')
-    ");
-        $stmt->bind_param("iissss", $appointment_id, $patient_id, $serviceName, $laboratorist_id, $scheduleDate, $scheduleTime);
-        $result = $stmt->execute();
+            INSERT INTO dl_schedule 
+            (appointment_id, patientID, serviceName, employee_id, scheduleDate, scheduleTime, room_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'Processing')
+        ");
+        if (!$stmt) {
+            alertAndExit("Database Error: " . $this->conn->error);
+        }
+
+        $stmt->bind_param(
+            "iisissi",
+            $appointment_id,
+            $patient_id,
+            $service['serviceName'],
+            $laboratorist_id,
+            $scheduleDate,
+            $scheduleTime,
+            $roomID
+        );
+
+        if (!$stmt->execute()) {
+            alertAndExit("Database Error: " . $stmt->error);
+        }
+
         $stmt->close();
 
-        return $result;
+        // Mark room as occupied
+        $roomManager->occupyRoom($roomID);
+
+        return true;
     }
 }
 
@@ -86,33 +127,41 @@ function getLatestSchedule($conn, $appointment_id)
         ORDER BY scheduleID DESC
         LIMIT 1
     ");
+    if (!$stmt) {
+        alertAndExit("Database Error: " . $conn->error);
+    }
     $stmt->bind_param("i", $appointment_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
+    if (!$stmt->execute()) {
+        alertAndExit("Database Error: " . $stmt->error);
+    }
+    $result = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    return $row ?: null; // return null if no record
+    return $result ?: null;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $schedule = new Schedule($conn);
 
-    $patient_id       = $_POST['patient_id'] ?? null;
-    $service_id       = $_POST['service_id'] ?? null;
-    $laboratorist_id  = $_POST['laboratorist_id'] ?? null;
-    $schedule_datetime = $_POST['schedule_datetime'] ?? null;
+    if (
+        !empty($_POST['patient_id']) &&
+        !empty($_POST['service_id']) &&
+        !empty($_POST['laboratorist_id']) &&
+        !empty($_POST['schedule_datetime']) &&
+        !empty($_POST['appointment_id'])
+    ) {
+        $success = $schedule->save(
+            (int)$_POST['patient_id'],
+            (int)$_POST['service_id'],
+            (int)$_POST['laboratorist_id'],
+            $_POST['schedule_datetime'],
+            (int)$_POST['appointment_id']
+        );
 
-    if ($patient_id && $service_id && $laboratorist_id && $schedule_datetime) {
-        if ($schedule->save($patient_id, $service_id, $laboratorist_id, $schedule_datetime, $_POST['appointment_id'] ?? null)) {
-            header("Location: ../doctor_referral.php?success=1");
+        if ($success) {
+            echo "<script>alert('Schedule saved successfully'); window.location='../doctor_referral.php';</script>";
             exit;
-        } else {
-            echo "Failed to save schedule.";
         }
     } else {
-        echo "Missing required fields.";
+        alertAndExit("Missing required fields.");
     }
-} 
-// else {
-//     echo "Invalid request.";
-// }
+}
