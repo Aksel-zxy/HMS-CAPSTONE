@@ -1,0 +1,21 @@
+body {
+  background: #f1f4f9;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.slide-in {
+  animation: slideIn 0.8s ease forwards;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

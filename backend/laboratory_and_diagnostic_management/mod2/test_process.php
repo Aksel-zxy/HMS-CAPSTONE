@@ -76,6 +76,9 @@ $allPatients = $patient->getAllPatients();
                     <li class="sidebar-item">
                         <a href="../mod1/cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="../mod1/room_available.php" class="sidebar-link">Room Overview</a>
+                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -144,9 +147,9 @@ $allPatients = $patient->getAllPatients();
                     </svg>
                     <span style="font-size: 18px;">Configuration</span>
                 </a>
-                <!-- <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="lab_equip.php" class="sidebar-link">Laboratory Price Configuration</a>
+                        <a href="../configuration_page/price.php" class="sidebar-link">Laboratory Price Configuration</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
@@ -154,7 +157,7 @@ $allPatients = $patient->getAllPatients();
                     <li class="sidebar-item">
                         <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
-                </ul> -->
+                </ul>
             </li>
         </aside>
         <!----- End of Sidebar ----->
@@ -193,7 +196,7 @@ $allPatients = $patient->getAllPatients();
             <!-- START CODING HERE -->
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
-                   🧾 Sample Processing
+                    🧾 Sample Processing
                 </h2>
                 <div class="col-md-3 mb-3">
                     <input type="text" id="searchInput" class="form-control"

@@ -1,7 +1,7 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
-require_once "oop3/machine.php";
+require_once 'oop/services.php';
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -20,6 +20,38 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+$service = new Service($conn);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    if (isset($_POST['add'])) {
+        $service->add(
+            $_POST['serviceName'],
+            $_POST['description'],
+            $_POST['price'],
+            $_POST['duration']
+        );
+    }
+
+    if (isset($_POST['update'])) {
+        $service->update(
+            $_POST['serviceID'],
+            $_POST['serviceName'],
+            $_POST['description'],
+            $_POST['price'],
+            $_POST['duration']
+        );
+    }
+
+    if (isset($_POST['delete'])) {
+        $service->delete($_POST['serviceID']);
+    }
+
+    header("Location: price.php");
+    exit();
+}
+
+$services = $service->getAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -73,6 +105,9 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="../mod1/cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="../mod1/room_available.php" class="sidebar-link">Room Overview</a>
+                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -123,13 +158,13 @@ if (!$user) {
                 </a>
                 <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
+                        <a href="../mod4/lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
+                        <a href="../mod4/maintenance.php" class="sidebar-link">Maintenance Schedule</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
+                        <a href="../mod4/operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -141,9 +176,9 @@ if (!$user) {
                     </svg>
                     <span style="font-size: 18px;">Configuration</span>
                 </a>
-                <!-- <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="lab_equip.php" class="sidebar-link">Laboratory Price Configuration</a>
+                        <a href="price.php" class="sidebar-link">Laboratory Price Configuration</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
@@ -151,7 +186,7 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
-                </ul> -->
+                </ul>
             </li>
         </aside>
         <!----- End of Sidebar ----->
@@ -188,21 +223,66 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
-                    ⚙️ Configuration Page - Laboratory & Diagnostic Equipment Prices
+                    ⚙️ Add or Update Laboratory Services and Prices
                 </h2>
 
                 <!-- Search box -->
-                <div class="col-md-3 mb-3">
+                <!-- <div class="col-md-3 mb-3">
                     <input type="text" id="searchMachineInput" class="form-control"
                         style="width:300px; border-radius:20px; padding:8px 15px;"
                         placeholder="🔍 Search machine type or name...">
-                </div>
+                </div> -->
 
                 <!-- Table container -->
-                <div style="height:600px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
-                    <h1>CONFIGURE PRICE</h1>
+                <div class="table-responsive" style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+                    <table class="table table-bordered table-hover align-middle">
+                        <thead class="table-success">
+                            <tr>
+                                <th>Service Name</th>
+                                <th>Description</th>
+                                <th width="120">Price</th>
+                                <th width="150">Duration (mins)</th>
+                                <th width="160">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                            <!-- ADD NEW SERVICE -->
+                            <tr>
+                                <form method="POST">
+                                    <td><input type="text" name="serviceName" class="form-control" required></td>
+                                    <td><input type="text" name="description" class="form-control" required></td>
+                                    <td><input type="number" step="0.01" name="price" class="form-control" required></td>
+                                    <td><input type="number" name="duration" class="form-control" required></td>
+                                    <td>
+                                        <button name="add" class="btn btn-success btn-sm w-100">Add</button>
+                                    </td>
+                                </form>
+                            </tr>
+
+                            <!-- EXISTING SERVICES -->
+                            <?php while ($row = $services->fetch_assoc()): ?>
+                                <tr>
+                                    <form method="POST">
+                                        <input type="hidden" name="serviceID" value="<?= $row['serviceID']; ?>">
+                                        <td><input type="text" name="serviceName" value="<?= $row['serviceName']; ?>" class="form-control"></td>
+                                        <td><input type="text" name="description" value="<?= $row['description']; ?>" class="form-control"></td>
+                                        <td><input type="number" step="0.01" name="price" value="<?= $row['price']; ?>" class="form-control"></td>
+                                        <td><input type="number" name="duration" value="<?= $row['durationMinutes']; ?>" class="form-control"></td>
+                                        <td class="d-flex gap-1">
+                                            <button name="update" class="btn btn-primary btn-sm w-100">Save</button>
+                                            <button name="delete" class="btn btn-danger btn-sm w-100"
+                                                onclick="return confirm('Delete this service?')">
+                                                Delete
+                                            </button>
+                                        </td>
+                                    </form>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
             <!----- End of Main Content ----->

@@ -1,6 +1,5 @@
 <?php
 session_start();
-
 include '../../SQL/config.php';
 require_once 'class/patient.php';
 require_once 'class/caller.php';
@@ -127,22 +126,10 @@ $user = $result->fetch_assoc();
                         <path
                             d="M64 96C81.7 96 96 110.3 96 128L96 352L320 352L320 224C320 206.3 334.3 192 352 192L512 192C565 192 608 235 608 288L608 512C608 529.7 593.7 544 576 544C558.3 544 544 529.7 544 512L544 448L96 448L96 512C96 529.7 81.7 544 64 544C46.3 544 32 529.7 32 512L32 128C32 110.3 46.3 96 64 96zM144 256C144 220.7 172.7 192 208 192C243.3 192 272 220.7 272 256C272 291.3 243.3 320 208 320C172.7 320 144 291.3 144 256z" />
                     </svg>
-                    <span style="font-size: 18px;">Bedding</span>
+                    <span style="font-size: 18px;">Bedding & Linen</span>
                 </a>
             </li>
 
-            <li class="sidebar-item">
-                <a href="pBilling.php   " class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                        class="fa-solid fa-clock-rotate-left" viewBox="0 0 16 16">
-
-                        <path
-                            d="M320 128C426 128 512 214 512 320C512 426 426 512 320 512C254.8 512 197.1 479.5 162.4 429.7C152.3 415.2 132.3 411.7 117.8 421.8C103.3 431.9 99.8 451.9 109.9 466.4C156.1 532.6 233 576 320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C234.3 64 158.5 106.1 112 170.7L112 144C112 126.3 97.7 112 80 112C62.3 112 48 126.3 48 144L48 256C48 273.7 62.3 288 80 288L104.6 288C105.1 288 105.6 288 106.1 288L192.1 288C209.8 288 224.1 273.7 224.1 256C224.1 238.3 209.8 224 192.1 224L153.8 224C186.9 166.6 249 128 320 128zM344 216C344 202.7 333.3 192 320 192C306.7 192 296 202.7 296 216L296 320C296 326.4 298.5 332.5 303 337L375 409C384.4 418.4 399.6 418.4 408.9 409C418.2 399.6 418.3 384.4 408.9 375.1L343.9 310.1L343.9 216z" />
-                    </svg>
-                    <span style="font-size: 18px;">Treatment History</span>
-                </a>
-            </li>
 
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
@@ -204,102 +191,6 @@ $user = $result->fetch_assoc();
             <!-- START CODING HERE -->
             <!-- Button to trigger modal -->
 
-            <!-- Modal -->
-            <div class="modal fade" id="appointmentModal" tabindex="-1" aria-labelledby="appointmentModalLabel"
-                aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-
-                        <!-- Modal Header -->
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="appointmentModalLabel">Book Appointment</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-
-                        <!-- Modal Form -->
-                        <form action="class/pcreate.php" method="POST">
-                            <div class="modal-body">
-
-                                <!-- Patient ID -->
-                                <div class="mb-3">
-                                    <label for="patient_search" class="form-label">Patient</label>
-                                    <input class="form-control" list="patientsList" id="patient_search"
-                                        name="patient_search" placeholder="Search patient..." autocomplete="off"
-                                        required>
-                                    <datalist id="patientsList">
-                                        <?php
-                                        if ($patients && $patients->num_rows > 0) {
-                                            while ($patient = $patients->fetch_assoc()) {
-                                                $displayName = "{$patient['fname']} {$patient['mname']} {$patient['lname']}";
-                                                echo "<option value=\"{$displayName}\" data-id=\"{$patient['patient_id']}\"></option>";
-                                            }
-                                        }
-                                        ?>
-                                    </datalist>
-                                    <input type="hidden" id="patient_id" name="patient_id">
-                                </div>
-
-                                <!-- Purpose -->
-                                <div class="mb-3">
-                                    <label for="doctor" class="form-label">Doctor</label>
-                                    <select class="form-select" id="doctor" name="doctor" required>
-                                        <option value="">-- Select Doctor --</option>
-                                        <?php 
-                                        if ($doctors && $doctors->num_rows > 0) {
-                                            while ($doctor = $doctors->fetch_assoc()) {
-                                                $doctorName = "{$doctor['first_name']} {$doctor['last_name']}";
-                                                // The value is employee_id
-                                                echo "<option value=\"{$doctor['employee_id']}\">{$doctorName} - {$doctor['specialization']}</option>";
-                                            }
-                                        } else {
-                                            echo "<option value=\"\">No doctors available</option>";
-                                        }
-                                        ?>
-                                    </select>
-                                </div>
-                                <!-- Appointment Date & Time -->
-                                <div class="mb-3">
-                                    <label for="appointment_date" class="form-label">Appointment Date & Time</label>
-                                    <input type="datetime-local" class="form-control" id="appointment_date"
-                                        name="appointment_date" required>
-                                </div>
-
-                                <!-- Purpose -->
-                                <div class="mb-3">
-                                    <label for="purpose" class="form-label">Purpose</label>
-                                    <input type="text" class="form-control" id="purpose" name="purpose"
-                                        value="consultation" readonly>
-                                </div>
-
-                                <!-- Status -->
-                                <div class="mb-3">
-                                    <label for="status" class="form-label">Status</label>
-                                    <input type="text" class="form-control" id="status" name="status" value="Scheduled"
-                                        readonly>
-                                </div>
-
-                                <!-- Notes -->
-                                <div class="mb-3">
-
-                                    <label for="notes" class="form-label">Notes</label>
-                                    <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
-                                    <p>Please Indicate what test is taken</p>
-                                </div>
-
-                            </div>
-                            <input type="hidden" name="submitted_by" value="admin">
-
-                            <!-- Modal Footer -->
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <button type="submit" class="btn btn-primary">Save Appointment</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-
 
 
             <div class="container mt-4">
@@ -311,6 +202,7 @@ $user = $result->fetch_assoc();
                         Add Appointment
                     </button>
                 </div>
+                <?php include 'pcreate.php'; ?>
                 <!-- Appointment Table -->
                 <table class="table table-hover align-middle overflow-x-auto">
                     <thead class="text-center">

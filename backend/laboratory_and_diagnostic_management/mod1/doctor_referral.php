@@ -75,6 +75,9 @@ $allPatients = $patient->getAllPatients();
                     <li class="sidebar-item">
                         <a href="cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="room_available.php" class="sidebar-link">Room Overview</a>
+                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -143,9 +146,9 @@ $allPatients = $patient->getAllPatients();
                     </svg>
                     <span style="font-size: 18px;">Configuration</span>
                 </a>
-                <!-- <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="lab_equip.php" class="sidebar-link">Laboratory Price Configuration</a>
+                        <a href="../configuration_page/price.php" class="sidebar-link">Laboratory Price Configuration</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
@@ -153,7 +156,7 @@ $allPatients = $patient->getAllPatients();
                     <li class="sidebar-item">
                         <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
-                </ul> -->
+                </ul>
             </li>
         </aside>
         <!----- End of Sidebar ----->
@@ -195,7 +198,6 @@ $allPatients = $patient->getAllPatients();
                     🏥 Doctor Referral
                 </h2>
 
-                <!-- Fixed height scroll container -->
                 <div style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
                     <table id="patientsTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
                         <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">

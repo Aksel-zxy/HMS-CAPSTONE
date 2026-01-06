@@ -1,14 +1,27 @@
 <?php
 include '../../SQL/config.php';
+include 'class/dashb.php';
+
+
+$callerObj = new Dashboard($conn);
+$beds= $callerObj->getAvailableBedsCount($conn);
+$appointments = $callerObj->getAppointmentsCount($conn);
+$outpatients = $callerObj->getOutpatientsCount($conn);
+$inpatients = $callerObj->getInpatientsCount($conn);
+$registered = $callerObj->getRegisteredPatientsCount($conn);
+$totalPatients = $callerObj->getTotalPatients($conn);
+
+
+
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
+header('Location: login.php'); // Redirect to login if not logged in
+exit();
 }
 
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
+echo "User ID is not set in session.";
+exit();
 }
 
 $query = "SELECT * FROM users WHERE user_id = ?";
@@ -19,9 +32,12 @@ $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 
 if (!$user) {
-    echo "No user found.";
-    exit();
+echo "No user found.";
+exit();
 }
+
+
+
 ?>
 
 <!DOCTYPE html>
@@ -116,22 +132,10 @@ if (!$user) {
                         <path
                             d="M64 96C81.7 96 96 110.3 96 128L96 352L320 352L320 224C320 206.3 334.3 192 352 192L512 192C565 192 608 235 608 288L608 512C608 529.7 593.7 544 576 544C558.3 544 544 529.7 544 512L544 448L96 448L96 512C96 529.7 81.7 544 64 544C46.3 544 32 529.7 32 512L32 128C32 110.3 46.3 96 64 96zM144 256C144 220.7 172.7 192 208 192C243.3 192 272 220.7 272 256C272 291.3 243.3 320 208 320C172.7 320 144 291.3 144 256z" />
                     </svg>
-                    <span style="font-size: 18px;">Bedding</span>
+                    <span style="font-size: 18px;">Bedding & Linen</span>
                 </a>
             </li>
 
-            <li class="sidebar-item">
-                <a href="pBilling.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
-                    aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                        class="fa-solid fa-clock-rotate-left" viewBox="0 0 16 16">
-
-                        <path
-                            d="M320 128C426 128 512 214 512 320C512 426 426 512 320 512C254.8 512 197.1 479.5 162.4 429.7C152.3 415.2 132.3 411.7 117.8 421.8C103.3 431.9 99.8 451.9 109.9 466.4C156.1 532.6 233 576 320 576C461.4 576 576 461.4 576 320C576 178.6 461.4 64 320 64C234.3 64 158.5 106.1 112 170.7L112 144C112 126.3 97.7 112 80 112C62.3 112 48 126.3 48 144L48 256C48 273.7 62.3 288 80 288L104.6 288C105.1 288 105.6 288 106.1 288L192.1 288C209.8 288 224.1 273.7 224.1 256C224.1 238.3 209.8 224 192.1 224L153.8 224C186.9 166.6 249 128 320 128zM344 216C344 202.7 333.3 192 320 192C306.7 192 296 202.7 296 216L296 320C296 326.4 298.5 332.5 303 337L375 409C384.4 418.4 399.6 418.4 408.9 409C418.2 399.6 418.3 384.4 408.9 375.1L343.9 310.1L343.9 216z" />
-                    </svg>
-                    <span style="font-size: 18px;">Treatment History</span>
-                </a>
-            </li>
 
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
@@ -190,65 +194,280 @@ if (!$user) {
             </div>
 
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <div class="container text-black allign-items-center rounded welcome">
-                    <span class="username ml-4 me-4 fs-4 justify-content-end">Hello, <?php echo $user['fname']; ?>
-                        <?php echo $user['lname']; ?>! Here's today's Hospital overview</span>
+            <div class="container-fluid mt-4">
+                <div class="container text-black allign-items-center rounded welcome my-4">
+                    <span class="username ml-4 me-4 fs-4 justify-content-end">Hello,
+                        <?php echo $user['fname']; ?> <?php echo $user['lname']; ?>! Here's today's Hospital overview
+                    </span>
                 </div>
-                <div class="container-fluid mt-4">
-                    <div class="row justify-content-center">
-                        <div class="col-md-3 mb-3">
-                            <div class="card text-center">
-                                <div class="card-body">
-                                    <h5 class="card-title">Total Patients</h5>
-                                    <p class="card-text">150</p>
-                                </div>
+
+                <div class="row g-3 flex-nowrap overflow-auto justify-content-center">
+
+                    <div class="col-10 col-sm-6 col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Inpatients</h6>
+                                <p class="card-text fs-4"><?php echo $inpatients; ?></p>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card text-center">
-                                <div class="card-body">
-                                    <h5 class="card-title">Today's appointment</h5>
-                                    <p class="card-text">80</p>
-                                </div>
+                    </div>
+
+                    <div class="col-10 col-sm-6 col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Outpatients</h6>
+                                <p class="card-text fs-4"><?php echo $outpatients; ?></p>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card text-center">
-                                <div class="card-body">
-                                    <h5 class="card-title">Prescriptions</h5>
-                                    <p class="card-text">70</p>
-                                </div>
+                    </div>
+
+                    <div class="col-10 col-sm-6 col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Total Patients</h6>
+                                <p class="card-text fs-4"><?php echo $totalPatients; ?></p>
                             </div>
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="card text-center">
-                                <div class="card-body">
-                                    <h5 class="card-title">Hospital Admissions</h5>
-                                    <p class="card-text">70</p>
-                                </div>
+                    </div>
+
+
+                    <div class="col-10 col-sm-6 col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Available Beds</h6>
+                                <p class="card-text fs-4"><?php echo $beds; ?></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-10 col-sm-6 col-md-2">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h6 class="card-title">Today's Appointments</h6>
+                                <p class="card-text fs-4"><?php echo $appointments; ?></p>
                             </div>
                         </div>
                     </div>
                 </div>
+
             </div>
 
+            <div class="container-fluid mt-4">
+                <div class="d-flex flex-ROW gap-3">
+                    <!-- Flex column wrapper -->
+                    <div class="card w-100">
+                        <div class="card-body justify-content-center">
+                            <div class="d-flex gap-3 mb-3 align-items-end">
+                                <div class="flex-grow-1">
+                                    <label for="typeSelect" class="form-label">Data Type</label>
+                                    <select id="typeSelect" class="form-select">
+                                        <option value="inpatient">Inpatient</option>
+                                        <option value="outpatient">Outpatient</option>
+                                        <option value="appointments">Appointments</option>
+                                        <option value="total">Total Patients</option>
+                                    </select>
+                                </div>
 
-            <!-- END CODING HERE -->
+                                <div class="flex-grow-1">
+                                    <label for="rangeSelect" class="form-label">Time Range</label>
+                                    <select id="rangeSelect" class="form-select">
+                                        <option value="monthly">Monthly</option>
+                                        <option value="weekly">Weekly</option>
+                                    </select>
+                                </div>
+                            </div>
+
+
+
+                            <!-- Chart below -->
+                            <div style="flex: 1; min-height: 400px;">
+                                <canvas id="monthlyReportChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card w-25">
+                        <div class="card-body">
+                            <h5 class="card-title text-center pb-3">Quick Actions</h5>
+
+                            <input type="text" id="patientSearch" class="form-control mb-3"
+                                placeholder="Search patient...">
+                            <div id="searchResults" class="list-group position-absolute" style="z-index:1000;"></div>
+
+
+                            <div class="d-flex justify-content-evenly mb-2">
+                                <button type="button" class="btn btn-primary btn-l rounded-3" id="Boton"
+                                    data-bs-toggle="modal" data-bs-target="#addPatientModal" style="fontsize: 50px;">
+                                    <span class="fs-5"><i class="fa-solid fa-plus me-2"></i> Add Patient</span>
+                                </button>
+
+                            </div>
+                            <?php include 'icreate.php'; // This includes the modal code ?>
+
+                            <div class="container mx-1 justify-content-evenly d-flex">
+                                <button type="button" class="btn btn-primary btn-l rounded-3" data-bs-toggle="modal"
+                                    data-bs-target="#moveModal">
+                                    <span class="fs-5"><i class="fa-solid fa-arrows-up-down-left-right me-2"></i>
+                                        Move Patient</span>
+                                </button>
+                            </div>
+                            <?php include 'move.php'; ?>
+
+                            <div class="container mt-3 mb-3 justify-content-evenly d-flex">
+                                <button type="button" class="btn btn-primary btn-l rounded-3" data-bs-toggle="modal"
+                                    data-bs-target="#appointmentModal">
+                                    <span class="fs-5"><i class="fa-solid fa-plus me-2"></i> Add Appointment</span>
+                                </button>
+                            </div>
+                            <?php include 'pcreate.php'; ?>
+
+
+                        </div>
+
+
+
+
+                    </div>
+                </div>
+            </div>
         </div>
-        <!----- End of Main Content ----->
+
+
+
+
+
+        <!-- END CODING HERE -->
     </div>
+    <!----- End of Main Content ----->
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 
     <script>
     const toggler = document.querySelector(".toggler-btn");
     toggler.addEventListener("click", function() {
         document.querySelector("#sidebar").classList.toggle("collapsed");
     });
+
+    const ctx = document.getElementById('monthlyReportChart').getContext('2d');
+
+    const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [], // will be updated dynamically
+            datasets: [{
+                label: '',
+                data: [],
+                tension: 0.3,
+                borderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    function loadChartData(type, range) {
+        fetch(`class/dashboard_chart.php?type=${type}&range=${range}`)
+            .then(res => res.json())
+            .then(data => {
+                chart.data.datasets[0].data = data;
+
+                if (range === 'weekly') {
+                    const labels = [];
+                    for (let i = 6; i >= 0; i--) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        labels.push(d.toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric'
+                        }));
+                    }
+                    chart.data.labels = labels;
+                } else {
+                    chart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct',
+                        'Nov', 'Dec'
+                    ];
+                }
+
+                chart.data.datasets[0].label =
+                    `${document.querySelector(`#typeSelect option[value="${type}"]`).text} (${range})`;
+
+                chart.update();
+            })
+            .catch(err => console.error('Chart fetch error:', err));
+    }
+
+    // INITIAL LOAD
+    loadChartData('inpatient', 'monthly');
+
+    // Event listeners
+    document.getElementById('typeSelect').addEventListener('change', () => {
+        const type = document.getElementById('typeSelect').value;
+        const range = document.getElementById('rangeSelect').value;
+        loadChartData(type, range);
+    });
+
+    document.getElementById('rangeSelect').addEventListener('change', () => {
+        const type = document.getElementById('typeSelect').value;
+        const range = document.getElementById('rangeSelect').value;
+        loadChartData(type, range);
+    });
+
+
+
+
+    // Search Patient
+    const searchInput = document.getElementById('patientSearch');
+    const resultsDiv = document.getElementById('searchResults');
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+
+        if (query.length === 0) {
+            resultsDiv.innerHTML = '';
+            return;
+        }
+
+        fetch('class/search_patient.php?q=' + encodeURIComponent(query))
+            .then(response => response.json())
+            .then(data => {
+                resultsDiv.innerHTML = '';
+
+                if (data.length > 0) {
+                    data.forEach(patient => {
+                        const item = document.createElement('a');
+                        item.href = `iview.php?patient_id=${patient.id}`;
+                        item.classList.add('list-group-item', 'list-group-item-action');
+                        item.textContent = patient.name;
+                        resultsDiv.appendChild(item);
+                    });
+                } else {
+                    const noItem = document.createElement('div');
+                    noItem.classList.add('list-group-item', 'text-muted');
+                    noItem.textContent = 'No results found';
+                    resultsDiv.appendChild(noItem);
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching patients:', err);
+            });
+    });
+
+    // Hide results when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+            resultsDiv.innerHTML = '';
+        }
+    });
     </script>
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="assets/Bootstrap/fontawesome.min.js"></script>
     <script src="assets/Bootstrap/jq.js"></script>
+
 </body>
 
 </html>
