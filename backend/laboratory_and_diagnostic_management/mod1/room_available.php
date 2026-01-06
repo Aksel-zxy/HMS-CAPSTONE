@@ -1,6 +1,7 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
+require_once 'oop/roommanager.php';
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -18,6 +19,20 @@ $user = $result->fetch_assoc();
 if (!$user) {
     echo "No user found.";
     exit();
+}
+$roomManager = new RoomManager($conn);
+
+$roomTypes = [
+    'laboratory'   => 'CBC Laboratory',
+    'xray' => 'X-Ray',
+    'MRI'   => 'MRI',
+    'CT'    => 'CT Scan'
+];
+
+$roomAvailability = [];
+
+foreach ($roomTypes as $type => $label) {
+    $roomAvailability[$type] = $roomManager->getAvailableRoomsByType($type);
 }
 ?>
 <!DOCTYPE html>
@@ -189,51 +204,54 @@ if (!$user) {
                     </div>
                 </div>
             </div>
+
             <!-- START CODING HERE -->
 
-            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+            <div style="height: 800px; width:95%; margin:20px auto; padding:20px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
 
-                <div style="display:flex; gap:15px;">
-                    <!-- Calendar -->
-                    <div id="scheduleCalendar" style="flex:2; background:#fff; border-radius:8px; padding:10px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                    </div>
+                <h4 style="color:#0d6efd; margin-bottom:20px;">
+                    🏥 Room Availability Overview
+                </h4>
 
-                    <!-- Available Slots -->
-                    <div style="flex:1; background:#fff; border-radius:8px; padding:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05);">
-                        <h4 style="margin-bottom:12px; color:#0d6efd; font-family:Arial, sans-serif;">Available Slots</h4>
-                        <ul id="availableSlots" style="list-style:none; padding:0; margin:0; font-family:Arial, sans-serif; font-size:14px;">
-                            <!-- Slots will be injected here -->
-                        </ul>
-                    </div>
+                <div class="row">
+
+                    <?php foreach ($roomTypes as $type => $label): ?>
+                        <div class="col-md-3 mb-4">
+                            <div style="background:#fff; border-radius:8px; padding:15px; box-shadow:0 2px 5px rgba(0,0,0,0.05); height:100%;">
+
+                                <h5 style="color:#198754; border-bottom:1px solid #eee; padding-bottom:8px;">
+                                    <?= htmlspecialchars($label) ?>
+                                </h5>
+
+                                <?php if (empty($roomAvailability[$type])): ?>
+                                    <p style="color:#dc3545; font-size:14px; margin-top:10px;">
+                                        ❌ No available rooms
+                                    </p>
+                                <?php else: ?>
+                                    <ul style="list-style:none; padding-left:0; margin-top:10px; font-size:14px;">
+                                        <?php foreach ($roomAvailability[$type] as $room): ?>
+                                            <li style="padding:6px 0; border-bottom:1px dashed #ddd;">
+                                                ✅ <?= htmlspecialchars($room['roomName']) ?>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endif; ?>
+
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+
                 </div>
-
             </div>
 
-
-            <!-- MODAL AREA PO -->
-            <div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="dayModalLabel">Available Slots</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body" id="dayModalBody">
-                            <!-- Filled by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-            </div>
             <!----- End of Main Content ----->
-            <script src="../assets/javascript/calendar.js"></script>
             <script>
                 // Sidebar toggle
                 document.querySelector(".toggler-btn")?.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
             </script>
-            <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet">
-            <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+
             <script src="../assets/Bootstrap/all.min.js"></script>
             <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
             <script src="../assets/Bootstrap/fontawesome.min.js"></script>

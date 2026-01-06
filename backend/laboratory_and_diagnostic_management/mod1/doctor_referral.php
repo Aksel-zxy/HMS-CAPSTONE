@@ -75,6 +75,9 @@ $allPatients = $patient->getAllPatients();
                     <li class="sidebar-item">
                         <a href="cas.php" class="sidebar-link">Calendar & Appointment Slot</a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="room_available.php" class="sidebar-link">Room Overview</a>
+                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
