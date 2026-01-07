@@ -7,7 +7,7 @@ switch ($serviceName) {
         include __DIR__ . "/forms/form_cbc.php";
         break;
 
-    case "X-ray (Chest)":
+    case "X-Ray (Chest)":
         include __DIR__ . "/forms/form_xray.php";
         break;
 
