@@ -212,6 +212,7 @@ $allPatients = $patient->getAllPatients();
                                 <th style="padding:12px;text-align:center;">Test Name</th>
                                 <th style="padding:12px;text-align:center;">Status</th>
                                 <th style="padding:12px;text-align:center;">Received By</th>
+                                <th style="padding:12px;text-align:center;">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -283,12 +284,29 @@ $allPatients = $patient->getAllPatients();
 
                                             <td style="padding:12px;text-align:center;">
                                                 <?php
-                                                if ($status === 'completed' && !empty($test['received_by'])) {
+                                                if (($status === 'completed' || $status === 'delivered') && !empty($test['received_by'])) {
                                                     echo "Dr. " . htmlspecialchars($test['received_by']);
                                                 } else {
                                                     echo "-";
                                                 }
                                                 ?>
+                                            </td>
+                                            <td style="padding:12px;text-align:center;">
+                                                <?php if ($status === 'delivered'): ?>
+                                                    <span class="badge bg-success" style="padding: 8px 12px;">
+                                                        <i class="bi bi-check-circle"></i> Sent to Patient
+                                                    </span>
+                                                <?php elseif ($status === 'completed'): ?>
+                                                    <button class="btn btn-sm btn-primary send-result-btn"
+                                                        data-resultid="<?= $test['resultID'] ?>"
+                                                        data-patientid="<?= $patientId ?>">
+                                                        ✉️ Send Result Copy
+                                                    </button>
+                                                <?php else: ?>
+                                                    <span class="text-muted">
+                                                        <i class="bi bi-clock-history"></i>
+                                                    </span>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                             <?php
@@ -356,6 +374,40 @@ $allPatients = $patient->getAllPatients();
                             const impression = this.getAttribute("data-impression") || "⚠️ No remarks available.";
                             impressionText.textContent = impression;
                         });
+                    });
+                });
+                document.querySelectorAll('.send-result-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const resultID = this.getAttribute('data-resultid');
+                        const patientID = this.getAttribute('data-patientid');
+
+                        if (confirm("Are you sure you want to send this result copy to the patient?")) {
+                            this.disabled = true;
+                            this.innerHTML = "Sending...";
+
+                            fetch('process_send_copy.php', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/x-www-form-urlencoded'
+                                    },
+                                    body: `resultID=${resultID}&patientID=${patientID}`
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        alert("Result copy sent successfully!");
+                                        location.reload(); // Reload to update status if necessary
+                                    } else {
+                                        alert("Error: " + data.message);
+                                        this.disabled = false;
+                                        this.innerHTML = "✉️ Send Copy";
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Error:', error);
+                                    alert("An error occurred while sending.");
+                                });
+                        }
                     });
                 });
             </script>
