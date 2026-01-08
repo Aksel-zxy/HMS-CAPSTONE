@@ -3,24 +3,101 @@ class Medicine
 {
     private $conn;
 
+    // ===== NEW: Category-based locations =====
+    private $category_locations = array(
+        'Antibiotic' => array('Storage Room' => 'Main', 'Shelf No' => 1, 'Rack No' => 1),
+        'Painkiller' => array('Storage Room' => 'Main', 'Shelf No' => 1, 'Rack No' => 2),
+        'Vitamins' => array('Storage Room' => 'Main', 'Shelf No' => 2, 'Rack No' => 1),
+        'Cold & Flu' => array('Storage Room' => 'Main', 'Shelf No' => 2, 'Rack No' => 2),
+        'Others' => array('Storage Room' => 'Main', 'Shelf No' => 3, 'Rack No' => 1)
+    );
+
     public function __construct($dbConnection)
     {
         $this->conn = $dbConnection;
     }
 
+    // ===== NEW: Assign location based on category =====
+    private function assignLocationByCategory($category)
+    {
+        $base = isset($this->category_locations[$category]) ? $this->category_locations[$category] : $this->category_locations['Others'];
+
+        $storage_room = $base['Storage Room'];
+        $shelf_no = $base['Shelf No'];
+        $rack_no = $base['Rack No'];
+
+        // Get last used Bin in this Shelf/Rack
+        $query = "SELECT `Bin No` 
+                  FROM `pharmacy_inventory`
+                  WHERE `Storage Room`='$storage_room' AND `Shelf No`='$shelf_no' AND `Rack No`='$rack_no'
+                  ORDER BY `Bin No` DESC LIMIT 1";
+        $result = mysqli_query($this->conn, $query);
+
+        if (mysqli_num_rows($result) > 0) {
+            $row = mysqli_fetch_assoc($result);
+            $bin_no = intval($row['Bin No']) + 1;
+        } else {
+            $bin_no = 1;
+        }
+
+        // Optional: max 10 bins per rack
+        if ($bin_no > 10) {
+            $bin_no = 1;
+            $rack_no += 1;
+        }
+
+        return array(
+            'Storage Room' => $storage_room,
+            'Shelf No' => $shelf_no,
+            'Rack No' => $rack_no,
+            'Bin No' => $bin_no
+        );
+    }
+
+    // ===== NEW: Add medicine with auto-location =====
+    public function addMedicineWithAutoLocation($med_name, $generic_name, $brand_name, $prescription_required, $category, $dosage, $unit, $unit_price, $stock_quantity)
+    {
+        $location = $this->assignLocationByCategory($category);
+
+        $stmt = $this->conn->prepare("
+            INSERT INTO pharmacy_inventory (med_name, generic_name, brand_name, prescription_required, category, dosage, unit, unit_price, stock_quantity, `Storage Room`, `Shelf No`, `Rack No`, `Bin No`)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->bind_param(
+            "ssssssdiiiiii",
+            $med_name,
+            $generic_name,
+            $brand_name,
+            $prescription_required,
+            $category,
+            $dosage,
+            $unit,
+            $unit_price,
+            $stock_quantity,
+            $location['Storage Room'],
+            $location['Shelf No'],
+            $location['Rack No'],
+            $location['Bin No']
+        );
+
+        if (!$stmt->execute()) {
+            throw new Exception("Failed to add medicine with auto-location: " . $stmt->error);
+        }
+
+        return true;
+    }
+
+    // =================== Existing methods ===================
     public function getAllMedicines()
     {
-        $query = "SELECT med_id, med_name, category, dosage, stock_quantity, unit_price, unit, status 
-              FROM pharmacy_inventory 
-              ORDER BY med_name ASC";
+        $query = "SELECT med_id, med_name, generic_name, brand_name, prescription_required, category, dosage, stock_quantity, unit_price, unit, status 
+                  FROM pharmacy_inventory 
+                  ORDER BY med_name ASC";
         $result = $this->conn->query($query);
         if (!$result) throw new Exception("Error fetching medicines: " . $this->conn->error);
         return $result->fetch_all(MYSQLI_ASSOC);
     }
 
-
-
-    // Fetch stock batches for a medicine
     public function getStockBatches($med_id)
     {
         $stmt = $this->conn->prepare("
@@ -39,39 +116,31 @@ class Medicine
             throw new Exception("Expiry date must be provided when adding stock.");
         }
 
-        // Auto-generate batch number if not provided
         if (!$batch_no) {
-            $batch_no = 'B' . date('YmdHis'); // e.g., B20250901153045
+            $batch_no = 'B' . date('YmdHis');
         }
 
-        // Insert batch
         $stmt = $this->conn->prepare("
-        INSERT INTO pharmacy_stock_batches (med_id, batch_no, stock_quantity, expiry_date)
-        VALUES (?, ?, ?, ?)
-    ");
+            INSERT INTO pharmacy_stock_batches (med_id, batch_no, stock_quantity, expiry_date)
+            VALUES (?, ?, ?, ?)
+        ");
         $stmt->bind_param("isis", $med_id, $batch_no, $quantity, $expiry_date);
         if (!$stmt->execute()) {
             throw new Exception("Failed to add stock batch: " . $stmt->error);
         }
 
-        // Update total inventory stock to match sum of batches
         $stmt2 = $this->conn->prepare("
-        UPDATE pharmacy_inventory
-        SET stock_quantity = (SELECT IFNULL(SUM(stock_quantity),0) FROM pharmacy_stock_batches WHERE med_id = ?)
-        WHERE med_id = ?
-    ");
+            UPDATE pharmacy_inventory
+            SET stock_quantity = (SELECT IFNULL(SUM(stock_quantity),0) FROM pharmacy_stock_batches WHERE med_id = ?)
+            WHERE med_id = ?
+        ");
         $stmt2->bind_param("ii", $med_id, $med_id);
         $stmt2->execute();
 
-        // Update status
         $this->autoUpdateStatus($med_id);
-
         return true;
     }
 
-
-
-    // Dispense medicine (FIFO by earliest expiry)
     public function dispenseMedicine($med_id, $dispense_qty)
     {
         $stmt = $this->conn->prepare("
@@ -102,7 +171,6 @@ class Medicine
             }
         }
 
-        // Update inventory total stock
         $stmt2 = $this->conn->prepare("
             UPDATE pharmacy_inventory
             SET stock_quantity = (SELECT IFNULL(SUM(stock_quantity),0) FROM pharmacy_stock_batches WHERE med_id = ?)
@@ -112,30 +180,26 @@ class Medicine
         $stmt2->execute();
 
         $this->autoUpdateStatus($med_id);
-
         return $dispense_qty === 0;
     }
 
-    // Update medicine general info
-    public function updateMedicine($med_id, $med_name, $category, $dosage, $unit, $unit_price)
+    public function updateMedicine($med_id, $med_name, $generic_name, $brand_name, $prescription_required, $category, $dosage, $unit, $unit_price)
     {
         $stmt = $this->conn->prepare("
             UPDATE pharmacy_inventory 
-            SET med_name = ?, category = ?, dosage = ?, unit = ?, unit_price = ?
+            SET med_name = ?, generic_name = ?, brand_name = ?, prescription_required = ?, category = ?, dosage = ?, unit = ?, unit_price = ?
             WHERE med_id = ?
         ");
-        $stmt->bind_param("sssdsi", $med_name, $category, $dosage, $unit, $unit_price, $med_id);
+        $stmt->bind_param("sssssssdi", $med_name, $generic_name, $brand_name, $prescription_required, $category, $dosage, $unit, $unit_price, $med_id);
         if (!$stmt->execute()) {
             throw new Exception("Failed to update medicine: " . $stmt->error);
         }
         return true;
     }
 
-    // Auto-update stock status
     public function autoUpdateStatus($med_id = null)
     {
         if ($med_id) {
-            // Single medicine
             $stmt = $this->conn->prepare("
                 UPDATE pharmacy_inventory i
                 JOIN (SELECT med_id, SUM(stock_quantity) AS total_qty FROM pharmacy_stock_batches WHERE med_id = ? GROUP BY med_id) b
@@ -145,7 +209,6 @@ class Medicine
             $stmt->bind_param("i", $med_id);
             $stmt->execute();
         } else {
-            // All medicines
             $this->conn->query("
                 UPDATE pharmacy_inventory i
                 LEFT JOIN (SELECT med_id, SUM(stock_quantity) AS total_qty FROM pharmacy_stock_batches GROUP BY med_id) b
@@ -155,7 +218,6 @@ class Medicine
         }
     }
 
-    // Get expiry tracking
     public function getExpiryTracking()
     {
         $query = "
@@ -170,9 +232,7 @@ class Medicine
             ORDER BY b.expiry_date ASC
         ";
         $result = $this->conn->query($query);
-        if (!$result) {
-            throw new Exception("Failed to fetch expiry tracking: " . $this->conn->error);
-        }
+        if (!$result) throw new Exception("Failed to fetch expiry tracking: " . $this->conn->error);
         return $result->fetch_all(MYSQLI_ASSOC);
     }
 
@@ -181,13 +241,17 @@ class Medicine
         $sql = "UPDATE pharmacy_inventory SET status = CASE WHEN stock_quantity = 0 THEN 'Out of Stock' ELSE 'Available' END";
         $this->conn->query($sql);
     }
+
     public function getAllBatches()
     {
         $query = "
         SELECT 
             i.med_id,
             i.med_name,
-            i.unit_price, -- get price from pharmacy_inventory
+            i.generic_name,
+            i.brand_name,
+            i.prescription_required,
+            i.unit_price,
             b.batch_id,
             b.batch_no,
             b.stock_quantity,
@@ -200,19 +264,19 @@ class Medicine
         FROM pharmacy_stock_batches b
         JOIN pharmacy_inventory i ON i.med_id = b.med_id
         ORDER BY b.expiry_date ASC, i.med_name
-    ";
-
+        ";
         $result = $this->conn->query($query);
         if (!$result) throw new Exception("Error fetching batches: " . $this->conn->error);
         return $result->fetch_all(MYSQLI_ASSOC);
     }
+
     public function updateStatus($med_id, $new_status)
     {
         $stmt = $this->conn->prepare("
-        UPDATE pharmacy_inventory 
-        SET status = ? 
-        WHERE med_id = ?
-    ");
+            UPDATE pharmacy_inventory 
+            SET status = ? 
+            WHERE med_id = ?
+        ");
 
         if (!$stmt) {
             throw new Exception("Prepare failed: " . $this->conn->error);

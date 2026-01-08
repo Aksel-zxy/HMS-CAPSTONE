@@ -118,6 +118,80 @@ if ($expiry_res && $expiry_res->num_rows > 0) {
 $notif = new Notification($conn);
 $latestNotifications = $notif->load();
 $notifCount = $notif->notifCount;
+// ---------------- INIT ----------------
+$_SESSION['recent_searches'] ??= [];
+$searchResultHTML = "";
+$openResultModal = false;
+
+// ---------------- SEARCH & LOCATE ----------------
+if (isset($_POST['search_medicine'])) {
+
+    $generic = $_POST['generic_name'] ?? '';
+    $brand   = $_POST['brand_name'] ?? '';
+    $dosage  = $_POST['dosage'] ?? '';
+
+    $stmt = $conn->prepare("
+        SELECT med_name, generic_name, brand_name, dosage,
+               `Shelf No`, `Rack No`, `Bin No`, stock_quantity
+        FROM pharmacy_inventory
+        WHERE generic_name = ? AND brand_name = ? AND dosage = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("sss", $generic, $brand, $dosage);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($row = $result->fetch_assoc()) {
+        $location = "Shelf {$row['Shelf No']} → Rack {$row['Rack No']} → Bin {$row['Bin No']}";
+        array_unshift($_SESSION['recent_searches'], [
+            'generic_name' => $row['generic_name'],
+            'brand_name'   => $row['brand_name'],
+            'med_name'     => $row['med_name'],
+            'dosage'       => $row['dosage'],
+            'location'     => $location,
+            'stock'        => $row['stock_quantity']
+        ]);
+        $_SESSION['recent_searches'] = array_slice($_SESSION['recent_searches'], 0, 10);
+
+        $searchResultHTML = "
+        <div class='alert alert-success'>
+            <b>Generic:</b> {$row['generic_name']}<br>
+            <b>Medicine:</b> {$row['med_name']}<br>
+            <b>Brand:</b> {$row['brand_name']}<br>
+            <b>Dosage:</b> {$row['dosage']}<br><br>
+            <b>Location:</b> {$location}<br>
+            <b>Stock:</b>
+            <span class='badge " . ($row['stock_quantity'] <= 10 ? 'bg-danger' : 'bg-success') . "'>
+                {$row['stock_quantity']}
+            </span>
+        </div>
+        ";
+    } else {
+        $searchResultHTML = "<div class='alert alert-danger text-center'>Medicine not found.</div>";
+    }
+
+    $_SESSION['search_result_html'] = $searchResultHTML;
+    $_SESSION['show_search_modal'] = true;
+
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+// ---------------- MODAL DISPLAY AFTER REDIRECT ----------------
+if (!empty($_SESSION['show_search_modal'])) {
+    $openResultModal = true;
+    $searchResultHTML = $_SESSION['search_result_html'];
+
+    unset($_SESSION['show_search_modal']);
+    unset($_SESSION['search_result_html']);
+}
+
+// ---------------- CLEAR RECENT ----------------
+if (isset($_POST['clear_recent'])) {
+    unset($_SESSION['recent_searches']);
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
 
 ?>
 
@@ -223,7 +297,6 @@ $notifCount = $notif->notifCount;
                 </a>
             </li>
 
-
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -325,186 +398,204 @@ $notifCount = $notif->notifCount;
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid py-4">
+            <div class="content">
                 <div class="title-container">
-                    <i class="fa-solid fa-chart-simple"></i>
-                    <h1 class="page-title">Dashboard</h1>
+                    <i class="fa-brands fa-searchengin"></i>
+                    <h1 class="page-title">Search & Locate</h1>
                 </div>
-                <div id="dashboardContent">
-                    <!-- Row 1: Sales Summary -->
-                    <div class="row mb-4 align-items-center">
-                        <!-- Total Sale -->
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3 text-white"
-                                style="background: linear-gradient(135deg, #007bff, #00bfff); transition: 0.3s;">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 class="mb-0" style="font-weight: 700;">Total Sale</h6>
-                                    <div class="d-flex align-items-center">
-                                        <form method="get" class="d-flex align-items-center mb-0 me-2">
-                                            <i class="fa-solid fa-calendar-days me-2"></i>
-                                            <select name="period" class="form-select form-select-sm" onchange="this.form.submit()">
-                                                <option value="all" <?= $period === 'all' ? 'selected' : '' ?>>All Time</option>
-                                                <option value="7days" <?= $period === '7days' ? 'selected' : '' ?>>Last 7 Days</option>
-                                                <option value="month" <?= $period === 'month' ? 'selected' : '' ?>>This Month</option>
-                                                <option value="last_month" <?= $period === 'last_month' ? 'selected' : '' ?>>Last Month</option>
-                                            </select>
-                                        </form>
+
+                <div class="content mt-4">
+                    <!-- Header Section -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h2></h2>
+
+                        <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
+                            <!-- Search Medicine Button -->
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#medicineModal">
+                                Search Medicine
+                            </button>
+                        </div>
+
+
+                        <div class="modal fade" id="medicineModal" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <form method="POST" id="medicineSearchForm">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Search & Locate Medicine</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label class="form-label">Generic Name</label>
+                                                <select class="form-select" id="generic_name" name="generic_name" required>
+                                                    <option value="">-- Select Generic --</option>
+                                                    <?php
+                                                    $q = $conn->query("SELECT DISTINCT generic_name FROM pharmacy_inventory ORDER BY generic_name");
+                                                    while ($row = $q->fetch_assoc()) {
+                                                        echo "<option value='{$row['generic_name']}'>{$row['generic_name']}</option>";
+                                                    }
+                                                    ?>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Brand Name</label>
+                                                <select class="form-select" id="brand_name" name="brand_name" disabled required>
+                                                    <option value="">-- Select Brand --</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label">Dosage</label>
+                                                <select class="form-select" id="dosage" name="dosage" disabled>
+                                                    <option value="">-- Select Dosage --</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="submit" name="search_medicine" class="btn btn-primary">Search</button>
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- SEARCH RESULT MODAL -->
+                        <div class="modal fade" id="resultModal" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Search Result</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div id="locationResult" class="p-3"><?= $searchResultHTML ?></div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     </div>
                                 </div>
-                                <h3>₱<?= number_format($totalSales, 2) ?></h3>
                             </div>
                         </div>
 
-                        <!-- Total Orders -->
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3 text-white"
-                                style="background: linear-gradient(135deg, #6f42c1, #b07aff); transition: 0.3s;">
-                                <h6 style="font-weight: 700;">Total Orders</h6>
-                                <h3><?= $totalOrders ?></h3>
-                            </div>
-                        </div>
 
-                        <!-- Dispensed Medicines Today -->
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3 text-white"
-                                style="background: linear-gradient(135deg, #20c997, #28a745); transition: 0.3s;">
-                                <h6 style="font-weight: 700;">Dispensed Medicines Today</h6>
-                                <h3><?= $dispensedToday ?></h3>
+                    </div>
+                    <div class="mt-4">
+                        <h4>Recently Searched Medicines</h4>
+                        <?php if (!empty($_SESSION['recent_searches'])): ?>
+                            <div class="d-flex justify-content-end mb-2">
+                                <form method="POST">
+                                    <button type="submit" name="clear_recent" class="btn btn-danger btn-sm">Clear Recent Searches</button>
+                                </form>
                             </div>
-                        </div>
-
-                        <!-- Total Stocks -->
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3 text-white"
-                                style="background: linear-gradient(135deg, #fd7e14, #ffc107); transition: 0.3s;">
-                                <h6 style="font-weight: 700;">Total Stocks</h6>
-                                <h3><?= $totalStocks ?></h3>
-                            </div>
-                        </div>
+                            <table class="table table-bordered table-sm align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Medicine</th>
+                                        <th>Generic Name</th>
+                                        <th>Brand</th>
+                                        <th>Dosage</th>
+                                        <th>Location</th>
+                                        <th>Stock</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($_SESSION['recent_searches'] as $search): ?>
+                                        <tr>
+                                            <td><?= htmlspecialchars($search['med_name'] ?? '-') ?></td>
+                                            <td><?= htmlspecialchars($search['generic_name'] ?? '-') ?></td>
+                                            <td><?= htmlspecialchars($search['brand_name'] ?? '-') ?></td>
+                                            <td><?= htmlspecialchars($search['dosage'] ?? '-') ?></td>
+                                            <td><?= htmlspecialchars($search['location'] ?? '-') ?></td>
+                                            <td>
+                                                <span class="badge <?= ($search['stock'] ?? 0) <= 10 ? 'bg-danger' : 'bg-success' ?>">
+                                                    <?= htmlspecialchars($search['stock'] ?? 0) ?>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php else: ?>
+                            <div class="alert alert-secondary text-center">No recent searches yet.</div>
+                        <?php endif; ?>
                     </div>
 
-                    <!-- Stock Thresholds -->
-                    <div class="row mb-4">
-                        <!-- High Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3"
-                                style="background-color: #e8f5e9; border-left: 5px solid #28a745;">
-                                <h6 style="font-weight: 700; color: #28a745;">High Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start" style="font-size: 16px;">
-                                        <?php if (!empty($highStock)): ?>
-                                            <?php foreach ($highStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-success"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Near Low Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3"
-                                style="background-color: #fff8e1; border-left: 5px solid #ffc107;">
-                                <h6 style="font-weight: 700; color: #ffc107;">Near Low Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start" style="font-size: 16px;">
-                                        <?php if (!empty($nearLowStock)): ?>
-                                            <?php foreach ($nearLowStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-warning text-dark"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row mb-4">
-                        <!-- Low Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3"
-                                style="background-color: #fff3e0; border-left: 5px solid #fd7e14;">
-                                <h6 style="font-weight: 700; color: #fd7e14;">Low Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start" style="font-size: 16px;">
-                                        <?php if (!empty($lowStock)): ?>
-                                            <?php foreach ($lowStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-danger"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- No Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3"
-                                style="background-color: #fdecea; border-left: 5px solid #dc3545;">
-                                <h6 style="font-weight: 700; color: #dc3545;">No Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start" style="font-size: 16px;">
-                                        <?php if (!empty($noStock)): ?>
-                                            <?php foreach ($noStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-secondary"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <!-- END CODING HERE -->
                 </div>
-
+                <!----- End of Main Content ----->
             </div>
-            <!-- END CODING HERE -->
-        </div>
-        <!----- End of Main Content ----->
-    </div>
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const loadMoreBtn = document.getElementById("loadMoreNotif");
-            if (loadMoreBtn) {
-                loadMoreBtn.addEventListener("click", function(e) {
-                    e.preventDefault();
-                    document.querySelectorAll(".extra-notif").forEach(el => el.classList.remove("d-none"));
-                    this.style.display = "none"; // hide the button once expanded
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const loadMoreBtn = document.getElementById("loadMoreNotif");
+                    if (loadMoreBtn) {
+                        loadMoreBtn.addEventListener("click", function(e) {
+                            e.preventDefault();
+                            document.querySelectorAll(".extra-notif").forEach(el => el.classList.remove("d-none"));
+                            this.style.display = "none"; // hide the button once expanded
+                        });
+                    }
                 });
-            }
-        });
-    </script>
+            </script>
+            <script>
+                // Dropdown fetching
+                document.getElementById('generic_name').addEventListener('change', function() {
+                    const generic = this.value;
+                    const brandSelect = document.getElementById('brand_name');
+                    const dosageSelect = document.getElementById('dosage');
+                    brandSelect.innerHTML = '<option value="">-- Select Brand --</option>';
+                    dosageSelect.innerHTML = '<option value="">-- Select Dosage --</option>';
+                    brandSelect.disabled = true;
+                    dosageSelect.disabled = true;
+                    if (!generic) return;
+                    fetch(`fetch_medicine_options.php?type=brands&generic=${encodeURIComponent(generic)}`)
+                        .then(res => res.json()).then(data => {
+                            if (data.length === 0) return;
+                            brandSelect.disabled = false;
+                            data.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
+                        });
+                });
 
-    <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    </script>
-    <script src="assets/Bootstrap/all.min.js"></script>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
+                document.getElementById('brand_name').addEventListener('change', function() {
+                    const brand = this.value;
+                    const generic = document.getElementById('generic_name').value;
+                    const dosageSelect = document.getElementById('dosage');
+                    dosageSelect.innerHTML = '<option value="">-- Select Dosage --</option>';
+                    dosageSelect.disabled = true;
+                    if (!brand || !generic) return;
+                    fetch(`fetch_medicine_options.php?type=dosage&generic=${encodeURIComponent(generic)}&brand=${encodeURIComponent(brand)}`)
+                        .then(res => res.json()).then(data => {
+                            if (data.length === 0) return;
+                            dosageSelect.disabled = false;
+                            data.forEach(d => dosageSelect.innerHTML += `<option value="${d}">${d}</option>`);
+                        });
+                });
+
+                // Clear result modal on close
+                const resultModalEl = document.getElementById('resultModal');
+                resultModalEl.addEventListener('hidden.bs.modal', function() {
+                    document.getElementById('locationResult').innerHTML = '';
+                });
+
+                // Auto-open result modal after search
+                <?php if ($openResultModal && !empty($searchResultHTML)): ?>
+                    document.addEventListener("DOMContentLoaded", function() {
+                        const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+                        document.getElementById('locationResult').innerHTML = <?= json_encode($searchResultHTML) ?>;
+                        resultModal.show();
+                    });
+                <?php endif; ?>
+            </script>
+
+            <script>
+                const toggler = document.querySelector(".toggler-btn");
+                toggler.addEventListener("click", function() {
+                    document.querySelector("#sidebar").classList.toggle("collapsed");
+                });
+            </script>
+            <script src="assets/Bootstrap/all.min.js"></script>
+            <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+            <script src="assets/Bootstrap/fontawesome.min.js"></script>
+            <script src="assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

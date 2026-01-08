@@ -102,18 +102,18 @@ if (isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])) {
                     </div>
                 </div>
 
-
                 <div class="employee-header">
                     
                     <!-- ----- Left: Employee Photo ----- -->
                     <div class="employee-photo-section">
-                        <img src="<?= htmlspecialchars($photoSrc); ?>"
+                        <img src="<?= htmlspecialchars($photoSrc ?? '') ?>"
                             alt="Employee Photo" 
                             class="employee-photo">
 
                         <?php
-                            $statusClass = 'status-' . strtolower($employee['status']);
-                            echo "<span class='status-badge {$statusClass}'>{$employee['status']}</span>";
+                            $status = $employee['status'] ?? '';
+                            $statusClass = 'status-' . strtolower($status);
+                            echo "<span class='status-badge {$statusClass}'>" . htmlspecialchars($status) . "</span>";
                         ?>
 
                         <div class="employee-photo-buttons">
@@ -127,21 +127,25 @@ if (isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])) {
                     <div class="card personal-info-card">
                         <h2 class="card-heading">Personal Information</h2>
                         <div class="info-grid">
-                            <div><strong>Employee ID:</strong> <?= htmlspecialchars($employee['employee_id']); ?></div>
-                            <div><strong>Full Name:</strong> <?= htmlspecialchars(trim($employee['first_name'] . ' ' . 
-                                ($employee['middle_name'] ? $employee['middle_name'] . ' ' : '') . 
-                                $employee['last_name'] . 
-                                ($employee['suffix_name'] ? ', ' . $employee['suffix_name'] : ''))); ?></div>
-                            <div><strong>Gender:</strong> <?= htmlspecialchars($employee['gender']); ?></div>
-                            <div><strong>Date of Birth:</strong> <?= htmlspecialchars($employee['date_of_birth']); ?></div>
-                            <div><strong>Contact Number:</strong> <?= htmlspecialchars($employee['contact_number']); ?></div>
-                            <div><strong>Email:</strong> <?= htmlspecialchars($employee['email']); ?></div>
-                            <div><strong>Citizenship:</strong> <?= htmlspecialchars($employee['citizenship']); ?></div>
+                            <div><strong>Employee ID:</strong> <?= htmlspecialchars($employee['employee_id'] ?? '') ?></div>
+
+                            <div><strong>Full Name:</strong>
+                                <?= htmlspecialchars(trim(
+                                    ($employee['first_name'] ?? '') . ' ' .
+                                    (!empty($employee['middle_name']) ? $employee['middle_name'] . ' ' : '') .
+                                    ($employee['last_name'] ?? '') .
+                                    (!empty($employee['suffix_name']) ? ', ' . $employee['suffix_name'] : '')
+                                )) ?>
+                            </div>
+
+                            <div><strong>Gender:</strong> <?= htmlspecialchars($employee['gender'] ?? '') ?></div>
+                            <div><strong>Date of Birth:</strong> <?= htmlspecialchars($employee['date_of_birth'] ?? '') ?></div>
+                            <div><strong>Contact Number:</strong> <?= htmlspecialchars($employee['contact_number'] ?? '') ?></div>
+                            <div><strong>Email:</strong> <?= htmlspecialchars($employee['email'] ?? '') ?></div>
+                            <div><strong>Citizenship:</strong> <?= htmlspecialchars($employee['citizenship'] ?? '') ?></div>
                         </div>
                     </div>
-
                 </div>
-
 
                 <!-- ----- Two Column Layout ----- -->
                 <div class="two-column-layout">
@@ -151,33 +155,32 @@ if (isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])) {
                         <div class="card">
                             <h2 class="card-heading">Address Information</h2>
                             <div class="info-grid">
-                                <div><strong>House No.:</strong> <?= htmlspecialchars($employee['house_no']); ?></div>
-                                <div><strong>Barangay:</strong> <?= htmlspecialchars($employee['barangay']); ?></div>
-                                <div><strong>City:</strong> <?= htmlspecialchars($employee['city']); ?></div>
-                                <div><strong>Province:</strong> <?= htmlspecialchars($employee['province']); ?></div>
-                                <div><strong>Region:</strong> <?= htmlspecialchars($employee['region']); ?></div>
+                                <div><strong>House No.:</strong> <?= htmlspecialchars($employee['house_no'] ?? '') ?></div>
+                                <div><strong>Barangay:</strong> <?= htmlspecialchars($employee['barangay'] ?? '') ?></div>
+                                <div><strong>City:</strong> <?= htmlspecialchars($employee['city'] ?? '') ?></div>
+                                <div><strong>Province:</strong> <?= htmlspecialchars($employee['province'] ?? '') ?></div>
+                                <div><strong>Region:</strong> <?= htmlspecialchars($employee['region'] ?? '') ?></div>
                             </div>
                         </div>
 
                         <div class="card">
                             <h2 class="card-heading">Emergency Contact</h2>
                             <div class="info-grid">
-                                <div><strong>Name:</strong> <?= htmlspecialchars($employee['eg_name']); ?></div>
-                                <div><strong>Relationship:</strong> <?= htmlspecialchars($employee['eg_relationship']); ?></div>
-                                <div><strong>Contact Number:</strong> <?= htmlspecialchars($employee['eg_cn']); ?></div>
+                                <div><strong>Name:</strong> <?= htmlspecialchars($employee['eg_name'] ?? '') ?></div>
+                                <div><strong>Relationship:</strong> <?= htmlspecialchars($employee['eg_relationship'] ?? '') ?></div>
+                                <div><strong>Contact Number:</strong> <?= htmlspecialchars($employee['eg_cn'] ?? '') ?></div>
                             </div>
                         </div>
 
                         <div class="card">
                             <h2 class="card-heading">System Information</h2>
                             <div class="info-grid">
-                                <div><strong>Username:</strong> <?= htmlspecialchars($employee['username']); ?></div>
-                                <div><strong>Password (hashed):</strong> <?= htmlspecialchars($employee['password']); ?></div>
-                                <div><strong>Created At:</strong> <?= htmlspecialchars($employee['created_at']); ?></div>
-                                <div><strong>Updated At:</strong> <?= htmlspecialchars($employee['update_at']); ?></div>
+                                <div><strong>Username:</strong> <?= htmlspecialchars($employee['username'] ?? '') ?></div>
+                                <div><strong>Password (hashed):</strong> <?= htmlspecialchars($employee['password'] ?? '') ?></div>
+                                <div><strong>Created At:</strong> <?= htmlspecialchars($employee['created_at'] ?? '') ?></div>
+                                <div><strong>Updated At:</strong> <?= htmlspecialchars($employee['update_at'] ?? '') ?></div>
                             </div>
                         </div>
-                        
                     </div>
 
                     <!-- ----- Right Column ----- -->
@@ -185,20 +188,20 @@ if (isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])) {
                         <div class="card">
                             <h2 class="card-heading">Job Information</h2>
                             <div class="info-grid">
-                                <div><strong>Hire Date:</strong> <?= htmlspecialchars($employee['hire_date']); ?></div>
-                                <div><strong>Profession:</strong> <?= htmlspecialchars($employee['profession']); ?></div>
-                                <div><strong>Department:</strong> <?= htmlspecialchars($employee['department']); ?></div>
-                                <div><strong>Status:</strong> <?= htmlspecialchars($employee['status']); ?></div>
+                                <div><strong>Hire Date:</strong> <?= htmlspecialchars($employee['hire_date'] ?? '') ?></div>
+                                <div><strong>Profession:</strong> <?= htmlspecialchars($employee['profession'] ?? '') ?></div>
+                                <div><strong>Department:</strong> <?= htmlspecialchars($employee['department'] ?? '') ?></div>
+                                <div><strong>Status:</strong> <?= htmlspecialchars($employee['status'] ?? '') ?></div>
                             </div>
                         </div>
 
                         <div class="card">
                             <h2 class="card-heading">Education Information</h2>
                             <div class="info-grid">
-                                <div><strong>Educational Status:</strong> <?= htmlspecialchars($employee['educational_status']); ?></div>
-                                <div><strong>Degree Type:</strong> <?= htmlspecialchars($employee['degree_type']); ?></div>
-                                <div><strong>School:</strong> <?= htmlspecialchars($employee['medical_school']); ?></div>
-                                <div><strong>Graduation Year:</strong> <?= htmlspecialchars($employee['graduation_year']); ?></div>
+                                <div><strong>Educational Status:</strong> <?= htmlspecialchars($employee['educational_status'] ?? '') ?></div>
+                                <div><strong>Degree Type:</strong> <?= htmlspecialchars($employee['degree_type'] ?? '') ?></div>
+                                <div><strong>School:</strong> <?= htmlspecialchars($employee['medical_school'] ?? '') ?></div>
+                                <div><strong>Graduation Year:</strong> <?= htmlspecialchars($employee['graduation_year'] ?? '') ?></div>
                             </div>
                         </div>
 
