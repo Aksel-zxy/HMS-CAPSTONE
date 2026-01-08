@@ -175,6 +175,14 @@ $notifCount = $notif->notifCount;
             </li>
 
             <li class="sidebar-item">
+                <a href="pharmacy_search_locate.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <i class="fa-brands fa-searchengin"></i>
+                    <span style="font-size: 18px;">Search & Locate</span>
+                </a>
+            </li>
+
+            <li class="sidebar-item">
                 <a href="pharmacy_prescription.php" class="sidebar-link position-relative">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-file-prescription" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />

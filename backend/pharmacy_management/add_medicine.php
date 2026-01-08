@@ -19,6 +19,9 @@ $shelf_life = [
 
 // Get POST data safely
 $med_name = $_POST['med_name'] ?? '';
+$generic_name = $_POST['generic_name'] ?? '';
+$brand_name = $_POST['brand_name'] ?? '';
+$prescription_required = $_POST['prescription_required'] ?? 'No';
 $category = $_POST['category'] ?? '';
 $dosage = $_POST['dosage'] ?? '';
 $stock_quantity = intval($_POST['stock_quantity'] ?? 0);
@@ -27,8 +30,8 @@ $unit_price = floatval($_POST['unit_price'] ?? 0);
 $batch_no = $_POST['batch_no'] ?? null;
 
 // Basic validation
-if (!$med_name || !$dosage || $stock_quantity <= 0 || !$unit) {
-    die("Medicine name, dosage, unit, and stock quantity are required.");
+if (!$med_name || !$generic_name || !$dosage || $stock_quantity <= 0 || !$unit) {
+    die("Medicine name, generic name, dosage, unit, and stock quantity are required.");
 }
 
 try {
@@ -50,24 +53,27 @@ try {
         // Add stock batch with expiry
         $medicineObj->addStock($med_id, $stock_quantity, $expiry_date, $batch_no);
 
-        // Optionally update unit price & unit
-        $stmt2 = $conn->prepare("UPDATE pharmacy_inventory SET unit_price = ?, unit = ? WHERE med_id = ?");
-        $stmt2->bind_param("dsi", $unit_price, $unit, $med_id);
+        // Optionally update unit price, unit, brand, generic, prescription
+        $stmt2 = $conn->prepare("
+            UPDATE pharmacy_inventory 
+            SET unit_price = ?, unit = ?, generic_name = ?, brand_name = ?, prescription_required = ? 
+            WHERE med_id = ?
+        ");
+        $stmt2->bind_param("dssssi", $unit_price, $unit, $generic_name, $brand_name, $prescription_required, $med_id);
         $stmt2->execute();
     } else {
-        // Insert new medicine
-        $stmt = $conn->prepare("
-            INSERT INTO pharmacy_inventory 
-            (med_name, category, dosage, stock_quantity, unit_price, unit, status)
-            VALUES (?, ?, ?, 0, ?, ?, 'Available')
-        ");
-        $stmt->bind_param("sssds", $med_name, $category, $dosage, $unit_price, $unit);
-        $stmt->execute();
-
-        $med_id = $conn->insert_id;
-
-        // Add initial stock batch with expiry
-        $medicineObj->addStock($med_id, $stock_quantity, $expiry_date, $batch_no);
+        // Insert new medicine with auto-location
+        $medicineObj->addMedicineWithAutoLocation(
+            $med_name,
+            $generic_name,
+            $brand_name,
+            $prescription_required,
+            $category,
+            $dosage,
+            $unit,
+            $unit_price,
+            $stock_quantity
+        );
     }
 
     header("Location: pharmacy_med_inventory.php?success=1");

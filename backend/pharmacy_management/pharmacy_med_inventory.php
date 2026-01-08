@@ -70,6 +70,9 @@ $notif = new Notification($conn);
 $latestNotifications = $notif->load();
 $notifCount = $notif->notifCount;
 
+
+
+
 ?>
 
 
@@ -130,6 +133,14 @@ $notifCount = $notif->notifCount;
             </li>
 
             <li class="sidebar-item">
+                <a href="pharmacy_search_locate.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <i class="fa-brands fa-searchengin"></i>
+                    <span style="font-size: 18px;">Search & Locate</span>
+                </a>
+            </li>
+
+            <li class="sidebar-item">
                 <a href="pharmacy_prescription.php" class="sidebar-link position-relative">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-solid fa-file-prescription" viewBox="0 0 16 16">
@@ -140,7 +151,7 @@ $notifCount = $notif->notifCount;
                     </svg>
                     <span style="font-size: 18px;">Prescription</span>
                     <?php if ($pendingCount > 0): ?>
-                    <span class="notif-badge"><?php echo $pendingCount; ?></span>
+                        <span class="notif-badge"><?php echo $pendingCount; ?></span>
                     <?php endif; ?>
                 </a>
             </li>
@@ -163,7 +174,7 @@ $notifCount = $notif->notifCount;
                     <i class="fa-solid fa-calendar-check"></i>
                     <span style="font-size: 18px;">Drug Expiry Tracking</span>
                     <?php if ($expiryCount > 0): ?>
-                    <span class="expiry-dot"></span>
+                        <span class="expiry-dot"></span>
                     <?php endif; ?>
                 </a>
             </li>
@@ -196,11 +207,11 @@ $notifCount = $notif->notifCount;
                                 style="text-decoration: none;">
                                 <i class="fa-solid fa-bell fs-4"></i>
                                 <?php if ($notifCount > 0): ?>
-                                <span
-                                    class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                                    style="font-size:11px;">
-                                    <?php echo $notifCount; ?>
-                                </span>
+                                    <span
+                                        class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                        style="font-size:11px;">
+                                        <?php echo $notifCount; ?>
+                                    </span>
                                 <?php endif; ?>
                             </a>
 
@@ -209,26 +220,26 @@ $notifCount = $notif->notifCount;
                                 <li class="dropdown-header fw-bold">Notifications</li>
 
                                 <?php if (!empty($latestNotifications)): ?>
-                                <?php foreach ($latestNotifications as $index => $n): ?>
-                                <li class="notif-item <?php echo $index >= 10 ? 'd-none extra-notif' : ''; ?>">
-                                    <a class="dropdown-item d-flex align-items-start" href="<?php echo $n['link']; ?>">
-                                        <div class="me-2">
-                                            <?php if ($n['type'] == 'prescription'): ?>
-                                            <i class="bi bi-file-earmark-medical-fill text-primary fs-5"></i>
-                                            <?php elseif ($n['type'] == 'expiry'): ?>
-                                            <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
-                                            <?php else: ?>
-                                            <i class="bi bi-info-circle-fill text-secondary fs-5"></i>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div>
-                                            <div class="small fw-semibold text-wrap"
-                                                style="white-space: normal; word-break: break-word;">
-                                                <?php echo $n['message']; ?>
-                                            </div>
-                                            <div class="small text-muted text-wrap"
-                                                style="white-space: normal; word-break: break-word;">
-                                                <?php
+                                    <?php foreach ($latestNotifications as $index => $n): ?>
+                                        <li class="notif-item <?php echo $index >= 10 ? 'd-none extra-notif' : ''; ?>">
+                                            <a class="dropdown-item d-flex align-items-start" href="<?php echo $n['link']; ?>">
+                                                <div class="me-2">
+                                                    <?php if ($n['type'] == 'prescription'): ?>
+                                                        <i class="bi bi-file-earmark-medical-fill text-primary fs-5"></i>
+                                                    <?php elseif ($n['type'] == 'expiry'): ?>
+                                                        <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                                                    <?php else: ?>
+                                                        <i class="bi bi-info-circle-fill text-secondary fs-5"></i>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div>
+                                                    <div class="small fw-semibold text-wrap"
+                                                        style="white-space: normal; word-break: break-word;">
+                                                        <?php echo $n['message']; ?>
+                                                    </div>
+                                                    <div class="small text-muted text-wrap"
+                                                        style="white-space: normal; word-break: break-word;">
+                                                        <?php
                                                         if ($n['type'] == 'expiry' && isset($n['days_left'])) {
                                                             $daysLeft = (int)$n['days_left'];
                                                             if ($daysLeft > 0) {
@@ -242,26 +253,26 @@ $notifCount = $notif->notifCount;
                                                             echo $n['time'];
                                                         }
                                                         ?>
-                                            </div>
-                                        </div>
-                                    </a>
-                                </li>
-                                <?php if ($index < count($latestNotifications) - 1): ?>
-                                <li class="<?php echo $index >= 10 ? 'd-none extra-notif' : ''; ?>">
-                                    <hr class="dropdown-divider">
-                                </li>
-                                <?php endif; ?>
-                                <?php endforeach; ?>
+                                                    </div>
+                                                </div>
+                                            </a>
+                                        </li>
+                                        <?php if ($index < count($latestNotifications) - 1): ?>
+                                            <li class="<?php echo $index >= 10 ? 'd-none extra-notif' : ''; ?>">
+                                                <hr class="dropdown-divider">
+                                            </li>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
 
-                                <!-- Load More Button -->
-                                <?php if (count($latestNotifications) > 10): ?>
-                                <li class="text-center">
-                                    <a href="#" id="loadMoreNotif" class="dropdown-item fw-semibold">View Previous
-                                        Notifications</a>
-                                </li>
-                                <?php endif; ?>
+                                    <!-- Load More Button -->
+                                    <?php if (count($latestNotifications) > 10): ?>
+                                        <li class="text-center">
+                                            <a href="#" id="loadMoreNotif" class="dropdown-item fw-semibold">View Previous
+                                                Notifications</a>
+                                        </li>
+                                    <?php endif; ?>
                                 <?php else: ?>
-                                <li><span class="dropdown-item text-muted">No new notifications</span></li>
+                                    <li><span class="dropdown-item text-muted">No new notifications</span></li>
                                 <?php endif; ?>
                             </ul>
                         </div>
@@ -292,16 +303,14 @@ $notifCount = $notif->notifCount;
 
 
                 <!-- Medicine Modal -->
-                <div class="modal fade" id="medicineModal" tabindex="-1" aria-labelledby="medicineModalLabel"
-                    aria-hidden="true">
+                <div class="modal fade" id="medicineModal" tabindex="-1" aria-labelledby="medicineModalLabel" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
 
                             <!-- Modal Header -->
                             <div class="modal-header">
                                 <h5 class="modal-title" id="medicineModalLabel">Add New Medicine</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                    aria-label="Close"></button>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
 
                             <!-- Modal Body -->
@@ -312,6 +321,27 @@ $notifCount = $notif->notifCount;
                                     <div class="mb-3">
                                         <label class="form-label">Medicine Name</label>
                                         <input type="text" class="form-control" name="med_name" required>
+                                    </div>
+
+                                    <!-- Generic Name -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Generic Name</label>
+                                        <input type="text" class="form-control" name="generic_name" required>
+                                    </div>
+
+                                    <!-- Brand Name -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Brand Name</label>
+                                        <input type="text" class="form-control" name="brand_name">
+                                    </div>
+
+                                    <!-- Prescription Required -->
+                                    <div class="mb-3">
+                                        <label class="form-label">Prescription Required</label>
+                                        <select class="form-control" name="prescription_required">
+                                            <option value="No" selected>No</option>
+                                            <option value="Yes">Yes</option>
+                                        </select>
                                     </div>
 
                                     <!-- Category -->
@@ -332,7 +362,6 @@ $notifCount = $notif->notifCount;
                                         </select>
                                     </div>
 
-
                                     <!-- Dosage -->
                                     <div class="mb-3">
                                         <label class="form-label">Dosage</label>
@@ -348,8 +377,7 @@ $notifCount = $notif->notifCount;
                                     <!-- Unit Price -->
                                     <div class="mb-3">
                                         <label class="form-label">Unit Price (₱)</label>
-                                        <input type="number" step="0.01" class="form-control" name="unit_price"
-                                            required>
+                                        <input type="number" step="0.01" class="form-control" name="unit_price" required>
                                     </div>
 
                                     <!-- Unit -->
@@ -359,19 +387,15 @@ $notifCount = $notif->notifCount;
                                             <option value="">-- Select Unit / Formulation --</option>
                                             <option value="Tablets & Capsules">Tablets & Capsules</option>
                                             <option value="Syrups / Oral Liquids">Syrups / Oral Liquids</option>
-                                            <option value="Antibiotic Dry Syrup (Powder)">Antibiotic Dry Syrup (Powder)
-                                            </option>
-                                            <option value="Injectables (Ampoules / Vials)">Injectables (Ampoules /
-                                                Vials)</option>
+                                            <option value="Antibiotic Dry Syrup (Powder)">Antibiotic Dry Syrup (Powder)</option>
+                                            <option value="Injectables (Ampoules / Vials)">Injectables (Ampoules / Vials)</option>
                                             <option value="Eye Drops / Ear Drops">Eye Drops / Ear Drops</option>
                                             <option value="Insulin">Insulin</option>
-                                            <option value="Topical Creams / Ointments">Topical Creams / Ointments
-                                            </option>
+                                            <option value="Topical Creams / Ointments">Topical Creams / Ointments</option>
                                             <option value="Vaccines">Vaccines</option>
                                             <option value="IV Fluids">IV Fluids</option>
                                         </select>
                                     </div>
-
 
                                     <!-- Submit Button -->
                                     <button type="submit" class="btn btn-success">Add Medicine</button>
@@ -387,6 +411,7 @@ $notifCount = $notif->notifCount;
 
 
 
+
                 <div class="content mt-4">
                     <!-- Header Section -->
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -396,7 +421,17 @@ $notifCount = $notif->notifCount;
                             <!-- Search bar -->
                             <input type="text" id="searchInput" class="form-control me-2"
                                 placeholder="Search medicine...">
-
+                            <!-- Display Unit Dropdown -->
+                            <form method="GET" class="d-flex gap-2">
+                                <select name="display_unit" class="form-select" onchange="this.form.submit()">
+                                    <option value="piece">Piece</option>
+                                    <option value="blister">Blister</option>
+                                    <option value="box">Box</option>
+                                    <option value="bottle">Bottle</option>
+                                    <option value="vial">Vial</option>
+                                    <option value="bag">Bag</option>
+                                </select>
+                            </form>
                             <!-- Add Medicine button -->
                             <button type="button" class="btn btn-primary text-nowrap" data-bs-toggle="modal"
                                 data-bs-target="#medicineModal">
@@ -412,65 +447,83 @@ $notifCount = $notif->notifCount;
                             <tr>
                                 <th onclick="sortTable(0)">Medicine ID</th>
                                 <th onclick="sortTable(1)">Medicine Name</th>
+                                <th>Generic Name</th>
+                                <th>Brand Name</th>
                                 <th onclick="groupTable(2)">Category</th>
                                 <th>Dosage</th>
                                 <th>Stock Quantity</th>
                                 <th>Unit Price (₱)</th>
                                 <th onclick="groupTable(6)">Unit</th>
+                                <th>Rx</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (isset($error)): ?>
-                            <tr>
-                                <td colspan="9"><?php echo $error; ?></td>
-                            </tr>
+                                <tr>
+                                    <td colspan="9"><?php echo $error; ?></td>
+                                </tr>
                             <?php elseif (!empty($medicines)): ?>
-                            <?php foreach ($medicines as $row): ?>
-                            <?php
+                                <?php foreach ($medicines as $row): ?>
+                                    <?php
                                     $status = htmlspecialchars($row['status'] ?? 'Unknown');
                                     $badgeClass = ($status == 'Available') ? 'success' : (($status == 'Out of Stock') ? 'danger' : 'secondary');
                                     ?>
-                            <tr>
-                                <td><?= htmlspecialchars($row['med_id']) ?></td>
-                                <td><?= htmlspecialchars($row['med_name']) ?></td>
-                                <td><?= htmlspecialchars($row['category']) ?></td>
-                                <td><?= htmlspecialchars($row['dosage']) ?></td>
-                                <td><?= htmlspecialchars($row['stock_quantity']) ?></td>
-                                <td><?= number_format($row['unit_price'], 2) ?></td>
-                                <td><?= htmlspecialchars($row['unit']) ?></td>
-                                <td>
-                                    <span class="badge bg-<?= $badgeClass ?>">
-                                        <?= $status ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <!-- Edit Button -->
-                                    <button class="btn btn-warning btn-sm edit-btn" data-bs-toggle="modal"
-                                        data-bs-target="#editMedicineModal" data-id="<?= $row['med_id'] ?>"
-                                        data-name="<?= htmlspecialchars($row['med_name']) ?>"
-                                        data-category="<?= htmlspecialchars($row['category']) ?>"
-                                        data-dosage="<?= htmlspecialchars($row['dosage']) ?>"
-                                        data-stock="<?= $row['stock_quantity'] ?>"
-                                        data-unit="<?= htmlspecialchars($row['unit']) ?>"
-                                        data-price="<?= $row['unit_price'] ?>">Update</button>
+                                    <tr>
+                                        <td><?= htmlspecialchars($row['med_id']) ?></td>
+                                        <td><?= htmlspecialchars($row['med_name']) ?></td>
+                                        <td><?= $row['generic_name'] ?></td>
+                                        <td><?= $row['brand_name'] ?></td>
+                                        <td><?= htmlspecialchars($row['category']) ?></td>
+                                        <td><?= htmlspecialchars($row['dosage']) ?></td>
+                                        <td class="stock-cell"
+                                            data-stock="<?= (int)$row['stock_quantity'] ?>"
+                                            data-form="<?= htmlspecialchars($row['unit']) ?>"
+                                            data-index="0"
+                                            style="cursor:pointer;"
+                                            title="Click to change unit">
+                                            <?= (int)$row['stock_quantity'] ?> Piece
+                                        </td>
 
-                                    <!-- Delete Button Form -->
-                                    <!-- <form action="update_medicine.php" method="POST" style="display:inline;">
+                                        <td><?= number_format($row['unit_price'], 2) ?></td>
+                                        <td><?= htmlspecialchars($row['unit']) ?></td>
+                                        <td>
+                                            <?= $row['prescription_required'] == 'Yes'
+                                                ? '<span class="badge bg-danger">Rx</span>'
+                                                : '<span class="badge bg-success">OTC</span>' ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-<?= $badgeClass ?>">
+                                                <?= $status ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <!-- Edit Button -->
+                                            <button class="btn btn-warning btn-sm edit-btn" data-bs-toggle="modal"
+                                                data-bs-target="#editMedicineModal" data-id="<?= $row['med_id'] ?>"
+                                                data-name="<?= htmlspecialchars($row['med_name']) ?>"
+                                                data-category="<?= htmlspecialchars($row['category']) ?>"
+                                                data-dosage="<?= htmlspecialchars($row['dosage']) ?>"
+                                                data-stock="<?= $row['stock_quantity'] ?>"
+                                                data-unit="<?= htmlspecialchars($row['unit']) ?>"
+                                                data-price="<?= $row['unit_price'] ?>">Update</button>
+
+                                            <!-- Delete Button Form -->
+                                            <!-- <form action="update_medicine.php" method="POST" style="display:inline;">
                                                 <input type="hidden" name="med_id" value="<?= $row['med_id'] ?>">
                                                 <button type="submit" name="delete" class="btn btn-danger btn-sm"
                                                     onclick="return confirm('Are you sure you want to delete this medicine?');">
                                                     Delete
                                                 </button>
                                             </form> -->
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
                             <?php else: ?>
-                            <tr>
-                                <td colspan="9">No medicine records found.</td>
-                            </tr>
+                                <tr>
+                                    <td colspan="9">No medicine records found.</td>
+                                </tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
@@ -482,81 +535,81 @@ $notifCount = $notif->notifCount;
 
 
                     <script>
-                    function setupPagination(tableId, paginationId, rowsPerPage) {
-                        const table = document.getElementById(tableId);
-                        const tbody = table.querySelector("tbody");
-                        const rows = tbody.querySelectorAll("tr");
-                        const pagination = document.getElementById(paginationId);
+                        function setupPagination(tableId, paginationId, rowsPerPage) {
+                            const table = document.getElementById(tableId);
+                            const tbody = table.querySelector("tbody");
+                            const rows = tbody.querySelectorAll("tr");
+                            const pagination = document.getElementById(paginationId);
 
-                        let currentPage = 1;
-                        const totalPages = Math.ceil(rows.length / rowsPerPage);
+                            let currentPage = 1;
+                            const totalPages = Math.ceil(rows.length / rowsPerPage);
 
-                        function displayRows() {
-                            rows.forEach((row, index) => {
-                                row.style.display =
-                                    (index >= (currentPage - 1) * rowsPerPage && index < currentPage *
-                                        rowsPerPage) ?
-                                    "" : "none";
-                            });
-                        }
-
-                        function updatePagination() {
-                            pagination.innerHTML = "";
-
-                            // Previous button
-                            const prevItem = document.createElement("li");
-                            prevItem.className = `page-item ${currentPage === 1 ? "disabled" : ""}`;
-                            prevItem.innerHTML = `<a class="page-link" href="#">&laquo;</a>`;
-                            prevItem.onclick = (e) => {
-                                e.preventDefault();
-                                if (currentPage > 1) {
-                                    currentPage--;
-                                    displayRows();
-                                    updatePagination();
-                                }
-                            };
-                            pagination.appendChild(prevItem);
-
-                            // Page numbers
-                            for (let i = 1; i <= totalPages; i++) {
-                                const li = document.createElement("li");
-                                li.className = `page-item ${i === currentPage ? "active" : ""}`;
-                                li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
-                                li.onclick = (e) => {
-                                    e.preventDefault();
-                                    currentPage = i;
-                                    displayRows();
-                                    updatePagination();
-                                };
-                                pagination.appendChild(li);
+                            function displayRows() {
+                                rows.forEach((row, index) => {
+                                    row.style.display =
+                                        (index >= (currentPage - 1) * rowsPerPage && index < currentPage *
+                                            rowsPerPage) ?
+                                        "" : "none";
+                                });
                             }
 
-                            // Next button
-                            const nextItem = document.createElement("li");
-                            nextItem.className = `page-item ${currentPage === totalPages ? "disabled" : ""}`;
-                            nextItem.innerHTML = `<a class="page-link" href="#">&raquo;</a>`;
-                            nextItem.onclick = (e) => {
-                                e.preventDefault();
-                                if (currentPage < totalPages) {
-                                    currentPage++;
-                                    displayRows();
-                                    updatePagination();
+                            function updatePagination() {
+                                pagination.innerHTML = "";
+
+                                // Previous button
+                                const prevItem = document.createElement("li");
+                                prevItem.className = `page-item ${currentPage === 1 ? "disabled" : ""}`;
+                                prevItem.innerHTML = `<a class="page-link" href="#">&laquo;</a>`;
+                                prevItem.onclick = (e) => {
+                                    e.preventDefault();
+                                    if (currentPage > 1) {
+                                        currentPage--;
+                                        displayRows();
+                                        updatePagination();
+                                    }
+                                };
+                                pagination.appendChild(prevItem);
+
+                                // Page numbers
+                                for (let i = 1; i <= totalPages; i++) {
+                                    const li = document.createElement("li");
+                                    li.className = `page-item ${i === currentPage ? "active" : ""}`;
+                                    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                                    li.onclick = (e) => {
+                                        e.preventDefault();
+                                        currentPage = i;
+                                        displayRows();
+                                        updatePagination();
+                                    };
+                                    pagination.appendChild(li);
                                 }
-                            };
-                            pagination.appendChild(nextItem);
+
+                                // Next button
+                                const nextItem = document.createElement("li");
+                                nextItem.className = `page-item ${currentPage === totalPages ? "disabled" : ""}`;
+                                nextItem.innerHTML = `<a class="page-link" href="#">&raquo;</a>`;
+                                nextItem.onclick = (e) => {
+                                    e.preventDefault();
+                                    if (currentPage < totalPages) {
+                                        currentPage++;
+                                        displayRows();
+                                        updatePagination();
+                                    }
+                                };
+                                pagination.appendChild(nextItem);
+                            }
+
+                            if (rows.length > 0) {
+                                displayRows();
+                                updatePagination();
+                            }
                         }
 
-                        if (rows.length > 0) {
-                            displayRows();
-                            updatePagination();
-                        }
-                    }
-
-                    // Initialize pagination when page loads
-                    document.addEventListener("DOMContentLoaded", function() {
-                        setupPagination("medicineInventoryTable", "medicineInventoryPagination",
-                        15); // Show 10 rows per page
-                    });
+                        // Initialize pagination when page loads
+                        document.addEventListener("DOMContentLoaded", function() {
+                            setupPagination("medicineInventoryTable", "medicineInventoryPagination",
+                                15); // Show 10 rows per page
+                        });
                     </script>
 
 
@@ -622,113 +675,161 @@ $notifCount = $notif->notifCount;
         <!----- End of Main Content ----->
     </div>
     <script>
-    // Simple table sort function (works for numbers and text)
-    function sortTable(colIndex) {
-        let table = document.getElementById("medicineInventoryTable");
-        let rows = Array.from(table.rows).slice(1); // skip header
-        let asc = table.getAttribute("data-sort-col") == colIndex && table.getAttribute("data-sort-dir") == "asc" ?
-            false : true;
+        // Simple table sort function (works for numbers and text)
+        function sortTable(colIndex) {
+            let table = document.getElementById("medicineInventoryTable");
+            let rows = Array.from(table.rows).slice(1); // skip header
+            let asc = table.getAttribute("data-sort-col") == colIndex && table.getAttribute("data-sort-dir") == "asc" ?
+                false : true;
 
-        rows.sort((a, b) => {
-            let x = a.cells[colIndex].innerText.trim().toLowerCase();
-            let y = b.cells[colIndex].innerText.trim().toLowerCase();
+            rows.sort((a, b) => {
+                let x = a.cells[colIndex].innerText.trim().toLowerCase();
+                let y = b.cells[colIndex].innerText.trim().toLowerCase();
 
-            // If number, compare numerically
-            if (!isNaN(x) && !isNaN(y)) {
-                return asc ? x - y : y - x;
-            }
+                // If number, compare numerically
+                if (!isNaN(x) && !isNaN(y)) {
+                    return asc ? x - y : y - x;
+                }
 
-            return asc ? x.localeCompare(y) : y.localeCompare(x);
-        });
+                return asc ? x.localeCompare(y) : y.localeCompare(x);
+            });
 
-        rows.forEach(row => table.tBodies[0].appendChild(row));
+            rows.forEach(row => table.tBodies[0].appendChild(row));
 
-        table.setAttribute("data-sort-col", colIndex);
-        table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
-    }
+            table.setAttribute("data-sort-col", colIndex);
+            table.setAttribute("data-sort-dir", asc ? "asc" : "desc");
+        }
 
-    // Force grouping for Category & Unit
-    function groupTable(colIndex) {
-        let table = document.getElementById("medicineInventoryTable");
-        let rows = Array.from(table.rows).slice(1);
+        // Force grouping for Category & Unit
+        function groupTable(colIndex) {
+            let table = document.getElementById("medicineInventoryTable");
+            let rows = Array.from(table.rows).slice(1);
 
-        rows.sort((a, b) => {
-            let x = a.cells[colIndex].innerText.trim().toLowerCase();
-            let y = b.cells[colIndex].innerText.trim().toLowerCase();
-            return x.localeCompare(y);
-        });
+            rows.sort((a, b) => {
+                let x = a.cells[colIndex].innerText.trim().toLowerCase();
+                let y = b.cells[colIndex].innerText.trim().toLowerCase();
+                return x.localeCompare(y);
+            });
 
-        rows.forEach(row => table.tBodies[0].appendChild(row));
-    }
+            rows.forEach(row => table.tBodies[0].appendChild(row));
+        }
     </script>
 
     <script>
-    document.querySelectorAll('.edit-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            document.getElementById('edit_med_id').value = this.dataset.id;
-            document.getElementById('edit_med_name').value = this.dataset.name;
-            document.getElementById('edit_category').value = this.dataset.category;
-            document.getElementById('edit_dosage').value = this.dataset.dosage;
-            document.getElementById('edit_stock_quantity').value = this.dataset.stock;
-            document.getElementById('edit_unit').value = this.dataset.unit;
-            document.getElementById('edit_unit_price').value = this.dataset.price; // NEW
-        });
-    });
-    </script>
-
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const dropdowns = document.querySelectorAll('.status-dropdown');
-
-        dropdowns.forEach(dropdown => {
-            dropdown.addEventListener('change', function() {
-                const med_id = this.getAttribute('data-id');
-                const new_status = this.value;
-
-                fetch('update_status.php', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded'
-                        },
-                        body: `med_id=${med_id}&new_status=${new_status}`
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            alert('Status updated.');
-                            location
-                        .reload(); // Optional: refresh table to see badge update
-                        } else {
-                            alert('Error: ' + data.message);
-                        }
-                    });
+        document.querySelectorAll('.edit-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                document.getElementById('edit_med_id').value = this.dataset.id;
+                document.getElementById('edit_med_name').value = this.dataset.name;
+                document.getElementById('edit_category').value = this.dataset.category;
+                document.getElementById('edit_dosage').value = this.dataset.dosage;
+                document.getElementById('edit_stock_quantity').value = this.dataset.stock;
+                document.getElementById('edit_unit').value = this.dataset.unit;
+                document.getElementById('edit_unit_price').value = this.dataset.price; // NEW
             });
         });
-    });
     </script>
+
     <script>
-    const searchInput = document.getElementById("searchInput");
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropdowns = document.querySelectorAll('.status-dropdown');
 
-    function filterInventoryTable() {
-        const searchValue = searchInput.value.toLowerCase();
+            dropdowns.forEach(dropdown => {
+                dropdown.addEventListener('change', function() {
+                    const med_id = this.getAttribute('data-id');
+                    const new_status = this.value;
 
-        document.querySelectorAll("#medicineInventoryTable tbody tr").forEach(row => {
-            const medNameCell = row.querySelector("td:nth-child(2)"); // 2nd column = Medicine Name
-            if (!medNameCell) return;
-
-            const medName = medNameCell.textContent.toLowerCase();
-            row.style.display = medName.includes(searchValue) ? "" : "none";
+                    fetch('update_status.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: `med_id=${med_id}&new_status=${new_status}`
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert('Status updated.');
+                                location
+                                    .reload(); // Optional: refresh table to see badge update
+                            } else {
+                                alert('Error: ' + data.message);
+                            }
+                        });
+                });
+            });
         });
-    }
+    </script>
+    <script>
+        const searchInput = document.getElementById("searchInput");
 
-    searchInput.addEventListener("keyup", filterInventoryTable);
+        function filterInventoryTable() {
+            const searchValue = searchInput.value.toLowerCase();
+
+            document.querySelectorAll("#medicineInventoryTable tbody tr").forEach(row => {
+                const medNameCell = row.querySelector("td:nth-child(2)"); // 2nd column = Medicine Name
+                if (!medNameCell) return;
+
+                const medName = medNameCell.textContent.toLowerCase();
+                row.style.display = medName.includes(searchValue) ? "" : "none";
+            });
+        }
+
+        searchInput.addEventListener("keyup", filterInventoryTable);
+    </script>
+    <script>
+        const conversionMap = {
+            "Tablets & Capsules": {
+                piece: 1,
+                blister: 10,
+                box: 100
+            },
+            "Injectables (Ampoules / Vials)": {
+                vial: 1,
+                box: 10
+            },
+            "Syrups / Oral Liquids": {
+                bottle: 1
+            },
+            "Eye Drops / Ear Drops": {
+                bottle: 1
+            },
+            "Topical Creams / Ointments": {
+                tube: 1
+            },
+            "IV Fluids": {
+                bag: 1
+            },
+            "Vaccines": {
+                vial: 1
+            }
+        };
+
+        document.querySelectorAll('.stock-cell').forEach(cell => {
+            cell.addEventListener('click', () => {
+                const baseStock = parseFloat(cell.dataset.stock);
+                const form = cell.dataset.form;
+                let index = parseInt(cell.dataset.index);
+
+                if (!conversionMap[form]) return;
+
+                const units = Object.keys(conversionMap[form]);
+                index = (index + 1) % units.length;
+
+                const unit = units[index];
+                const value = (baseStock / conversionMap[form][unit])
+                    .toFixed(2).replace(/\.00$/, '');
+
+                cell.innerText = `${value} ${unit.charAt(0).toUpperCase() + unit.slice(1)}`;
+                cell.dataset.index = index;
+            });
+        });
     </script>
 
     <script>
-    const toggler = document.querySelector(".toggler-btn");
-    toggler.addEventListener("click", function() {
-        document.querySelector("#sidebar").classList.toggle("collapsed");
-    });
+        const toggler = document.querySelector(".toggler-btn");
+        toggler.addEventListener("click", function() {
+            document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
     </script>
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
