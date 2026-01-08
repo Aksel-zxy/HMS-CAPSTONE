@@ -276,23 +276,33 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                 <input type="number" name="year" value="<?= $currentYear ?>" readonly>
                             </div>
 
-                            <!-- Preset Leave Types -->
+                            <!-- Preset Leave Types with Default Days -->
                             <div id="leaveTypesWrapper">
                                 <?php 
-                                $leaveTypes = [
-                                    "Vacation Leave",
-                                    "Sick Leave",
-                                    "Emergency Leave",
-                                    "Maternity Leave",
-                                    "Paternity Leave",
-                                    "Bereavement Leave"
-                                ];
-                                foreach ($leaveTypes as $type): 
-                                    $id = strtolower(str_replace(" ", "_", $type)); ?>
+                                    $leaveTypes = [
+                                        "Vacation Leave"     => 15,
+                                        "Sick Leave"         => 10,
+                                        "Emergency Leave"    => 5,
+                                        "Maternity Leave"    => 105, // female only
+                                        "Paternity Leave"    => 7,   // male only
+                                        "Bereavement Leave"  => 5
+                                    ];
+
+                                    foreach ($leaveTypes as $type => $days): 
+                                        $id = strtolower(str_replace(" ", "_", $type));
+                                ?>
                                     <div class="form-group leave-type-field" data-leavetype="<?= $type ?>" id="<?= $id ?>_field">
                                         <label><?= $type ?></label>
+
                                         <input type="hidden" name="leave_type[]" value="<?= $type ?>">
-                                        <input type="number" name="allocated_days[]" placeholder="Enter days" min="0">
+
+                                        <!-- auto-filled default days -->
+                                        <input 
+                                            type="number" 
+                                            name="allocated_days[]" 
+                                            value="<?= $days ?>" 
+                                            min="0"
+                                        >
                                     </div>
                                 <?php endforeach; ?>
                             </div>
@@ -337,7 +347,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                             <td rowspan="<?= $rowCount ?>"><?= htmlspecialchars($rec['profession']) ?></td>
                                         <?php $firstRow = false; endif; ?>
 
-                                        <td><?= htmlspecialchars($rec['leave_type']) ?></td>
+                                        <td><?= htmlspecialchars($rec['leave_type'] ?? '') ?></td>
                                         <td><?= (int)$rec['allocated_days'] ?></td>
                                         <td><?= (int)$rec['used_days'] ?></td>
                                         <td><?= max(0, $rec['allocated_days'] - $rec['used_days']) ?></td>

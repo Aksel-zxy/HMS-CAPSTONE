@@ -162,12 +162,6 @@ foreach ($roomTypes as $type => $label) {
                     <li class="sidebar-item">
                         <a href="../configuration_page/price.php" class="sidebar-link">Laboratory Price Configuration</a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
-                    </li>
                 </ul>
             </li>
         </aside>
