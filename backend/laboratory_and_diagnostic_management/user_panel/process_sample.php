@@ -2,7 +2,7 @@
 $serviceName = $_GET['serviceName'] ?? '';
 
 switch ($serviceName) {
-    case "Complete Blood Count":
+    case "CBC":
     case "Complete Blood Count (CBC)":
         include __DIR__ . "/forms/form_cbc.php";
         break;
