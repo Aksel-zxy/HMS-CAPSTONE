@@ -1,7 +1,10 @@
 <?php
 include '../../SQL/config.php';
 
-// ✅ Fetch patients who have lab results but no paid receipt yet
+// ==============================
+// Fetch patients with completed lab results
+// ==============================
+
 $sql = "
 SELECT 
     p.patient_id,
@@ -9,7 +12,7 @@ SELECT
     p.address,
     p.dob,
     p.phone_number,
-    COALESCE(ir.status, 'N/A') AS insurance_status,
+
     (
         SELECT pr.status 
         FROM patient_receipt pr 
@@ -17,39 +20,28 @@ SELECT
         ORDER BY pr.created_at DESC 
         LIMIT 1
     ) AS payment_status,
+
     (
         SELECT pr.receipt_id 
         FROM patient_receipt pr 
         WHERE pr.patient_id = p.patient_id
-        ORDER BY pr.created_at DESC 
+        ORDER BY pr.created_at DESC
         LIMIT 1
-    ) AS latest_receipt_id
+    ) AS latest_receipt_id,
+
+    IFNULL(SUM(s.price),0) AS total_price
+
 FROM patientinfo p
-LEFT JOIN insurance_requests ir 
-    ON p.patient_id = ir.patient_id
-    AND ir.request_id = (
-        SELECT MAX(request_id) 
-        FROM insurance_requests 
-        WHERE patient_id = p.patient_id
-    )
-WHERE EXISTS (
-    SELECT 1 
-    FROM dl_results dr
-    WHERE dr.patientID = p.patient_id
-)
-AND (
-    SELECT pr.status 
-    FROM patient_receipt pr 
-    WHERE pr.patient_id = p.patient_id
-    ORDER BY pr.created_at DESC
-    LIMIT 1
-) IS NULL OR (
-    SELECT pr.status 
-    FROM patient_receipt pr 
-    WHERE pr.patient_id = p.patient_id
-    ORDER BY pr.created_at DESC
-    LIMIT 1
-) != 'Paid'
+
+LEFT JOIN dl_results dr 
+    ON dr.patientID = p.patient_id
+    AND dr.status = 'Completed'
+
+LEFT JOIN dl_services s
+    ON s.serviceName = dr.result
+
+GROUP BY p.patient_id
+HAVING total_price > 0
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
@@ -62,184 +54,182 @@ $result = $conn->query($sql);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Patient Billing</title>
+
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 <link rel="stylesheet" href="assets/CSS/patient_billing.css">
-<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
+<link rel="stylesheet" href="assets/css/billing_sidebar.css">
 </head>
+
 <body>
 <div class="dashboard-wrapper">
+<div class="main-content-wrapper">
+<div class="container-fluid bg-white p-4 rounded shadow">
 
-    <!-- Main Content -->
-    <div class="main-content-wrapper" id="mainContent">
-        <div class="container-fluid bg-white p-4 rounded shadow">
-            <h1 class="mb-4">Patient Billing</h1>
-            <table class="table table-bordered table-striped">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Patient Name</th>
-                        <th>Insurance Status</th>
-                        <th>Remarks</th>
-                        <th class="text-end">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if ($result && $result->num_rows > 0): ?>
-                        <?php while ($row = $result->fetch_assoc()): ?>
-                            <?php 
-                                $insuranceStatus = $row['insurance_status'] ?? 'N/A';
-                                $paymentStatus = $row['payment_status'] ?? 'Pending';
-                                $receipt_id = $row['latest_receipt_id'] ?? 0;
-                                $disableBill = ($insuranceStatus === 'Pending') || ($paymentStatus === 'Paid');
-                                $showInsuranceButton = ($insuranceStatus === 'N/A');
-                                $rowClass = $insuranceStatus === 'Pending' ? 'pending-insurance' : '';
-                            ?>
-                            <tr class="<?= $rowClass ?>">
-                                <td><?= htmlspecialchars($row['full_name']); ?></td>
-                                <td>
-                                    <?php if ($insuranceStatus === 'Pending'): ?>
-                                        <span class="badge bg-warning text-dark">Pending</span>
-                                    <?php elseif ($insuranceStatus === 'Approved'): ?>
-                                        <span class="badge bg-success">Approved</span>
-                                    <?php elseif ($insuranceStatus === 'Rejected' || $insuranceStatus === 'Declined'): ?>
-                                        <span class="badge bg-danger">Declined</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-secondary">N/A</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <?php if ($paymentStatus === 'Paid'): ?>
-                                        <span class="badge bg-success">Paid</span>
-                                    <?php else: ?>
-                                        <span class="badge bg-warning text-dark">Pending</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="text-end">
-                                    <div class="d-flex justify-content-end gap-2 align-items-center flex-wrap">
+<h1 class="mb-4">Patient Billing</h1>
 
-                                        <!-- ✅ View Total Bill (Before Generating Bill) -->
-                                        <?php if (!$receipt_id): ?>
-                                            <a href="total_bill.php?patient_id=<?= $row['patient_id']; ?>" 
-                                               class="btn btn-secondary btn-sm" 
-                                               target="_blank">
-                                               View Total Bill
-                                            </a>
-                                        <?php else: ?>
-                                            <a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" 
-                                               target="_blank" 
-                                               class="btn btn-secondary btn-sm">
-                                               View Total Bill
-                                            </a>
-                                        <?php endif; ?>
+<table class="table table-bordered table-striped">
+<thead class="table-dark">
+<tr>
+    <th>Patient Name</th>
+    <th>Insurance Status / Plan</th>
+    <th>Payment Status</th>
+    <th>Total Charges</th>
+    <th class="text-end">Actions</th>
+</tr>
+</thead>
 
-                                        <!-- ✅ Generate Bill -->
-                                        <?php if ($disableBill): ?>
-                                            <button class="btn btn-success btn-sm" disabled>
-                                                <?= $paymentStatus === 'Paid' ? 'Already Paid' : 'Generate Bill'; ?>
-                                            </button>
-                                            <?php if ($insuranceStatus === 'Pending'): ?>
-                                                <i class="bi bi-question-circle-fill tooltip-icon" 
-                                                   data-bs-toggle="tooltip" 
-                                                   data-bs-placement="top" 
-                                                   title="Cannot generate bill until insurance request is resolved."></i>
-                                            <?php endif; ?>
-                                        <?php else: ?>
-                                            <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" 
-                                               class="btn btn-success btn-sm">
-                                               Generate Bill
-                                            </a>
-                                        <?php endif; ?>
+<tbody>
+<?php if ($result && $result->num_rows > 0): ?>
+<?php while ($row = $result->fetch_assoc()): ?>
 
-                                        <!-- ✅ Insurance Request Button -->
-                                        <?php if ($showInsuranceButton): ?>
-                                            <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">
-                                                Insurance Request
-                                            </button>
-                                        <?php endif; ?>
-                                    </div>
+<?php
+$insuranceStatus = 'N/A';
+$insuranceDiscount = 0;
+$insurance = null;
 
-                                    <!-- ✅ Insurance Modal -->
-                                    <?php if ($showInsuranceButton): ?>
-                                    <div class="modal fade" id="insuranceModal<?= $row['patient_id'] ?>" tabindex="-1">
-                                        <div class="modal-dialog">
-                                            <form method="POST" action="request_insurance.php" class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title">Insurance Request Form</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <div class="mb-3">
-                                                        <label>Name:</label>
-                                                        <input type="text" value="<?= htmlspecialchars($row['full_name']); ?>" class="form-control" readonly>
-                                                    </div>
-                                                    <input type="hidden" name="patient_id" value="<?= $row['patient_id'] ?>">
+$paymentStatus = $row['payment_status'] ?? 'Pending';
+$receipt_id = $row['latest_receipt_id'] ?? 0;
+$totalPrice = $row['total_price'];
 
-                                                    <div class="mb-3">
-                                                        <label>Date of Birth:</label>
-                                                        <input type="text" value="<?= htmlspecialchars($row['dob']); ?>" class="form-control" readonly>
-                                                    </div>
+$disableBill = ($paymentStatus === 'Paid');
+$showInsuranceButton = true;
+$rowClass = 'pending-insurance';
 
-                                                    <div class="mb-3">
-                                                        <label>Address:</label>
-                                                        <input type="text" value="<?= htmlspecialchars($row['address']); ?>" class="form-control" readonly>
-                                                    </div>
+// ✅ FIXED QUERY (NO ORDER BY id)
+$stmt = $conn->prepare("
+    SELECT insurance_number, insurance_company, promo_name, discount_type, discount_value
+    FROM patient_insurance
+    WHERE full_name = ?
+      AND status = 'Active'
+    LIMIT 1
+");
 
-                                                    <div class="mb-3">
-                                                        <label>Contact Number:</label>
-                                                        <input type="text" value="<?= htmlspecialchars($row['phone_number']); ?>" class="form-control" readonly>
-                                                    </div>
+$stmt->bind_param("s", $row['full_name']);
+$stmt->execute();
+$insurance = $stmt->get_result()->fetch_assoc();
 
-                                                    <div class="mb-3">
-                                                        <label>Insurance Company</label>
-                                                        <input type="text" name="insurance_company" class="form-control" required>
-                                                    </div>
+if ($insurance && !empty($insurance['insurance_number'])) {
+    $insuranceStatus = 'Approved';
+    $showInsuranceButton = false;
+    $rowClass = '';
 
-                                                    <div class="mb-3">
-                                                        <label>Insurance Number</label>
-                                                        <input type="text" name="insurance_number" class="form-control" required>
-                                                    </div>
+    if ($insurance['discount_type'] === 'Percentage') {
+        $insuranceDiscount = ($insurance['discount_value'] / 100) * $totalPrice;
+    } else {
+        $insuranceDiscount = min($insurance['discount_value'], $totalPrice);
+    }
 
-                                                    <div class="mb-3">
-                                                        <label>Relationship to Insured</label>
-                                                        <input type="text" name="relationship_to_insured" class="form-control" required>
-                                                    </div>
-                                                </div>
+    $totalPrice -= $insuranceDiscount;
+}
+?>
 
-                                                <div class="modal-footer">
-                                                    <button type="submit" class="btn btn-primary">Send Request</button>
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="4" class="text-center">No patients with completed results pending billing.</td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
+<tr class="<?= $rowClass ?>">
+<td><?= htmlspecialchars($row['full_name']); ?></td>
 
-    <!-- Sidebar -->
-    <div class="main-sidebar">
-        <?php include 'billing_sidebar.php'; ?>
-    </div>
+<td>
+<?php if ($insuranceStatus === 'Approved'): ?>
+    <span class="badge bg-success">Approved</span><br>
+    <small class="text-muted">
+        <?= htmlspecialchars($insurance['insurance_company']); ?> –
+        <?= htmlspecialchars($insurance['promo_name']); ?>
+        (<?= $insurance['discount_type']; ?> <?= $insurance['discount_value']; ?>)
+    </small>
+<?php else: ?>
+    <span class="badge bg-secondary">N/A</span>
+<?php endif; ?>
+</td>
+
+<td>
+<?php if ($paymentStatus === 'Paid'): ?>
+    <span class="badge bg-success">Paid</span>
+<?php else: ?>
+    <span class="badge bg-warning text-dark">Pending</span>
+<?php endif; ?>
+</td>
+
+<td>₱ <?= number_format($totalPrice, 2); ?></td>
+
+<td class="text-end">
+<div class="d-flex justify-content-end gap-2 flex-wrap">
+
+<?php if (!$receipt_id): ?>
+<a href="total_bill.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-secondary btn-sm" target="_blank">
+View Total Bill
+</a>
+<?php else: ?>
+<a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" class="btn btn-secondary btn-sm" target="_blank">
+View Total Bill
+</a>
+<?php endif; ?>
+
+<?php if ($disableBill): ?>
+<button class="btn btn-success btn-sm" disabled>Already Paid</button>
+<?php else: ?>
+<a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-success btn-sm">
+Generate Bill
+</a>
+<?php endif; ?>
+
+<?php if ($showInsuranceButton): ?>
+<button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">
+Enter Insurance
+</button>
+<?php endif; ?>
+
+</div>
+
+<?php if ($showInsuranceButton): ?>
+<div class="modal fade" id="insuranceModal<?= $row['patient_id'] ?>" tabindex="-1">
+<div class="modal-dialog">
+<form method="POST" action="apply_insurance.php" class="modal-content">
+
+<div class="modal-header">
+<h5 class="modal-title">Enter Insurance Number</h5>
+<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+
+<div class="modal-body">
+<input type="hidden" name="full_name" value="<?= htmlspecialchars($row['full_name']) ?>">
+
+<div class="mb-3">
+<label>Insurance Number</label>
+<input type="text" name="insurance_number" class="form-control" required>
+</div>
+</div>
+
+<div class="modal-footer">
+<button type="submit" class="btn btn-primary">Apply</button>
+<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+</div>
+
+</form>
+</div>
+</div>
+<?php endif; ?>
+
+</td>
+</tr>
+
+<?php endwhile; ?>
+<?php else: ?>
+<tr>
+<td colspan="5" class="text-center">No patients ready for billing.</td>
+</tr>
+<?php endif; ?>
+
+</tbody>
+</table>
+
+</div>
+</div>
+
+<div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
+</div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-        new bootstrap.Tooltip(tooltipTriggerEl);
-    });
-});
-</script>
 </body>
 </html>

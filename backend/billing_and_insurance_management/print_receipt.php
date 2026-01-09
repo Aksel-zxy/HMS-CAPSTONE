@@ -24,6 +24,13 @@ if (!$billing) {
     exit();
 }
 
+// Fetch patient insurance
+$insurance = $conn->query("
+    SELECT * FROM patient_insurance 
+    WHERE full_name = '".$billing['fname']." ".(!empty($billing['mname'])?$billing['mname'].' ':'').$billing['lname']."' 
+      AND status='Active' LIMIT 1
+")->fetch_assoc();
+
 // Fetch doctor info if available
 $doctor = null;
 if (!empty($billing['attending_doctor'])) {
@@ -52,6 +59,7 @@ while ($row = $service_stmt->fetch_assoc()) {
     ];
 }
 
+// Add billing items and calculate total charges
 while ($row = $results->fetch_assoc()) {
     $services = explode(',', $row['result']);
     foreach ($services as $s) {
@@ -69,12 +77,22 @@ while ($row = $results->fetch_assoc()) {
     }
 }
 
-// Use stored totals from patient_receipt
+// Calculate insurance deduction
+$insurance_covered = 0;
+if ($insurance) {
+    if ($insurance['discount_type'] === 'Percentage') {
+        $insurance_covered = ($insurance['discount_value']/100) * $total_charges;
+    } else { // Fixed
+        $insurance_covered = min($insurance['discount_value'], $total_charges);
+    }
+}
+
+// Assume total_discount (PWD/Senior) is already stored in receipt
 $total_discount = floatval($billing['total_discount']);
-$insurance_covered = floatval($billing['insurance_covered']);
-$total_out_of_pocket = floatval($billing['total_out_of_pocket']);
-$grand_total = floatval($billing['grand_total']);
+$total_out_of_pocket = $total_charges - $insurance_covered - $total_discount;
+$grand_total = $total_charges - $total_discount;
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -109,6 +127,10 @@ $grand_total = floatval($billing['grand_total']);
 <tr><td>Name:</td><td><?= htmlspecialchars($billing['fname'].' '.(!empty($billing['mname'])?$billing['mname'].' ':'').$billing['lname']); ?></td></tr>
 <tr><td>Contact Number:</td><td><?= htmlspecialchars($billing['phone_number']); ?></td></tr>
 <tr><td>Address:</td><td><?= htmlspecialchars($billing['address']); ?></td></tr>
+<?php if($insurance): ?>
+<tr><td>Insurance:</td><td><?= htmlspecialchars($insurance['insurance_company'].' ('.$insurance['promo_name'].')'); ?></td></tr>
+<tr><td>Insurance Number:</td><td><?= htmlspecialchars($insurance['insurance_number']); ?></td></tr>
+<?php endif; ?>
 </table>
 </td>
 <td width="4%"></td>
@@ -173,7 +195,7 @@ if ($doctor) {
 SUB TOTAL: ₱ <?= number_format($total_charges,2); ?><br>
 PWD/SENIOR DISCOUNT: ₱ <?= number_format($total_discount,2); ?><br>
 INSURANCE COVERED: ₱ <?= number_format($insurance_covered,2); ?><br>
-<div class="total-box">TOTAL: ₱ <?= number_format($total_out_of_pocket,2); ?></div>
+<div class="total-box">TOTAL DUE: ₱ <?= number_format($total_out_of_pocket,2); ?></div>
 </td>
 </tr>
 </table>
