@@ -1,6 +1,6 @@
 <?php
 require '../SQL/config.php';
-require_once 'assets/oop/auth.php';
+require_once 'assets/oop/off_otp.php';
 ?>
 
 <!DOCTYPE html>

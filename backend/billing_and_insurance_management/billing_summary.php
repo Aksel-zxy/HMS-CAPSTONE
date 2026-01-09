@@ -40,6 +40,9 @@ $billing_id = null;
 $insurance_covered = 0;
 $insurance_company = null;
 $selected_patient = null;
+$insurance_discount = 0;
+$insurance_discount_type = null;
+$insurance_plan = null;
 
 if ($patient_id > 0) {
     $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
@@ -57,22 +60,26 @@ if ($patient_id > 0) {
     $billing_id = $res['latest_billing_id'] ?? null;
 }
 
-// ======================= INSURANCE (FIXED SECTION) =======================
-// --- FIX: Deduct approved insurance even if total_bill = 0 ---
+// ======================= INSURANCE (UPDATED) =======================
 if ($patient_id > 0) {
     $stmt = $conn->prepare("
-        SELECT insurance_company, SUM(covered_amount) AS total_covered
-        FROM insurance_requests
-        WHERE patient_id = ? AND status='Approved'
-        GROUP BY insurance_company
-        ORDER BY total_covered DESC
+        SELECT pi.insurance_number, ic.company_name, ip.promo_name, ip.discount_type, ip.discount_value
+        FROM patient_insurance pi
+        LEFT JOIN insurance_company ic ON pi.insurance_company_id = ic.insurance_company_id
+        LEFT JOIN insurance_promo ip ON pi.promo_id = ip.promo_id
+        WHERE pi.patient_id = ? AND pi.status = 'Active'
         LIMIT 1
     ");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
-    $insurance_covered = floatval($row['total_covered'] ?? 0);
-    $insurance_company = $row['insurance_company'] ?? null;
+
+    if ($row) {
+        $insurance_company = $row['company_name'];
+        $insurance_discount = floatval($row['discount_value']);
+        $insurance_discount_type = $row['discount_type'];
+        $insurance_plan = $row['promo_name'];
+    }
 }
 
 // ======================= BILLING ITEMS =======================
@@ -133,10 +140,18 @@ if ($patient_id > 0) {
     }
 }
 
+// ======================= APPLY INSURANCE DISCOUNT =======================
+$insurance_covered = 0;
+if ($insurance_discount > 0) {
+    if ($insurance_discount_type === 'Percentage') {
+        $insurance_covered = $total_charges * ($insurance_discount / 100);
+    } else { // Fixed
+        $insurance_covered = min($insurance_discount, $total_charges);
+    }
+}
+
 // ======================= TOTALS =======================
 $grand_total = $total_charges - $total_discount;
-
-// --- FIX: Ensure insurance coverage applies to total, not ignored ---
 $total_out_of_pocket = max($grand_total - $insurance_covered, 0);
 
 // ======================= PAYMENT PROCESSING =======================
@@ -181,69 +196,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         if ($stmt->execute()) {
-            // --- Journal Entry Creation ---
-            $receipt_id = $stmt->insert_id;
-            $created_by = $_SESSION['username'] ?? 'System';
-            $je_module = "billing";
-            $je_reference = $txn_id;
-            $je_desc = "Payment received for Patient ID {$patient_id}. Receipt TXN: {$txn_id}. Method: {$payment_method}. Amount: ₱" . number_format($grand_total, 2);
-
-            $stmtJe = $conn->prepare("
-                INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by)
-                VALUES (NOW(), ?, ?, ?, 'Posted', ?)
-            ");
-            if ($stmtJe) {
-                $stmtJe->bind_param("ssss", $je_module, $je_desc, $je_reference, $created_by);
-                $stmtJe->execute();
-                $je_id = $stmtJe->insert_id;
-
-                $payment_account = 'Cash';
-                if (stripos($payment_method, 'bank') !== false) $payment_account = 'Bank';
-                if (stripos($payment_method, 'gcash') !== false) $payment_account = 'Cash';
-
-                $amount_cash = floatval($total_out_of_pocket);
-                $amount_insurance = floatval($insurance_covered);
-
-                $stmtLine = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit) VALUES (?, ?, ?, ?)");
-                if ($stmtLine) {
-                    $zero = 0.0;
-
-                    // --- Patient payment ---
-                    if ($amount_cash > 0) {
-                        $account_name = $payment_account;
-                        $debit = $amount_cash;
-                        $credit = $zero;
-                        $stmtLine->bind_param("isdd", $je_id, $account_name, $debit, $credit);
-                        $stmtLine->execute();
-
-                        $account_name = 'Accounts Receivable';
-                        $debit = $zero;
-                        $credit = $amount_cash;
-                        $stmtLine->bind_param("isdd", $je_id, $account_name, $debit, $credit);
-                        $stmtLine->execute();
-                    }
-
-                    // --- Insurance coverage ---
-                    if ($amount_insurance > 0) {
-                        $account_name = 'Accounts Receivable - Insurance';
-                        $debit = $amount_insurance;
-                        $credit = $zero;
-                        $stmtLine->bind_param("isdd", $je_id, $account_name, $debit, $credit);
-                        $stmtLine->execute();
-
-                        $account_name = 'Accounts Receivable';
-                        $debit = $zero;
-                        $credit = $amount_insurance;
-                        $stmtLine->bind_param("isdd", $je_id, $account_name, $debit, $credit);
-                        $stmtLine->execute();
-                    }
-
-                    $stmtLine->close();
-                }
-
-                $stmtJe->close();
-            }
-
             echo "<script>alert('Payment recorded successfully!'); window.location='billing_records.php';</script>";
             exit;
         } else {
@@ -252,6 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -261,6 +214,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <link rel="stylesheet" href="assets/CSS/billing_summary.css">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+<style>
+.payment-card { cursor:pointer; border:1px solid #ccc; padding:15px; border-radius:8px; text-align:center; width:80px; }
+.payment-card.active { border-color:#0d6efd; background:#e7f1ff; }
+.payment-extra { margin-top:10px; }
+</style>
 </head>
 <body class="bg-light p-4">
 
@@ -278,7 +236,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <strong>BILLED TO:</strong><br>
         <?= htmlspecialchars(($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['mname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '')) ?><br>
         Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?><br>
-        Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?>
+        Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?><br>
+        <?php if($insurance_company): ?>
+            <strong>Insurance:</strong> <?= htmlspecialchars($insurance_company) ?> - <?= htmlspecialchars($insurance_plan) ?> (<?= htmlspecialchars($insurance_discount_type) ?> <?= number_format($insurance_discount,2) ?>)
+        <?php endif; ?>
     </div>
 
     <table class="table table-sm table-bordered mb-3">
@@ -311,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="text-end mb-3">
         <strong>Total Charges: ₱<?= number_format($total_charges,2) ?></strong><br>
-        <strong>PWD/Senior Discount: ₱<?= number_format($total_discount,2) ?></strong><br>
+        <strong>Discount: ₱<?= number_format($total_discount,2) ?></strong><br>
         <strong>Insurance Covered: ₱<?= number_format($insurance_covered,2) ?></strong><br>
         <strong>Total: ₱<?= number_format($total_out_of_pocket,2) ?></strong>
     </div>
@@ -328,30 +289,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <!-- PAYMENT MODAL -->
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="POST">
         <div class="modal-header">
-          <h5 class="modal-title" id="paymentModalLabel">Select Payment Method</h5>
+          <h5 class="modal-title">Select Payment Method</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
 
         <div class="modal-body text-center">
           <input type="hidden" name="payment_method" id="payment_method">
           <div class="d-flex flex-wrap gap-3 justify-content-center mb-4">
-            <div class="payment-card" data-value="GCash">
-              <i class="bi bi-phone text-primary"></i><br><span>GCash</span>
-            </div>
-            <div class="payment-card" data-value="Bank">
-              <i class="bi bi-bank text-success"></i><br><span>Bank</span>
-            </div>
-            <div class="payment-card" data-value="Card">
-              <i class="bi bi-credit-card text-warning"></i><br><span>Card</span>
-            </div>
-            <div class="payment-card" data-value="Cash">
-              <i class="bi bi-cash-coin text-success"></i><br><span>Cash</span>
-            </div>
+            <div class="payment-card" data-value="GCash"><i class="bi bi-phone text-primary"></i><br><span>GCash</span></div>
+            <div class="payment-card" data-value="Bank"><i class="bi bi-bank text-success"></i><br><span>Bank</span></div>
+            <div class="payment-card" data-value="Card"><i class="bi bi-credit-card text-warning"></i><br><span>Card</span></div>
+            <div class="payment-card" data-value="Cash"><i class="bi bi-cash-coin text-success"></i><br><span>Cash</span></div>
           </div>
 
           <div id="gcash_box" class="payment-extra" style="display:none;">

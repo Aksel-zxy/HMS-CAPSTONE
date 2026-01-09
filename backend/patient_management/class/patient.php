@@ -81,7 +81,7 @@ public function insertPatient($data) {
     }
 
     $stmt->bind_param(
-        "ssssissssssssss",
+        "ssssissssssisss",
         $data['fname'], $data['mname'], $data['lname'], $data['address'],
         $data['age'], $data['dob'], $data['gender'], $data['civil_status'],
         $data['phone_number'], $data['email'], $data['admission_type'],

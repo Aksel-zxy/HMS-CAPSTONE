@@ -43,7 +43,7 @@ $user = $result->fetch_assoc();
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="assets/CSS/list.css">
+
 </head>
 
 <body>
@@ -163,13 +163,12 @@ $user = $result->fetch_assoc();
                         </svg>
                     </button>
                 </div>
-
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
                         <span class="username ml-1 me-2"><?php echo $user['fname']; ?>
                             <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton"
-                            data-bs-toggle="dropdown" aria-expanded="true">
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
                         <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton"
@@ -185,6 +184,7 @@ $user = $result->fetch_assoc();
                                 </a>
                             </li>
                         </ul>
+
                     </div>
                 </div>
             </div>
@@ -272,6 +272,5 @@ $user = $result->fetch_assoc();
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="assets/Bootstrap/fontawesome.min.js"></script>
     <script src="assets/Bootstrap/jq.js"></script>
-</body>
 
 </html>
