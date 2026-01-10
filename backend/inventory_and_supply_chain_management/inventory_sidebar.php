@@ -185,22 +185,6 @@ body {
                         </div>
                     </li>
 
-                    <!-- Vendor Management -->
-                    <?php
-                    $vendorPages = ['vendor_application.php','vendor_list.php','vendor_rating.php','admin_vendor_contracts.php','admin_vendor_documents.php'];
-                    $isVendorActive = in_array($currentPage, $vendorPages);
-                    ?>
-                    <li>
-                        <button class="dropdown-btn <?= $isVendorActive ? 'active' : '' ?>">Vendor Management</button>
-                        <div class="dropdown-container" style="<?= $isVendorActive ? 'display:block;' : 'display:none;' ?>">
-                            <a href="vendor_application.php" class="<?= $currentPage=='vendor_application.php'?'active-link':'' ?>">Vendor Registration Approval</a>
-                            <a href="vendor_list.php" class="<?= $currentPage=='vendor_list.php'?'active-link':'' ?>">Vendors</a>
-                            <a href="vendor_rating.php" class="<?= $currentPage=='vendor_rating.php'?'active-link':'' ?>">Vendor Rating & Feedback</a>
-                            <a href="admin_vendor_contracts.php" class="<?= $currentPage=='admin_vendor_contracts.php'?'active-link':'' ?>">Contract & Agreement Tracking</a>
-                            <a href="admin_vendor_documents.php" class="<?= $currentPage=='admin_vendor_documents.php'?'active-link':'' ?>">Compliance & Document Management</a>
-                        </div>
-                    </li>
-
                     <!-- Purchase Order Processing -->
                     <?php
                     $poPages = ['purchase_order.php','admin_purchase_requests.php','department_request.php','order_receive.php','po_status_tracking.php'];
@@ -209,11 +193,9 @@ body {
                     <li>
                         <button class="dropdown-btn <?= $isPOActive ? 'active' : '' ?>">Purchase Order Processing</button>
                         <div class="dropdown-container" style="<?= $isPOActive ? 'display:block;' : 'display:none;' ?>">
-                            <a href="purchase_order.php" class="<?= $currentPage=='purchase_order.php'?'active-link':'' ?>">Purchase Order</a>
                             <a href="department_request.php" class="<?= $currentPage=='department_request.php'?'active-link':'' ?>">Department Request</a>
                             <a href="purchase_request.php" class="<?= $currentPage=='purchase_request.php'?'active-link':'' ?>">Purchase Request</a>
                             <a href="order_receive.php" class="<?= $currentPage=='order_receive.php'?'active-link':'' ?>">Goods Receipt & Verification</a>
-                            <a href="po_status_tracking.php" class="<?= $currentPage=='po_status_tracking.php'?'active-link':'' ?>">PO Status Tracking</a>
                         </div>
                     </li>
 
