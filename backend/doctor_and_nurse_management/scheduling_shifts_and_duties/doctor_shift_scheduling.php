@@ -4,34 +4,77 @@ require_once '../class/DoctorShiftScheduling.php';
 
 $doctorSched = new DoctorShiftScheduling($conn);
 $user = $doctorSched->user;
-$days = $doctorSched->days;
+$days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']; // Static array for the loop
 $doctors = $doctorSched->doctors;
-$professions = $doctorSched->professions;
-$departments = $doctorSched->departments;
+$rooms_query = $conn->query("SELECT room_id, room_name FROM rooms_table ORDER BY room_name ASC");
+$rooms_list = $rooms_query->fetch_all(MYSQLI_ASSOC);
+
+// Helper for validation
+$role_map = [];
+foreach ($doctors as $doc) {
+    $role_map[$doc['employee_id']] = $doc['role'];
+}
 
 // 1. Fetch Rooms List for dropdowns (Used in both Create and Edit)
 $rooms_query = $conn->query("SELECT room_id, room_name FROM rooms_table ORDER BY room_name ASC");
 $rooms_list = $rooms_query->fetch_all(MYSQLI_ASSOC);
 
+include '../../../SQL/config.php';
+require_once '../class/DoctorShiftScheduling.php';
+
+$doctorSched = new DoctorShiftScheduling($conn);
+$doctors = $doctorSched->doctors;
+$days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+// 1. Create a Role Map (Helper for validation)
+$role_map = [];
+foreach ($doctors as $doc) {
+    $role_map[$doc['employee_id']] = $doc['role'];
+}
+
 // Handle schedule form submission (CREATE)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
     $employee_id = $_POST['employee_id'];
-    $week_start = $_POST['week_start'];
-    $created_at = date('Y-m-d H:i:s');
-    $schedule_id = uniqid('sched_');
+    $week_start  = $_POST['week_start'];
+    $doctor_role = $role_map[$employee_id] ?? '';
 
-    $days_data = [];
-    foreach (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as $d) {
-        $days_data[$d . '_start'] = $_POST[$d . '_start'] ?? null;
-        $days_data[$d . '_end'] = $_POST[$d . '_end'] ?? null;
-        $days_data[$d . '_status'] = $_POST[$d . '_status'] ?? 'Off Duty';
-        // Ensure room_id is stored as integer or null
-        $days_data[$d . '_room_id'] = !empty($_POST[$d . '_room_id']) ? (int)$_POST[$d . '_room_id'] : null;
+    // 1. DUPLICATE CHECK
+    $check_stmt = $conn->prepare("SELECT schedule_id FROM shift_scheduling WHERE employee_id = ? AND week_start = ? LIMIT 1");
+    $check_stmt->bind_param("is", $employee_id, $week_start);
+    $check_stmt->execute();
+    if ($check_stmt->get_result()->num_rows > 0) {
+        header("Location: doctor_shift_scheduling.php?error=" . urlencode("Schedule already exists for this week."));
+        exit();
+    }
+    $check_stmt->close();
+
+    $days_list = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    $bind_values = [$unique_id = uniqid('sched_'), $employee_id, $week_start];
+
+    foreach ($days_list as $d) {
+        $status = $_POST[$d . '_status'] ?? 'Off Duty';
+        $start = ($status === 'On Duty') ? ($_POST[$d . '_start'] ?: null) : null;
+        $end   = ($status === 'On Duty') ? ($_POST[$d . '_end'] ?: null) : null;
+        $room  = ($status === 'On Duty' && !empty($_POST[$d . '_room_id'])) ? (int)$_POST[$d . '_room_id'] : null;
+
+        // Resident Validation
+        if ($doctor_role === 'Resident Doctor' && $status === 'On Duty' && $start && $end) {
+            $diff = (strtotime($end) - strtotime($start)) / 3600;
+            if ($diff < 0) $diff += 24;
+            if ($diff < 8) {
+                header("Location: doctor_shift_scheduling.php?error=" . urlencode("Resident doctors require 8+ hour shifts."));
+                exit();
+            }
+        }
+        // Push 4 values per day into the array for binding
+        array_push($bind_values, $start, $end, $status, $room);
     }
 
-    $stmt = $conn->prepare(
-        "INSERT INTO shift_scheduling 
-        (employee_id, schedule_id, week_start, 
+    $bind_values[] = date('Y-m-d H:i:s'); // created_at
+
+    // 31 placeholders total: 3 (header) + 28 (7 days * 4) + 1 (timestamp)
+    $sql = "INSERT INTO shift_scheduling (
+        schedule_id, employee_id, week_start, 
         mon_start, mon_end, mon_status, mon_room_id, 
         tue_start, tue_end, tue_status, tue_room_id, 
         wed_start, wed_end, wed_status, wed_room_id, 
@@ -39,55 +82,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
         fri_start, fri_end, fri_status, fri_room_id, 
         sat_start, sat_end, sat_status, sat_room_id, 
         sun_start, sun_end, sun_status, sun_room_id, 
-        created_at)
-        VALUES (?, ?, ?, " . str_repeat("?,?,?, ?,", 6) . " ?,?,?, ?, ?)"
-    );
+        created_at
+    ) VALUES (" . implode(',', array_fill(0, 32, '?')) . ")";
 
-    $types = "iss" . str_repeat("sssi", 7) . "s";
-    $stmt->bind_param(
-        $types,
-        $employee_id,
-        $schedule_id,
-        $week_start,
-        $days_data['mon_start'],
-        $days_data['mon_end'],
-        $days_data['mon_status'],
-        $days_data['mon_room_id'],
-        $days_data['tue_start'],
-        $days_data['tue_end'],
-        $days_data['tue_status'],
-        $days_data['tue_room_id'],
-        $days_data['wed_start'],
-        $days_data['wed_end'],
-        $days_data['wed_status'],
-        $days_data['wed_room_id'],
-        $days_data['thu_start'],
-        $days_data['thu_end'],
-        $days_data['thu_status'],
-        $days_data['thu_room_id'],
-        $days_data['fri_start'],
-        $days_data['fri_end'],
-        $days_data['fri_status'],
-        $days_data['fri_room_id'],
-        $days_data['sat_start'],
-        $days_data['sat_end'],
-        $days_data['sat_status'],
-        $days_data['sat_room_id'],
-        $days_data['sun_start'],
-        $days_data['sun_end'],
-        $days_data['sun_status'],
-        $days_data['sun_room_id'],
-        $created_at
-    );
+    $stmt = $conn->prepare($sql);
+    // types: s (id), i (emp), s (week) + 7 * (sssi) + s (timestamp) = 32 chars
+    $types = "sis" . str_repeat("sssi", 7) . "s";
+    $stmt->bind_param($types, ...$bind_values);
 
     if ($stmt->execute()) {
         header("Location: doctor_shift_scheduling.php?success=1");
         exit();
     } else {
-        $error = "Error saving schedule: " . $stmt->error;
+        die("Error: " . $stmt->error);
     }
 }
-
 // Handle schedule update (EDIT)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_schedule'])) {
     $schedule_id = $_POST['schedule_id'];
@@ -174,6 +183,7 @@ if (isset($_GET['view_sched_id'])) {
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
     <link rel="stylesheet" href="../assets/CSS/shift_scheduling.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -310,18 +320,20 @@ if (isset($_GET['view_sched_id'])) {
                             <div class="row g-3 mb-4">
                                 <div class="col-md-4">
                                     <label for="employee_id">Select Doctor</label>
-                                    <select name="employee_id" class="form-select" required>
+                                    <select name="employee_id" id="doctor_select" class="form-select" required>
                                         <option value="">-- Choose Doctor --</option>
                                         <?php foreach ($doctors as $doc): ?>
-                                            <option value="<?= $doc['employee_id'] ?>"><?= $doc['first_name'] ?> <?= $doc['last_name'] ?></option>
+                                            <option value="<?= $doc['employee_id'] ?>"><?= $doc['first_name'] ?> <?= $doc['last_name'] ?> (<?= $doc['role'] ?>)</option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
                                     <label for="week_start" class="form-label">Week Starting</label>
                                     <input type="date" name="week_start" id="week_start" class="form-control" required>
+                                    <div id="availability_status" class="small mt-1"></div>
                                 </div>
                             </div>
+
                             <table class="table table-bordered table-striped shift-table ">
                                 <thead>
                                     <tr class="shift-table-header">
@@ -426,8 +438,8 @@ if (isset($_GET['view_sched_id'])) {
                 </div>
                 <?php if (isset($_GET['view_sched_id'])): ?>
                     <div class="modal fade show" id="scheduleModal" tabindex="-1" style="display:block; background: rgba(0,0,0,0.5);">
-                        <div class="modal-dialog modal-xl">
-                            <div class="modal-content shadow-lg border-0">
+                        <div class="modal-dialog modal-xl modal-dialog-centered">
+                            <div class="modal-content shadow-lg border-0" style="max-height: 90vh;">
                                 <div class="modal-header bg-primary text-white">
                                     <h5 class="modal-title">
                                         <i class="fas fa-calendar-alt me-2"></i>
@@ -435,8 +447,8 @@ if (isset($_GET['view_sched_id'])) {
                                     </h5>
                                     <a href="doctor_shift_scheduling.php" class="btn-close btn-close-white"></a>
                                 </div>
-                                <div class="modal-body p-4">
 
+                                <div class="modal-body p-4" style="overflow-y: auto; background-color: #f8f9fa;">
                                     <?php if (!empty($modal_schedules)): ?>
                                         <?php foreach ($modal_schedules as $modal_schedule):
                                             $is_editing = ($edit_sched_id == $modal_schedule['schedule_id']);
@@ -474,7 +486,7 @@ if (isset($_GET['view_sched_id'])) {
 
                                                 <div class="table-responsive">
                                                     <table class="table table-hover align-middle mb-0">
-                                                        <thead class="table-light small text-uppercase">
+                                                        <thead class="table-light small text-uppercase sticky-top" style="top: 0; z-index: 10;">
                                                             <tr>
                                                                 <th style="width: 15%;">Day</th>
                                                                 <th>Start Time</th>
@@ -528,7 +540,7 @@ if (isset($_GET['view_sched_id'])) {
                                                                             </select>
                                                                         <?php else: ?>
                                                                             <span class="fw-semibold text-primary">
-                                                                                <?= htmlspecialchars($modal_schedule[$prefix . '_room_name'] ?? '---') ?>
+                                                                                <?= ($status === 'On Duty') ? htmlspecialchars($modal_schedule[$prefix . '_room_name'] ?? '---') : '---'; ?>
                                                                             </span>
                                                                         <?php endif; ?>
                                                                     </td>
@@ -547,7 +559,6 @@ if (isset($_GET['view_sched_id'])) {
                                             <p>This doctor currently has no shifts assigned to them.</p>
                                         </div>
                                     <?php endif; ?>
-
                                 </div>
                                 <div class="modal-footer bg-light">
                                     <a href="doctor_shift_scheduling.php" class="btn btn-primary px-4">Close View</a>
@@ -594,6 +605,91 @@ if (isset($_GET['view_sched_id'])) {
                     }
                 }
             });
+            document.addEventListener('DOMContentLoaded', function() {
+                const doctorSelect = document.getElementById('doctor_select');
+                const dateInput = document.getElementById('week_start');
+                const statusDiv = document.getElementById('availability_status');
+                const saveBtn = document.querySelector('button[name="save_schedule"]');
+
+                function checkAvailability() {
+                    const empId = doctorSelect.value;
+                    const weekDate = dateInput.value;
+
+                    // Only run if both fields have values
+                    if (empId && weekDate) {
+                        statusDiv.innerHTML = '<span class="text-muted"><i class="fas fa-spinner fa-spin"></i> Checking...</span>';
+
+                        fetch('check_sched.php', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded'
+                                },
+                                body: `employee_id=${empId}&week_start=${weekDate}`
+                            })
+                            .then(response => {
+                                if (!response.ok) throw new Error('File not found or Server Error');
+                                return response.text();
+                            })
+                            .then(data => {
+                                const result = data.trim();
+                                if (result === 'exists') {
+                                    statusDiv.innerHTML = '<span class="text-danger">❌ Week already scheduled for this doctor!</span>';
+                                    saveBtn.disabled = true; // STOPS YOU FROM SUBMITTING
+
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Duplicate Detected',
+                                        text: 'This doctor already has a schedule for the chosen week.',
+                                        confirmButtonColor: '#d33'
+                                    });
+                                    dateInput.value = ''; // Clears the date so they can't submit
+                                } else {
+                                    statusDiv.innerHTML = '<span class="text-success">✅ Week available.</span>';
+                                    saveBtn.disabled = false;
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                statusDiv.innerHTML = '<span class="text-warning">⚠️ Cannot connect to availability checker.</span>';
+                            });
+                    }
+                }
+
+                // Trigger instantly when either field changes
+                doctorSelect.addEventListener('change', checkAvailability);
+                dateInput.addEventListener('change', checkAvailability);
+            });
+        </script>
+        <script type="text/javascript">
+            const urlParams = new URLSearchParams(window.location.search);
+            const errorMsg = urlParams.get('error');
+            const successMsg = urlParams.get('success');
+
+            if (errorMsg) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Validation Error',
+                    text: decodeURIComponent(errorMsg),
+                    confirmButtonColor: '#0d6efd'
+                }).then((result) => {
+                    // Reloads the page without the error parameters in the URL
+                    window.location.href = 'doctor_shift_scheduling.php';
+                });
+            }
+
+            if (successMsg) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: 'Schedule saved successfully.',
+                    timer: 2000,
+                    showConfirmButton: true,
+                    confirmButtonColor: '#0d6efd'
+                }).then(() => {
+                    // Reloads the page to show the fresh list
+                    window.location.href = 'doctor_shift_scheduling.php';
+                });
+            }
         </script>
         <script src="../assets/Bootstrap/all.min.js"></script>
         <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

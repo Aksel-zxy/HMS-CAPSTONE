@@ -1,0 +1,57 @@
+/* Container and Table Adjustments */
+.schedule-container {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 10px;
+    overflow-x: auto;
+}
+
+.schedule-table thead th {
+    background-color: #fcfcfc;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 15px 10px;
+    font-weight: 600;
+}
+
+.schedule-table tbody tr {
+    transition: background 0.2s;
+}
+
+.schedule-table tbody tr:hover {
+    background-color: #fbfcfe !important;
+}
+
+/* Shift Card Detail */
+.shift-card {
+    padding: 12px;
+    border-radius: 10px;
+    min-width: 135px;
+    margin: 8px auto;
+    border-left: 4px solid;
+    transition: transform 0.2s;
+}
+
+.shift-card:hover {
+    transform: translateY(-2px);
+}
+
+.shift-doctor {
+    background-color: #f0f7ff;
+    border-color: #0d6efd;
+    color: #084298;
+}
+
+.shift-nurse {
+    background-color: #f0fff4;
+    border-color: #198754;
+    color: #0f5132;
+}
+
+/* Avatar Styling */
+.avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
