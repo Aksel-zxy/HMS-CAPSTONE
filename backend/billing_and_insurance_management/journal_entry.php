@@ -2,39 +2,60 @@
 session_start();
 include '../../SQL/config.php';
 
-// ✅ Handle Add Journal Entry submission
+/* ===============================
+   ADD JOURNAL ENTRY
+================================ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_entry'])) {
-    $module = $_POST['module'];
-    $reference = $_POST['reference'] ?: null;
-    $description = $_POST['description'] ?: null;
-    $status = $_POST['status'] ?? 'Draft';
-    $created_by = $_SESSION['username'] ?? "Admin";
+
+    $module      = $_POST['module'];
+    $reference   = !empty($_POST['reference']) ? $_POST['reference'] : null;
+    $description = !empty($_POST['description']) ? $_POST['description'] : null;
+    $status      = $_POST['status'] ?? 'Draft';
+    $created_by  = $_SESSION['username'] ?? 'Admin';
 
     $stmt = $conn->prepare("
-        INSERT INTO journal_entries (entry_date, module, description, reference, status, created_by) 
+        INSERT INTO journal_entries 
+        (entry_date, module, description, reference, status, created_by)
         VALUES (NOW(), ?, ?, ?, ?, ?)
     ");
-    $stmt->bind_param("sssss", $module, $description, $reference, $status, $created_by);
+    $stmt->bind_param("sssss",
+        $module,
+        $description,
+        $reference,
+        $status,
+        $created_by
+    );
     $stmt->execute();
-    $entry_id = $stmt->insert_id;
 
-    header("Location: journal_entry_line.php?entry_id=" . $entry_id);
+    header("Location: journal_entry_line.php?entry_id=".$stmt->insert_id);
     exit;
 }
 
-// ✅ Fetch receipts for dropdown
+/* ===============================
+   FETCH RECEIPTS (ACCOUNTING SAFE)
+================================ */
 $receipts = $conn->query("
-    SELECT receipt_id, transaction_id, payment_method, grand_total, status 
-    FROM patient_receipt 
+    SELECT 
+        receipt_id,
+        billing_id,
+        transaction_id,
+        payment_method,
+        grand_total,
+        status
+    FROM patient_receipt
     ORDER BY created_at DESC
 ")->fetch_all(MYSQLI_ASSOC);
 
-// ✅ Filters
+/* ===============================
+   FILTERS
+================================ */
 $module_filter = $_GET['module'] ?? 'all';
 $date_from = $_GET['from'] ?? null;
-$date_to = $_GET['to'] ?? null;
+$date_to   = $_GET['to'] ?? null;
 
-// ✅ Base query
+/* ===============================
+   JOURNAL ENTRIES
+================================ */
 $sql = "SELECT * FROM journal_entries WHERE 1=1";
 $params = [];
 $types = "";
@@ -56,41 +77,38 @@ if (!empty($date_to)) {
 }
 
 $sql .= " ORDER BY entry_date DESC";
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
-$entries = $result->fetch_all(MYSQLI_ASSOC);
 
-// ✅ Count totals
-$total_entries = count($entries);
-$total_posted = count(array_filter($entries, fn($e) => $e['status'] === 'Posted'));
-$total_draft = $total_entries - $total_posted;
+$stmt = $conn->prepare($sql);
+if ($params) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$entries = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Journal Management Module</title>
+
 <link rel="stylesheet" href="assets/CSS/journalentry.css">
-<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
+<link rel="stylesheet" href="assets/css/billing_sidebar.css">
+
 <style>
-.modal { display: none; position: fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); justify-content:center; align-items:center; }
-.modal-content { background:#fff; padding:20px; width:500px; border-radius:8px; box-shadow:0 4px 10px rgba(0,0,0,0.3); }
-.modal-header { display:flex; justify-content:space-between; align-items:center; }
-.close-btn { background:none; border:none; font-size:20px; cursor:pointer; }
-.form-group { margin-bottom:15px; }
-.form-group label { display:block; margin-bottom:5px; }
-.form-group input, .form-group select, .form-group textarea { width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; }
-.status.posted { color: green; font-weight:bold; }
-.status.draft { color: orange; font-weight:bold; }
-.badge.billing { background:#007bff; color:#fff; padding:2px 6px; border-radius:4px; }
-.badge.insurance { background:#28a745; color:#fff; padding:2px 6px; border-radius:4px; }
-.badge.supply { background:#6c757d; color:#fff; padding:2px 6px; border-radius:4px; }
-.badge.general { background:#17a2b8; color:#fff; padding:2px 6px; border-radius:4px; }
+.modal{display:none;position:fixed;z-index:1000;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,.6);justify-content:center;align-items:center}
+.modal-content{background:#fff;padding:20px;width:500px;border-radius:8px}
+.status.posted{color:green;font-weight:bold}
+.status.draft{color:orange;font-weight:bold}
+.badge.billing{background:#007bff;color:#fff}
+.badge.insurance{background:#28a745;color:#fff}
+.badge.supply{background:#6c757d;color:#fff}
+.badge.general{background:#17a2b8;color:#fff}
 </style>
 </head>
+
 <body>
+
 <div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
@@ -98,7 +116,7 @@ $total_draft = $total_entries - $total_posted;
 <div class="container">
 <h1>Journal Management Module</h1>
 
-<table id="journals-table" class="table table-bordered table-striped">
+<table class="table table-bordered table-striped">
 <thead>
 <tr>
 <th>Entry ID</th>
@@ -112,6 +130,7 @@ $total_draft = $total_entries - $total_posted;
 </tr>
 </thead>
 <tbody>
+
 <?php foreach ($entries as $row): ?>
 <tr>
 <td><?= $row['entry_id'] ?></td>
@@ -126,18 +145,25 @@ $total_draft = $total_entries - $total_posted;
 </td>
 </tr>
 <?php endforeach; ?>
+
 </tbody>
 </table>
 
-<!-- Add Entry Modal -->
+<button id="openModal" class="btn btn-primary">Add Journal Entry</button>
+</div>
+
+<!-- ADD ENTRY MODAL -->
 <div id="addEntryModal" class="modal">
 <div class="modal-content">
+
 <div class="modal-header">
 <h2>Add Journal Entry</h2>
 <button class="close-btn" id="closeModal">&times;</button>
 </div>
-<form method="post">
+
+<form method="POST">
 <input type="hidden" name="add_entry" value="1">
+
 <div class="form-group">
 <label>Module</label>
 <select name="module" required>
@@ -147,19 +173,27 @@ $total_draft = $total_entries - $total_posted;
 <option value="general">General</option>
 </select>
 </div>
+
 <div class="form-group">
-<label>Reference</label>
+<label>Reference (Receipt)</label>
 <select name="reference">
 <option value="">-- Manual Entry --</option>
-<?php foreach($receipts as $r): ?>
-<option value="<?= htmlspecialchars($r['transaction_id']) ?>">TXN: <?= $r['transaction_id'] ?> | ₱<?= number_format($r['grand_total'],2) ?> | <?= $r['status'] ?></option>
+<?php foreach ($receipts as $r): ?>
+<option value="RECEIPT-<?= $r['receipt_id'] ?>">
+Receipt #<?= $r['receipt_id'] ?> |
+TXN <?= $r['transaction_id'] ?> |
+₱<?= number_format($r['grand_total'],2) ?> |
+<?= $r['status'] ?>
+</option>
 <?php endforeach; ?>
 </select>
 </div>
+
 <div class="form-group">
 <label>Description</label>
 <textarea name="description" rows="3"></textarea>
 </div>
+
 <div class="form-group">
 <label>Status</label>
 <select name="status">
@@ -167,19 +201,18 @@ $total_draft = $total_entries - $total_posted;
 <option value="Posted">Posted</option>
 </select>
 </div>
+
 <button type="submit">Save Entry</button>
 </form>
+
 </div>
 </div>
 
 <script>
-// Add Entry Modal JS
-const addModal = document.getElementById('addEntryModal');
-const openModalBtn = document.getElementById('openModal');
-const closeModalBtn = document.getElementById('closeModal');
-openModalBtn?.addEventListener('click', ()=> addModal.style.display='flex');
-closeModalBtn?.addEventListener('click', ()=> addModal.style.display='none');
-window.addEventListener('click', e=>{if(e.target==addModal) addModal.style.display='none';});
+const modal = document.getElementById('addEntryModal');
+document.getElementById('openModal').onclick = ()=> modal.style.display='flex';
+document.getElementById('closeModal').onclick = ()=> modal.style.display='none';
+window.onclick = e => { if (e.target === modal) modal.style.display='none'; };
 </script>
 
 </body>
