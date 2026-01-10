@@ -68,12 +68,12 @@ $result = $conn->query($sql);
 <body>
 <div class="dashboard-wrapper">
 <div class="main-content-wrapper">
-<div class="container-fluid bg-white p-4 rounded shadow">
+<div class="container-fluid bg-white p-4 rounded shadow" style="border-radius: 50px; margin-top: 100px; width: 100%; overflow: hidden;">
 
 <h1 class="mb-4">Patient Billing</h1>
 
-<table class="table table-bordered table-striped">
-<thead class="table-dark">
+<table class="table table-bordered table-striped" style="width: 100%;">
+<thead class="table-white">
 <tr>
     <th>Patient Name</th>
     <th>Insurance Status / Plan</th>

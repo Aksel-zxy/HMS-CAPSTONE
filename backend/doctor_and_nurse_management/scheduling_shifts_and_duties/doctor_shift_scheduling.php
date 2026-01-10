@@ -9,6 +9,10 @@ $doctors = $doctorSched->doctors;
 $professions = $doctorSched->professions;
 $departments = $doctorSched->departments;
 
+// 1. Fetch Rooms List for dropdowns (Used in both Create and Edit)
+$rooms_query = $conn->query("SELECT room_id, room_name FROM rooms_table ORDER BY room_name ASC");
+$rooms_list = $rooms_query->fetch_all(MYSQLI_ASSOC);
+
 // Handle schedule form submission (CREATE)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
     $employee_id = $_POST['employee_id'];
@@ -16,62 +20,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
     $created_at = date('Y-m-d H:i:s');
     $schedule_id = uniqid('sched_');
 
-    // Check if employee_id is not empty and exists in hr_employees
-    $check_stmt = $conn->prepare("SELECT employee_id FROM hr_employees WHERE employee_id = ?");
-    $check_stmt->bind_param("i", $employee_id);
-    $check_stmt->execute();
-    $check_result = $check_stmt->get_result();
+    $days_data = [];
+    foreach (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as $d) {
+        $days_data[$d . '_start'] = $_POST[$d . '_start'] ?? null;
+        $days_data[$d . '_end'] = $_POST[$d . '_end'] ?? null;
+        $days_data[$d . '_status'] = $_POST[$d . '_status'] ?? 'Off Duty';
+        // Ensure room_id is stored as integer or null
+        $days_data[$d . '_room_id'] = !empty($_POST[$d . '_room_id']) ? (int)$_POST[$d . '_room_id'] : null;
+    }
 
-    if (empty($employee_id) || $check_result->num_rows === 0) {
-        $error = "Selected employee ID does not exist or is empty. Please choose a valid Doctor.";
+    $stmt = $conn->prepare(
+        "INSERT INTO shift_scheduling 
+        (employee_id, schedule_id, week_start, 
+        mon_start, mon_end, mon_status, mon_room_id, 
+        tue_start, tue_end, tue_status, tue_room_id, 
+        wed_start, wed_end, wed_status, wed_room_id, 
+        thu_start, thu_end, thu_status, thu_room_id, 
+        fri_start, fri_end, fri_status, fri_room_id, 
+        sat_start, sat_end, sat_status, sat_room_id, 
+        sun_start, sun_end, sun_status, sun_room_id, 
+        created_at)
+        VALUES (?, ?, ?, " . str_repeat("?,?,?, ?,", 6) . " ?,?,?, ?, ?)"
+    );
+
+    $types = "iss" . str_repeat("sssi", 7) . "s";
+    $stmt->bind_param(
+        $types,
+        $employee_id,
+        $schedule_id,
+        $week_start,
+        $days_data['mon_start'],
+        $days_data['mon_end'],
+        $days_data['mon_status'],
+        $days_data['mon_room_id'],
+        $days_data['tue_start'],
+        $days_data['tue_end'],
+        $days_data['tue_status'],
+        $days_data['tue_room_id'],
+        $days_data['wed_start'],
+        $days_data['wed_end'],
+        $days_data['wed_status'],
+        $days_data['wed_room_id'],
+        $days_data['thu_start'],
+        $days_data['thu_end'],
+        $days_data['thu_status'],
+        $days_data['thu_room_id'],
+        $days_data['fri_start'],
+        $days_data['fri_end'],
+        $days_data['fri_status'],
+        $days_data['fri_room_id'],
+        $days_data['sat_start'],
+        $days_data['sat_end'],
+        $days_data['sat_status'],
+        $days_data['sat_room_id'],
+        $days_data['sun_start'],
+        $days_data['sun_end'],
+        $days_data['sun_status'],
+        $days_data['sun_room_id'],
+        $created_at
+    );
+
+    if ($stmt->execute()) {
+        header("Location: doctor_shift_scheduling.php?success=1");
+        exit();
     } else {
-        // Collect start, end, and status for each day
-        $mon_start = $_POST['mon_start'] ?? null;
-        $mon_end   = $_POST['mon_end'] ?? null;
-        $mon_status = $_POST['mon_status'] ?? null;
-        $tue_start = $_POST['tue_start'] ?? null;
-        $tue_end   = $_POST['tue_end'] ?? null;
-        $tue_status = $_POST['tue_status'] ?? null;
-        $wed_start = $_POST['wed_start'] ?? null;
-        $wed_end   = $_POST['wed_end'] ?? null;
-        $wed_status = $_POST['wed_status'] ?? null;
-        $thu_start = $_POST['thu_start'] ?? null;
-        $thu_end   = $_POST['thu_end'] ?? null;
-        $thu_status = $_POST['thu_status'] ?? null;
-        $fri_start = $_POST['fri_start'] ?? null;
-        $fri_end   = $_POST['fri_end'] ?? null;
-        $fri_status = $_POST['fri_status'] ?? null;
-        $sat_start = $_POST['sat_start'] ?? null;
-        $sat_end   = $_POST['sat_end'] ?? null;
-        $sat_status = $_POST['sat_status'] ?? null;
-        $sun_start = $_POST['sun_start'] ?? null;
-        $sun_end   = $_POST['sun_end'] ?? null;
-        $sun_status = $_POST['sun_status'] ?? null;
-
-        $stmt = $conn->prepare(
-            "INSERT INTO shift_scheduling 
-            (employee_id, schedule_id, week_start, mon_start, mon_end, mon_status, tue_start, tue_end, tue_status, wed_start, wed_end, wed_status, thu_start, thu_end, thu_status, fri_start, fri_end, fri_status, sat_start, sat_end, sat_status, sun_start, sun_end, sun_status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
-        $stmt->bind_param(
-            "sssssssssssssssssssssssss",
-            $employee_id, $schedule_id, $week_start,
-            $mon_start, $mon_end, $mon_status,
-            $tue_start, $tue_end, $tue_status,
-            $wed_start, $wed_end, $wed_status,
-            $thu_start, $thu_end, $thu_status,
-            $fri_start, $fri_end, $fri_status,
-            $sat_start, $sat_end, $sat_status,
-            $sun_start, $sun_end, $sun_status,
-            $created_at
-        );
-
-        if ($stmt->execute()) {
-            header("Location: doctor_shift_scheduling.php?success=1");
-            exit();
-        } else {
-            $error = "Error saving schedule: " . $stmt->error;
-        }
+        $error = "Error saving schedule: " . $stmt->error;
     }
 }
 
@@ -79,33 +92,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_schedule'])) {
     $schedule_id = $_POST['schedule_id'];
     $employee_id = $_POST['employee_id'];
-    $week_start = $_POST['week_start'];
-    $created_at = date('Y-m-d H:i:s');
+    $week_start  = $_POST['week_start'];
+
     $params = [];
     $types = '';
     $fields = '';
-    foreach ($days as $day) {
-        $prefix = strtolower(substr($day, 0, 3));
-        $fields .= "{$prefix}_start = ?, {$prefix}_end = ?, {$prefix}_status = ?, ";
-        $params[] = $_POST[$prefix . '_start'] ?? null;
-        $params[] = $_POST[$prefix . '_end'] ?? null;
-        $params[] = $_POST[$prefix . '_status'] ?? null;
-        $types .= 'sss';
+
+    foreach (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as $day) {
+        $fields .= "{$day}_start = ?, {$day}_end = ?, {$day}_status = ?, {$day}_room_id = ?, ";
+        $params[] = $_POST[$day . '_start'] ?: null;
+        $params[] = $_POST[$day . '_end'] ?: null;
+        $params[] = $_POST[$day . '_status'] ?: 'Off Duty';
+        $params[] = !empty($_POST[$day . '_room_id']) ? (int)$_POST[$day . '_room_id'] : null;
+        $types .= 'sssi';
     }
-    $fields .= "week_start = ?, created_at = ?";
+
+    $fields .= "week_start = ?";
     $params[] = $week_start;
-    $params[] = $created_at;
-    $types .= 'ss';
+    $types .= 's';
+
     $params[] = $schedule_id;
     $types .= 's';
 
     $sql = "UPDATE shift_scheduling SET $fields WHERE schedule_id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param($types, ...$params);
-    $stmt->execute();
-    $success = "Schedule updated successfully!";
-    header("Location: doctor_shift_scheduling.php?view_sched_id=" . urlencode($employee_id));
-    exit();
+
+    if ($stmt->execute()) {
+        header("Location: doctor_shift_scheduling.php?view_sched_id=" . urlencode($employee_id) . "&success=update");
+        exit();
+    }
 }
 
 // Handle schedule delete
@@ -114,15 +130,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_schedule'])) {
     $stmt = $conn->prepare("DELETE FROM shift_scheduling WHERE schedule_id = ?");
     $stmt->bind_param("s", $schedule_id);
     $stmt->execute();
-    $success = "Schedule deleted successfully!";
 }
 
-// Fetch all schedules for modal view
+// Fetch all schedules for modal view (with LEFT JOIN for room names)
 $modal_schedules = [];
 $edit_sched_id = $_GET['edit_sched_id'] ?? null;
 if (isset($_GET['view_sched_id'])) {
     $view_id = $_GET['view_sched_id'];
-    $stmt = $conn->prepare("SELECT * FROM shift_scheduling WHERE employee_id = ? ORDER BY week_start DESC");
+    // We JOIN rooms_table for every day to get names instead of IDs
+    $sql = "SELECT s.*, 
+            r1.room_name as mon_room_name, r2.room_name as tue_room_name, 
+            r3.room_name as wed_room_name, r4.room_name as thu_room_name, 
+            r5.room_name as fri_room_name, r6.room_name as sat_room_name, 
+            r7.room_name as sun_room_name
+            FROM shift_scheduling s
+            LEFT JOIN rooms_table r1 ON s.mon_room_id = r1.room_id
+            LEFT JOIN rooms_table r2 ON s.tue_room_id = r2.room_id
+            LEFT JOIN rooms_table r3 ON s.wed_room_id = r3.room_id
+            LEFT JOIN rooms_table r4 ON s.thu_room_id = r4.room_id
+            LEFT JOIN rooms_table r5 ON s.fri_room_id = r5.room_id
+            LEFT JOIN rooms_table r6 ON s.sat_room_id = r6.room_id
+            LEFT JOIN rooms_table r7 ON s.sun_room_id = r7.room_id
+            WHERE s.employee_id = ? ORDER BY s.week_start DESC";
+
+    $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $view_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -143,36 +174,6 @@ if (isset($_GET['view_sched_id'])) {
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
     <link rel="stylesheet" href="../assets/CSS/shift_scheduling.css">
-    <script>
-    // Validate max 8 hours per day before submitting
-    document.addEventListener("DOMContentLoaded", function() {
-        var form = document.querySelector('form[method="POST"]');
-        if (form) {
-            form.addEventListener("submit", function(e) {
-                var days = ["mon","tue","wed","thu","fri","sat","sun"];
-                for (var i = 0; i < days.length; i++) {
-                    var start = form.querySelector('[name="'+days[i]+'_start"]').value;
-                    var end = form.querySelector('[name="'+days[i]+'_end"]').value;
-                    if (start && end) {
-                        var startDate = new Date("1970-01-01T" + start + ":00");
-                        var endDate = new Date("1970-01-01T" + end + ":00");
-                        var diff = (endDate - startDate) / (1000 * 60 * 60);
-                        if (diff > 8) {
-                            alert("Maximum shift per day is 8 hours ("+days[i].charAt(0).toUpperCase()+days[i].slice(1)+")");
-                            e.preventDefault();
-                            return false;
-                        }
-                        if (diff < 0) {
-                            alert("End time must be after start time ("+days[i].charAt(0).toUpperCase()+days[i].slice(1)+")");
-                            e.preventDefault();
-                            return false;
-                        }
-                    }
-                }
-            });
-        }
-    });
-    </script>
 </head>
 
 <body>
@@ -187,8 +188,8 @@ if (isset($_GET['view_sched_id'])) {
             <div class="menu-title">Navigation</div>
 
             <!----- Sidebar Navigation ----->
-        
-           <li class="sidebar-item">
+
+            <li class="sidebar-item">
                 <a href="../doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg x..mlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
@@ -202,7 +203,9 @@ if (isset($_GET['view_sched_id'])) {
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#schedule"
                     aria-expanded="true" aria-controls="auth">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 512"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M320 16a104 104 0 1 1 0 208 104 104 0 1 1 0-208zM96 88a72 72 0 1 1 0 144 72 72 0 1 1 0-144zM0 416c0-70.7 57.3-128 128-128 12.8 0 25.2 1.9 36.9 5.4-32.9 36.8-52.9 85.4-52.9 138.6l0 16c0 11.4 2.4 22.2 6.7 32L32 480c-17.7 0-32-14.3-32-32l0-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32l0-16c0-53.2-20-101.8-52.9-138.6 11.7-3.5 24.1-5.4 36.9-5.4 70.7 0 128 57.3 128 128l0 32c0 17.7-14.3 32-32 32l-86.7 0zM472 160a72 72 0 1 1 144 0 72 72 0 1 1 -144 0zM160 432c0-88.4 71.6-160 160-160s160 71.6 160 160l0 16c0 17.7-14.3 32-32 32l-256 0c-17.7 0-32-14.3-32-32l0-16z"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 512"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M320 16a104 104 0 1 1 0 208 104 104 0 1 1 0-208zM96 88a72 72 0 1 1 0 144 72 72 0 1 1 0-144zM0 416c0-70.7 57.3-128 128-128 12.8 0 25.2 1.9 36.9 5.4-32.9 36.8-52.9 85.4-52.9 138.6l0 16c0 11.4 2.4 22.2 6.7 32L32 480c-17.7 0-32-14.3-32-32l0-32zm521.3 64c4.3-9.8 6.7-20.6 6.7-32l0-16c0-53.2-20-101.8-52.9-138.6 11.7-3.5 24.1-5.4 36.9-5.4 70.7 0 128 57.3 128 128l0 32c0 17.7-14.3 32-32 32l-86.7 0zM472 160a72 72 0 1 1 144 0 72 72 0 1 1 -144 0zM160 432c0-88.4 71.6-160 160-160s160 71.6 160 160l0 16c0 17.7-14.3 32-32 32l-256 0c-17.7 0-32-14.3-32-32l0-16z" />
+                    </svg>
                     <span style="font-size: 18px;">Scheduling Shifts and Duties</span>
                 </a>
 
@@ -213,19 +216,21 @@ if (isset($_GET['view_sched_id'])) {
                     <li class="sidebar-item">
                         <a href="nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
-                     <li class="sidebar-item">
+                    <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
-                       <li class="sidebar-item">
+                    <li class="sidebar-item">
                         <a href="schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
 
-<li class="sidebar-item">
+            <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#license"
-                                 aria-expanded="true" aria-controls="auth">
-                   <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M80 480L80 224L560 224L560 480C560 488.8 552.8 496 544 496L352 496C352 451.8 316.2 416 272 416L208 416C163.8 416 128 451.8 128 496L96 496C87.2 496 80 488.8 80 480zM96 96C60.7 96 32 124.7 32 160L32 480C32 515.3 60.7 544 96 544L544 544C579.3 544 608 515.3 608 480L608 160C608 124.7 579.3 96 544 96L96 96zM240 376C270.9 376 296 350.9 296 320C296 289.1 270.9 264 240 264C209.1 264 184 289.1 184 320C184 350.9 209.1 376 240 376zM408 272C394.7 272 384 282.7 384 296C384 309.3 394.7 320 408 320L488 320C501.3 320 512 309.3 512 296C512 282.7 501.3 272 488 272L408 272zM408 368C394.7 368 384 378.7 384 392C384 405.3 394.7 416 408 416L488 416C501.3 416 512 405.3 512 392C512 378.7 501.3 368 488 368L408 368z"/></svg>
+                    aria-expanded="true" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M80 480L80 224L560 224L560 480C560 488.8 552.8 496 544 496L352 496C352 451.8 316.2 416 272 416L208 416C163.8 416 128 451.8 128 496L96 496C87.2 496 80 488.8 80 480zM96 96C60.7 96 32 124.7 32 160L32 480C32 515.3 60.7 544 96 544L544 544C579.3 544 608 515.3 608 480L608 160C608 124.7 579.3 96 544 96L96 96zM240 376C270.9 376 296 350.9 296 320C296 289.1 270.9 264 240 264C209.1 264 184 289.1 184 320C184 350.9 209.1 376 240 376zM408 272C394.7 272 384 282.7 384 296C384 309.3 394.7 320 408 320L488 320C501.3 320 512 309.3 512 296C512 282.7 501.3 272 488 272L408 272zM408 368C394.7 368 384 378.7 384 392C384 405.3 394.7 416 408 416L488 416C501.3 416 512 405.3 512 392C512 378.7 501.3 368 488 368L408 368z" />
+                    </svg>
                     <span style="font-size: 18px;">Doctor & Nurse Registration & Compliance Licensing</span>
                 </a>
 
@@ -236,22 +241,24 @@ if (isset($_GET['view_sched_id'])) {
                     <li class="sidebar-item">
                         <a href="../dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
-                     <li class="sidebar-item">
+                    <li class="sidebar-item">
                         <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">Notifications & Alerts</a>
                     </li>
-                       <li class="sidebar-item">
+                    <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">Compliance Audit Log</a>
                     </li>
                 </ul>
             </li>
 
-              <li class="sidebar-item">
+            <li class="sidebar-item">
                 <a href="doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                   <svg xmlns="http://www.w3.org/2000/svg"  width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M96 96C113.7 96 128 110.3 128 128L128 464C128 472.8 135.2 480 144 480L544 480C561.7 480 576 494.3 576 512C576 529.7 561.7 544 544 544L144 544C99.8 544 64 508.2 64 464L64 128C64 110.3 78.3 96 96 96zM208 288C225.7 288 240 302.3 240 320L240 384C240 401.7 225.7 416 208 416C190.3 416 176 401.7 176 384L176 320C176 302.3 190.3 288 208 288zM352 224L352 384C352 401.7 337.7 416 320 416C302.3 416 288 401.7 288 384L288 224C288 206.3 302.3 192 320 192C337.7 192 352 206.3 352 224zM432 256C449.7 256 464 270.3 464 288L464 384C464 401.7 449.7 416 432 416C414.3 416 400 401.7 400 384L400 288C400 270.3 414.3 256 432 256zM576 160L576 384C576 401.7 561.7 416 544 416C526.3 416 512 401.7 512 384L512 160C512 142.3 526.3 128 544 128C561.7 128 576 142.3 576 160z"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                        <path d="M96 96C113.7 96 128 110.3 128 128L128 464C128 472.8 135.2 480 144 480L544 480C561.7 480 576 494.3 576 512C576 529.7 561.7 544 544 544L144 544C99.8 544 64 508.2 64 464L64 128C64 110.3 78.3 96 96 96zM208 288C225.7 288 240 302.3 240 320L240 384C240 401.7 225.7 416 208 416C190.3 416 176 401.7 176 384L176 320C176 302.3 190.3 288 208 288zM352 224L352 384C352 401.7 337.7 416 320 416C302.3 416 288 401.7 288 384L288 224C288 206.3 302.3 192 320 192C337.7 192 352 206.3 352 224zM432 256C449.7 256 464 270.3 464 288L464 384C464 401.7 449.7 416 432 416C414.3 416 400 401.7 400 384L400 288C400 270.3 414.3 256 432 256zM576 160L576 384C576 401.7 561.7 416 544 416C526.3 416 512 401.7 512 384L512 160C512 142.3 526.3 128 544 128C561.7 128 576 142.3 576 160z" />
+                    </svg>
                     <span style="font-size: 18px;">Performance and Evaluation</span>
                 </a>
             </li>
@@ -302,13 +309,11 @@ if (isset($_GET['view_sched_id'])) {
                         <form method="POST" class="mb-4">
                             <div class="row g-3 mb-4">
                                 <div class="col-md-4">
-                                    <label for="employee_id" class="form-label">Select Doctor</label>
-                                    <select name="employee_id" id="employee_id" class="form-select" required>
-                                        <option value="">-- Choose a Doctor --</option>
+                                    <label for="employee_id">Select Doctor</label>
+                                    <select name="employee_id" class="form-select" required>
+                                        <option value="">-- Choose Doctor --</option>
                                         <?php foreach ($doctors as $doc): ?>
-                                            <option value="<?= htmlspecialchars($doc['employee_id']) ?>">
-                                                <?= htmlspecialchars($doc['employee_id'] . ' - ' . $doc['first_name'] . ' ' . $doc['last_name']) ?>
-                                            </option>
+                                            <option value="<?= $doc['employee_id'] ?>"><?= $doc['first_name'] ?> <?= $doc['last_name'] ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
@@ -323,17 +328,31 @@ if (isset($_GET['view_sched_id'])) {
                                         <th>Day</th>
                                         <th>Start Time</th>
                                         <th>End Time</th>
+                                        <th>Room</th>
                                         <th>Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($days as $day): ?>
+                                        <?php $prefix = strtolower(substr($day, 0, 3)); ?>
                                         <tr>
                                             <td><?= $day ?></td>
-                                            <td><input type="time" name="<?= strtolower(substr($day, 0, 3)) ?>_start" class="form-control"></td>
-                                            <td><input type="time" name="<?= strtolower(substr($day, 0, 3)) ?>_end" class="form-control"></td>
                                             <td>
-                                                <select name="<?= strtolower(substr($day, 0, 3)) ?>_status" class="form-select" required>
+                                                <input type="time" name="<?= $prefix ?>_start" class="form-control start-time-input">
+                                            </td>
+                                            <td>
+                                                <input type="time" name="<?= $prefix ?>_end" class="form-control end-time-input">
+                                            </td>
+                                            <td>
+                                                <select name="<?= $prefix ?>_room_id" class="form-select">
+                                                    <option value="">-- Select Room --</option>
+                                                    <?php foreach ($rooms_list as $room): ?>
+                                                        <option value="<?= $room['room_id'] ?>"><?= htmlspecialchars($room['room_name']) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <select name="<?= $prefix ?>_status" class="form-select" required>
                                                     <option value="">-- Select Status --</option>
                                                     <option value="On Duty">On Duty</option>
                                                     <option value="Off Duty">Off Duty</option>
@@ -350,14 +369,10 @@ if (isset($_GET['view_sched_id'])) {
                     </div>
                 </div>
             </div>
-            
 
-
-
-
-             <div class="container-fluid ">
+            <!-- List of Doctors -->
+            <div class="container-fluid ">
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">📃List of Doctors</h2>
-               
                 <?php if (!empty($success)): ?>
                     <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
                 <?php elseif (!empty($error)): ?>
@@ -397,131 +412,193 @@ if (isset($_GET['view_sched_id'])) {
                                             </form>
                                         </td>
                                         <td>
-    <form action="doctor_download_schedule.php" method="get" target="_blank">
-        <input type="hidden" name="employee_id" value="<?= htmlspecialchars($doc['employee_id']) ?>">
-        <button type="submit" class="btn btn-success">Download as PDF</button>
-    </form>
-</td>
+                                            <form action="doctor_download_schedule.php" method="get" target="_blank">
+                                                <input type="hidden" name="employee_id" value="<?= htmlspecialchars($doc['employee_id']) ?>">
+                                                <button type="submit" class="btn btn-success">Download as PDF</button>
+                                            </form>
+                                        </td>
 
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-                </table>
-                </div>
-            </div>
-            <?php if (!empty($modal_schedules)): ?>
-                <div class="modal fade show schedule-modal" id="scheduleModal" tabindex="-1" aria-modal="true" role="dialog" style="display:block;">
-                    <div class="modal-dialog modal-xl">
-                        <div class="modal-content rounded shadow">
-                            <div class="modal-header bg-primary text-white">
-                                <h5 class="modal-title">Schedules for Doctor ID: <?= htmlspecialchars($modal_schedules[0]['employee_id']) ?></h5>
-                                <a href="doctor_shift_scheduling.php" class="btn-close"></a>
-                            </div>
-                            <div class="modal-body">
-                                <?php foreach ($modal_schedules as $modal_schedule): ?>
-                                    <?php $is_editing = ($edit_sched_id == $modal_schedule['schedule_id']); ?>
-                                    <form method="POST" class="mb-4 border rounded p-3">
-                                        <input type="hidden" name="schedule_id" value="<?= htmlspecialchars($modal_schedule['schedule_id']) ?>">
-                                        <input type="hidden" name="employee_id" value="<?= htmlspecialchars($modal_schedule['employee_id']) ?>">
-                                        <h6>Week:
-                                            <?php if ($is_editing): ?>
-                                                <input type="date" name="week_start" class="form-control d-inline-block w-auto"
-                                                    value="<?= htmlspecialchars($modal_schedule['week_start']) ?>">
-                                            <?php else: ?>
-                                                <?= htmlspecialchars($modal_schedule['week_start']) ?>
-                                            <?php endif; ?>
-                                        </h6>
-                                        <table class="table table-bordered bg-white schedule-table">
-                                            <thead>
-                                                <tr class="schedule-table-header">
-                                                    <th>Day</th>
-                                                    <th>Start Time</th>
-                                                    <th>End Time</th>
-                                                    <th>Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($days as $day): ?>
-                                                    <?php $prefix = strtolower(substr($day, 0, 3)); ?>
-                                                    <tr>
-                                                        <td><?= $day ?></td>
-                                                        <td>
-                                                            <?php if (!$is_editing): ?>
-                                                                <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
-                                                                    ---
-                                                                <?php else: ?>
-                                                                    <?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?>
-                                                                <?php endif; ?>
-                                                            <?php else: ?>
-                                                                <input type="time" name="<?= $prefix ?>_start" class="form-control"
-                                                                    value="<?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?>">
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td>
-                                                            <?php if (!$is_editing): ?>
-                                                                <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>
-                                                                    ---
-                                                                <?php else: ?>
-                                                                    <?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?>
-                                                                <?php endif; ?>
-                                                            <?php else: ?>
-                                                                <input type="time" name="<?= $prefix ?>_end" class="form-control"
-                                                                    value="<?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?>">
-                                                            <?php endif; ?>
-                                                        </td>
-                                                        <td>
-                                                            <?php if (!$is_editing): ?>
-                                                                <?= htmlspecialchars($modal_schedule[$prefix . '_status'] ?? '') ?>
-                                                            <?php else: ?>
-                                                                <select name="<?= $prefix ?>_status" class="form-select">
-                                                                    <option value="">-- Select Status --</option>
-                                                                    <option value="On Duty" <?= ($modal_schedule[$prefix . '_status'] ?? '') == 'On Duty' ? 'selected' : '' ?>>On Duty</option>
-                                                                    <option value="Off Duty" <?= ($modal_schedule[$prefix . '_status'] ?? '') == 'Off Duty' ? 'selected' : '' ?>>Off Duty</option>
-                                                                    <option value="Leave" <?= ($modal_schedule[$prefix . '_status'] ?? '') == 'Leave' ? 'selected' : '' ?>>Leave</option>
-                                                                    <option value="Sick" <?= ($modal_schedule[$prefix . '_status'] ?? '') == 'Sick' ? 'selected' : '' ?>>Sick</option>
-                                                                </select>
-                                                            <?php endif; ?>
-                                                        </td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                        <div class="d-flex gap-2 mt-2">
-                                            <?php if ($is_editing): ?>
-                                                <button type="submit" name="update_schedule" class="btn btn-success">Save Changes</button>
-                                                <a href="?view_sched_id=<?= htmlspecialchars($modal_schedule['employee_id']) ?>" class="btn btn-secondary">Cancel</a>
-                                            <?php else: ?>
-                                                <a href="?view_sched_id=<?= htmlspecialchars($modal_schedule['employee_id']) ?>&edit_sched_id=<?= htmlspecialchars($modal_schedule['schedule_id']) ?>" class="btn btn-warning">Edit</a>
-                                            <?php endif; ?>
-                                            <button type="submit" name="delete_schedule" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this schedule?');">Delete</button>
-                                        </div>
-                                    </form>
+                                    </tr>
                                 <?php endforeach; ?>
-                            </div>
-                            <div class="modal-footer">
-                                <a href="doctor_shift_scheduling.php" class="btn btn-secondary">Close</a>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <?php if (isset($_GET['view_sched_id'])): ?>
+                    <div class="modal fade show" id="scheduleModal" tabindex="-1" style="display:block; background: rgba(0,0,0,0.5);">
+                        <div class="modal-dialog modal-xl">
+                            <div class="modal-content shadow-lg border-0">
+                                <div class="modal-header bg-primary text-white">
+                                    <h5 class="modal-title">
+                                        <i class="fas fa-calendar-alt me-2"></i>
+                                        Schedules for Doctor ID: <?= htmlspecialchars($view_id) ?>
+                                    </h5>
+                                    <a href="doctor_shift_scheduling.php" class="btn-close btn-close-white"></a>
+                                </div>
+                                <div class="modal-body p-4">
+
+                                    <?php if (!empty($modal_schedules)): ?>
+                                        <?php foreach ($modal_schedules as $modal_schedule):
+                                            $is_editing = ($edit_sched_id == $modal_schedule['schedule_id']);
+                                        ?>
+                                            <form method="POST" class="mb-4 border rounded bg-white shadow-sm overflow-hidden">
+                                                <input type="hidden" name="schedule_id" value="<?= htmlspecialchars($modal_schedule['schedule_id']) ?>">
+                                                <input type="hidden" name="employee_id" value="<?= htmlspecialchars($modal_schedule['employee_id']) ?>">
+
+                                                <div class="d-flex justify-content-between align-items-center bg-light p-3 border-bottom">
+                                                    <div>
+                                                        <span class="text-muted small text-uppercase fw-bold">Week Starting</span>
+                                                        <?php if ($is_editing): ?>
+                                                            <input type="date" name="week_start" class="form-control form-control-sm mt-1" value="<?= $modal_schedule['week_start'] ?>">
+                                                        <?php else: ?>
+                                                            <h6 class="mb-0 mt-1 fw-bold text-dark"><?= date('M d, Y', strtotime($modal_schedule['week_start'])) ?></h6>
+                                                        <?php endif; ?>
+                                                    </div>
+
+                                                    <div class="btn-group">
+                                                        <?php if (!$is_editing): ?>
+                                                            <a href="?view_sched_id=<?= $view_id ?>&edit_sched_id=<?= $modal_schedule['schedule_id'] ?>" class="btn btn-outline-warning btn-sm">
+                                                                <i class="fas fa-edit"></i> Edit
+                                                            </a>
+                                                            <button type="submit" name="delete_schedule" class="btn btn-outline-danger btn-sm" onclick="return confirm('Are you sure?')">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        <?php else: ?>
+                                                            <button type="submit" name="update_schedule" class="btn btn-success btn-sm px-3">
+                                                                <i class="fas fa-save"></i> Save Changes
+                                                            </button>
+                                                            <a href="?view_sched_id=<?= $view_id ?>" class="btn btn-secondary btn-sm">Cancel</a>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+
+                                                <div class="table-responsive">
+                                                    <table class="table table-hover align-middle mb-0">
+                                                        <thead class="table-light small text-uppercase">
+                                                            <tr>
+                                                                <th style="width: 15%;">Day</th>
+                                                                <th>Start Time</th>
+                                                                <th>End Time</th>
+                                                                <th>Status</th>
+                                                                <th>Assigned Room</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <?php foreach (['Monday' => 'mon', 'Tuesday' => 'tue', 'Wednesday' => 'wed', 'Thursday' => 'thu', 'Friday' => 'fri', 'Saturday' => 'sat', 'Sunday' => 'sun'] as $dayName => $prefix):
+                                                                $status = $modal_schedule[$prefix . '_status'] ?? 'Off Duty';
+                                                                $is_off = in_array($status, ['Off Duty', 'Leave', 'Sick']);
+                                                            ?>
+                                                                <tr>
+                                                                    <td class="fw-bold"><?= $dayName ?></td>
+                                                                    <td>
+                                                                        <?php if ($is_editing): ?>
+                                                                            <input type="time" name="<?= $prefix ?>_start" class="form-control form-control-sm" value="<?= $modal_schedule[$prefix . '_start'] ?>">
+                                                                        <?php else: ?>
+                                                                            <span class="<?= $is_off ? 'text-muted italic' : '' ?>"><?= $is_off ? '---' : ($modal_schedule[$prefix . '_start'] ?: '---') ?></span>
+                                                                        <?php endif; ?>
+                                                                    </td>
+                                                                    <td>
+                                                                        <?php if ($is_editing): ?>
+                                                                            <input type="time" name="<?= $prefix ?>_end" class="form-control form-control-sm" value="<?= $modal_schedule[$prefix . '_end'] ?>">
+                                                                        <?php else: ?>
+                                                                            <span class="<?= $is_off ? 'text-muted italic' : '' ?>"><?= $is_off ? '---' : ($modal_schedule[$prefix . '_end'] ?: '---') ?></span>
+                                                                        <?php endif; ?>
+                                                                    </td>
+                                                                    <td>
+                                                                        <?php if ($is_editing): ?>
+                                                                            <select name="<?= $prefix ?>_status" class="form-select form-select-sm">
+                                                                                <?php foreach (['On Duty', 'Off Duty', 'Leave', 'Sick'] as $st): ?>
+                                                                                    <option value="<?= $st ?>" <?= $status == $st ? 'selected' : '' ?>><?= $st ?></option>
+                                                                                <?php endforeach; ?>
+                                                                            </select>
+                                                                        <?php else: ?>
+                                                                            <?php $badgeClass = ($status == 'On Duty') ? 'bg-success' : (($status == 'Off Duty') ? 'bg-secondary' : 'bg-warning text-dark'); ?>
+                                                                            <span class="badge rounded-pill <?= $badgeClass ?>"><?= $status ?></span>
+                                                                        <?php endif; ?>
+                                                                    </td>
+                                                                    <td>
+                                                                        <?php if ($is_editing): ?>
+                                                                            <select name="<?= $prefix ?>_room_id" class="form-select form-select-sm">
+                                                                                <option value="">-- Select Room --</option>
+                                                                                <?php foreach ($rooms_list as $room): ?>
+                                                                                    <option value="<?= $room['room_id'] ?>" <?= ($modal_schedule[$prefix . '_room_id'] == $room['room_id']) ? 'selected' : '' ?>>
+                                                                                        <?= htmlspecialchars($room['room_name']) ?>
+                                                                                    </option>
+                                                                                <?php endforeach; ?>
+                                                                            </select>
+                                                                        <?php else: ?>
+                                                                            <span class="fw-semibold text-primary">
+                                                                                <?= htmlspecialchars($modal_schedule[$prefix . '_room_name'] ?? '---') ?>
+                                                                            </span>
+                                                                        <?php endif; ?>
+                                                                    </td>
+                                                                </tr>
+                                                            <?php endforeach; ?>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </form>
+                                        <?php endforeach; ?>
+
+                                    <?php else: ?>
+                                        <div class="text-center py-5">
+                                            <i class="fas fa-calendar-times fa-4x text-muted mb-3"></i>
+                                            <h4 class="text-muted">No Schedule Found</h4>
+                                            <p>This doctor currently has no shifts assigned to them.</p>
+                                        </div>
+                                    <?php endif; ?>
+
+                                </div>
+                                <div class="modal-footer bg-light">
+                                    <a href="doctor_shift_scheduling.php" class="btn btn-primary px-4">Close View</a>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                <script>
-                    document.body.classList.add('modal-open');
-                </script>
-            <?php endif; ?>
-        </div>
+                <?php endif; ?>
+            </div>
             <!-- END CODING HERE -->
-        <!----- End of Main Content ----->
-    </div>
-    <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    </script>
-    <script src="../assets/Bootstrap/all.min.js"></script>
-    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="../assets/Bootstrap/jq.js"></script>
+            <!----- End of Main Content ----->
+        </div>
+        <script>
+            const toggler = document.querySelector(".toggler-btn");
+            toggler.addEventListener("click", function() {
+                document.querySelector("#sidebar").classList.toggle("collapsed");
+            });
+            document.addEventListener('change', function(e) {
+                // Check if the changed element is a start-time input
+                if (e.target.classList.contains('start-time-input')) {
+                    const startTime = e.target.value; // Format is "HH:MM"
+
+                    if (startTime) {
+                        // Get the corresponding end-time input in the same table row
+                        const row = e.target.closest('tr');
+                        const endTimeInput = row.querySelector('.end-time-input');
+
+                        // Split hours and minutes
+                        let [hours, minutes] = startTime.split(':').map(Number);
+
+                        // Add 8 hours
+                        let endHours = hours + 8;
+
+                        // Handle wrap-around (if it goes past midnight)
+                        if (endHours >= 24) {
+                            endHours = endHours - 24;
+                        }
+
+                        // Format back to HH:MM string (adding leading zero if needed)
+                        const formattedHours = String(endHours).padStart(2, '0');
+                        const formattedMinutes = String(minutes).padStart(2, '0');
+
+                        endTimeInput.value = `${formattedHours}:${formattedMinutes}`;
+                    }
+                }
+            });
+        </script>
+        <script src="../assets/Bootstrap/all.min.js"></script>
+        <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+        <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+        <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
