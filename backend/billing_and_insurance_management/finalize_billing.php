@@ -2,98 +2,116 @@
 include '../../SQL/config.php';
 session_start();
 
-// Get patient ID
-$patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
-if ($patient_id <= 0) die("<script>alert('Invalid patient ID.'); window.history.back();</script>");
+/* ===============================
+   VALIDATE PATIENT
+================================ */
+$patient_id = intval($_GET['patient_id'] ?? 0);
+if ($patient_id <= 0) {
+    die("<script>alert('Invalid patient ID'); window.history.back();</script>");
+}
 
-// Fetch patient info
 $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
-if (!$patient) die("<script>alert('Patient not found.'); window.history.back();</script>");
+if (!$patient) {
+    die("<script>alert('Patient not found'); window.history.back();</script>");
+}
 
-// Check billing cart
-if (!isset($_SESSION['billing_cart'][$patient_id]) || empty($_SESSION['billing_cart'][$patient_id])) {
-    die("<script>alert('No services to finalize.'); window.history.back();</script>");
+/* ===============================
+   CHECK BILLING CART
+================================ */
+if (empty($_SESSION['billing_cart'][$patient_id])) {
+    die("<script>alert('No services to finalize'); window.history.back();</script>");
 }
 $cart = $_SESSION['billing_cart'][$patient_id];
 
-// Compute age and discount eligibility
-$dob = $patient['dob'];
+/* ===============================
+   COMPUTE AGE / DISCOUNTS
+================================ */
 $age = 0;
-if (!empty($dob) && $dob != '0000-00-00') {
-    $birth = new DateTime($dob);
-    $today = new DateTime();
-    $age = $today->diff($birth)->y;
+if (!empty($patient['dob']) && $patient['dob'] !== '0000-00-00') {
+    $age = (new DateTime())->diff(new DateTime($patient['dob']))->y;
 }
-$is_pwd = $patient['is_pwd'] ?? 0;
-$is_senior = $age >= 60 ? 1 : 0;
 
-// VAT percentage
-$vat_rate = 0.12;
+$is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
+$is_senior = $age >= 60;
+$discount_rate = ($is_pwd || $is_senior) ? 0.20 : 0;
 
-// Compute totals
+/* ===============================
+   COMPUTE TOTALS
+================================ */
 $subtotal = 0;
-$total_discount = 0;
 foreach ($cart as $srv) {
-    $price = round(floatval($srv['price']), 2);
-    $discount = ($is_pwd || $is_senior) ? round($price * 0.20, 2) : 0;
-    $subtotal += $price;
-    $total_discount += $discount;
+    $subtotal += floatval($srv['price']);
 }
 
-$vat_amount = round(($subtotal - $total_discount) * $vat_rate, 2);
+$total_discount = round($subtotal * $discount_rate, 2);
+$vat_amount = round(($subtotal - $total_discount) * 0.12, 2);
 $grand_total = round(($subtotal - $total_discount) + $vat_amount, 2);
-$total_out_of_pocket = $grand_total;
 
-// Start transaction
+$total_out_of_pocket = $grand_total;
+$txn = "TXN" . uniqid();
+
+/* ===============================
+   START TRANSACTION
+================================ */
 $conn->begin_transaction();
 
 try {
-    $txn = "TXN" . uniqid();
 
-    // -------------------------------
-    // Insert billing_records
-    // -------------------------------
+    /* ===============================
+       INSERT billing_records
+    ================================ */
     $stmt = $conn->prepare("
-        INSERT INTO billing_records 
+        INSERT INTO billing_records
         (patient_id, billing_date, total_amount, insurance_covered, out_of_pocket, grand_total, status, payment_method, transaction_id)
         VALUES (?, NOW(), ?, 0, ?, ?, 'Pending', 'Unpaid', ?)
     ");
-    if (!$stmt) throw new Exception($conn->error);
-    $stmt->bind_param("iddds", $patient_id, $grand_total, $total_out_of_pocket, $grand_total, $txn);
-    if (!$stmt->execute()) throw new Exception($stmt->error);
-    $billing_id = $stmt->insert_id; // AUTO_INCREMENT now works
+    $stmt->bind_param(
+        "iddds",
+        $patient_id,
+        $grand_total,
+        $total_out_of_pocket,
+        $grand_total,
+        $txn
+    );
+    $stmt->execute();
+    $billing_id = $conn->insert_id;
 
-    // -------------------------------
-    // Insert billing_items
-    // -------------------------------
+    /* ===============================
+       INSERT billing_items
+    ================================ */
     $stmt_item = $conn->prepare("
-        INSERT INTO billing_items 
+        INSERT INTO billing_items
         (billing_id, patient_id, service_id, quantity, unit_price, total_price, finalized)
         VALUES (?, ?, ?, 1, ?, ?, 1)
     ");
-    if (!$stmt_item) throw new Exception($conn->error);
 
     foreach ($cart as $srv) {
-        $srv_id = intval($srv['serviceID']);
-        $price = round(floatval($srv['price']), 2);
-        $discount = ($is_pwd || $is_senior) ? round($price * 0.20, 2) : 0;
-        $total_price = round($price - $discount, 2);
-        $stmt_item->bind_param("iiidd", $billing_id, $patient_id, $srv_id, $price, $total_price);
-        if (!$stmt_item->execute()) throw new Exception($stmt_item->error);
+        $stmt_item->bind_param(
+            "iiidd",
+            $billing_id,
+            $patient_id,
+            $srv['serviceID'],
+            $srv['price'],
+            $srv['price'] // FULL PRICE — discount handled globally
+        );
+        $stmt_item->execute();
     }
 
-    // -------------------------------
-    // Insert patient_receipt
-    // -------------------------------
+    /* ===============================
+       INSERT patient_receipt
+       (NO receipt_id column!)
+    ================================ */
     $stmt_receipt = $conn->prepare("
         INSERT INTO patient_receipt
-        (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, created_at, billing_date, insurance_covered, payment_method, status, transaction_id, is_pwd)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), CURDATE(), 0, 'Unpaid', 'Pending', ?, ?)
+        (patient_id, billing_id, total_charges, total_vat, total_discount,
+         total_out_of_pocket, grand_total, billing_date,
+         insurance_covered, payment_method, status, transaction_id, is_pwd)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), 0, 'Unpaid', 'Pending', ?, ?)
     ");
-    if (!$stmt_receipt) throw new Exception($conn->error);
+
     $stmt_receipt->bind_param(
         "iidddddsi",
         $patient_id,
@@ -106,23 +124,19 @@ try {
         $txn,
         $is_pwd
     );
-    if (!$stmt_receipt->execute()) throw new Exception($stmt_receipt->error);
+    $stmt_receipt->execute();
 
-    // Commit transaction
+    /* ===============================
+       COMMIT
+    ================================ */
     $conn->commit();
 
-    // Clear session
-    unset($_SESSION['billing_cart'][$patient_id]);
-    unset($_SESSION['is_pwd'][$patient_id]);
+    unset($_SESSION['billing_cart'][$patient_id], $_SESSION['is_pwd'][$patient_id]);
 
-    // Redirect with success
-    header("Location: billing_items.php?patient_id=$patient_id&success=1&total=" . urlencode($grand_total));
+    header("Location: billing_items.php?success=1");
     exit;
 
 } catch (Exception $e) {
     $conn->rollback();
-    error_log('Finalize billing error: ' . $e->getMessage());
-    echo "<script>alert('Error finalizing billing: {$e->getMessage()}'); window.history.back();</script>";
-    exit;
+    die("<script>alert('Finalize failed: {$e->getMessage()}'); window.history.back();</script>");
 }
-?>

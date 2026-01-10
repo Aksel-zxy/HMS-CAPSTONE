@@ -3,7 +3,7 @@ include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 // ==============================
-// Fetch patients with billing records
+// Fetch patients with billing records + insurance info
 // ==============================
 $sql = "
 SELECT 
@@ -13,32 +13,27 @@ SELECT
     p.dob,
     p.phone_number,
 
-    -- Latest payment status
-    (
-        SELECT pr.status 
-        FROM patient_receipt pr 
-        WHERE pr.patient_id = p.patient_id
-        ORDER BY pr.created_at DESC
-        LIMIT 1
-    ) AS payment_status,
-
-    -- Latest receipt
-    (
-        SELECT pr.receipt_id
-        FROM patient_receipt pr 
-        WHERE pr.patient_id = p.patient_id
-        ORDER BY pr.created_at DESC
-        LIMIT 1
-    ) AS latest_receipt_id,
+    -- Latest payment status & receipt
+    pr.status AS payment_status,
+    pr.receipt_id AS latest_receipt_id,
+    pr.insurance_covered,
+    pr.payment_method AS insurance_plan,
 
     -- Total charges from billing_items
-    (
-        SELECT IFNULL(SUM(total_price),0)
-        FROM billing_items bi
-        WHERE bi.patient_id = p.patient_id
-    ) AS total_price
+    IFNULL(
+        (SELECT SUM(total_price) 
+         FROM billing_items bi 
+         WHERE bi.patient_id = p.patient_id),
+    0) AS total_price
 
 FROM patientinfo p
+LEFT JOIN patient_receipt pr 
+    ON pr.patient_id = p.patient_id
+    AND pr.created_at = (
+        SELECT MAX(created_at)
+        FROM patient_receipt
+        WHERE patient_id = p.patient_id
+    )
 WHERE EXISTS (
     SELECT 1 
     FROM billing_records br 
@@ -90,26 +85,26 @@ $paymentStatus = $row['payment_status'] ?? 'Pending';
 $receipt_id = $row['latest_receipt_id'] ?? 0;
 $totalPrice = floatval($row['total_price']);
 
-$disableBill = ($paymentStatus === 'Paid');
-
-// Check if insurance was applied
-$insuranceStatus = 'N/A';
-$showInsuranceButton = true;
-$rowClass = 'pending-insurance';
-
-if (isset($_SESSION['insurance_applied'][$row['patient_id']]) && $_SESSION['insurance_applied'][$row['patient_id']] == 1) {
+// Determine insurance status from patient_receipt
+if (floatval($row['insurance_covered']) > 0) {
     $insuranceStatus = 'Applied';
+    $insurancePlan = htmlspecialchars($row['insurance_plan']);
     $showInsuranceButton = false;
-    $rowClass = '';
+} else {
+    $insuranceStatus = 'N/A';
+    $insurancePlan = '';
+    $showInsuranceButton = true;
 }
+
+$disableBill = ($paymentStatus === 'Paid');
 ?>
 
-<tr class="<?= $rowClass ?>">
+<tr>
 <td><?= htmlspecialchars($row['full_name']); ?></td>
 
 <td>
 <?php if ($insuranceStatus === 'Applied'): ?>
-    <span class="badge bg-success">Applied</span>
+    <span class="badge bg-success"><?= $insurancePlan ?: 'Applied' ?></span>
 <?php else: ?>
     <span class="badge bg-secondary">N/A</span>
 <?php endif; ?>
