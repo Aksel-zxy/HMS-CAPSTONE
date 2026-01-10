@@ -32,17 +32,18 @@ $request_date = date('F d, Y');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $items = $_POST['items'] ?? [];
-        $grand_total = $_POST['grand_total'] ?? 0;
 
-        if ($grand_total <= 0) {
-            throw new Exception("Grand total must be greater than zero.");
+        // ❌ Validation: ensure at least one item with a name
+        $valid_items = array_filter($items, fn($i) => !empty(trim($i['name'] ?? '')));
+        if (count($valid_items) === 0) {
+            throw new Exception("Please add at least one item before submitting.");
         }
 
         $stmt = $pdo->prepare("
             INSERT INTO department_request
-            (user_id, department, department_id, month, items, total_items, grand_total, status)
+            (user_id, department, department_id, month, items, total_items, status)
             VALUES
-            (:user_id, :department, :department_id, :month, :items, :total_items, :grand_total, 'Pending')
+            (:user_id, :department, :department_id, :month, :items, :total_items, 'Pending')
         ");
 
         $stmt->execute([
@@ -50,9 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':department'     => $department,
             ':department_id'  => $department_id,
             ':month'          => date('Y-m-d'),
-            ':items'          => json_encode($items, JSON_UNESCAPED_UNICODE),
-            ':total_items'    => count($items),
-            ':grand_total'    => $grand_total
+            ':items'          => json_encode($valid_items, JSON_UNESCAPED_UNICODE),
+            ':total_items'    => count($valid_items)
         ]);
 
         $success = "Purchase request successfully submitted!";
@@ -76,9 +76,7 @@ th, td { vertical-align: middle; text-align:center; }
 
 .unit-select { min-width:120px; }
 .qty-input { min-width:80px; }
-.price-input { min-width:120px; }
 .pcs-box-input { min-width:90px; }
-.total-input { background:#f8fafc; min-width:120px; }
 .total-pcs-input { background:#f8fafc; min-width:90px; }
 .info-box strong { display:inline-block; width:120px; }
 </style>
@@ -102,7 +100,7 @@ th, td { vertical-align: middle; text-align:center; }
 <div class="alert alert-danger"><?= $error ?></div>
 <?php endif; ?>
 
-<form method="POST">
+<form method="POST" id="requestForm">
 <div class="table-responsive">
 <table class="table table-bordered align-middle">
 <thead class="table-light">
@@ -113,8 +111,6 @@ th, td { vertical-align: middle; text-align:center; }
 <th>Qty</th>
 <th>Pcs / Box</th>
 <th>Total Pcs</th>
-<th>Price</th>
-<th>Total</th>
 <th>Action</th>
 </tr>
 </thead>
@@ -144,30 +140,10 @@ th, td { vertical-align: middle; text-align:center; }
 </td>
 
 <td>
-<input type="number" name="items[0][price]" class="form-control form-control-sm price price-input"
-       step="0.01" min="0" placeholder="₱ / pcs">
-</td>
-
-<td>
-<input type="text" class="form-control form-control-sm total total-input" readonly value="₱0.00">
-</td>
-
-<td>
 <button type="button" class="btn btn-sm btn-danger btn-remove">✕</button>
 </td>
 </tr>
 </tbody>
-
-<tfoot>
-<tr>
-<td colspan="7" class="text-end fw-bold">Grand Total</td>
-<td>
-<input type="text" id="grandTotalDisplay" class="form-control fw-bold text-success" readonly value="₱0.00">
-<input type="hidden" name="grand_total" id="grandTotal">
-</td>
-<td></td>
-</tr>
-</tfoot>
 </table>
 </div>
 
@@ -185,68 +161,62 @@ th, td { vertical-align: middle; text-align:center; }
 
 <script>
 let itemIndex = 1;
-const currency = "₱";
 
-document.getElementById('addRowBtn').onclick = () => {
-    const row = document.querySelector('#itemBody tr').cloneNode(true);
+const addRowBtn = document.getElementById('addRowBtn');
+const itemBody = document.getElementById('itemBody');
+const requestForm = document.getElementById('requestForm');
+
+// ➕ Add new row
+addRowBtn.onclick = () => {
+    const row = itemBody.querySelector('tr').cloneNode(true);
     row.querySelectorAll('input, select').forEach(el => {
         el.name = el.name.replace(/\[\d+\]/, `[${itemIndex}]`);
         if (el.classList.contains('quantity')) el.value = 1;
         if (el.classList.contains('pcs-per-box')) { el.value = 1; el.disabled = true; }
         if (el.classList.contains('total-pcs')) el.value = 1;
-        if (el.classList.contains('price')) { el.value = ''; el.placeholder = '₱ / pcs'; }
-        if (el.classList.contains('total')) el.value = currency + '0.00';
+        if (el.classList.contains('name')) el.value = '';
+        if (el.classList.contains('description')) el.value = '';
     });
-    document.getElementById('itemBody').appendChild(row);
+    itemBody.appendChild(row);
     itemIndex++;
 };
 
-function calculateTotals() {
-    let grand = 0;
-
-    document.querySelectorAll('#itemBody tr').forEach(row => {
-        const unit = row.querySelector('.unit').value;
-        const qty = parseFloat(row.querySelector('.quantity').value) || 0;
-        const pcsBox = row.querySelector('.pcs-per-box');
-        const pcsPerBox = parseFloat(pcsBox.value) || 1;
-        const priceInput = row.querySelector('.price');
-        const price = parseFloat(priceInput.value) || 0;
-
-        let totalPcs = qty;
-
-        if (unit === 'box') {
-            pcsBox.disabled = false;
-            totalPcs = qty * pcsPerBox;
-            priceInput.placeholder = '₱ / box';
+// ✖ Remove row (if more than one)
+itemBody.addEventListener('click', e => {
+    if (e.target.classList.contains('btn-remove')) {
+        if (itemBody.querySelectorAll('tr').length > 1) {
+            e.target.closest('tr').remove();
         } else {
-            pcsBox.disabled = true;
-            pcsBox.value = 1;
-            priceInput.placeholder = '₱ / pcs';
+            alert("At least one item must be in the request.");
         }
-
-        row.querySelector('.total-pcs').value = totalPcs;
-
-        // 💰 Price aligned with unit
-        let lineTotal = unit === 'box'
-            ? qty * price
-            : totalPcs * price;
-
-        row.querySelector('.total').value = currency + lineTotal.toFixed(2);
-        grand += lineTotal;
-    });
-
-    document.getElementById('grandTotalDisplay').value = currency + grand.toFixed(2);
-    document.getElementById('grandTotal').value = grand.toFixed(2);
-}
-
-document.addEventListener('input', e => {
-    if (e.target.closest('table')) calculateTotals();
+    }
 });
 
-document.addEventListener('click', e => {
-    if (e.target.classList.contains('btn-remove')) {
-        e.target.closest('tr').remove();
-        calculateTotals();
+// Update Total Pcs based on Qty & Unit
+itemBody.addEventListener('input', e => {
+    const row = e.target.closest('tr');
+    if (!row) return;
+
+    const unit = row.querySelector('.unit').value;
+    const qty = parseFloat(row.querySelector('.quantity').value) || 0;
+    const pcsBox = row.querySelector('.pcs-per-box');
+    const pcsPerBox = parseFloat(pcsBox.value) || 1;
+
+    row.querySelector('.total-pcs').value = unit === 'box' ? qty * pcsPerBox : qty;
+    pcsBox.disabled = unit !== 'box';
+});
+
+// ❌ Validate form before submit
+requestForm.addEventListener('submit', e => {
+    const rows = Array.from(itemBody.querySelectorAll('tr'));
+    const hasItem = rows.some(row => {
+        const name = row.querySelector('input[name*="[name]"]').value.trim();
+        return name !== '';
+    });
+
+    if (!hasItem) {
+        e.preventDefault();
+        alert("Please add at least one item with a name before submitting.");
     }
 });
 </script>
