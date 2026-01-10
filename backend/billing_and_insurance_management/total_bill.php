@@ -1,200 +1,184 @@
 <?php
 include '../../SQL/config.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
 
-// Get patient ID
-$patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
+/* =======================
+   GET PATIENT
+======================= */
+$patient_id = intval($_GET['patient_id'] ?? 0);
 if ($patient_id <= 0) {
-    echo "Invalid patient ID.";
-    exit();
+    die("Invalid patient ID.");
 }
 
-// Fetch patient info
-$patient_stmt = $conn->prepare("
-    SELECT p.*, 
-           CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
-           p.attending_doctor
-    FROM patientinfo p
-    WHERE p.patient_id = ?
+$stmt = $conn->prepare("
+    SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name
+    FROM patientinfo
+    WHERE patient_id = ?
 ");
-$patient_stmt->bind_param("i", $patient_id);
-$patient_stmt->execute();
-$patient = $patient_stmt->get_result()->fetch_assoc();
+$stmt->bind_param("i", $patient_id);
+$stmt->execute();
+$patient = $stmt->get_result()->fetch_assoc();
 
 if (!$patient) {
-    echo "Patient not found.";
-    exit();
+    die("Patient not found.");
 }
 
-// Fetch doctor info (if any)
-$doctor = null;
-if (!empty($patient['attending_doctor'])) {
-    $doc_stmt = $conn->prepare("SELECT * FROM hr_employees WHERE employee_id = ?");
-    $doc_stmt->bind_param("i", $patient['attending_doctor']);
-    $doc_stmt->execute();
-    $doctor = $doc_stmt->get_result()->fetch_assoc();
+/* =======================
+   GET LATEST BILLING ID
+======================= */
+$stmt = $conn->prepare("
+    SELECT MAX(billing_id) AS billing_id
+    FROM billing_items
+    WHERE patient_id = ? AND finalized = 1
+");
+$stmt->bind_param("i", $patient_id);
+$stmt->execute();
+$billing = $stmt->get_result()->fetch_assoc();
+$billing_id = $billing['billing_id'] ?? null;
+
+if (!$billing_id) {
+    die("No finalized billing found.");
 }
 
-// Fetch all completed lab results for this patient
-$results_stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID=? AND status='Completed'");
-$results_stmt->bind_param("i", $patient_id);
-$results_stmt->execute();
-$results = $results_stmt->get_result();
+/* =======================
+   INSURANCE (same logic)
+======================= */
+$insurance_covered = 0;
+$insurance_plan = null;
+$insurance_discount = 0;
+$insurance_discount_type = null;
 
-// Fetch service prices
-$service_prices = [];
-$service_query = $conn->query("SELECT serviceName, description, price FROM dl_services");
-while ($row = $service_query->fetch_assoc()) {
-    $service_prices[$row['serviceName']] = [
-        'description' => $row['description'],
-        'price' => floatval($row['price'])
-    ];
+$stmt = $conn->prepare("
+    SELECT promo_name, discount_type, discount_value, insurance_number, insurance_company
+    FROM patient_insurance
+    WHERE full_name = ? AND status = 'Active'
+    LIMIT 1
+");
+$stmt->bind_param("s", $patient['full_name']);
+$stmt->execute();
+$insurance = $stmt->get_result()->fetch_assoc();
+
+if ($insurance) {
+    $insurance_plan = $insurance['promo_name'];
+    $insurance_discount = floatval($insurance['discount_value']);
+    $insurance_discount_type = $insurance['discount_type'];
 }
 
-// Compute bill items and totals
+/* =======================
+   BILLING ITEMS (SOURCE)
+======================= */
 $billing_items = [];
 $total_charges = 0;
 
-while ($row = $results->fetch_assoc()) {
-    $services = explode(',', $row['result']);
-    foreach ($services as $service) {
-        $service = trim($service);
-        if (empty($service)) continue;
+$stmt = $conn->prepare("
+    SELECT bi.*, ds.serviceName, ds.description
+    FROM billing_items bi
+    LEFT JOIN dl_services ds ON bi.service_id = ds.serviceID
+    WHERE bi.patient_id = ? AND bi.billing_id = ?
+");
+$stmt->bind_param("ii", $patient_id, $billing_id);
+$stmt->execute();
+$res = $stmt->get_result();
 
-        $price = $service_prices[$service]['price'] ?? 0;
-        $desc  = $service_prices[$service]['description'] ?? '';
-        $billing_items[] = [
-            'service_name' => $service,
-            'description'  => $desc,
-            'quantity'     => 1,
-            'unit_price'   => $price,
-            'total_price'  => $price
-        ];
-        $total_charges += $price;
+while ($row = $res->fetch_assoc()) {
+    $billing_items[] = $row;
+    $total_charges += floatval($row['total_price']);
+}
+
+/* =======================
+   APPLY INSURANCE
+======================= */
+if ($insurance_discount > 0) {
+    if ($insurance_discount_type === 'Percentage') {
+        $insurance_covered = $total_charges * ($insurance_discount / 100);
+    } else {
+        $insurance_covered = min($insurance_discount, $total_charges);
     }
 }
 
-// Optional: Insurance adjustment or discounts
-$discount = 0;
-$insurance_covered = 0;
-$out_of_pocket = $total_charges - ($discount + $insurance_covered);
+$total_discount = 0;
+$total_out_of_pocket = max($total_charges - $insurance_covered, 0);
+
+/* =======================
+   DOCTOR
+======================= */
+$doctor = null;
+if (!empty($patient['attending_doctor'])) {
+    $stmt = $conn->prepare("SELECT * FROM hr_employees WHERE employee_id = ?");
+    $stmt->bind_param("i", $patient['attending_doctor']);
+    $stmt->execute();
+    $doctor = $stmt->get_result()->fetch_assoc();
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Total Bill - <?= htmlspecialchars($patient['full_name']); ?></title>
+<title>Total Bill</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="assets/CSS/pdf.css">
 <style>
-body { background: #f8f9fa; padding: 20px; }
-.invoice-box {
-    background: #fff;
-    padding: 20px 30px;
-    border-radius: 10px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-}
-.invoice-header {
-    text-align: center;
-    border-bottom: 2px solid #1976d2;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-}
-.invoice-header h2 { color: #1976d2; margin-bottom: 5px; }
-.invoice-header p { margin: 0; color: #555; }
-.info-table td { padding: 3px 5px; }
-.table th, .table td { vertical-align: middle !important; }
-.total-section { text-align: right; margin-top: 20px; font-size: 1.1em; }
-.print-btn { float: right; }
-@media print {
-    .print-btn { display: none !important; }
-    body { background: none; }
-}
+@media print { .print-btn { display:none; } }
+.total-box { font-size:16px; font-weight:bold; }
 </style>
 </head>
 <body>
 
-<div class="invoice-box">
+<button class="btn btn-primary print-btn mb-3" onclick="window.print()">Print Bill</button>
 
-    <div class="invoice-header">
-        <h2>PATIENT TOTAL BILL SUMMARY</h2>
-        <p>Date: <?= date("Y-m-d H:i:s"); ?></p>
-    </div>
+<h2>PATIENT TOTAL BILL</h2>
 
-    <button class="btn btn-primary mb-3 print-btn" onclick="window.print()">
-        <i class="bi bi-printer"></i> Print Bill
-    </button>
+<table width="100%" style="margin-bottom:10px;">
+<tr>
+<td width="48%" valign="top">
+<b>PATIENT INFORMATION</b><br>
+Name: <?= htmlspecialchars($patient['full_name']); ?><br>
+Contact: <?= htmlspecialchars($patient['phone_number']); ?><br>
+Address: <?= htmlspecialchars($patient['address']); ?><br>
+<?php if ($insurance): ?>
+Insurance: <?= htmlspecialchars($insurance['insurance_company'].' ('.$insurance['promo_name'].')'); ?><br>
+Insurance #: <?= htmlspecialchars($insurance['insurance_number']); ?>
+<?php endif; ?>
+</td>
 
-    <table width="100%" style="margin-bottom:10px;">
-        <tr>
-            <td width="48%" valign="top" style="border-right:1px solid #1976d2;">
-                <h6 class="text-primary">PATIENT INFORMATION</h6>
-                <table class="info-table">
-                    <tr><td>Name:</td><td><?= htmlspecialchars($patient['full_name']); ?></td></tr>
-                    <tr><td>Contact:</td><td><?= htmlspecialchars($patient['phone_number']); ?></td></tr>
-                    <tr><td>Address:</td><td><?= htmlspecialchars($patient['address']); ?></td></tr>
-                </table>
-            </td>
-            <td width="4%"></td>
-            <td width="48%" valign="top" style="border-left:1px solid #1976d2;">
-                <h6 class="text-primary">DOCTOR INFORMATION</h6>
-                <table class="info-table">
-                    <tr><td>Name:</td><td>
-                        <?php
-                        if ($doctor) {
-                            $full = $doctor['first_name'];
-                            if (!empty($doctor['middle_name'])) $full .= ' '.$doctor['middle_name'];
-                            if (!empty($doctor['last_name'])) $full .= ' '.$doctor['last_name'];
-                            echo htmlspecialchars($full);
-                        } else echo "N/A";
-                        ?>
-                    </td></tr>
-                    <tr><td>Contact:</td><td><?= ($doctor && !empty($doctor['contact_number']))?htmlspecialchars($doctor['contact_number']):"N/A"; ?></td></tr>
-                    <tr><td>Specialization:</td><td><?= ($doctor && !empty($doctor['specialization']))?htmlspecialchars($doctor['specialization']):"N/A"; ?></td></tr>
-                </table>
-            </td>
-        </tr>
-    </table>
+<td width="48%" valign="top">
+<b>DOCTOR INFORMATION</b><br>
+<?php if ($doctor): ?>
+<?= htmlspecialchars($doctor['first_name'].' '.$doctor['last_name']); ?><br>
+<?= htmlspecialchars($doctor['specialization']); ?>
+<?php else: ?>
+N/A
+<?php endif; ?>
+</td>
+</tr>
+</table>
 
-    <table class="table table-bordered table-striped">
-        <thead class="table-primary">
-            <tr>
-                <th>Item</th>
-                <th>Description</th>
-                <th class="text-center">Qty</th>
-                <th class="text-end">Unit Price</th>
-                <th class="text-end">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (!empty($billing_items)): ?>
-                <?php foreach ($billing_items as $item): ?>
-                <tr>
-                    <td><?= htmlspecialchars($item['service_name']); ?></td>
-                    <td><?= htmlspecialchars($item['description']); ?></td>
-                    <td class="text-center"><?= intval($item['quantity']); ?></td>
-                    <td class="text-end">₱ <?= number_format($item['unit_price'], 2); ?></td>
-                    <td class="text-end">₱ <?= number_format($item['total_price'], 2); ?></td>
-                </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr><td colspan="5" class="text-center text-muted">No completed services found.</td></tr>
-            <?php endif; ?>
-        </tbody>
-    </table>
+<table class="table table-bordered">
+<thead class="table-primary">
+<tr>
+<th>Service</th>
+<th>Description</th>
+<th class="text-end">Amount</th>
+</tr>
+</thead>
+<tbody>
+<?php if ($billing_items): foreach ($billing_items as $item): ?>
+<tr>
+<td><?= htmlspecialchars($item['serviceName']); ?></td>
+<td><?= htmlspecialchars($item['description']); ?></td>
+<td class="text-end">₱<?= number_format($item['total_price'],2); ?></td>
+</tr>
+<?php endforeach; else: ?>
+<tr><td colspan="3" class="text-center">No billing items found.</td></tr>
+<?php endif; ?>
+</tbody>
+</table>
 
-    <div class="total-section">
-        <p>Subtotal: ₱ <?= number_format($total_charges, 2); ?></p>
-        <p>Discount: ₱ <?= number_format($discount, 2); ?></p>
-        <p>Insurance Covered: ₱ <?= number_format($insurance_covered, 2); ?></p>
-        <h5><strong>Total Due: ₱ <?= number_format($out_of_pocket, 2); ?></strong></h5>
-    </div>
-
-    <div class="mt-4 text-muted">
-        <strong>Notes:</strong><br>
-        This is a preliminary bill summary based on completed lab results. The final invoice will be generated once approved.
-    </div>
-
+<div class="text-end mt-3">
+Subtotal: ₱<?= number_format($total_charges,2); ?><br>
+Insurance Covered: ₱<?= number_format($insurance_covered,2); ?><br>
+<div class="total-box">TOTAL DUE: ₱<?= number_format($total_out_of_pocket,2); ?></div>
 </div>
 
 </body>
