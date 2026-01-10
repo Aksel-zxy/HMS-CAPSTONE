@@ -1,11 +1,11 @@
 <?php
 
-$configPath = realpath(__DIR__ . "/../../../../../SQL/config.php");
+$configPath = realpath(__DIR__ . "../../../../../SQL/config.php");
 
 if ($configPath && file_exists($configPath)) {
     include $configPath;
 } else {
-    die("Critcal Error: Config file not found at: " . __DIR__ . "/../../../SQL/config.php");
+    die("Critcal Error: Config file not found at: " . __DIR__ . "../../../../../SQL/config.php");
 }
 
 // Ensure $conn is actually defined from config.php
@@ -23,7 +23,7 @@ if (!$scheduleID || !$testType) {
 
 $testType = strtolower(trim($testType));
 
-if (strpos($testType, "cbc") !== false || strpos($testType, "complete blood count") !== false) {
+if (strpos($testType, "cbc") !== false || strpos($testType, "laboratory") !== false) {
     $table = "dl_lab_cbc";
     $mode = "cbc";
 } elseif (strpos($testType, "x-ray") !== false || strpos($testType, "xray") !== false) {
