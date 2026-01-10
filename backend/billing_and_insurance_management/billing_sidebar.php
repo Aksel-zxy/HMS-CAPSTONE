@@ -265,6 +265,7 @@ body {
                 <li>
                     <button class="dropdown-btn">Billing Management</button>
                     <div class="dropdown-container">
+                        <a href="billing_items.php">Billing Items</a>
                         <a href="patient_billing.php">Patient Billing</a>
                         <a href="billing_records.php">Billing Records</a>
                         <!-- <a href="billing_items.php">Billing Items</a> -->

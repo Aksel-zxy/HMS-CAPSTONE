@@ -37,15 +37,13 @@ if (!$qrImageSrc) {
 // ======================= PATIENT DATA =======================
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 $billing_id = null;
-$insurance_covered = 0;
-$insurance_company = null;
 $selected_patient = null;
 $insurance_discount = 0;
 $insurance_discount_type = null;
 $insurance_plan = null;
 
 if ($patient_id > 0) {
-    $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
+    $stmt = $conn->prepare("SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id = ?");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $selected_patient = $stmt->get_result()->fetch_assoc();
@@ -60,25 +58,24 @@ if ($patient_id > 0) {
     $billing_id = $res['latest_billing_id'] ?? null;
 }
 
-// ======================= INSURANCE (UPDATED) =======================
-if ($patient_id > 0) {
+// ======================= INSURANCE (MATCH BY FULL NAME) =======================
+$insurance_covered = 0;
+if ($patient_id > 0 && !empty($selected_patient['full_name'])) {
+    $full_name = $selected_patient['full_name'];
     $stmt = $conn->prepare("
-        SELECT pi.insurance_number, ic.company_name, ip.promo_name, ip.discount_type, ip.discount_value
-        FROM patient_insurance pi
-        LEFT JOIN insurance_company ic ON pi.insurance_company_id = ic.insurance_company_id
-        LEFT JOIN insurance_promo ip ON pi.promo_id = ip.promo_id
-        WHERE pi.patient_id = ? AND pi.status = 'Active'
+        SELECT insurance_number, promo_name, discount_type, discount_value
+        FROM patient_insurance
+        WHERE full_name = ? AND status = 'Active'
         LIMIT 1
     ");
-    $stmt->bind_param("i", $patient_id);
+    $stmt->bind_param("s", $full_name);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
 
     if ($row) {
-        $insurance_company = $row['company_name'];
-        $insurance_discount = floatval($row['discount_value']);
-        $insurance_discount_type = $row['discount_type'];
-        $insurance_plan = $row['promo_name'];
+        $insurance_plan = $row['promo_name'] ?? 'N/A';
+        $insurance_discount = floatval($row['discount_value'] ?? 0);
+        $insurance_discount_type = $row['discount_type'] ?? 'Fixed';
     }
 }
 
@@ -100,48 +97,10 @@ if ($patient_id > 0 && $billing_id) {
     while ($row = $res->fetch_assoc()) {
         $billing_items[] = $row;
         $total_charges += floatval($row['total_price'] ?? 0);
-        $total_discount += floatval($row['discount'] ?? 0);
-    }
-}
-
-// ======================= DIAGNOSTIC RESULTS =======================
-$dl_services = [];
-if ($patient_id > 0) {
-    $stmt = $conn->prepare("SELECT * FROM dl_results WHERE patientID = ? AND status = 'Completed'");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-
-    while ($row = $res->fetch_assoc()) {
-        $services = array_map('trim', explode(',', $row['result']));
-        foreach ($services as $svcName) {
-            if (!empty($svcName)) {
-                $stmt2 = $conn->prepare("SELECT serviceName, description, price FROM dl_services WHERE serviceName = ?");
-                $stmt2->bind_param("s", $svcName);
-                $stmt2->execute();
-                $svcRes = $stmt2->get_result()->fetch_assoc();
-
-                if ($svcRes) {
-                    $dl_services[] = [
-                        'service_name' => $svcRes['serviceName'],
-                        'description'  => $svcRes['description'] . " (Completed on " . date('F j, Y', strtotime($row['resultDate'])) . ")",
-                        'total_price'  => floatval($svcRes['price'])
-                    ];
-                    $total_charges += floatval($svcRes['price']);
-                } else {
-                    $dl_services[] = [
-                        'service_name' => $svcName,
-                        'description'  => 'Diagnostic/Lab Service (Completed on ' . date('F j, Y', strtotime($row['resultDate'])) . ')',
-                        'total_price'  => 0
-                    ];
-                }
-            }
-        }
     }
 }
 
 // ======================= APPLY INSURANCE DISCOUNT =======================
-$insurance_covered = 0;
 if ($insurance_discount > 0) {
     if ($insurance_discount_type === 'Percentage') {
         $insurance_covered = $total_charges * ($insurance_discount / 100);
@@ -161,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ref = 'N/A';
 
     if (isset($_POST['confirm_paid']) && $total_out_of_pocket == 0) {
-        $payment_method = $insurance_company ?: "Insurance";
+        $payment_method = $insurance_plan ?: "Insurance";
         $ref = "Covered by Insurance";
     } elseif (isset($_POST['make_payment'])) {
         $payment_method = trim($_POST['payment_method'] ?? '');
@@ -172,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($payment_method)) {
         if ($insurance_covered > 0 && $total_out_of_pocket > 0) {
-            $payment_method = ($insurance_company ?: "Insurance") . " / " . $payment_method;
+            $payment_method = ($insurance_plan ?: "Insurance") . " / " . $payment_method;
         }
 
         $is_pwd = $selected_patient['is_pwd'] ?? 0;
@@ -214,11 +173,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <link rel="stylesheet" href="assets/CSS/billing_summary.css">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-<style>
-.payment-card { cursor:pointer; border:1px solid #ccc; padding:15px; border-radius:8px; text-align:center; width:80px; }
-.payment-card.active { border-color:#0d6efd; background:#e7f1ff; }
-.payment-extra { margin-top:10px; }
-</style>
 </head>
 <body class="bg-light p-4">
 
@@ -227,22 +181,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <div class="receipt-box">
-    <div class="d-flex justify-content-between mb-3">
-        <h4>Billing Summary</h4>
-        <div><?= date('F j, Y') ?></div>
-    </div>
+    <h4>Billing Summary</h4>
+    <div><strong>Billed To:</strong> <?= htmlspecialchars($selected_patient['full_name'] ?? '') ?></div>
+    <div>Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?></div>
+    <div>Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?></div>
+    <?php if($insurance_plan): ?>
+        <div><strong>Insurance:</strong> <?= htmlspecialchars($insurance_plan) ?> (<?= htmlspecialchars($insurance_discount_type) ?> <?= number_format($insurance_discount,2) ?>)</div>
+    <?php endif; ?>
 
-    <div class="mb-2">
-        <strong>BILLED TO:</strong><br>
-        <?= htmlspecialchars(($selected_patient['fname'] ?? '') . ' ' . ($selected_patient['mname'] ?? '') . ' ' . ($selected_patient['lname'] ?? '')) ?><br>
-        Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?><br>
-        Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?><br>
-        <?php if($insurance_company): ?>
-            <strong>Insurance:</strong> <?= htmlspecialchars($insurance_company) ?> - <?= htmlspecialchars($insurance_plan) ?> (<?= htmlspecialchars($insurance_discount_type) ?> <?= number_format($insurance_discount,2) ?>)
-        <?php endif; ?>
-    </div>
-
-    <table class="table table-sm table-bordered mb-3">
+    <table class="table table-sm table-bordered mt-2">
         <thead class="table-primary">
             <tr>
                 <th>Service</th>
@@ -251,40 +198,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </tr>
         </thead>
         <tbody>
-            <?php
-            $hasRows = false;
-            foreach ([$billing_items, $dl_services] as $list) {
-                foreach ($list as $it) {
-                    $hasRows = true;
-                    echo "<tr>
-                        <td>" . htmlspecialchars($it['service_name'] ?? '') . "</td>
-                        <td>" . htmlspecialchars($it['description'] ?? '') . "</td>
-                        <td class='text-end'>₱" . number_format($it['total_price'] ?? 0, 2) . "</td>
-                    </tr>";
-                }
-            }
-            if (!$hasRows) {
-                echo "<tr><td colspan='3' class='text-center'>No billed or diagnostic services found.</td></tr>";
-            }
-            ?>
+        <?php if($billing_items): ?>
+            <?php foreach($billing_items as $it): ?>
+            <tr>
+                <td><?= htmlspecialchars($it['serviceName'] ?? '') ?></td>
+                <td><?= htmlspecialchars($it['description'] ?? '') ?></td>
+                <td class="text-end">₱<?= number_format($it['total_price'] ?? 0,2) ?></td>
+            </tr>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <tr><td colspan="3" class="text-center">No billed services found.</td></tr>
+        <?php endif; ?>
         </tbody>
     </table>
 
-    <div class="text-end mb-3">
-        <strong>Total Charges: ₱<?= number_format($total_charges,2) ?></strong><br>
-        <strong>Discount: ₱<?= number_format($total_discount,2) ?></strong><br>
-        <strong>Insurance Covered: ₱<?= number_format($insurance_covered,2) ?></strong><br>
-        <strong>Total: ₱<?= number_format($total_out_of_pocket,2) ?></strong>
+    <div class="text-end mt-2">
+        <strong>Total Charges:</strong> ₱<?= number_format($total_charges,2) ?><br>
+        <strong>Discount:</strong> ₱<?= number_format($total_discount,2) ?><br>
+        <strong>Insurance Covered:</strong> ₱<?= number_format($insurance_covered,2) ?><br>
+        <strong>Total Payable:</strong> ₱<?= number_format($total_out_of_pocket,2) ?>
     </div>
 
-    <?php if ($total_out_of_pocket > 0): ?>
-        <div class="text-end">
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">Proceed to Payment</button>
-        </div>
+    <?php if($total_out_of_pocket > 0): ?>
+    <div class="text-end mt-3">
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">Proceed to Payment</button>
+    </div>
     <?php else: ?>
-        <form method="POST" class="text-end">
-            <button type="submit" name="confirm_paid" class="btn btn-primary">Confirm & Mark as Paid</button>
-        </form>
+    <form method="POST" class="text-end mt-3">
+        <button type="submit" name="confirm_paid" class="btn btn-primary">Confirm & Mark as Paid</button>
+    </form>
     <?php endif; ?>
 </div>
 
@@ -297,18 +239,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <h5 class="modal-title">Select Payment Method</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-
         <div class="modal-body text-center">
           <input type="hidden" name="payment_method" id="payment_method">
           <div class="d-flex flex-wrap gap-3 justify-content-center mb-4">
-            <div class="payment-card" data-value="GCash"><i class="bi bi-phone text-primary"></i><br><span>GCash</span></div>
-            <div class="payment-card" data-value="Bank"><i class="bi bi-bank text-success"></i><br><span>Bank</span></div>
-            <div class="payment-card" data-value="Card"><i class="bi bi-credit-card text-warning"></i><br><span>Card</span></div>
-            <div class="payment-card" data-value="Cash"><i class="bi bi-cash-coin text-success"></i><br><span>Cash</span></div>
+            <div class="payment-card" data-value="GCash"><i class="bi bi-phone text-primary"></i><br>GCash</div>
+            <div class="payment-card" data-value="Bank"><i class="bi bi-bank text-success"></i><br>Bank</div>
+            <div class="payment-card" data-value="Card"><i class="bi bi-credit-card text-warning"></i><br>Card</div>
+            <div class="payment-card" data-value="Cash"><i class="bi bi-cash-coin text-success"></i><br>Cash</div>
           </div>
-
           <div id="gcash_box" class="payment-extra" style="display:none;">
-            <img src="<?= $qrImageSrc ?>" alt="GCash QR" class="img-fluid mb-3">
+            <img src="<?= $qrImageSrc ?>" class="img-fluid mb-2">
             <input type="text" class="form-control" name="payment_reference_gcash" placeholder="Enter GCash Reference Number">
           </div>
           <div id="bank_box" class="payment-extra" style="display:none;">
@@ -321,7 +261,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p>No reference required for cash payments.</p>
           </div>
         </div>
-
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" name="make_payment" class="btn btn-primary">Confirm Payment</button>
@@ -334,16 +273,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.querySelectorAll('.payment-card').forEach(card => {
-  card.addEventListener('click', function(){
-    document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('active'));
-    this.classList.add('active');
-    document.getElementById('payment_method').value = this.dataset.value;
-    document.querySelectorAll('.payment-extra').forEach(el => el.style.display = 'none');
-    if(this.dataset.value === 'GCash') document.getElementById('gcash_box').style.display = 'block';
-    if(this.dataset.value === 'Bank') document.getElementById('bank_box').style.display = 'block';
-    if(this.dataset.value === 'Card') document.getElementById('card_box').style.display = 'block';
-    if(this.dataset.value === 'Cash') document.getElementById('cash_box').style.display = 'block';
-  });
+    card.addEventListener('click', function(){
+        document.querySelectorAll('.payment-card').forEach(c=>c.classList.remove('active'));
+        this.classList.add('active');
+        document.getElementById('payment_method').value = this.dataset.value;
+        document.querySelectorAll('.payment-extra').forEach(el=>el.style.display='none');
+        if(this.dataset.value==='GCash') document.getElementById('gcash_box').style.display='block';
+        if(this.dataset.value==='Bank') document.getElementById('bank_box').style.display='block';
+        if(this.dataset.value==='Card') document.getElementById('card_box').style.display='block';
+        if(this.dataset.value==='Cash') document.getElementById('cash_box').style.display='block';
+    });
 });
 </script>
 </body>

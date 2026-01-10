@@ -2,46 +2,50 @@
 include '../../SQL/config.php';
 
 // ==============================
-// Fetch patients with completed lab results
+// Fetch patients who already have billing records
 // ==============================
 
 $sql = "
 SELECT 
     p.patient_id,
-    CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
+    CONCAT(p.fname, ' ', IFNULL(p.mname,''), ' ', p.lname) AS full_name,
     p.address,
     p.dob,
     p.phone_number,
 
+    -- Latest payment status from patient_receipt
     (
         SELECT pr.status 
         FROM patient_receipt pr 
         WHERE pr.patient_id = p.patient_id
-        ORDER BY pr.created_at DESC 
+        ORDER BY pr.created_at DESC
         LIMIT 1
     ) AS payment_status,
 
+    -- Latest receipt_id
     (
-        SELECT pr.receipt_id 
+        SELECT pr.receipt_id
         FROM patient_receipt pr 
         WHERE pr.patient_id = p.patient_id
         ORDER BY pr.created_at DESC
         LIMIT 1
     ) AS latest_receipt_id,
 
-    IFNULL(SUM(s.price),0) AS total_price
+    -- Total charges from billing_items
+    (
+        SELECT IFNULL(SUM(bi.total_price),0)
+        FROM billing_items bi
+        WHERE bi.patient_id = p.patient_id
+    ) AS total_price
 
 FROM patientinfo p
 
-LEFT JOIN dl_results dr 
-    ON dr.patientID = p.patient_id
-    AND dr.status = 'Completed'
+WHERE EXISTS (
+    SELECT 1 
+    FROM billing_records br 
+    WHERE br.patient_id = p.patient_id
+)
 
-LEFT JOIN dl_services s
-    ON s.serviceName = dr.result
-
-GROUP BY p.patient_id
-HAVING total_price > 0
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
@@ -90,37 +94,28 @@ $insurance = null;
 
 $paymentStatus = $row['payment_status'] ?? 'Pending';
 $receipt_id = $row['latest_receipt_id'] ?? 0;
-$totalPrice = $row['total_price'];
+$totalPrice = (float)$row['total_price'];
 
 $disableBill = ($paymentStatus === 'Paid');
 $showInsuranceButton = true;
 $rowClass = 'pending-insurance';
 
-// ✅ FIXED QUERY (NO ORDER BY id)
-$stmt = $conn->prepare("
-    SELECT insurance_number, insurance_company, promo_name, discount_type, discount_value
-    FROM patient_insurance
-    WHERE full_name = ?
-      AND status = 'Active'
-    LIMIT 1
-");
-
-$stmt->bind_param("s", $row['full_name']);
-$stmt->execute();
-$insurance = $stmt->get_result()->fetch_assoc();
-
-if ($insurance && !empty($insurance['insurance_number'])) {
-    $insuranceStatus = 'Approved';
+// --------------------------
+// If insurance was already applied manually, show Applied
+// --------------------------
+if (isset($row['insurance_applied']) && $row['insurance_applied'] == 1) {
+    $insuranceStatus = 'Applied';
     $showInsuranceButton = false;
     $rowClass = '';
+}
 
-    if ($insurance['discount_type'] === 'Percentage') {
-        $insuranceDiscount = ($insurance['discount_value'] / 100) * $totalPrice;
-    } else {
-        $insuranceDiscount = min($insurance['discount_value'], $totalPrice);
-    }
-
-    $totalPrice -= $insuranceDiscount;
+// --------------------------
+// Fetch insurance rule if user enters insurance number
+// --------------------------
+if ($showInsuranceButton) {
+    // When the modal is used, user inputs insurance number
+    // The logic to check and apply discount will be handled in apply_insurance.php
+    // Here we just display the button to input insurance number
 }
 ?>
 
@@ -128,10 +123,10 @@ if ($insurance && !empty($insurance['insurance_number'])) {
 <td><?= htmlspecialchars($row['full_name']); ?></td>
 
 <td>
-<?php if ($insuranceStatus === 'Approved'): ?>
-    <span class="badge bg-success">Approved</span><br>
+<?php if ($insuranceStatus === 'Applied' && $insurance): ?>
+    <span class="badge bg-success">Applied</span><br>
     <small class="text-muted">
-        <?= htmlspecialchars($insurance['insurance_company']); ?> –
+        <?= htmlspecialchars($insurance['insurance_company']); ?> – 
         <?= htmlspecialchars($insurance['promo_name']); ?>
         (<?= $insurance['discount_type']; ?> <?= $insurance['discount_value']; ?>)
     </small>
@@ -167,7 +162,7 @@ View Total Bill
 <button class="btn btn-success btn-sm" disabled>Already Paid</button>
 <?php else: ?>
 <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-success btn-sm">
-Generate Bill
+Process Payment
 </a>
 <?php endif; ?>
 
@@ -191,6 +186,7 @@ Enter Insurance
 
 <div class="modal-body">
 <input type="hidden" name="full_name" value="<?= htmlspecialchars($row['full_name']) ?>">
+<input type="hidden" name="patient_id" value="<?= $row['patient_id'] ?>">
 
 <div class="mb-3">
 <label>Insurance Number</label>
@@ -199,7 +195,7 @@ Enter Insurance
 </div>
 
 <div class="modal-footer">
-<button type="submit" class="btn btn-primary">Apply</button>
+<button type="submit" class="btn btn-primary">Apply Insurance</button>
 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
 </div>
 
