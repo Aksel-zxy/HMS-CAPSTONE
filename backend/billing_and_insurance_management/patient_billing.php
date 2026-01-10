@@ -1,47 +1,44 @@
 <?php
 include '../../SQL/config.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
 
 // ==============================
-// Fetch patients with completed lab results
+// Fetch patients with billing records + insurance info
 // ==============================
-
 $sql = "
 SELECT 
     p.patient_id,
-    CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
+    CONCAT(p.fname, ' ', IFNULL(p.mname,''), ' ', p.lname) AS full_name,
     p.address,
     p.dob,
     p.phone_number,
 
-    (
-        SELECT pr.status 
-        FROM patient_receipt pr 
-        WHERE pr.patient_id = p.patient_id
-        ORDER BY pr.created_at DESC 
-        LIMIT 1
-    ) AS payment_status,
+    -- Latest payment status & receipt
+    pr.status AS payment_status,
+    pr.receipt_id AS latest_receipt_id,
+    pr.insurance_covered,
+    pr.payment_method AS insurance_plan,
 
-    (
-        SELECT pr.receipt_id 
-        FROM patient_receipt pr 
-        WHERE pr.patient_id = p.patient_id
-        ORDER BY pr.created_at DESC
-        LIMIT 1
-    ) AS latest_receipt_id,
-
-    IFNULL(SUM(s.price),0) AS total_price
+    -- Total charges from billing_items
+    IFNULL(
+        (SELECT SUM(total_price) 
+         FROM billing_items bi 
+         WHERE bi.patient_id = p.patient_id),
+    0) AS total_price
 
 FROM patientinfo p
-
-LEFT JOIN dl_results dr 
-    ON dr.patientID = p.patient_id
-    AND dr.status = 'Completed'
-
-LEFT JOIN dl_services s
-    ON s.serviceName = dr.result
-
-GROUP BY p.patient_id
-HAVING total_price > 0
+LEFT JOIN patient_receipt pr 
+    ON pr.patient_id = p.patient_id
+    AND pr.created_at = (
+        SELECT MAX(created_at)
+        FROM patient_receipt
+        WHERE patient_id = p.patient_id
+    )
+WHERE EXISTS (
+    SELECT 1 
+    FROM billing_records br 
+    WHERE br.patient_id = p.patient_id
+)
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
@@ -84,57 +81,30 @@ $result = $conn->query($sql);
 <?php while ($row = $result->fetch_assoc()): ?>
 
 <?php
-$insuranceStatus = 'N/A';
-$insuranceDiscount = 0;
-$insurance = null;
-
 $paymentStatus = $row['payment_status'] ?? 'Pending';
 $receipt_id = $row['latest_receipt_id'] ?? 0;
-$totalPrice = $row['total_price'];
+$totalPrice = floatval($row['total_price']);
+
+// Determine insurance status from patient_receipt
+if (floatval($row['insurance_covered']) > 0) {
+    $insuranceStatus = 'Applied';
+    $insurancePlan = htmlspecialchars($row['insurance_plan']);
+    $showInsuranceButton = false;
+} else {
+    $insuranceStatus = 'N/A';
+    $insurancePlan = '';
+    $showInsuranceButton = true;
+}
 
 $disableBill = ($paymentStatus === 'Paid');
-$showInsuranceButton = true;
-$rowClass = 'pending-insurance';
-
-// ✅ FIXED QUERY (NO ORDER BY id)
-$stmt = $conn->prepare("
-    SELECT insurance_number, insurance_company, promo_name, discount_type, discount_value
-    FROM patient_insurance
-    WHERE full_name = ?
-      AND status = 'Active'
-    LIMIT 1
-");
-
-$stmt->bind_param("s", $row['full_name']);
-$stmt->execute();
-$insurance = $stmt->get_result()->fetch_assoc();
-
-if ($insurance && !empty($insurance['insurance_number'])) {
-    $insuranceStatus = 'Approved';
-    $showInsuranceButton = false;
-    $rowClass = '';
-
-    if ($insurance['discount_type'] === 'Percentage') {
-        $insuranceDiscount = ($insurance['discount_value'] / 100) * $totalPrice;
-    } else {
-        $insuranceDiscount = min($insurance['discount_value'], $totalPrice);
-    }
-
-    $totalPrice -= $insuranceDiscount;
-}
 ?>
 
-<tr class="<?= $rowClass ?>">
+<tr>
 <td><?= htmlspecialchars($row['full_name']); ?></td>
 
 <td>
-<?php if ($insuranceStatus === 'Approved'): ?>
-    <span class="badge bg-success">Approved</span><br>
-    <small class="text-muted">
-        <?= htmlspecialchars($insurance['insurance_company']); ?> –
-        <?= htmlspecialchars($insurance['promo_name']); ?>
-        (<?= $insurance['discount_type']; ?> <?= $insurance['discount_value']; ?>)
-    </small>
+<?php if ($insuranceStatus === 'Applied'): ?>
+    <span class="badge bg-success"><?= $insurancePlan ?: 'Applied' ?></span>
 <?php else: ?>
     <span class="badge bg-secondary">N/A</span>
 <?php endif; ?>
@@ -153,28 +123,20 @@ if ($insurance && !empty($insurance['insurance_number'])) {
 <td class="text-end">
 <div class="d-flex justify-content-end gap-2 flex-wrap">
 
-<?php if (!$receipt_id): ?>
-<a href="total_bill.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-secondary btn-sm" target="_blank">
-View Total Bill
-</a>
+<?php if ($receipt_id): ?>
+<a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" class="btn btn-secondary btn-sm" target="_blank">View Total Bill</a>
 <?php else: ?>
-<a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" class="btn btn-secondary btn-sm" target="_blank">
-View Total Bill
-</a>
+<a href="total_bill.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-secondary btn-sm" target="_blank">View Total Bill</a>
 <?php endif; ?>
 
 <?php if ($disableBill): ?>
 <button class="btn btn-success btn-sm" disabled>Already Paid</button>
 <?php else: ?>
-<a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-success btn-sm">
-Generate Bill
-</a>
+<a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-success btn-sm">Process Payment</a>
 <?php endif; ?>
 
 <?php if ($showInsuranceButton): ?>
-<button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">
-Enter Insurance
-</button>
+<button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">Enter Insurance</button>
 <?php endif; ?>
 
 </div>
@@ -191,6 +153,7 @@ Enter Insurance
 
 <div class="modal-body">
 <input type="hidden" name="full_name" value="<?= htmlspecialchars($row['full_name']) ?>">
+<input type="hidden" name="patient_id" value="<?= $row['patient_id'] ?>">
 
 <div class="mb-3">
 <label>Insurance Number</label>
@@ -199,7 +162,7 @@ Enter Insurance
 </div>
 
 <div class="modal-footer">
-<button type="submit" class="btn btn-primary">Apply</button>
+<button type="submit" class="btn btn-primary">Apply Insurance</button>
 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
 </div>
 
@@ -231,5 +194,6 @@ Enter Insurance
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

@@ -1,0 +1,60 @@
+/* Schedule Container */
+.schedule-container {
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+}
+
+.schedule-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 10px; /* Gap between rows */
+}
+
+.schedule-table th {
+    color: #858796;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    padding-bottom: 20px;
+    border: none;
+    text-align: center;
+}
+
+.employee-cell {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+}
+
+.avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    margin-right: 15px;
+    object-fit: cover;
+    background: #eee;
+}
+
+.shift-card {
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.75rem;
+    margin: 5px;
+    min-width: 120px;
+    position: relative;
+    border-left: 4px solid; /* The colored bar on the left */
+    text-align: left;
+}
+
+/* Specific Shift Colors */
+.shift-doctor { background: #f0f4ff; border-color: #4361ee; color: #4361ee; }
+.shift-nurse { background: #eefdf5; border-color: #1cc88a; color: #1cc88a; }
+.shift-off { background: #f8f9fc; border-color: #d1d3e2; color: #858796; opacity: 0.5; }
+
+.break-info {
+    font-size: 0.65rem;
+    display: flex;
+    align-items: center;
+    margin-top: 5px;
+}
