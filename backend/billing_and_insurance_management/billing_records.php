@@ -48,60 +48,62 @@ $result = $stmt->get_result();
 <body class="p-4 bg-light">
 
 <div class="container">
-    <h3 class="mb-4">🧾 Patient Billing Records</h3>
 
-    <!-- Search form -->
-    <form class="row mb-4" method="GET">
-        <div class="col-md-6">
-            <input type="text" name="search" class="form-control" placeholder="Search by patient name or transaction ID" value="<?= htmlspecialchars($search) ?>">
-        </div>
-        <div class="col-md-3">
-            <button type="submit" class="btn btn-primary me-2">Search</button>
-            <a href="billing_records.php" class="btn btn-secondary">Reset</a>
-        </div>
-    </form>
 
-    <!-- Billing table -->
-    <div class="table-responsive">
-        <table class="table table-bordered table-striped align-middle text-center">
-            <thead class="table-dark">
-                <tr>
-                    <th>Patient Name</th>
-                    <th>Billing Date</th>
-                    <th>Total Amount</th>
-                    <th>Status</th>
-                    <th>Payment Method</th>
-                    <th>Transaction ID</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if ($result->num_rows > 0): ?>
-                    <?php while($row = $result->fetch_assoc()): ?>
-                        <?php
-                            $full_name = $row['fname'] . ' ' . (!empty($row['mname']) ? $row['mname'].' ' : '') . $row['lname'];
-                            $total = $row['grand_total'] ?: $row['billing_grand_total'] ?: $row['total_amount'];
-                            $grand_total = number_format($total, 2);
-                        ?>
-                        <tr>
-                            <td><?= htmlspecialchars($full_name) ?></td>
-                            <td><?= htmlspecialchars($row['billing_date']) ?></td>
-                            <td>₱<?= $grand_total ?></td>
-                            <td>
-                                <?php if ($row['status'] === 'Pending'): ?>
-                                    <span class="badge bg-warning text-dark">Pending</span>
-                                <?php else: ?>
-                                    <span class="badge bg-success">Paid</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?= htmlspecialchars($row['payment_method'] ?: 'Unpaid') ?></td>
-                            <td><?= htmlspecialchars($row['transaction_id'] ?: '-') ?></td>
-                            <td>
-                                <!-- Only print/view action -->
-                                <a href="print_receipt.php?receipt_id=<?= $row['receipt_id'] ?>" 
-                                   class="btn btn-info btn-sm" target="_blank">Print</a>
-                            </td>
-                        </tr>
+    <div style="background-color: white; border-radius: 30px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 80px; margin-left: 100px;">
+        <!-- Search form -->
+         <h1 class="mb-4">Patient Billing Records</h1>
+        <form class="row mb-4" method="GET">
+            <div class="col-md-6">
+                <input type="text" name="search" class="form-control" placeholder="Search by patient name or transaction ID" value="<?= htmlspecialchars($search) ?>">
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary me-2">Search</button>
+                <a href="billing_records.php" class="btn btn-secondary">Reset</a>
+            </div>
+        </form>
+
+        <!-- Billing table -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle text-left" style="border-radius: 20px; overflow: hidden;">
+                <thead class="table-wite">
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Billing Date</th>
+                        <th>Total Amount</th>
+                        <th>Status</th>
+                        <th>Payment Method</th>
+                        <th>Transaction ID</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if ($result->num_rows > 0): ?>
+                        <?php while($row = $result->fetch_assoc()): ?>
+                            <?php
+                                $full_name = $row['fname'] . ' ' . (!empty($row['mname']) ? $row['mname'].' ' : '') . $row['lname'];
+                                $total = $row['grand_total'] ?: $row['billing_grand_total'] ?: $row['total_amount'];
+                                $grand_total = number_format($total, 2);
+                            ?>
+                            <tr>
+                                <td><?= htmlspecialchars($full_name) ?></td>
+                                <td><?= htmlspecialchars($row['billing_date']) ?></td>
+                                <td>₱<?= $grand_total ?></td>
+                                <td>
+                                    <?php if ($row['status'] === 'Pending'): ?>
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-success">Paid</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td><?= htmlspecialchars($row['payment_method'] ?: 'Unpaid') ?></td>
+                                <td><?= htmlspecialchars($row['transaction_id'] ?: '-') ?></td>
+                                <td>
+                                    <!-- Only print/view action -->
+                                    <a href="print_receipt.php?receipt_id=<?= $row['receipt_id'] ?>" 
+                                       class="btn btn-info btn-sm" target="_blank">Print</a>
+                                </td>
+                            </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
                     <tr>
