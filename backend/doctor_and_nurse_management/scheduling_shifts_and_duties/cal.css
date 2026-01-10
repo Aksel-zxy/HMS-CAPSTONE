@@ -1,57 +1,60 @@
-/* Container and Table Adjustments */
+/* Schedule Container */
 .schedule-container {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 10px;
-    overflow-x: auto;
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.03);
 }
 
-.schedule-table thead th {
-    background-color: #fcfcfc;
-    border-bottom: 1px solid #f0f0f0;
-    padding: 15px 10px;
-    font-weight: 600;
+.schedule-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 10px; /* Gap between rows */
 }
 
-.schedule-table tbody tr {
-    transition: background 0.2s;
+.schedule-table th {
+    color: #858796;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    padding-bottom: 20px;
+    border: none;
+    text-align: center;
 }
 
-.schedule-table tbody tr:hover {
-    background-color: #fbfcfe !important;
+.employee-cell {
+    display: flex;
+    align-items: center;
+    padding: 15px;
 }
 
-/* Shift Card Detail */
-.shift-card {
-    padding: 12px;
-    border-radius: 10px;
-    min-width: 135px;
-    margin: 8px auto;
-    border-left: 4px solid;
-    transition: transform 0.2s;
-}
-
-.shift-card:hover {
-    transform: translateY(-2px);
-}
-
-.shift-doctor {
-    background-color: #f0f7ff;
-    border-color: #0d6efd;
-    color: #084298;
-}
-
-.shift-nurse {
-    background-color: #f0fff4;
-    border-color: #198754;
-    color: #0f5132;
-}
-
-/* Avatar Styling */
 .avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
-    margin-right: 12px;
-    flex-shrink: 0;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    margin-right: 15px;
+    object-fit: cover;
+    background: #eee;
+}
+
+.shift-card {
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 0.75rem;
+    margin: 5px;
+    min-width: 120px;
+    position: relative;
+    border-left: 4px solid; /* The colored bar on the left */
+    text-align: left;
+}
+
+/* Specific Shift Colors */
+.shift-doctor { background: #f0f4ff; border-color: #4361ee; color: #4361ee; }
+.shift-nurse { background: #eefdf5; border-color: #1cc88a; color: #1cc88a; }
+.shift-off { background: #f8f9fc; border-color: #d1d3e2; color: #858796; opacity: 0.5; }
+
+.break-info {
+    font-size: 0.65rem;
+    display: flex;
+    align-items: center;
+    margin-top: 5px;
 }

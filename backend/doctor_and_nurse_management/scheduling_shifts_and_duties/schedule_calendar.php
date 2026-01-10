@@ -7,71 +7,63 @@ if (!isset($_SESSION['doctor']) || $_SESSION['doctor'] !== true) {
     exit();
 }
 
+// Logged-in user info
 $user_id = $_SESSION['user_id'];
 $user_query = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
 $user_query->bind_param("i", $user_id);
 $user_query->execute();
 $user = $user_query->get_result()->fetch_assoc();
 
-$doctor_id = $_GET['doctor_id'] ?? '';
-$nurse_id = $_GET['nurse_id'] ?? '';
-$department_filter = $_GET['department'] ?? '';
-$current_monday = $_GET['week_start'] ?? date('Y-m-d', strtotime('monday this week'));
+// --- 1. DATE & FILTER LOGIC ---
+$selected_week = $_GET['week'] ?? date('Y-m-d', strtotime('monday this week'));
+$week_end = date('Y-m-d', strtotime("$selected_week +6 days"));
+$display_range = date('M d', strtotime($selected_week)) . " — " . date('M d, Y', strtotime($week_end));
 
-$doctor_options = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession='Doctor'")->fetch_all(MYSQLI_ASSOC);
-$nurse_options = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession='Nurse'")->fetch_all(MYSQLI_ASSOC);
-$dept_options = $conn->query("SELECT DISTINCT department FROM hr_employees WHERE department IS NOT NULL AND department != ''")->fetch_all(MYSQLI_ASSOC);
+$prev_week = date('Y-m-d', strtotime("$selected_week -7 days"));
+$next_week = date('Y-m-d', strtotime("$selected_week +7 days"));
 
-$query = "SELECT s.*, e.first_name, e.last_name, e.profession, e.department, e.role 
-          FROM shift_scheduling s 
-          JOIN hr_employees e ON s.employee_id = e.employee_id 
-          WHERE s.week_start = ?";
-
-if ($doctor_id) $query .= " AND e.employee_id = '" . $conn->real_escape_string($doctor_id) . "'";
-if ($nurse_id) $query .= " AND e.employee_id = '" . $conn->real_escape_string($nurse_id) . "'";
-if ($department_filter) $query .= " AND e.department = '" . $conn->real_escape_string($department_filter) . "'";
-$query .= " ORDER BY e.profession ASC";
+// --- 2. DATA QUERY (Secure & Week-filtered) ---
+$query = "SELECT e.first_name, e.last_name, e.profession, e.role, e.department, s.*
+          FROM hr_employees e
+          INNER JOIN shift_scheduling s ON e.employee_id = s.employee_id
+          WHERE s.week_start = ?
+          ORDER BY e.profession ASC, e.last_name ASC";
 
 $stmt = $conn->prepare($query);
-$stmt->bind_param("s", $current_monday);
+$stmt->bind_param("s", $selected_week);
 $stmt->execute();
 $result = $stmt->get_result();
 
+// --- 3. PREPARE TABLE ROWS AND CALENDAR EVENTS ---
+$days_map = ['mon' => 0, 'tue' => 1, 'wed' => 2, 'thu' => 3, 'fri' => 4, 'sat' => 5, 'sun' => 6];
+$table_rows = [];
 $events = [];
-$table_data = [];
-$days = ['mon' => 0, 'tue' => 1, 'wed' => 2, 'thu' => 3, 'fri' => 4, 'sat' => 5, 'sun' => 6];
 
 while ($row = $result->fetch_assoc()) {
-    $table_data[] = $row;
-    foreach ($days as $prefix => $offset) {
-        $start = $row[$prefix . "_start"];
-        $end = $row[$prefix . "_end"];
-        $status = $row[$prefix . "_status"];
+    $table_rows[] = $row;
 
-        if (!empty($start) && !empty($end) && $status !== 'Off') {
-            $current_date = date('Y-m-d', strtotime("$current_monday +$offset days"));
+    foreach ($days_map as $prefix => $offset) {
+        $start = $row[$prefix . '_start'];
+        $end = $row[$prefix . '_end'];
+        $status = $row[$prefix . '_status'];
+
+        if (!empty($start) && $status !== 'Off') {
+            $date = date('Y-m-d', strtotime("$selected_week +$offset days"));
+
             $events[] = [
                 'title' => $row['first_name'] . ' ' . $row['last_name'],
-                'start' => $current_date . 'T' . $start,
-                'end' => $current_date . 'T' . $end,
-                'backgroundColor' => ($row['profession'] == 'Doctor' ? '#0d6efd' : '#198754'),
+                'start' => $date . 'T' . $start,
+                'end' => $date . 'T' . $end,
+                'backgroundColor' => ($row['profession'] === 'Doctor') ? '#3b82f6' : '#10b981',
                 'borderColor' => 'transparent',
-                'extendedProps' => [
-                    'dept' => $row['department'],
-                    'role' => $row['role'],
-                    'status' => $status
-                ]
+                'dept' => $row['department'],
+                'status' => $status
             ];
         }
     }
 }
-
-$prev_week = date('Y-m-d', strtotime("$current_monday -7 days"));
-$next_week = date('Y-m-d', strtotime("$current_monday +7 days"));
-$today_week = date('Y-m-d', strtotime('monday this week'));
-$week_end = date('Y-m-d', strtotime("$current_monday +6 days"));
-$display_range = date('M d', strtotime($current_monday)) . " — " . date('M d, Y', strtotime($week_end));
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -210,178 +202,133 @@ $display_range = date('M d', strtotime($current_monday)) . " — " . date('M d, 
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <div class="main p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <div>
-                            <h2 class="fw-bold mb-0" style="color: #2d3748;">Schedule</h2>
-                            <p class="text-muted small">Viewing hospital shifts for the selected week</p>
-                        </div>
-
-                        <div class="d-flex gap-3 align-items-center">
-                            <div class="btn-group shadow-sm bg-white rounded-3">
-                                <a href="?week_start=<?php echo $prev_week; ?>" class="btn btn-outline-secondary border-0 py-2 px-3">
-                                    <i class="bi bi-chevron-left"></i>
-                                </a>
-                                <a href="?week_start=<?php echo $today_week; ?>" class="btn btn-outline-secondary border-0 py-2 px-3 fw-bold small">
-                                    Today
-                                </a>
-                                <a href="?week_start=<?php echo $next_week; ?>" class="btn btn-outline-secondary border-0 py-2 px-3">
-                                    <i class="bi bi-chevron-right"></i>
-                                </a>
-                            </div>
-
-                            <div class="bg-white px-4 py-2 rounded-pill shadow-sm small border fw-bold text-secondary">
-                                <i class="bi bi-calendar3 me-2 text-primary"></i>
-                                <?php echo $display_range; ?>
-                            </div>
-
-                            <button class="btn btn-dark rounded-circle shadow p-2" style="width: 40px; height: 40px;">
-                                <i class="bi bi-sliders"></i>
-                            </button>
-                            <button class="btn btn-primary rounded-circle shadow p-2" style="width: 40px; height: 40px;">
-                                <i class="bi bi-plus-lg"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="schedule-container shadow-sm border-0">
-                        <table class="schedule-table">
-                            <thead>
-                                <tr>
-                                    <th style="text-align: left; padding-left: 30px; width: 250px;">Employee Name</th>
-                                    <th>Mon</th>
-                                    <th>Tue</th>
-                                    <th>Wed</th>
-                                    <th>Thu</th>
-                                    <th>Fri</th>
-                                    <th>Sat</th>
-                                    <th>Sun</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                // Query to join Employee details with their specific schedule
-                                $query = "SELECT e.first_name, e.last_name, e.profession, e.role, s.* FROM hr_employees e 
-                          INNER JOIN shift_scheduling s ON e.employee_id = s.employee_id 
-                          ORDER BY e.profession ASC";
-
-                                $result = $conn->query($query);
-
-                                if ($result->num_rows > 0):
-                                    while ($row = $result->fetch_assoc()):
-                                        // Determine styling based on profession
-                                        $is_doctor = ($row['profession'] == 'Doctor');
-                                        $card_style = $is_doctor ? 'shift-doctor' : 'shift-nurse';
-                                        $initials = substr($row['first_name'], 0, 1) . substr($row['last_name'], 0, 1);
-                                ?>
-                                        <tr class="bg-white">
-                                            <td class="employee-cell px-4">
-                                                <div class="avatar d-flex align-items-center justify-content-center fw-bold <?php echo $is_doctor ? 'bg-primary text-white' : 'bg-success text-white'; ?>" style="font-size: 0.8rem;">
-                                                    <?php echo $initials; ?>
-                                                </div>
-                                                <div>
-                                                    <div class="fw-bold text-dark mb-0" style="font-size: 0.85rem;">
-                                                        <?php echo $row['first_name'] . ' ' . $row['last_name']; ?>
-                                                    </div>
-                                                    <div class="text-muted" style="font-size: 0.7rem;"><?php echo $row['role']; ?></div>
-                                                </div>
-                                            </td>
-
-                                            <?php
-                                            $days_of_week = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-                                            foreach ($days_of_week as $day):
-                                                $start = $row[$day . '_start'];
-                                                $end = $row[$day . '_end'];
-                                                $status = $row[$day . '_status'];
-
-                                                // Check if staff is on duty or off
-                                                $is_on_duty = ($status !== 'Off' && !empty($start));
-                                            ?>
-                                                <td>
-                                                    <?php if ($is_on_duty): ?>
-                                                        <div class="shift-card <?php echo $card_style; ?> shadow-sm">
-                                                            <div class="fw-bold" style="letter-spacing: -0.3px;">
-                                                                <?php echo date("g:i a", strtotime($start)); ?> - <?php echo date("g:i a", strtotime($end)); ?>
-                                                            </div>
-                                                            <div class="small mt-1" style="font-size: 0.65rem; font-weight: 500;">
-                                                                <?php echo $row['profession']; ?>
-                                                            </div>
-                                                            <div class="break-info mt-1 text-muted">
-                                                                <i class="bi bi-clock-history me-1"></i> 30m break
-                                                            </div>
-                                                        </div>
-                                                    <?php else: ?>
-                                                        <div class="text-center py-3">
-                                                            <span class="badge rounded-pill bg-light text-muted fw-normal" style="font-size: 0.65rem; border: 1px dashed #ddd;">OFF</span>
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </td>
-                                            <?php endforeach; ?>
-                                        </tr>
-                                    <?php
-                                    endwhile;
-                                else:
-                                    ?>
-                                    <tr>
-                                        <td colspan="8" class="text-center py-5 text-muted">No schedules found in database.</td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <!-- END CODING HERE -->
+            <div class="container-fluid p-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+        <div>
+            <h2 class="fw-bold mb-1 text-dark">Schedule Calendar</h2>
+            <p class="text-muted small">Week: <span class="fw-bold text-primary"><?= $display_range ?></span></p>
         </div>
-        <!----- End of Main Content ----->
-    </div>
-    <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-    <script src="../assets/Bootstrap/all.min.js"></script>
-    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="../assets/Bootstrap/jq.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const calendarEl = document.getElementById('calendar');
-            const calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'timeGridWeek',
-                height: 650, // Slightly smaller height
-                contentHeight: 'auto',
-                aspectRatio: 1.8,
-                headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'timeGridWeek,dayGridMonth'
-                },
-                allDaySlot: false,
-                events: <?php echo json_encode($events); ?>,
-                eventClick: function(info) {
-                    const p = info.event.extendedProps;
-                    document.getElementById('modalHeader').style.background = info.event.backgroundColor;
-                    document.getElementById('modalDetails').innerHTML = `
-                <p class="mb-1"><strong>Staff:</strong> ${info.event.title}</p>
-                <p class="mb-1"><strong>Dept:</strong> ${p.dept}</p>
-                <p class="mb-1"><strong>Time:</strong> ${info.event.start.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
-                <p class="mb-0"><strong>Status:</strong> <span class="badge bg-light text-dark">${p.status}</span></p>
-            `;
-                    new bootstrap.Modal(document.getElementById('shiftModal')).show();
-                }
-            });
-            calendar.render();
 
-            document.querySelector(".toggler-btn").addEventListener("click", () => {
+        <!-- Week Picker + Export -->
+        <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="input-group shadow-sm rounded-pill overflow-hidden" style="height:40px;">
+                <a href="?week=<?= $prev_week ?>" class="btn btn-black border-end">
+                    <i class="bi bi-chevron-left"><</i>
+                </a>
+                <input type="date" name="week" value="<?= $selected_week ?>" 
+                       class="form-control border-0 text-center" style="max-width:150px;" onchange="this.form.submit()">
+                <a href="?week=<?= $next_week ?>" class="btn btn-black border-start">
+                    <i class="bi bi-chevron-right">></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Schedule Table Card -->
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="ps-4 py-3 border-0 text-muted small text-uppercase" style="width: 250px;">Employee Name</th>
+                        <?php foreach (['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as $day_name): ?>
+                            <th class="text-center py-3 border-0 text-muted small text-uppercase"><?= $day_name ?></th>
+                        <?php endforeach; ?>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if(count($table_rows) > 0): ?>
+                        <?php foreach($table_rows as $row):
+                            $is_doctor = ($row['profession'] === 'Doctor');
+                            $card_theme = $is_doctor ? 'shift-doctor' : 'shift-nurse';
+                            $avatar_bg = $is_doctor ? 'bg-primary' : 'bg-success';
+                            $initials = strtoupper(substr($row['first_name'],0,1).substr($row['last_name'],0,1));
+                        ?>
+                            <tr>
+                                <!-- Employee -->
+                                <td class="ps-4 py-3">
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar <?= $avatar_bg ?> text-white fw-bold d-flex align-items-center justify-content-center rounded-circle me-3" 
+                                             style="width:40px; height:40px; font-size:0.85rem;">
+                                            <?= $initials ?>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold text-dark mb-0" style="font-size:0.9rem;"><?= $row['first_name'].' '.$row['last_name'] ?></div>
+                                            <div class="text-muted" style="font-size:0.75rem;"><?= $row['role'] ?></div>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- Days -->
+                                <?php foreach(array_keys($days_map) as $day):
+                                    $start = $row[$day.'_start'];
+                                    $end = $row[$day.'_end'];
+                                    $status = $row[$day.'_status'];
+                                    $is_on_duty = (!empty($start) && $status!=='Off');
+                                ?>
+                                    <td class="p-2 text-center">
+                                        <?php if($is_on_duty): ?>
+                                            <div class="shift-card <?= $card_theme ?> d-flex flex-column align-items-center justify-content-center rounded-3 shadow-sm p-1" style="font-size:0.75rem; min-height:45px;">
+                                                <span class="fw-bold"><?= date("g:i a", strtotime($start)) ?></span>
+                                                <span class="text-muted small">—</span>
+                                                <span class="fw-bold"><?= date("g:i a", strtotime($end)) ?></span>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="badge rounded-pill bg-light text-secondary border fw-normal px-3 py-2" style="font-size:0.65rem;">OFF</span>
+                                        <?php endif; ?>
+                                    </td>
+                                <?php endforeach; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+                                No schedules found for this week.
+                            </td>
+                        </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+            <!----- End of Main Content ----->
+        </div>
+        <script>
+            const toggler = document.querySelector(".toggler-btn");
+            toggler.addEventListener("click", function() {
                 document.querySelector("#sidebar").classList.toggle("collapsed");
-                setTimeout(() => calendar.updateSize(), 300); // Important: refresh calendar size after sidebar animation
             });
-        });
-    </script>
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+        <script src="../assets/Bootstrap/all.min.js"></script>
+        <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+        <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+        <script src="../assets/Bootstrap/jq.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const calendarEl = document.getElementById('calendar');
+                const calendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'timeGridWeek',
+                    firstDay: 1,
+                    height: 650,
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'timeGridWeek,timeGridDay'
+                    },
+                    allDaySlot: false,
+                    events: <?= json_encode($events) ?>,
+                    eventClick: function(info) {
+                        const p = info.event.extendedProps;
+                        alert(`Staff: ${info.event.title}\nDept: ${p.dept}\nStatus: ${p.status}`);
+                    }
+                });
+                calendar.render();
+            });
+        </script>
 </body>
 
 </html>
