@@ -211,7 +211,7 @@ body {
                         <div class="dropdown-container" style="<?= $isPOActive ? 'display:block;' : 'display:none;' ?>">
                             <a href="purchase_order.php" class="<?= $currentPage=='purchase_order.php'?'active-link':'' ?>">Purchase Order</a>
                             <a href="department_request.php" class="<?= $currentPage=='department_request.php'?'active-link':'' ?>">Department Request</a>
-                            <a href="admin_purchase_requests.php" class="<?= $currentPage=='admin_purchase_requests.php'?'active-link':'' ?>">Purchase Request</a>
+                            <a href="purchase_request.php" class="<?= $currentPage=='purchase_request.php'?'active-link':'' ?>">Purchase Request</a>
                             <a href="order_receive.php" class="<?= $currentPage=='order_receive.php'?'active-link':'' ?>">Goods Receipt & Verification</a>
                             <a href="po_status_tracking.php" class="<?= $currentPage=='po_status_tracking.php'?'active-link':'' ?>">PO Status Tracking</a>
                         </div>
