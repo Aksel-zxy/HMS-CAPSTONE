@@ -281,7 +281,6 @@ body {
                         <a href="journal_entry.php">Journal Entry</a>
                     </div>
                 </li>
-                <li><a href="insurance_approval.php" target="_blank">Insurance Approval</a></li>
             </ul>
         </div>
 
