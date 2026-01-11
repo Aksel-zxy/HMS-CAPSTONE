@@ -17,7 +17,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 // Query: join patient_receipt and patientinfo; get latest billing info
 if ($search_param) {
     $sql = "
-        SELECT pr.*, pi.fname, pi.mname, pi.lname, br.total_amount, br.out_of_pocket, br.grand_total AS billing_grand_total, br.billing_date AS br_billing_date
+        SELECT pr.*, pi.fname, pi.mname, pi.lname, pi.patient_id, br.billing_id, br.grand_total AS billing_grand_total, br.billing_date AS br_billing_date
         FROM patient_receipt pr
         JOIN patientinfo pi ON pr.patient_id = pi.patient_id
         LEFT JOIN billing_records br ON pr.billing_id = br.billing_id
@@ -28,7 +28,7 @@ if ($search_param) {
     $stmt->bind_param("sss", $search_param, $search_param, $search_param);
 } else {
     $sql = "
-        SELECT pr.*, pi.fname, pi.mname, pi.lname, br.total_amount, br.out_of_pocket, br.grand_total AS billing_grand_total, br.billing_date AS br_billing_date
+        SELECT pr.*, pi.fname, pi.mname, pi.lname, pi.patient_id, br.billing_id, br.grand_total AS billing_grand_total, br.billing_date AS br_billing_date
         FROM patient_receipt pr
         JOIN patientinfo pi ON pr.patient_id = pi.patient_id
         LEFT JOIN billing_records br ON pr.billing_id = br.billing_id
@@ -82,25 +82,17 @@ $result = $stmt->get_result();
             <?php if ($result->num_rows > 0): ?>
                 <?php while($row = $result->fetch_assoc()): ?>
                     <?php
-                        // Patient full name
                         $full_name = trim($row['fname'] . ' ' . (!empty($row['mname']) ? $row['mname'].' ' : '') . $row['lname']);
-                        
-                        // Billing date fallback
                         $billing_date = $row['billing_date'] ?? $row['br_billing_date'] ?? 'N/A';
-                        
-                        // Grand total fallback
-                        $grand_total = $row['grand_total'] ?? $row['billing_grand_total'] ?? $row['total_amount'] ?? 0;
+                        $grand_total = $row['grand_total'] ?? $row['billing_grand_total'] ?? 0;
                         $grand_total_fmt = number_format((float)$grand_total, 2);
-
-                        // Insurance covered
                         $insurance_covered = $row['insurance_covered'] ?? 0;
                         $insurance_covered_fmt = number_format((float)$insurance_covered, 2);
-
-                        // Status
                         $status = $row['status'] ?? 'Pending';
                         $payment_method = $row['payment_method'] ?? 'Unpaid';
                         $transaction_id = $row['transaction_id'] ?? '-';
                         $receipt_id = $row['receipt_id'] ?? 0;
+                        $billing_id = $row['billing_id'] ?? 0;
                     ?>
                     <tr>
                         <td><?= htmlspecialchars($full_name) ?></td>
@@ -118,7 +110,8 @@ $result = $stmt->get_result();
                         <td><?= htmlspecialchars($transaction_id) ?></td>
                         <td>
                             <?php if (!empty($receipt_id) && $receipt_id > 0): ?>
-                                <a href="patient_receipt.php?receipt_id=<?= $receipt_id ?>" target="_blank" class="btn btn-info btn-sm">Print</a>
+                                <!-- Updated link to correct print_receipt.php -->
+                                <a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" target="_blank" class="btn btn-info btn-sm">Print</a>
                             <?php else: ?>
                                 <span class="text-muted">N/A</span>
                             <?php endif; ?>

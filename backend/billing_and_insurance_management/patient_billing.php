@@ -2,43 +2,52 @@
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// ==============================
-// Fetch patients with billing records + insurance info
-// ==============================
+/*
+|--------------------------------------------------------------------------
+| FETCH PATIENTS WITH UNPAID / PARTIALLY PAID BILLINGS
+|--------------------------------------------------------------------------
+| - billing_items is the source of services
+| - billing_id is the source of truth
+| - patient_receipt defines payment status
+*/
+
 $sql = "
-SELECT 
+SELECT
     p.patient_id,
-    CONCAT(p.fname, ' ', IFNULL(p.mname,''), ' ', p.lname) AS full_name,
+    CONCAT(p.fname,' ',IFNULL(p.mname,''),' ',p.lname) AS full_name,
     p.address,
-    p.dob,
     p.phone_number,
 
-    -- Latest payment status & receipt
-    pr.status AS payment_status,
-    pr.receipt_id AS latest_receipt_id,
-    pr.insurance_covered,
-    pr.payment_method AS insurance_plan,
+    bi.billing_id,
 
-    -- Total charges from billing_items
-    IFNULL(
-        (SELECT SUM(total_price) 
-         FROM billing_items bi 
-         WHERE bi.patient_id = p.patient_id),
-    0) AS total_price
+    -- Billing totals
+    SUM(bi.total_price) AS total_charges,
+
+    -- Latest receipt (if any)
+    pr.receipt_id,
+    pr.status AS payment_status,
+    pr.insurance_covered,
+    pr.payment_method
 
 FROM patientinfo p
-LEFT JOIN patient_receipt pr 
-    ON pr.patient_id = p.patient_id
-    AND pr.created_at = (
-        SELECT MAX(created_at)
-        FROM patient_receipt
-        WHERE patient_id = p.patient_id
+
+INNER JOIN billing_items bi
+    ON bi.patient_id = p.patient_id
+    AND bi.finalized = 1
+
+LEFT JOIN patient_receipt pr
+    ON pr.billing_id = bi.billing_id
+    AND pr.receipt_id = (
+        SELECT MAX(r2.receipt_id)
+        FROM patient_receipt r2
+        WHERE r2.billing_id = bi.billing_id
     )
-WHERE EXISTS (
-    SELECT 1 
-    FROM billing_records br 
-    WHERE br.patient_id = p.patient_id
-)
+
+GROUP BY p.patient_id, bi.billing_id
+
+HAVING 
+    pr.status IS NULL OR pr.status != 'Paid'
+
 ORDER BY p.lname ASC, p.fname ASC
 ";
 
@@ -49,8 +58,8 @@ $result = $conn->query($sql);
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Patient Billing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
@@ -60,16 +69,17 @@ $result = $conn->query($sql);
 
 <body>
 <div class="dashboard-wrapper">
+
 <div class="main-content-wrapper">
 <div class="container-fluid bg-white p-4 rounded shadow">
 
 <h1 class="mb-4">Patient Billing</h1>
 
-<table class="table table-bordered table-striped">
+<table class="table table-bordered table-striped align-middle">
 <thead class="table-dark">
 <tr>
     <th>Patient Name</th>
-    <th>Insurance Status / Plan</th>
+    <th>Insurance</th>
     <th>Payment Status</th>
     <th>Total Charges</th>
     <th class="text-end">Actions</th>
@@ -77,71 +87,72 @@ $result = $conn->query($sql);
 </thead>
 
 <tbody>
+
 <?php if ($result && $result->num_rows > 0): ?>
 <?php while ($row = $result->fetch_assoc()): ?>
 
 <?php
-$paymentStatus = $row['payment_status'] ?? 'Pending';
-$receipt_id = $row['latest_receipt_id'] ?? 0;
-$totalPrice = floatval($row['total_price']);
+$billing_id   = (int)$row['billing_id'];
+$receipt_id   = $row['receipt_id'];
+$totalCharges = (float)$row['total_charges'];
+$status       = $row['payment_status'] ?? 'Pending';
 
-// Determine insurance status from patient_receipt
-if (floatval($row['insurance_covered']) > 0) {
-    $insuranceStatus = 'Applied';
-    $insurancePlan = htmlspecialchars($row['insurance_plan']);
-    $showInsuranceButton = false;
-} else {
-    $insuranceStatus = 'N/A';
-    $insurancePlan = '';
-    $showInsuranceButton = true;
-}
-
-$disableBill = ($paymentStatus === 'Paid');
+$insuranceApplied = ((float)$row['insurance_covered'] > 0);
+$insuranceLabel   = $insuranceApplied ? htmlspecialchars($row['payment_method']) : 'N/A';
 ?>
 
 <tr>
 <td><?= htmlspecialchars($row['full_name']); ?></td>
 
 <td>
-<?php if ($insuranceStatus === 'Applied'): ?>
-    <span class="badge bg-success"><?= $insurancePlan ?: 'Applied' ?></span>
+<?php if ($insuranceApplied): ?>
+    <span class="badge bg-success"><?= $insuranceLabel ?></span>
 <?php else: ?>
     <span class="badge bg-secondary">N/A</span>
 <?php endif; ?>
 </td>
 
 <td>
-<?php if ($paymentStatus === 'Paid'): ?>
+<?php if ($status === 'Paid'): ?>
     <span class="badge bg-success">Paid</span>
 <?php else: ?>
     <span class="badge bg-warning text-dark">Pending</span>
 <?php endif; ?>
 </td>
 
-<td>₱ <?= number_format($totalPrice, 2); ?></td>
+<td>₱ <?= number_format($totalCharges, 2); ?></td>
 
 <td class="text-end">
 <div class="d-flex justify-content-end gap-2 flex-wrap">
 
 <?php if ($receipt_id): ?>
-<a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" class="btn btn-secondary btn-sm" target="_blank">View Total Bill</a>
+    <a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" 
+       class="btn btn-secondary btn-sm" target="_blank">
+       View Receipt
+    </a>
 <?php else: ?>
-<a href="total_bill.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-secondary btn-sm" target="_blank">View Total Bill</a>
+    <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" 
+       class="btn btn-secondary btn-sm">
+       View Bill
+    </a>
 <?php endif; ?>
 
-<?php if ($disableBill): ?>
-<button class="btn btn-success btn-sm" disabled>Already Paid</button>
-<?php else: ?>
-<a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-success btn-sm">Process Payment</a>
-<?php endif; ?>
+<a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" 
+   class="btn btn-success btn-sm">
+   Process Payment
+</a>
 
-<?php if ($showInsuranceButton): ?>
-<button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">Enter Insurance</button>
+<?php if (!$insuranceApplied): ?>
+<button class="btn btn-info btn-sm"
+        data-bs-toggle="modal"
+        data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">
+    Enter Insurance
+</button>
 <?php endif; ?>
 
 </div>
 
-<?php if ($showInsuranceButton): ?>
+<?php if (!$insuranceApplied): ?>
 <div class="modal fade" id="insuranceModal<?= $row['patient_id'] ?>" tabindex="-1">
 <div class="modal-dialog">
 <form method="POST" action="apply_insurance.php" class="modal-content">
@@ -152,11 +163,11 @@ $disableBill = ($paymentStatus === 'Paid');
 </div>
 
 <div class="modal-body">
-<input type="hidden" name="full_name" value="<?= htmlspecialchars($row['full_name']) ?>">
 <input type="hidden" name="patient_id" value="<?= $row['patient_id'] ?>">
+<input type="hidden" name="billing_id" value="<?= $billing_id ?>">
 
 <div class="mb-3">
-<label>Insurance Number</label>
+<label class="form-label">Insurance Number</label>
 <input type="text" name="insurance_number" class="form-control" required>
 </div>
 </div>
@@ -194,6 +205,5 @@ $disableBill = ($paymentStatus === 'Paid');
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 </body>
 </html>

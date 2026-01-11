@@ -15,21 +15,21 @@ if (isset($_POST['action'])) {
         if (!is_array($items)) $items = [];
 
         if ($_POST['action'] === 'approve') {
-            $approved_qty = 0;
-            $grand_total = 0;
 
             // Read approved quantities from POST
             $approved_quantities = $_POST['approved_quantity'] ?? [];
 
+            // Loop through items and update approved quantities
             foreach ($items as $index => &$item) {
                 $approved = isset($approved_quantities[$index]) ? (int)$approved_quantities[$index] : ($item['approved_quantity'] ?? $item['quantity']);
                 // Validation: cannot approve more than requested
                 $approved = min($approved, $item['quantity']);
                 $item['approved_quantity'] = $approved;
-                $approved_qty += $approved;
-                $grand_total += $approved * $item['price'];
             }
             unset($item);
+
+            // Calculate total approved items
+            $total_approved_items = array_sum(array_map(fn($i) => $i['approved_quantity'] ?? 0, $items));
 
             // Ensure department_id exists
             $stmtDept = $pdo->prepare("SELECT department_id FROM departments WHERE department_name = ? LIMIT 1");
@@ -41,21 +41,19 @@ if (isset($_POST['action'])) {
                 $department_id = $pdo->lastInsertId();
             }
 
-            // Update request
+            // Update request including total approved items
             $stmt = $pdo->prepare("
                 UPDATE department_request
                 SET status='Approved',
                     items=:items_json,
-                    total_approved_items=:approved_qty,
-                    grand_total=:grand_total,
-                    department_id=:department_id
+                    department_id=:department_id,
+                    total_approved_items=:total_approved
                 WHERE id=:id
             ");
             $stmt->execute([
                 ':items_json' => json_encode($items, JSON_UNESCAPED_UNICODE),
-                ':approved_qty' => $approved_qty,
-                ':grand_total' => $grand_total,
                 ':department_id' => $department_id,
+                ':total_approved' => $total_approved_items,
                 ':id' => $request_id
             ]);
         } elseif ($_POST['action'] === 'reject') {
@@ -88,6 +86,7 @@ $stmt->execute($params);
 $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -102,8 +101,6 @@ body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; }
 .table thead th { background-color: #1e293b; color: #fff; }
 .modal-header { background-color: #2563eb; color: white; }
 input.approved-qty { width: 70px; }
-.grand-total { font-weight: bold; text-align: right; margin-top: 10px; }
-.total-approved { font-weight: bold; text-align: right; margin-top: 5px; }
 </style>
 </head>
 <body>
@@ -159,7 +156,6 @@ input.approved-qty { width: 70px; }
                         <th>Department</th>
                         <th>Requested By (User ID)</th>
                         <th>Total Requested Items</th>
-                        <th>Total Approved Items</th>
                         <th>Status</th>
                         <th>Requested At</th>
                         <th>Items</th>
@@ -179,7 +175,6 @@ input.approved-qty { width: 70px; }
                         <td><?= htmlspecialchars($r['department']) ?></td>
                         <td><?= htmlspecialchars($r['user_id']) ?></td>
                         <td class="text-center"><?= $r['total_items'] ?></td>
-                        <td class="text-center"><?= $r['total_approved_items'] ?? 0 ?></td>
                         <td class="text-center">
                             <?php if ($r['status'] == 'Pending'): ?>
                                 <span class="badge bg-warning text-dark">Pending</span>
@@ -220,34 +215,6 @@ input.approved-qty { width: 70px; }
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-function updateTotals() {
-    const rows = document.querySelectorAll('#approveItemsForm tbody tr');
-    let grandTotal = 0;
-    let totalApproved = 0;
-    rows.forEach(row => {
-        const approvedInput = row.querySelector('input.approved-qty');
-        const priceCell = row.cells[4];
-        const requestedQty = parseInt(row.cells[2].textContent) || 0;
-        if (approvedInput && priceCell) {
-            let approved = parseInt(approvedInput.value) || 0;
-            // Validation: cannot exceed requested quantity
-            if (approved > requestedQty) {
-                approved = requestedQty;
-                approvedInput.value = approved;
-            } else if (approved < 0) {
-                approved = 0;
-                approvedInput.value = 0;
-            }
-            const price = parseFloat(priceCell.textContent.replace('₱','')) || 0;
-            row.cells[5].textContent = '₱' + (approved * price).toFixed(2);
-            grandTotal += approved * price;
-            totalApproved += approved;
-        }
-    });
-    document.getElementById('grandTotalDisplay').textContent = 'Grand Total: ₱' + grandTotal.toFixed(2);
-    document.getElementById('totalApprovedDisplay').textContent = 'Total Approved Items: ' + totalApproved;
-}
-
 document.querySelectorAll('.view-items-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const department = btn.dataset.dept;
@@ -271,15 +238,12 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
                                 <th>Description</th>
                                 <th>Requested Quantity</th>
                                 <th>Approved Quantity</th>
-                                <th>Price</th>
-                                <th>Total</th>
                             </tr>
                         </thead>
                         <tbody>`;
             items.forEach((item, idx) => {
                 const requested = item.quantity ?? 0;
                 const approved = item.approved_quantity ?? requested;
-                const price = item.price ?? 0;
                 html += `<tr>
                             <td>${item.name || ''}</td>
                             <td>${item.description || item.desc || ''}</td>
@@ -290,17 +254,10 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
                 } else {
                     html += approved;
                 }
-                html += `</td>
-                         <td>₱${parseFloat(price).toFixed(2)}</td>
-                         <td>₱${(approved*price).toFixed(2)}</td>
-                         </tr>`;
+                html += `</td></tr>`;
             });
             html += `</tbody></table>
-                     <div class="d-flex justify-content-between mt-2 align-items-center">
-                        <div>
-                            <div class="total-approved" id="totalApprovedDisplay"></div>
-                            <div class="grand-total" id="grandTotalDisplay"></div>
-                        </div>
+                     <div class="d-flex justify-content-end mt-2">
                         <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle"></i> Approve</button>
                      </div>
                      </form>`;
@@ -311,26 +268,23 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
         document.getElementById('viewItemsLabel').innerHTML = `📦 Request from ${department}`;
         document.getElementById('modalBody').innerHTML = html;
 
-        document.querySelectorAll('input.approved-qty').forEach(input => {
-            input.addEventListener('input', updateTotals);
-        });
-
-        // Prevent form submission if approved > requested
+        // Prevent approved quantity > requested
         const form = document.getElementById('approveItemsForm');
-        form.addEventListener('submit', (e) => {
-            let invalid = false;
-            document.querySelectorAll('#approveItemsForm tbody tr').forEach(row => {
-                const approved = parseInt(row.querySelector('input.approved-qty').value) || 0;
-                const requested = parseInt(row.cells[2].textContent) || 0;
-                if (approved > requested) invalid = true;
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                let invalid = false;
+                document.querySelectorAll('#approveItemsForm tbody tr').forEach(row => {
+                    const approved = parseInt(row.querySelector('input.approved-qty').value) || 0;
+                    const requested = parseInt(row.cells[2].textContent) || 0;
+                    if (approved > requested) invalid = true;
+                });
+                if (invalid) {
+                    alert('Approved quantity cannot exceed requested quantity!');
+                    e.preventDefault();
+                }
             });
-            if (invalid) {
-                alert('Approved quantity cannot exceed requested quantity!');
-                e.preventDefault();
-            }
-        });
+        }
 
-        updateTotals();
         const modal = new bootstrap.Modal(document.getElementById('viewItemsModal'));
         modal.show();
     });
