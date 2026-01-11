@@ -1,184 +1,210 @@
-<?php
-
-include '../../SQL/config.php';
-
-if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Dashboard</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payroll Annual Summary Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet" />
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-
     <style>
+        :root {
+            --ink: #0f172a;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --brand: #0ea5a6;
+            --brand-700: #0b7e7f;
+            --brand-50: #e6fbfb;
+            --panel: #ffffff;
+            --sidebar: #113437;
+            --bg: #f7f7fb;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html,
         body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
+            height: 100%
         }
 
-        .report-card {
-            transition: all 0.3s ease;
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font: 14px/1.4 Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            /* Center horizontally */
+            align-items: flex-start;
+            /* Keep content from going too high */
+            padding-left: 270px;
+            /* Offset for sidebar */
+        }
+
+
+        /* Sidebar fix */
+        .sidebar-toggle {
+            width: 250px;
+            /* fixed width */
+            background: var(--sidebar);
+            min-height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            padding: 20px;
+            color: #fff;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 1000px;
+            margin: 32px auto;
+            /* Center inside remaining width */
+            background: var(--panel);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .06);
             border-radius: 14px;
-            background: #fff;
-            border: 1px solid #e6e6e6;
+            overflow: hidden;
+            display: block;
         }
 
-        .report-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        .header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: 28px 28px 10px 28px
         }
 
-        .card-title {
-            font-size: 18px;
+        .title {
+            font-weight: 800;
+            color: var(--ink);
+            letter-spacing: .3px
+        }
+
+        .title span {
+            display: block;
+            font-size: 12px;
             font-weight: 600;
+            color: var(--muted);
+            margin-top: 6px
         }
 
-        .grid-container {
+        .year {
+            font-weight: 800;
+            color: var(--brand-700);
+            font-size: 24px
+        }
+
+        .meta {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 25px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            padding: 0 28px 24px 28px
         }
 
-        .link-section {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
+        .kpi {
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px;
+            background: #fff
         }
 
-        .link-section a {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #000;
-        }
-
-        .link-section a:hover {
-            background: #000;
-            color: #fff;
-            transform: translateY(-3px);
-        }
-
-        hr {
-            border-top: 1px solid #000;
-            opacity: 0.3;
-        }
-
-        /* Available Doctors Section */
-        .doctor-card {
-            border: 1px solid #000;
-            border-radius: 10px;
-            background-color: #fff;
-            transition: all 0.25s ease;
-        }
-
-        .doctor-card:hover {
-            transform: translateY(-5px);
-            background-color: #f1f1f1;
-        }
-
-        .doctor-avatar-placeholder {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #e9ecef;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #000;
+        .kpi h4 {
+            margin: 0 0 6px 0;
             font-weight: 600;
-            font-size: 1.1rem;
-            text-transform: uppercase;
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: .3px
         }
 
-        .btn-view {
-            border: 1px solid #000;
-            background: #000;
-            color: #fff;
-            border-radius: 20px;
-            padding: 5px 14px;
-            font-size: 0.85rem;
+        .kpi p {
+            margin: 0;
+            font-weight: 700;
+            color: var(--ink)
         }
 
-        .btn-view:hover {
-            background: #fff;
-            color: #000;
+        .table-wrap {
+            padding: 0 28px 28px
         }
 
-        .btn-collapse {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            border: 1px solid #000;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            overflow: hidden
         }
 
-        .btn-collapse:hover {
-            background: #000;
-            color: #fff;
+        thead th {
+            background: var(--brand-50);
+            color: #0b4243;
+            font-weight: 700;
+            text-align: left;
+            padding: 12px 14px;
+            font-size: 13px;
+            border-bottom: 1px solid var(--line)
         }
 
-        .modal-header {
-            background: #000;
-            color: #fff;
+        tbody td {
+            padding: 11px 14px;
+            border-bottom: 1px solid var(--line);
+            font-size: 13px
         }
 
-        .table thead {
-            background: #000;
-            color: #fff;
+        tbody tr:nth-child(even) {
+            background: #fafafa
         }
 
-        .list-group-item {
-            border-color: #ddd;
+        tfoot td {
+            padding: 12px 14px;
+            font-weight: 800;
+            color: #0b4243;
+            background: #111827;
+            color: #fff
+        }
+
+        tfoot td:last-child {
+            font-weight: 800
+        }
+
+        .badge {
+            display: inline-block;
+            padding: .2rem .5rem;
+            border-radius: 999px;
+            background: var(--brand-50);
+            color: var(--brand-700);
+            font-weight: 700;
+            font-size: 12px
+        }
+
+        @media (max-width:900px) {
+            .meta {
+                grid-template-columns: repeat(2, 1fr)
+            }
+
+            .page {
+                margin-left: 0;
+                /* hide sidebar offset on small screens */
+            }
+
+            .sidebar-toggle {
+                position: relative;
+                width: 100%;
+                min-height: auto;
+            }
         }
     </style>
 </head>
 
 <body>
     <div class="d-flex">
-        <!-- SIDEBAR -->
+        <!----- Sidebar ----->
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
 
@@ -378,111 +404,117 @@ if (!$user) {
 
 
         </aside>
-
-        <!-- MAIN CONTENT -->
-        <div class="main w-100">
-            <div class="container my-5">
-                <div class="text-center mb-4">
-                    <h4 class="fw-bold"> Reports Dashboard</h4>
+        <!-- Main Page -->
+        <div class="page">
+            <header class="header">
+                <div>
+                    <h1 class="title">PAYROLL ANNUAL SUMMARY REPORT
+                    </h1>
                 </div>
+            </header>
 
-                <h5 class="text-center mb-4">Select a Report</h5>
-
-                <!-- Reports Grid -->
-                <div class="grid-container mb-5">
-                    <a href="daily_attendance_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-calendar-check" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Daily Attendance Report</h5>
-                        </div>
-                    </a>
-
-
-                    <a href="month_insurance_claim_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-file-earmark-medical" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Insurance Claim Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="paycycle_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-clock-history" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Paycycle Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="revenue_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-bar-chart-line" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Revenue Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="salary_paid_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-wallet2" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Monthly Payroll Summary</h5>
-                        </div>
-                    </a>
-
-                    <a href="shift_and_duty.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Shift & Duty Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="leave_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Month Leave Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="staff_information.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Staff Information Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="doctor_specialization_and_eval_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Active Doctor Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="performance_and_evaluation.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Employee Performance report</h5>
-                        </div>
-                    </a>
-
-                    <a href="pharmacy_sales_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-capsule" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Hospital Rx Sales Report </h5>
-                        </div>
-                    </a>
-
-
-                    <a href="department_budget_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-cash-coin" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Department Budget Report </h5>
-                        </div>
-                    </a>
+            <section class="meta">
+                <div class="kpi">
+                    <h4>Total Hours Worked</h4>
+                    <p>1820h</p>
                 </div>
+                <div class="kpi">
+                    <h4>Total Overtime Hours Worked</h4>
+                    <p>387h</p>
+                </div>
+                <div class="kpi">
+                    <h4>Total Wage</h4>
+                    <p>$13,242</p>
+                </div>
+            </section>
 
-                <hr class="my-5">
-            </div>
+            <section class="table-wrap">
+                <table role="table" aria-label="Payroll annual summary">
+                    <thead>
+                        <tr>
+                            <th>Months</th>
+                            <th>Overtime Hours</th>
+                            <th>Total Worked Hours</th>
+                            <th style="text-align:right">Total Wage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>January</td>
+                            <td>9h 35m</td>
+                            <td>168h 58m</td>
+                            <td style="text-align:right">$910</td>
+                        </tr>
+                        <tr>
+                            <td>February</td>
+                            <td>2h 20m</td>
+                            <td>157h 40m</td>
+                            <td style="text-align:right">$901</td>
+                        </tr>
+                        <tr>
+                            <td>March</td>
+                            <td>4h</td>
+                            <td>164h</td>
+                            <td style="text-align:right">$965</td>
+                        </tr>
+                        <tr>
+                            <td>April</td>
+                            <td>10h</td>
+                            <td>169h 9m</td>
+                            <td style="text-align:right">$1,018</td>
+                        </tr>
+                        <tr>
+                            <td>May</td>
+                            <td>11h</td>
+                            <td>153h 49m</td>
+                            <td style="text-align:right">$908</td>
+                        </tr>
+                        <tr>
+                            <td>June</td>
+                            <td>11h 40m</td>
+                            <td>158h 58m</td>
+                            <td style="text-align:right">$953</td>
+                        </tr>
+                        <tr>
+                            <td>July</td>
+                            <td>5h</td>
+                            <td>165h</td>
+                            <td style="text-align:right">$958</td>
+                        </tr>
+                        <tr>
+                            <td>August</td>
+                            <td>5h</td>
+                            <td>145h 55m</td>
+                            <td style="text-align:right">$872</td>
+                        </tr>
+                        <tr>
+                            <td>September</td>
+                            <td>4h</td>
+                            <td>162h 25m</td>
+                            <td style="text-align:right">$907</td>
+                        </tr>
+                        <tr>
+                            <td>October</td>
+                            <td>12h 10m</td>
+                            <td>157h 34m</td>
+                            <td style="text-align:right">$945</td>
+                        </tr>
+                        <tr>
+                            <td>November</td>
+                            <td>7h 25m</td>
+                            <td>167h 25m</td>
+                            <td style="text-align:right">$1,002</td>
+                        </tr>
+                        <tr>
+                            <td>December</td>
+                            <td>7h 25m</td>
+                            <td>167h 25m</td>
+                            <td style="text-align:right">$1,083</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
         </div>
-    </div>
-
-    </script>
 </body>
 
 </html>

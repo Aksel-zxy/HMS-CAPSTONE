@@ -1,184 +1,48 @@
 <?php
-
-include '../../SQL/config.php';
-
-if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
+include 'header.php'
 ?>
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Dashboard</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Leave Report — Employee Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <style>
         body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
+            background: #f7f7f8;
+            font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         }
 
-        .report-card {
-            transition: all 0.3s ease;
-            border-radius: 14px;
-            background: #fff;
-            border: 1px solid #e6e6e6;
-        }
-
-        .report-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 25px;
-        }
-
-        .link-section {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .link-section a {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
+        .page-head {
             display: flex;
             align-items: center;
-            gap: 8px;
-            border: 1px solid #000;
+            justify-content: space-between;
+            margin: 1.5rem 0;
         }
 
-        .link-section a:hover {
-            background: #000;
-            color: #fff;
-            transform: translateY(-3px);
+        .card-sm {
+            border-radius: .6rem;
+            box-shadow: 0 6px 16px rgba(16, 24, 40, 0.04);
         }
 
-        hr {
-            border-top: 1px solid #000;
-            opacity: 0.3;
+        .table thead th {
+            background: #f1f1f1;
         }
 
-        /* Available Doctors Section */
-        .doctor-card {
-            border: 1px solid #000;
-            border-radius: 10px;
-            background-color: #fff;
-            transition: all 0.25s ease;
-        }
-
-        .doctor-card:hover {
-            transform: translateY(-5px);
-            background-color: #f1f1f1;
-        }
-
-        .doctor-avatar-placeholder {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #e9ecef;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #000;
-            font-weight: 600;
-            font-size: 1.1rem;
-            text-transform: uppercase;
-        }
-
-        .btn-view {
-            border: 1px solid #000;
-            background: #000;
-            color: #fff;
-            border-radius: 20px;
-            padding: 5px 14px;
-            font-size: 0.85rem;
-        }
-
-        .btn-view:hover {
-            background: #fff;
-            color: #000;
-        }
-
-        .btn-collapse {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            border: 1px solid #000;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-collapse:hover {
-            background: #000;
-            color: #fff;
-        }
-
-        .modal-header {
-            background: #000;
-            color: #fff;
-        }
-
-        .table thead {
-            background: #000;
-            color: #fff;
-        }
-
-        .list-group-item {
-            border-color: #ddd;
+        .page-item.disabled .page-link {
+            pointer-events: none;
+            opacity: 0.5;
         }
     </style>
 </head>
 
 <body>
     <div class="d-flex">
-        <!-- SIDEBAR -->
+        <!----- Sidebar ----->
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
 
@@ -376,113 +240,228 @@ if (!$user) {
                 </a>
             </li>
 
-
         </aside>
+        <div class="container-fluid py-4">
+            <div class="page-head">
+                <div>
+                    <h3 class="mb-0">Leave Report</h3>
+                    <div class="text-muted">Filter by month and year to view employee leave summaries</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <select id="monthSelect" class="form-select">
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
 
-        <!-- MAIN CONTENT -->
-        <div class="main w-100">
-            <div class="container my-5">
-                <div class="text-center mb-4">
-                    <h4 class="fw-bold"> Reports Dashboard</h4>
+                    <select id="yearSelect" class="form-select">
+                        <option>2023</option>
+                        <option>2024</option>
+                        <option selected>2025</option>
+                        <option>2026</option>
+                    </select>
+
+                    <button class="btn btn-primary" onclick="reloadReports()">Load</button>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="row g-3 mb-3">
+                <div class="col-sm-3">
+                    <div class="card card-sm p-3">
+                        <small class="text-muted">Total Requests</small>
+                        <h4 id="summaryTotal" class="mb-0">0</h4>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="card card-sm p-3">
+                        <small class="text-muted">Approved</small>
+                        <h4 id="summaryApproved" class="mb-0">0</h4>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="card card-sm p-3">
+                        <small class="text-muted">Rejected</small>
+                        <h4 id="summaryRejected" class="mb-0">0</h4>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="card card-sm p-3">
+                        <small class="text-muted">Pending</small>
+                        <h4 id="summaryPending" class="mb-0">0</h4>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="card card-sm shadow-sm">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Leave ID</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Processed on</th>
+                                <th>Submitted</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaveTbody">
+                            <tr>
+                                <td colspan="11" class="text-center text-muted py-4">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <h5 class="text-center mb-4">Select a Report</h5>
-
-                <!-- Reports Grid -->
-                <div class="grid-container mb-5">
-                    <a href="daily_attendance_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-calendar-check" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Daily Attendance Report</h5>
-                        </div>
-                    </a>
-
-
-                    <a href="month_insurance_claim_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-file-earmark-medical" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Insurance Claim Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="paycycle_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-clock-history" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Paycycle Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="revenue_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-bar-chart-line" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Revenue Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="salary_paid_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-wallet2" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Monthly Payroll Summary</h5>
-                        </div>
-                    </a>
-
-                    <a href="shift_and_duty.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Shift & Duty Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="leave_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Month Leave Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="staff_information.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Staff Information Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="doctor_specialization_and_eval_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Active Doctor Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="performance_and_evaluation.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Employee Performance report</h5>
-                        </div>
-                    </a>
-
-                    <a href="pharmacy_sales_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-capsule" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Hospital Rx Sales Report </h5>
-                        </div>
-                    </a>
-
-
-                    <a href="department_budget_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-cash-coin" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Department Budget Report </h5>
-                        </div>
-                    </a>
+                <div class="d-flex justify-content-between align-items-center p-3">
+                    <div id="pagerInfo" class="text-muted small"></div>
+                    <ul class="pagination pagination-sm mb-0" id="pager"></ul>
                 </div>
-
-                <hr class="my-5">
             </div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const PAGE_SIZE = 5; // you can increase to 5 or 10 later
+        let allLeaves = [];
+        let currentPage = 1;
+        let totalPages = 1;
+        let month = 8,
+            year = 2025;
 
+        async function reloadReports() {
+            month = document.getElementById('monthSelect').value;
+            year = document.getElementById('yearSelect').value;
+            await loadReportData();
+            renderPage(1);
+        }
+
+        async function loadReportData() {
+            const url = `https://bsis-03.keikaizen.xyz/employee/getMonthLeaveReports/${month}/${year}`;
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                // ✅ Update summary counts
+                document.getElementById('summaryTotal').textContent = data.total_leaves ?? 0;
+                document.getElementById('summaryApproved').textContent = data.approved ?? 0;
+                document.getElementById('summaryRejected').textContent = data.rejected ?? 0;
+                document.getElementById('summaryPending').textContent = data.pending ?? 0;
+
+                // ✅ Leaves array
+                if (Array.isArray(data.leaves)) {
+                    allLeaves = data.leaves;
+                } else {
+                    allLeaves = [];
+                }
+
+                totalPages = Math.ceil(allLeaves.length / PAGE_SIZE);
+            } catch (err) {
+                console.error('Failed to load report data:', err);
+                allLeaves = [];
+                totalPages = 1;
+            }
+        }
+
+        function renderPage(page) {
+            currentPage = page;
+            const startIndex = (page - 1) * PAGE_SIZE;
+            const pageData = allLeaves.slice(startIndex, startIndex + PAGE_SIZE);
+            const tbody = document.getElementById('leaveTbody');
+
+            if (!pageData.length) {
+                tbody.innerHTML = `<tr><td colspan="11" class="text-center text-muted py-4">No records found</td></tr>`;
+                document.getElementById('pager').innerHTML = '';
+                document.getElementById('pagerInfo').textContent = '';
+                return;
+            }
+
+            tbody.innerHTML = pageData.map((r, i) => `
+            <tr>
+                <td>${r.leave_id}</td>
+                <td>${r.leave_start_date}</td>
+                <td>${r.leave_end_date}</td>
+                <td>${r.leave_type}</td>
+                <td>
+                    <span class="badge bg-${getStatusColor(r.leave_status)}">${r.leave_status}</span>
+                </td>
+                <td>${r.approval_date ?? '—'}</td>
+                <td>${formatDateTime(r.submit_at)}</td>
+            </tr>
+        `).join('');
+
+            renderPager();
+        }
+
+        function getStatusColor(status) {
+            switch ((status || '').toLowerCase()) {
+                case 'approved':
+                    return 'success';
+                case 'rejected':
+                    return 'danger';
+                case 'pending':
+                    return 'warning';
+                default:
+                    return 'secondary';
+            }
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '—';
+            const d = new Date(dateStr);
+            return isNaN(d) ? dateStr : d.toLocaleString();
+        }
+
+        function renderPager() {
+            const pager = document.getElementById('pager');
+            pager.innerHTML = '';
+
+            const createBtn = (label, disabled, page) => {
+                const li = document.createElement('li');
+                li.className = `page-item ${disabled ? 'disabled' : ''} ${page === currentPage ? 'active' : ''}`;
+                li.innerHTML = `<a class="page-link" href="#">${label}</a>`;
+                if (!disabled) {
+                    li.onclick = e => {
+                        e.preventDefault();
+                        renderPage(page);
+                    };
+                }
+                return li;
+            };
+
+            pager.appendChild(createBtn('« First', currentPage === 1, 1));
+            pager.appendChild(createBtn('‹ Prev', currentPage === 1, currentPage - 1));
+
+            for (let i = 1; i <= totalPages; i++) {
+                pager.appendChild(createBtn(i, false, i));
+            }
+
+            pager.appendChild(createBtn('Next ›', currentPage === totalPages, currentPage + 1));
+            pager.appendChild(createBtn('Last »', currentPage === totalPages, totalPages));
+
+            const totalRecords = allLeaves.length;
+            const start = (currentPage - 1) * PAGE_SIZE + 1;
+            const end = Math.min(totalRecords, currentPage * PAGE_SIZE);
+            document.getElementById('pagerInfo').textContent =
+                `Showing ${start}-${end} of ${totalRecords}`;
+        }
+
+        // 🚀 Load initial data on page load
+        reloadReports();
     </script>
+
 </body>
 
 </html>

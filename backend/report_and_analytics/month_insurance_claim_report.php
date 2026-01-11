@@ -1,184 +1,9 @@
-<?php
+<?php include 'header.php' ?>
 
-include '../../SQL/config.php';
+<body class="bg-light">
 
-if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
-?>
-
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Dashboard</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-
-    <style>
-        body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
-        }
-
-        .report-card {
-            transition: all 0.3s ease;
-            border-radius: 14px;
-            background: #fff;
-            border: 1px solid #e6e6e6;
-        }
-
-        .report-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 25px;
-        }
-
-        .link-section {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .link-section a {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #000;
-        }
-
-        .link-section a:hover {
-            background: #000;
-            color: #fff;
-            transform: translateY(-3px);
-        }
-
-        hr {
-            border-top: 1px solid #000;
-            opacity: 0.3;
-        }
-
-        /* Available Doctors Section */
-        .doctor-card {
-            border: 1px solid #000;
-            border-radius: 10px;
-            background-color: #fff;
-            transition: all 0.25s ease;
-        }
-
-        .doctor-card:hover {
-            transform: translateY(-5px);
-            background-color: #f1f1f1;
-        }
-
-        .doctor-avatar-placeholder {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #e9ecef;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #000;
-            font-weight: 600;
-            font-size: 1.1rem;
-            text-transform: uppercase;
-        }
-
-        .btn-view {
-            border: 1px solid #000;
-            background: #000;
-            color: #fff;
-            border-radius: 20px;
-            padding: 5px 14px;
-            font-size: 0.85rem;
-        }
-
-        .btn-view:hover {
-            background: #fff;
-            color: #000;
-        }
-
-        .btn-collapse {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            border: 1px solid #000;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-collapse:hover {
-            background: #000;
-            color: #fff;
-        }
-
-        .modal-header {
-            background: #000;
-            color: #fff;
-        }
-
-        .table thead {
-            background: #000;
-            color: #fff;
-        }
-
-        .list-group-item {
-            border-color: #ddd;
-        }
-    </style>
-</head>
-
-<body>
     <div class="d-flex">
-        <!-- SIDEBAR -->
+        <!----- Sidebar ----->
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
 
@@ -378,110 +203,255 @@ if (!$user) {
 
 
         </aside>
+        <!----- End of Sidebar ----->
 
-        <!-- MAIN CONTENT -->
-        <div class="main w-100">
-            <div class="container my-5">
-                <div class="text-center mb-4">
-                    <h4 class="fw-bold"> Reports Dashboard</h4>
+        <div class="container py-4">
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <h1 class="h3 mb-0">Monthly Claims — Status Overview</h1>
+                    <div class="small-muted mt-1">See quick totals and per-employee details by status</div>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <select id="monthSelect" class="form-select form-select-sm" style="width:140px">
+                        <option value="1">Jan</option>
+                        <option value="2">Feb</option>
+                        <option value="3">Mar</option>
+                        <option value="4">Apr</option>
+                        <option value="5">May</option>
+                        <option value="6">Jun</option>
+                        <option value="7">Jul</option>
+                        <option value="8">Aug</option>
+                        <option value="9" selected>Sep</option>
+                        <option value="10">Oct</option>
+                        <option value="11">Nov</option>
+                        <option value="12">Dec</option>
+                    </select>
+                    <select id="yearSelect" class="form-select form-select-sm" style="width:110px"></select>
+                    <button id="loadBtn" class="btn btn-primary btn-sm">Load</button>
+                </div>
+            </div>
+
+            <div class="row gy-4">
+                <!-- Tiles -->
+                <div class="col-12 col-lg-4 tiles-col">
+                    <div class="d-grid gap-3">
+                        <!-- Approved -->
+                        <div class="tile-card bg-white p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="tile-label text-uppercase text-muted">Approved</div>
+                                    <div id="approvedCount" class="tile-count text-primary">0</div>
+                                </div>
+                                <div><span class="badge pill-approved rounded-pill py-2 px-3">Approved</span></div>
+                            </div>
+                            <hr class="my-3" />
+                            <div id="approvedList" style="max-height:320px; overflow:auto;">
+                                <div class="empty-state">No approved claims</div>
+                            </div>
+                        </div>
+                        <!-- Pending -->
+                        <div class="tile-card bg-white p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="tile-label text-uppercase text-muted">Pending</div>
+                                    <div id="pendingCount" class="tile-count text-warning">0</div>
+                                </div>
+                                <div><span class="badge pill-pending rounded-pill py-2 px-3">Pending</span></div>
+                            </div>
+                            <hr class="my-3" />
+                            <div id="pendingList" style="max-height:320px; overflow:auto;">
+                                <div class="empty-state">No pending claims</div>
+                            </div>
+                        </div>
+                        <!-- Denied -->
+                        <div class="tile-card bg-white p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="tile-label text-uppercase text-muted">Denied</div>
+                                    <div id="deniedCount" class="tile-count text-danger">0</div>
+                                </div>
+                                <div><span class="badge pill-denied rounded-pill py-2 px-3">Denied</span></div>
+                            </div>
+                            <hr class="my-3" />
+                            <div id="deniedList" style="max-height:320px; overflow:auto;">
+                                <div class="empty-state">No denied claims</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <h5 class="text-center mb-4">Select a Report</h5>
-
-                <!-- Reports Grid -->
-                <div class="grid-container mb-5">
-                    <a href="daily_attendance_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-calendar-check" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Daily Attendance Report</h5>
+                <!-- Details -->
+                <div class="col-12 col-lg-8">
+                    <div class="card tile-card p-3 mb-4">
+                        <h5 class="mb-3">Summary</h5>
+                        <div class="d-flex gap-3">
+                            <div>
+                                <div class="fs-3 fw-bold" id="totalsAll">0</div>
+                                <div class="small-muted">All claims</div>
+                            </div>
+                            <div>
+                                <div class="fs-3 text-primary fw-bold" id="totalsApproved">0</div>
+                                <div class="small-muted">Approved</div>
+                            </div>
+                            <div>
+                                <div class="fs-3 text-warning fw-bold" id="totalsPending">0</div>
+                                <div class="small-muted">Pending</div>
+                            </div>
+                            <div>
+                                <div class="fs-3 text-danger fw-bold" id="totalsDenied">0</div>
+                                <div class="small-muted">Denied</div>
+                            </div>
                         </div>
-                    </a>
+                    </div>
 
-
-                    <a href="month_insurance_claim_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-file-earmark-medical" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Insurance Claim Report</h5>
+                    <!-- Table of all claims -->
+                    <div class="card tile-card p-3">
+                        <h5 class="mb-3">All Claims (Table View)</h5>
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Patient</th>
+                                        <th>Provider</th>
+                                        <th>Insurance #</th>
+                                        <th>Date of Service</th>
+                                        <th>Remarks</th>
+                                        <th>Claim Amount</th>
+                                        <th>Insurance Covered</th>
+                                        <th>Insurance Covered %</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="claimsTableBody">
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted">No claims available</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                    </a>
-
-                    <a href="paycycle_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-clock-history" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Paycycle Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="revenue_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-bar-chart-line" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Revenue Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="salary_paid_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-wallet2" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Monthly Payroll Summary</h5>
-                        </div>
-                    </a>
-
-                    <a href="shift_and_duty.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Shift & Duty Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="leave_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Month Leave Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="staff_information.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Staff Information Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="doctor_specialization_and_eval_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Active Doctor Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="performance_and_evaluation.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Employee Performance report</h5>
-                        </div>
-                    </a>
-
-                    <a href="pharmacy_sales_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-capsule" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Hospital Rx Sales Report </h5>
-                        </div>
-                    </a>
-
-
-                    <a href="department_budget_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-cash-coin" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Department Budget Report </h5>
-                        </div>
-                    </a>
+                    </div>
                 </div>
-
-                <hr class="my-5">
             </div>
         </div>
     </div>
 
+    <script>
+        function el(id) {
+            return document.getElementById(id);
+        }
+
+        function formatCurrency(v) {
+            return "₱ " + (+v).toLocaleString();
+        }
+
+        function formatDate(d) {
+            const dt = new Date(d);
+            return dt.toLocaleDateString();
+        }
+
+        function normalizeStatus(s) {
+            if (!s) return "Pending";
+            s = s.toLowerCase();
+            if (s.includes("approve")) return "Approved";
+            if (s.includes("pend")) return "Pending";
+            if (s.includes("deny") || s.includes("declin")) return "Denied";
+            return s;
+        }
+
+
+        async function loadData() {
+            const m = el("monthSelect").value,
+                y = el("yearSelect").value;
+            const url = `http://localhost:5288/insurance/monthInsuranceClaimsReport/${m}/${y}`;
+            el("approvedList").innerHTML = el("pendingList").innerHTML = el("deniedList").innerHTML =
+                '<div class="empty-state">Loading…</div>';
+            el("claimsTableBody").innerHTML =
+                '<tr><td colspan="9" class="text-center text-muted">Loading…</td></tr>';
+            try {
+                const r = await fetch(url);
+                let data = await r.json();
+                if (!Array.isArray(data)) data = [data];
+                data = data.map(d => ({
+                    ...d,
+                    status: normalizeStatus(d.status)
+                }));
+
+                const approved = data.filter(d => d.status === "Approved");
+                const pending = data.filter(d => d.status === "Pending");
+                const denied = data.filter(d => d.status === "Denied");
+
+                // Update counts
+                el("approvedCount").textContent = approved.length;
+                el("pendingCount").textContent = pending.length;
+                el("deniedCount").textContent = denied.length;
+                el("totalsAll").textContent = data.length;
+                el("totalsApproved").textContent = approved.length;
+                el("totalsPending").textContent = pending.length;
+                el("totalsDenied").textContent = denied.length;
+
+                // Populate side lists
+                const makeRow = (item) => {
+                    const div = document.createElement("div");
+                    div.className = "employee-row mb-2 p-2 border-bottom";
+                    div.innerHTML = `<div style="flex:1">
+                        <div class="fw-bold">${item.patientName}</div>
+                        <div class="small text-muted"><strong>${item.insuranceProvider}</strong> · ${formatDate(item.dateOfService)} · #${item.insuranceNumber}</div>
+                        <div class="small text-muted">${item.remarks}</div>
+                        <div class="small text-muted">Covered: ${formatCurrency(item.insuranceCovered || 0)} (${item.percentageCovered?.length ? item.percentageCovered.join(", ") + "%" : "0%"})</div>
+                    </div>
+                    <div style="text-align:right">
+                        <div class="fw-semibold">${formatCurrency(item.claimAmount)}</div>
+                        <div class="small-muted">${item.status}</div>
+                    </div>`;
+                    return div;
+                };
+                el("approvedList").innerHTML = approved.length ? "" : '<div class="empty-state">No approved claims</div>';
+                approved.forEach(i => el("approvedList").appendChild(makeRow(i)));
+                el("pendingList").innerHTML = pending.length ? "" : '<div class="empty-state">No pending claims</div>';
+                pending.forEach(i => el("pendingList").appendChild(makeRow(i)));
+                el("deniedList").innerHTML = denied.length ? "" : '<div class="empty-state">No denied claims</div>';
+                denied.forEach(i => el("deniedList").appendChild(makeRow(i)));
+
+                // Populate table
+                el("claimsTableBody").innerHTML = data.length ? "" : '<tr><td colspan="9" class="text-center text-muted">No claims available</td></tr>';
+                data.forEach(i => {
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `
+                        <td>${i.patientName}</td>
+                        <td>${i.insuranceProvider}</td>
+                        <td>${i.insuranceNumber}</td>
+                        <td>${formatDate(i.dateOfService)}</td>
+                        <td>${i.remarks}</td>
+                        <td>${formatCurrency(i.claimAmount)}</td>
+                        <td>${formatCurrency(i.insuranceCovered || 0)}</td>
+                        <td>${i.percentageCovered?.length ? i.percentageCovered.join(", ") + "%" : "0%"}</td>
+                        <td><span class="badge ${i.status === 'Approved' ? 'bg-primary' : i.status === 'Pending' ? 'bg-warning text-dark' : 'bg-danger'}">${i.status}</span></td>
+                    `;
+                    el("claimsTableBody").appendChild(tr);
+                });
+
+            } catch (e) {
+                console.error(e);
+                el("approvedList").innerHTML = el("pendingList").innerHTML = el("deniedList").innerHTML =
+                    '<div class="empty-state">Error loading data</div>';
+                el("claimsTableBody").innerHTML =
+                    '<tr><td colspan="9" class="text-center text-danger">Error loading data</td></tr>';
+            }
+        }
+
+        (function populateYears() {
+            const y = new Date().getFullYear();
+            for (let i = y; i >= y - 5; i--) {
+                const o = document.createElement("option");
+                o.value = i;
+                o.textContent = i;
+                if (i === y) o.selected = true;
+                el("yearSelect").appendChild(o);
+            }
+        })();
+
+        document.getElementById("loadBtn").addEventListener("click", loadData);
+        loadData();
     </script>
 </body>
 

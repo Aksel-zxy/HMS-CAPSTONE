@@ -1,0 +1,11 @@
+[phases.setup]
+
+[phases.install]
+cmds = [
+    'mkdir -p /etc/php/conf.d',
+    'mkdir -p /var/log/nginx && mkdir -p /var/cache/nginx',
+    'cp _php.ini /etc/php/conf.d/99-custom.ini',
+    'composer install --ignore-platform-reqs'
+]
+
+[start]
