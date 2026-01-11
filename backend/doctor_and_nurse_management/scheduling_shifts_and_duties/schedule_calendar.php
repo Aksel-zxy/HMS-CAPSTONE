@@ -146,13 +146,13 @@ while ($row = $result->fetch_assoc()) {
                         <a href="../dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
+                        <a href="../dnrcl/compliance.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notifications & Alerts</a>
+                        <a href="../dnrcl/notif_alert.php" class="sidebar-link">Notifications & Alerts</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Compliance Audit Log</a>
+                        <a href="../dnrcl/audit_log.php" class="sidebar-link">Compliance Audit Log</a>
                     </li>
                 </ul>
             </li>
@@ -203,97 +203,106 @@ while ($row = $result->fetch_assoc()) {
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid p-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
-        <div>
-            <h2 class="fw-bold mb-1 text-dark">Schedule Calendar</h2>
-            <p class="text-muted small">Week: <span class="fw-bold text-primary"><?= $display_range ?></span></p>
-        </div>
+                <!-- Header -->
+                <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
 
-        <!-- Week Picker + Export -->
-        <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
-            <div class="input-group shadow-sm rounded-pill overflow-hidden" style="height:40px;">
-                <a href="?week=<?= $prev_week ?>" class="btn btn-black border-end">
-                    <i class="bi bi-chevron-left"><</i>
-                </a>
-                <input type="date" name="week" value="<?= $selected_week ?>" 
-                       class="form-control border-0 text-center" style="max-width:150px;" onchange="this.form.submit()">
-                <a href="?week=<?= $next_week ?>" class="btn btn-black border-start">
-                    <i class="bi bi-chevron-right">></i>
-                </a>
+                    <div>
+                        <h4 class="text-primary fw-bold border-bottom border-primary pb-2 mb-2">
+                            🗓️ Schedule Calendar
+                        </h4>
+                        <p class="text-muted small mb-0">
+                            Week: <span class="fw-bold text-dark"><?= $display_range ?></span>
+                        </p>
+                    </div>
+
+                    <form method="GET" class="d-flex align-items-center">
+                        <div class="input-group shadow-sm">
+                            <a href="?week=<?= $prev_week ?>" class="btn btn-outline-secondary bg-white" title="Previous Week">
+                               <
+                            </a>
+
+                            <input type="date" name="week" value="<?= $selected_week ?>"
+                                class="form-control text-center border-secondary border-start-0 border-end-0"
+                                style="max-width: 150px; cursor: pointer;"
+                                onchange="this.form.submit()">
+
+                            <a href="?week=<?= $next_week ?>" class="btn btn-outline-secondary bg-white" title="Next Week">
+                                >
+                            </a>
+                        </div>
+                    </form>
+
+                </div>
+
+                <!-- Schedule Table Card -->
+                <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="ps-4 py-3 border-0 text-muted small text-uppercase" style="width: 250px;">Employee Name</th>
+                                    <?php foreach (['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as $day_name): ?>
+                                        <th class="text-center py-3 border-0 text-muted small text-uppercase"><?= $day_name ?></th>
+                                    <?php endforeach; ?>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (count($table_rows) > 0): ?>
+                                    <?php foreach ($table_rows as $row):
+                                        $is_doctor = ($row['profession'] === 'Doctor');
+                                        $card_theme = $is_doctor ? 'shift-doctor' : 'shift-nurse';
+                                        $avatar_bg = $is_doctor ? 'bg-primary' : 'bg-success';
+                                        $initials = strtoupper(substr($row['first_name'], 0, 1) . substr($row['last_name'], 0, 1));
+                                    ?>
+                                        <tr>
+                                            <!-- Employee -->
+                                            <td class="ps-4 py-3">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar <?= $avatar_bg ?> text-white fw-bold d-flex align-items-center justify-content-center rounded-circle me-3"
+                                                        style="width:40px; height:40px; font-size:0.85rem;">
+                                                        <?= $initials ?>
+                                                    </div>
+                                                    <div>
+                                                        <div class="fw-bold text-dark mb-0" style="font-size:0.9rem;"><?= $row['first_name'] . ' ' . $row['last_name'] ?></div>
+                                                        <div class="text-muted" style="font-size:0.75rem;"><?= $row['role'] ?></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <!-- Days -->
+                                            <?php foreach (array_keys($days_map) as $day):
+                                                $start = $row[$day . '_start'];
+                                                $end = $row[$day . '_end'];
+                                                $status = $row[$day . '_status'];
+                                                $is_on_duty = (!empty($start) && $status !== 'Off');
+                                            ?>
+                                                <td class="p-2 text-center">
+                                                    <?php if ($is_on_duty): ?>
+                                                        <div class="shift-card <?= $card_theme ?> d-flex flex-column align-items-center justify-content-center rounded-3 shadow-sm p-1" style="font-size:0.75rem; min-height:45px;">
+                                                            <span class="fw-bold"><?= date("g:i a", strtotime($start)) ?></span>
+                                                            <span class="text-muted small">—</span>
+                                                            <span class="fw-bold"><?= date("g:i a", strtotime($end)) ?></span>
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <span class="badge rounded-pill bg-light text-secondary border fw-normal px-3 py-2" style="font-size:0.65rem;">OFF</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            <?php endforeach; ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="8" class="text-center py-5 text-muted">
+                                            <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
+                                            No schedules found for this week.
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-        </form>
-    </div>
-
-    <!-- Schedule Table Card -->
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="bg-light">
-                    <tr>
-                        <th class="ps-4 py-3 border-0 text-muted small text-uppercase" style="width: 250px;">Employee Name</th>
-                        <?php foreach (['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] as $day_name): ?>
-                            <th class="text-center py-3 border-0 text-muted small text-uppercase"><?= $day_name ?></th>
-                        <?php endforeach; ?>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if(count($table_rows) > 0): ?>
-                        <?php foreach($table_rows as $row):
-                            $is_doctor = ($row['profession'] === 'Doctor');
-                            $card_theme = $is_doctor ? 'shift-doctor' : 'shift-nurse';
-                            $avatar_bg = $is_doctor ? 'bg-primary' : 'bg-success';
-                            $initials = strtoupper(substr($row['first_name'],0,1).substr($row['last_name'],0,1));
-                        ?>
-                            <tr>
-                                <!-- Employee -->
-                                <td class="ps-4 py-3">
-                                    <div class="d-flex align-items-center">
-                                        <div class="avatar <?= $avatar_bg ?> text-white fw-bold d-flex align-items-center justify-content-center rounded-circle me-3" 
-                                             style="width:40px; height:40px; font-size:0.85rem;">
-                                            <?= $initials ?>
-                                        </div>
-                                        <div>
-                                            <div class="fw-bold text-dark mb-0" style="font-size:0.9rem;"><?= $row['first_name'].' '.$row['last_name'] ?></div>
-                                            <div class="text-muted" style="font-size:0.75rem;"><?= $row['role'] ?></div>
-                                        </div>
-                                    </div>
-                                </td>
-
-                                <!-- Days -->
-                                <?php foreach(array_keys($days_map) as $day):
-                                    $start = $row[$day.'_start'];
-                                    $end = $row[$day.'_end'];
-                                    $status = $row[$day.'_status'];
-                                    $is_on_duty = (!empty($start) && $status!=='Off');
-                                ?>
-                                    <td class="p-2 text-center">
-                                        <?php if($is_on_duty): ?>
-                                            <div class="shift-card <?= $card_theme ?> d-flex flex-column align-items-center justify-content-center rounded-3 shadow-sm p-1" style="font-size:0.75rem; min-height:45px;">
-                                                <span class="fw-bold"><?= date("g:i a", strtotime($start)) ?></span>
-                                                <span class="text-muted small">—</span>
-                                                <span class="fw-bold"><?= date("g:i a", strtotime($end)) ?></span>
-                                            </div>
-                                        <?php else: ?>
-                                            <span class="badge rounded-pill bg-light text-secondary border fw-normal px-3 py-2" style="font-size:0.65rem;">OFF</span>
-                                        <?php endif; ?>
-                                    </td>
-                                <?php endforeach; ?>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="8" class="text-center py-5 text-muted">
-                                <i class="bi bi-calendar-x fs-2 d-block mb-2"></i>
-                                No schedules found for this week.
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
             <!----- End of Main Content ----->
         </div>
         <script>
