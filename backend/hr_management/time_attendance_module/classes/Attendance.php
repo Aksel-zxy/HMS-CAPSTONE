@@ -95,9 +95,23 @@ class Attendance {
     public function getEmployees() {
         $employees = [];
         $result = $this->conn->query("
-            SELECT employee_id, CONCAT(first_name, ' ', middle_name, ' ', last_name, ' ', suffix_name) AS full_name 
-            FROM hr_employees ORDER BY employee_id ASC
+            SELECT 
+                employee_id,
+                TRIM(
+                    CONCAT(
+                        COALESCE(first_name, ''),
+                        ' ',
+                        COALESCE(middle_name, ''),
+                        ' ',
+                        COALESCE(last_name, ''),
+                        ' ',
+                        COALESCE(suffix_name, '')
+                    )
+                ) AS full_name
+            FROM hr_employees
+            ORDER BY employee_id ASC
         ");
+
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
                 $employees[] = $row;
@@ -105,4 +119,5 @@ class Attendance {
         }
         return $employees;
     }
+
 }
