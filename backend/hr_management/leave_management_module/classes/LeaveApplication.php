@@ -28,7 +28,7 @@ class LeaveApplication {
         return $this->conn->query($sql);
     }
 
-    // Get remaining leave days
+    // Get remaining leave days (considering Half Day)
     public function getRemainingDays($employee_id, $leave_type, $year) {
         $stmt = $this->conn->prepare("
             SELECT allocated_days 
@@ -43,7 +43,7 @@ class LeaveApplication {
         $allocatedDays = $allocatedDays ?? 0;
 
         $stmt2 = $this->conn->prepare("
-            SELECT SUM(DATEDIFF(leave_end_date, leave_start_date) + 1) as used_days
+            SELECT SUM(leave_fraction) as used_days
             FROM hr_leave
             WHERE employee_id = ? AND leave_type = ? 
             AND leave_status = 'Approved' 
@@ -59,12 +59,12 @@ class LeaveApplication {
         return $allocatedDays - $usedDays;
     }
 
-    // Submit leave with optional medical certificate (stored as BLOB)
+    // Submit leave with Half Day support and optional medical certificate
     public function submit($data, $file = null) {
         try {
             $fileContent = null;
 
-            // If a file is uploaded
+            // Validate file upload
             if ($file && $file['error'] === UPLOAD_ERR_OK) {
                 $allowed = ['jpg','jpeg','png','pdf','docx'];
                 $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -73,18 +73,22 @@ class LeaveApplication {
                     throw new Exception("Invalid file type. Allowed: JPG, JPEG, PNG, PDF, DOCX.");
                 }
 
-                // Read file content as BLOB
                 $fileContent = file_get_contents($file['tmp_name']);
                 if ($fileContent === false) {
                     throw new Exception("Failed to read uploaded file.");
                 }
             }
 
-            // Prepare insert query
+            // Determine leave fraction
+            $leave_fraction = 1; // full day default
+            if (isset($data['leave_duration']) && $data['leave_duration'] === 'Half Day') {
+                $leave_fraction = 0.5;
+            }
+
             $stmt = $this->conn->prepare("
                 INSERT INTO hr_leave 
-                (employee_id, leave_type, leave_start_date, leave_end_date, leave_status, leave_reason, medical_cert)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (employee_id, leave_type, leave_start_date, leave_end_date, leave_status, leave_reason, medical_cert, leave_duration, half_day_type, leave_fraction)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             if (!$stmt) {
@@ -92,22 +96,24 @@ class LeaveApplication {
             }
 
             $leave_status = 'Pending';
+            $half_day_type = $data['half_day_type'] ?? null;
 
-            // 'b' in bind_param for BLOB
             $stmt->bind_param(
-                "ssssssb",
+                "sssssssssd",
                 $data['employee_id'],
                 $data['leave_type'],
                 $data['leave_start_date'],
                 $data['leave_end_date'],
                 $leave_status,
                 $data['leave_reason'],
-                $fileContent
+                $fileContent,
+                $data['leave_duration'],
+                $half_day_type,
+                $leave_fraction
             );
 
-            // For BLOBs, need send_long_data
             if ($fileContent) {
-                $stmt->send_long_data(6, $fileContent); // index 6 = 7th parameter (medical_cert)
+                $stmt->send_long_data(6, $fileContent); // index 6 = medical_cert
             }
 
             if (!$stmt->execute()) {

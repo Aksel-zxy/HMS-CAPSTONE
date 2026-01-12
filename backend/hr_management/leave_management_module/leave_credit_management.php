@@ -349,7 +349,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                                         <td><?= htmlspecialchars($rec['leave_type'] ?? '') ?></td>
                                         <td><?= (int)$rec['allocated_days'] ?></td>
-                                        <td><?= (int)$rec['used_days'] ?></td>
+                                        <td><?= (float)$rec['used_days'] ?></td>
                                         <td><?= max(0, $rec['allocated_days'] - $rec['used_days']) ?></td>
                                     </tr>
                                 <?php endforeach; ?>

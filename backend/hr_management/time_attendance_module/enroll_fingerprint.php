@@ -4,7 +4,7 @@ include '../includes/FooterComponent.php';
 require_once '../classes/Auth.php';
 require_once '../classes/User.php';
 require_once '../classes/LeaveNotification.php';
-require_once 'classes/AttendanceRecord.php';
+require_once 'classes/FingerprintManager.php';
 
 Auth::checkHR();
 
@@ -15,25 +15,20 @@ if (!$userId) {
     die("User ID not set.");
 }
 
-$userModel = new User($conn);
-$leaveNotif = new LeaveNotification($conn);
-$attendanceRecords = new AttendanceRecord($conn);
-
 $userObj = new User($conn);
 $user = $userObj->getById($userId);
 if (!$user) {
     die("User not found.");
 }
 
+$leaveNotif = new LeaveNotification($conn);
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
-// Get date from GET param or default to today
-$date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
-$prev_day = date('Y-m-d', strtotime($date . ' -1 day'));
-$next_day = date('Y-m-d', strtotime($date . ' +1 day'));
+// 🔹 MISSING: Instantiate FingerprintManager
+$fingerprintManager = new FingerprintManager($conn);
 
-$result = $attendanceRecords->getDailyRecords($date);
-
+// 🔹 MISSING: Get employees without fingerprint
+$employees = $fingerprintManager->employeesWithoutFingerprint();
 ?>
 
 <!DOCTYPE html>
@@ -46,7 +41,7 @@ $result = $attendanceRecords->getDailyRecords($date);
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
-    <link rel="stylesheet" href="css/daily_attendance_records.css">
+    <link rel="stylesheet" href="css/enroll_fingerprint.css">
 </head>
 
 <body>
@@ -238,79 +233,65 @@ $result = $attendanceRecords->getDailyRecords($date);
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="attendance">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Daily Attendance Records (<?php echo $date; ?>)</p>
 
-                <!-- Navigation -->
-                <form method="GET" class="attendance-nav" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 900px; margin-left: auto; margin-right: auto;">
+            <!-- -------------------- Fingerprint Enrollment -------------------- -->
+            <div class="content">
+                <h2>Fingerprint Enrollment (Simulation)</h2>
+
+                <?php if($employees->num_rows > 0): ?>
+                <form method="POST" action="process_enroll.php">
+                    <label>Select Employee:</label>
+                    <select name="employee_id" id="employee_id" required>
+                        <option value="">----- Select Employee -----</option>
+
+                        <?php while ($emp = $employees->fetch_assoc()): ?>
+
+                            <?php
+                                // Collect name parts safely
+                                $nameParts = [
+                                    $emp['first_name'] ?? '',
+                                    $emp['middle_name'] ?? '',
+                                    $emp['last_name'] ?? '',
+                                    $emp['suffix_name'] ?? ''
+                                ];
+
+                                // Remove empty values & build full name
+                                $fullName = htmlspecialchars(trim(implode(' ', array_filter($nameParts))));
+                            ?>
+
+                            <option value="<?= htmlspecialchars($emp['employee_id']) ?>">
+                                <?= $fullName ?> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Employee ID: <?= htmlspecialchars($emp['employee_id']) ?>)
+                            </option>
+
+                        <?php endwhile; ?>
+                    </select>
+                    <br />
+                    <br />
+
+                    <div class="fingerprint-container">
+                        <video id="video" width="430px" height="320px" autoplay></video>
+                        <canvas id="canvas" width="430px" height="320px" style="display:none;"></canvas>
+
+                        <!-- Finger placement guide -->
+                        <div id="fp-square"></div>
+
+                        <div id="fp-warning" class="fp-warning">❌ No Fingerprint Detected!</div>
+                        <div id="fp-success" class="fp-success">✅ Fingerprint Captured!</div>
+                    </div>
+
+                    <input type="hidden" name="fingerprint" id="fingerprint"><br>
+
+                    <br />
                     
-                    <!-- Previous Day Button -->
-                    <button type="submit" class="nav-btn" 
-                        onclick="document.getElementById('form-date').value='<?= $prev_day; ?>'">
-                        ⬅ Previous Day
-                    </button>
-
-                    <!-- Hidden input to store the selected date -->
-                    <input type="hidden" name="date" id="form-date" value="<?= $date; ?>">
-
-                    <!-- Calendar Date Picker -->
-                    <input type="date" class="date-picker" value="<?= $date; ?>" 
-                        onchange="document.getElementById('form-date').value=this.value; this.form.submit();"
-                        style="padding: 5px 10px; font-size: 16px;">
-
-                    <!-- Next Day Button -->
-                    <button type="submit" class="nav-btn" 
-                        onclick="document.getElementById('form-date').value='<?= $next_day; ?>'">
-                        Next Day ➡
-                    </button>
+                    <center>
+                        <button class="hahaha" type="button" onclick="capture()">Capture Fingerprint</button>
+                        <button class="hahahaha" type="submit">Enroll Fingerprint</button>
+                    </center>
 
                 </form>
-                <br />
-
-                <table id="AttendanceTable">
-                    <thead>
-                        <tr>
-                            <th>Employee ID</th>
-                            <th>Date</th>
-                            <th>Time In</th>
-                            <th>Time Out</th>
-                            <th>Hours Worked</th>
-                            <th>Late (min)</th>
-                            <th>Undertime (min)</th>
-                            <th>Overtime (min)</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if($result->num_rows > 0): ?>
-                            <?php while($row = $result->fetch_assoc()): ?>
-                                <?php
-                                    $statusText = $attendanceRecords->getStatusText($row);
-                                    $statusClass = $attendanceRecords->getStatusClass($statusText);
-                                ?>
-                                <tr>
-                                    <td><?= $row['employee_id'] ?? '-' ?></td>
-                                    <td><?= $row['attendance_date'] ?? '-' ?></td>
-                                    <td><?= $row['time_in'] ?? '-' ?></td>
-                                    <td><?= $row['time_out'] ?? '-' ?></td>
-                                    <td><?= $row['working_hours'] ?? '0' ?></td>
-                                    <td><?= $row['late_minutes'] ?? '0' ?></td>
-                                    <td><?= $row['undertime_minutes'] ?? '0' ?></td>
-                                    <td><?= $row['overtime_minutes'] ?? '0' ?></td>
-                                    <td>
-                                        <span class="status-badge <?= $statusClass; ?>"><?= $statusText; ?></span>
-                                    </td>
-                                </tr>
-                            <?php endwhile; ?>
-                        <?php else: ?>
-                            <tr><td colspan="10">No attendance records for this date.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-
-                <!-- ----- Pagination Controls ----- -->
-                <div id="pagination" class="pagination"></div>
-
+                <?php else: ?>
+                    <p>All employees already have fingerprint enrolled.</p>
+                <?php endif; ?>
             </div>
             <!-- END CODING HERE -->
         </div>
@@ -322,74 +303,78 @@ $result = $attendanceRecords->getDailyRecords($date);
 
     <!----- End of Footer Content ----->
     
-    <script>
+ 
+            <script>
+            window.addEventListener("load", function(){
+                setTimeout(() => {
+                    const loader = document.getElementById("loading-screen");
+                    if (loader) loader.style.display = "none";
+                }, 2000);
+            });
 
-        window.addEventListener("load", function(){
-            setTimeout(function(){
-                document.getElementById("loading-screen").style.display = "none";
-            }, 2000);
-        });
-
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-
-        document.addEventListener("DOMContentLoaded", function () {
-            const table = document.getElementById("AttendanceTable");
-            const rows = table.querySelectorAll("tbody tr");
-            const pagination = document.getElementById("pagination");
-
-            let rowsPerPage = 10;
-            let currentPage = 1;
-            let totalPages = Math.ceil(rows.length / rowsPerPage);
-
-            function displayRows() {
-                rows.forEach((row, index) => {
-                    row.style.display =
-                    index >= (currentPage - 1) * rowsPerPage && index < currentPage * rowsPerPage
-                    ? ""
-                    : "none";
+            // Sidebar toggle
+            const toggler = document.querySelector(".toggler-btn");
+            if (toggler) {
+                toggler.addEventListener("click", function() {
+                    const sidebar = document.querySelector("#sidebar");
+                    if (sidebar) sidebar.classList.toggle("collapsed");
                 });
             }
 
-            function updatePagination() {
-                pagination.innerHTML = ""; 
+            // Start webcam
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    const video = document.getElementById("video");
+                    if (video) video.srcObject = stream;
+                })
+                .catch(err => console.error("Error accessing camera: ", err));
 
-                const createButton = (text, page, isDisabled = false, isActive = false) => {
-                    const button = document.createElement("button");
-                    button.textContent = text;
-                    if (isDisabled) button.disabled = true;
-                    if (isActive) button.classList.add("active");
+            // Capture fingerprint
+            function capture() {
+                const canvas = document.getElementById("canvas");
+                const video = document.getElementById("video");
+                const warning = document.getElementById("fp-warning");
+                const success = document.getElementById("fp-success");
 
-                    button.addEventListener("click", function () {
-                        currentPage = page;
-                        displayRows();
-                        updatePagination();
-                    });
-                    return button;
-                };
+                if (!canvas || !video) return;
 
-                pagination.appendChild(createButton("First", 1, currentPage === 1));
-                pagination.appendChild(createButton("Previous", currentPage - 1, currentPage === 1));
+                const ctx = canvas.getContext('2d');
 
-                for (let i = 1; i <= totalPages; i++) {
-                    pagination.appendChild(createButton(i, i, false, i === currentPage));
+                // Capture only the square region (center 120x120)
+                const sx = (video.videoWidth / 2) - 60;
+                const sy = (video.videoHeight / 2) - 60;
+                ctx.drawImage(video, sx, sy, 120, 120, 0, 0, 120, 120);
+
+                const dataUrl = canvas.toDataURL("image/png");
+                document.getElementById("fingerprint").value = dataUrl;
+
+                if (dataUrl) {
+                    warning.style.display = "none";
+                    success.style.display = "block";
+                } else {
+                    warning.style.display = "block";
+                    success.style.display = "none";
                 }
-
-                pagination.appendChild(createButton("Next", currentPage + 1, currentPage === totalPages));
-                pagination.appendChild(createButton("Last", totalPages, currentPage === totalPages));
             }
 
-            displayRows();
-            updatePagination();
-        });
+            // Form validation
+            const form = document.querySelector("form");
+            if (form) {
+                form.addEventListener("submit", function(e) {
+                    const fp = document.getElementById("fingerprint").value;
+                    const warning = document.getElementById("fp-warning");
 
-    </script>
+                    if (!fp) {
+                        e.preventDefault();
+                        warning.style.display = "block";
+                    }
+                });
+            }
+            </script>
+
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="../assets/Bootstrap/fontawesome.min.js"></script>
     <script src="../assets/Bootstrap/jq.js"></script>
 </body>
-
 </html>
