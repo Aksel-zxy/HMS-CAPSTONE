@@ -1,67 +1,22 @@
 <?php
-include '../../SQL/config.php';
-
-class DoctorDashboard
-{
-    public $conn;
-    public $user;
-
-    public function __construct($conn)
-    {
-        $this->conn = $conn;
-        $this->authenticate();
-        $this->fetchUser();
-    }
-
-    private function authenticate()
-    {
-        if (!isset($_SESSION['doctor']) || $_SESSION['doctor'] !== true) {
-            header('Location: login.php');
-            exit();
-        }
-        if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-            echo "User ID is not set in session.";
-            exit();
-        }
-    }
-
-    private function fetchUser()
-    {
-        $query = "SELECT * FROM users WHERE user_id = ?";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $_SESSION['user_id']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $this->user = $result->fetch_assoc();
-        if (!$this->user) {
-            echo "No user found.";
-            exit();
-        }
-    }
+include '../../../SQL/config.php';
+if (!isset($_SESSION['doctor']) || $_SESSION['doctor'] !== true) {
+    header('Location: ' . BASE_URL . 'backend/login.php');
+    exit();
 }
-
-$dashboard = new DoctorDashboard($conn);
-$user = $dashboard->user;
-
-$query = "
-    SELECT profession, COUNT(*) AS total
-    FROM hr_employees
-    WHERE profession IN ('Doctor', 'Nurse')
-    GROUP BY profession
-";
-$result = $conn->query($query);
-
-$doctorCount = 0;
-$nurseCount  = 0;
-
-if ($result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        if (strtolower($row['profession']) === 'doctor') {
-            $doctorCount = $row['total'];
-        } elseif (strtolower($row['profession']) === 'nurse') {
-            $nurseCount = $row['total'];
-        }
-    }
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+    echo "User ID is not set in session.";
+    exit();
+}
+$query = "SELECT * FROM users WHERE user_id = ?";
+$stmt = $conn->prepare($query);
+$stmt->bind_param("i", $_SESSION['user_id']);
+$stmt->execute();
+$result = $stmt->get_result();
+$user = $result->fetch_assoc();
+if (!$user) {
+    echo "No user found.";
+    exit();
 }
 ?>
 
@@ -72,9 +27,11 @@ if ($result->num_rows > 0) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Doctor and Nurse Management</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
+    <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="stylesheet" href="../assets/CSS/shift_scheduling.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -83,7 +40,7 @@ if ($result->num_rows > 0) {
         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
-                <img src="assets/image/logo-dark.png" width="90px" height="20px">
+                <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
             <div class="menu-title">Navigation</div>
@@ -91,9 +48,9 @@ if ($result->num_rows > 0) {
             <!----- Sidebar Navigation ----->
 
             <li class="sidebar-item">
-                <a href="doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="../doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
+                    <svg x..mlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
                         <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
@@ -112,16 +69,16 @@ if ($result->num_rows > 0) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="scheduling_shifts_and_duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="scheduling_shifts_and_duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="scheduling_shifts_and_duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="scheduling_shifts_and_duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -137,19 +94,19 @@ if ($result->num_rows > 0) {
 
                 <ul id="license" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="dnrcl/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
+                        <a href="../dnrcl/registration_clinical_profile.php" class="sidebar-link">Registration & Clinical Profile Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="dnrcl/license_management.php" class="sidebar-link">License Management</a>
+                        <a href="../dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="dnrcl/compliance.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
+                        <a href="../dnrcl/compliance.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="dnrcl/notif_alert.php" class="sidebar-link">Notifications & Alerts</a>
+                        <a href="../dnrcl/notif_alert.php" class="sidebar-link">Notifications & Alerts</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="dnrcl/audit_log.php" class="sidebar-link">Compliance Audit Log</a>
+                        <a href="../dnrcl/audit_log.php" class="sidebar-link">Compliance Audit Log</a>
                     </li>
                 </ul>
             </li>
@@ -165,18 +122,17 @@ if ($result->num_rows > 0) {
 
                 <ul id="evaluation" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="evaluation/doc_feedback.php" class="sidebar-link">View Nurse Evaluation</a>
+                        <a href="doc_feedback.php" class="sidebar-link">View Nurse Evaluation</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="evaluation/analytics.php" class="sidebar-link">Evaluation Report & Analytics</a>
+                        <a href="analytics.php" class="sidebar-link">Evaluation Report & Analytics</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="evaluation/criteria.php" class="sidebar-link">Manage Evaluation Criteria</a>
+                        <a href="criteria.php" class="sidebar-link">Manage Evaluation Criteria</a>
                     </li>
                 </ul>
             </li>
         </aside>
-
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
         <div class="main">
@@ -201,7 +157,7 @@ if ($result->num_rows > 0) {
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['lname']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                <a class="dropdown-item" href="../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
                                     Logout
                                 </a>
                             </li>
@@ -211,39 +167,24 @@ if ($result->num_rows > 0) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;">
-                <!-- Doctors Box -->
-                <div style="background:#fff; border-radius:14px; padding:25px; box-shadow:0 3px 10px rgba(0,0,0,0.06); text-align:center;">
-                    <h2 style="font-size:18px; color:#333; margin-bottom:10px;">Doctors</h2>
-                    <p style="color:#888; font-size:13px; margin-bottom:20px;">Total number of doctors</p>
-                    <div style="font-size:48px; font-weight:700; color:#0d6efd;">
-                        <?php echo $doctorCount; ?>
-                    </div>
-                </div>
+            <div style="width:95%; margin:20px auto; padding:20px;">
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
+                    👨‍⚕️ Medical Staff Duty Overview
+                </h2>
 
-                <!-- Nurses Box -->
-                <div style="background:#fff; border-radius:14px; padding:25px; box-shadow:0 3px 10px rgba(0,0,0,0.06); text-align:center;">
-                    <h2 style="font-size:18px; color:#333; margin-bottom:10px;">Nurses</h2>
-                    <p style="color:#888; font-size:13px; margin-bottom:20px;">Total number of nurses</p>
-                    <div style="font-size:48px; font-weight:700; color:#198754;">
-                        <?php echo $nurseCount; ?>
-                    </div>
-                </div>
-            </div>
             <!-- END CODING HERE -->
+            <!----- End of Main Content ----->
         </div>
-        <!----- End of Main Content ----->
-    </div>
-    <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    </script>
-    <script src="assets/Bootstrap/all.min.js"></script>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
+        <script>
+            const toggler = document.querySelector(".toggler-btn");
+            toggler.addEventListener("click", function() {
+                document.querySelector("#sidebar").classList.toggle("collapsed");
+            });
+        </script>
+        <script src="../assets/Bootstrap/all.min.js"></script>
+        <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+        <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+        <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

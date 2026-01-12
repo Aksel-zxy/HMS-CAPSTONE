@@ -373,7 +373,7 @@ if ($result_pat && $result_pat->num_rows > 0) {
                         <a href="../Employee/admin.php" class="sidebar-link">My Schedule</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                        <a href="doctor_duty.php" class="sidebar-link">Patient Management</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../Employee/admin.php" class="sidebar-link">View Clinical Profile</a>

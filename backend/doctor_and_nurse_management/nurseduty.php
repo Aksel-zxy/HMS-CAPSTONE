@@ -156,7 +156,7 @@ if ($duty_res && $duty_res->num_rows > 0) {
                         <a href="doctor_panel/my_doctor_schedule.php" class="sidebar-link">My Schedule</a>
                   </li>
                   <li class="sidebar-item">
-                        <a href="doctor_panel/doctor_duty.php" class="sidebar-link">Doctor Duty</a>
+                        <a href="doctor_panel/doctor_duty.php" class="sidebar-link">Patient Management</a>
                     </li>
                         <li class="sidebar-item">
                         <a href="../doctor_panel/prescription.php" class="sidebar-link">Prescription</a>
