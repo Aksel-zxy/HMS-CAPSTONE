@@ -125,24 +125,6 @@ if (isset($uploadedDocs[$docType])) {
                         </div>
                     </div>
 
-                    <!-- ----- Left: Employee Photo ----- -->
-                    <div class="employee-photo-section">
-                        <img src="<?= htmlspecialchars($photoSrc); ?>"
-                            alt="Employee Photo" 
-                            class="employee-photo">
-
-                        <?php
-                            $statusClass = 'status-' . strtolower($employee['status']);
-                            echo "<span class='status-badge {$statusClass}'>{$employee['status']}</span>";
-                        ?>
-
-                        <div class="employee-photo-buttons">
-                            <center>
-                                <a href="#" class="btn-edit" onclick="openEditModal()">Edit</a>
-                            </center>
-                        </div>
-                    </div>
-
                     <!-- ----- Right: Personal Information ----- -->
                     <div class="card personal-info-card">
                         <h2 class="card-heading">Personal Information</h2>

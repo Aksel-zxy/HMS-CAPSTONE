@@ -6,6 +6,9 @@ class LeaveCredit {
         $this->conn = $db;
     }
 
+    /**
+     * Get all employees
+     */
     public function getAllEmployees() {
         $sql = "SELECT employee_id, first_name, middle_name, last_name, suffix_name, role, profession, gender 
                 FROM hr_employees 
@@ -13,6 +16,10 @@ class LeaveCredit {
         return $this->conn->query($sql);
     }
 
+    /**
+     * Get all leave credits for the year
+     * Supports Half Day leave calculation
+     */
     public function getAllLeaveCredits($year) {
         $sql = "
             SELECT 
@@ -33,7 +40,10 @@ class LeaveCredit {
                         WHEN h.leave_status = 'Approved' 
                             AND h.leave_type = lc.leave_type 
                             AND YEAR(h.leave_start_date) = ? 
-                        THEN DATEDIFF(h.leave_end_date, h.leave_start_date) + 1  -- ✅ Add +1
+                        THEN CASE 
+                                WHEN h.leave_duration = 'HALF' THEN 0.5
+                                ELSE DATEDIFF(h.leave_end_date, h.leave_start_date) + 1
+                             END
                         ELSE 0 
                     END
                 ), 0) AS used_days
@@ -59,33 +69,47 @@ class LeaveCredit {
         while ($row = $result->fetch_assoc()) {
             if ($row['leave_type'] === "Maternity Leave" && $row['gender'] !== "Female") continue;
             if ($row['leave_type'] === "Paternity Leave" && $row['gender'] !== "Male") continue;
+
+            // Ensure used_days and allocated_days are float
+            $row['used_days'] = (float)$row['used_days'];
+            $row['allocated_days'] = (float)$row['allocated_days'];
+
             $filtered[] = $row;
         }
 
         return $filtered;
     }
 
+    /**
+     * Generate leave message for display
+     */
     public function generateLeaveMessage($leaveData, $requestedDays = 0) {
         $remaining = $leaveData['allocated_days'] - $leaveData['used_days'];
 
+        // Format remaining: integer kung whole number, decimal kung may .5
+        $remainingFormatted = ($remaining == (int)$remaining) ? (int)$remaining : $remaining;
+        $requestedFormatted = ($requestedDays == (int)$requestedDays) ? (int)$requestedDays : $requestedDays;
+
         if ($requestedDays > $remaining) {
-            return "❌ {$leaveData['full_name']} ({$leaveData['role']}) has insufficient leave balance for {$leaveData['leave_type']} ({$remaining} left, needs {$requestedDays}).";
+            return "❌ {$leaveData['full_name']} ({$leaveData['role']}) has insufficient leave balance for {$leaveData['leave_type']} ({$remainingFormatted} left, needs {$requestedFormatted}).";
         }
 
-        return "✅ {$leaveData['full_name']} ({$leaveData['role']}) still has {$remaining} {$leaveData['leave_type']} credits remaining.";
+        return "✅ {$leaveData['full_name']} ({$leaveData['role']}) still has {$remainingFormatted} {$leaveData['leave_type']} credits remaining.";
     }
 
+    /**
+     * Assign leave credit to employee
+     * Supports decimal allocation (Half Day)
+     */
     public function assignLeaveCredit($employeeId, $leaveType, $allocatedDays, $year) {
         $sql = "
-            INSERT INTO hr_leave_credits (employee_id, leave_type, allocated_days, remaining_days, year)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO hr_leave_credits (employee_id, leave_type, allocated_days, year)
+            VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE 
-                allocated_days = VALUES(allocated_days), 
-                remaining_days = VALUES(remaining_days)
+                allocated_days = VALUES(allocated_days)
         ";
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("isiii", $employeeId, $leaveType, $allocatedDays, $allocatedDays, $year);
+        $stmt->bind_param("isdi", $employeeId, $leaveType, $allocatedDays, $year); // d = double for decimals
         return $stmt->execute();
     }
 }
-

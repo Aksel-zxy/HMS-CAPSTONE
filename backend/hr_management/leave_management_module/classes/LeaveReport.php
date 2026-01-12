@@ -8,19 +8,26 @@ class LeaveReport {
 
     public function fetchAll() {
         $sql = "SELECT 
-                    l.leave_id,  -- add this line
+                    l.leave_id,
                     l.employee_id,
                     CONCAT(
                         e.first_name, ' ',
                         IFNULL(e.middle_name, ''), ' ',
                         e.last_name, ' ',
                         IFNULL(e.suffix_name, '')
-                    ) AS full_name, 
+                    ) AS full_name,
                     l.leave_type,
+                    l.leave_duration,
                     l.leave_start_date,
                     l.leave_end_date,
                     l.medical_cert,
-                    DATEDIFF(l.leave_end_date, l.leave_start_date) + 1 AS total_days,
+
+                    -- ✅ FIXED total days
+                    CASE 
+                        WHEN l.leave_duration = 'HALF' THEN 0.5
+                        ELSE DATEDIFF(l.leave_end_date, l.leave_start_date) + 1
+                    END AS total_days,
+
                     l.leave_status,
                     CASE 
                         WHEN l.leave_status = 'Approved' THEN 'Yes'
@@ -30,9 +37,12 @@ class LeaveReport {
                     l.leave_reason,
                     l.submit_at
                 FROM hr_leave l
-                JOIN hr_employees e ON l.employee_id = e.employee_id
+                JOIN hr_employees e 
+                    ON l.employee_id = e.employee_id
                 ORDER BY l.submit_at DESC";
+
         return $this->conn->query($sql);
     }
 }
+
 
