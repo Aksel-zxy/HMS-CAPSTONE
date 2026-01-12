@@ -2,6 +2,7 @@
 require_once 'class/update.php';
 require_once 'class/patient.php';
 require_once 'class/caller.php';    
+include 'class/logs.php';
 
 $callerObj = new Caller($conn); // create Caller instance
 $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
@@ -29,6 +30,10 @@ if ($medical_history) {
     $patient['diagnosis_date'] = '';
     $patient['notes'] = '';
 }
+
+$user_id = $_SESSION['user_id'];
+
+logAction($conn, $_SESSION['user_id'], 'UPDATE_PATIENT', $patient_id);
 
 ?>
 

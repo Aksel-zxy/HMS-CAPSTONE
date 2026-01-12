@@ -2,6 +2,7 @@
 ob_start(); // Prevent "headers already sent" errors
 include '../../../SQL/config.php';
 require_once 'patient.php';
+include `class/logs.php`;
 
 $patient = new Patient($conn);
 
@@ -72,19 +73,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
         $conn->commit();
 
+        $user_id = $_SESSION['user_id'] ?? null;
+        if ($user_id) {
+        logAction($conn, $user_id, 'ADD_PATIENT', $patient_id);
+        }
         header("Location: ../registered.php?success=1");
         exit();
 
-    } catch (Exception $e) {
+        } catch (Exception $e) {
         $conn->rollback();
+
+        if (isset($_SESSION['user_id'])) {
+            logAction($conn, $_SESSION['user_id'], 'ADD_PATIENT_FAILED');
+        }
+
         error_log("Patient creation failed: " . $e->getMessage());
-
-        // 🔍 Debug output (remove in production)
-        echo "<pre style='color:red; font-weight:bold;'>Patient creation failed:
-" . htmlspecialchars($e->getMessage()) . "</pre>";
-
+        echo "<pre style='color:red; font-weight:bold;'>Patient creation failed:" . htmlspecialchars($e->getMessage()) . "</pre>";
         exit();
-    }
+        }
+
 }
 ob_end_flush();
 ?>

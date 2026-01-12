@@ -2,7 +2,7 @@
 session_start();
 include '../../SQL/config.php';
 require_once 'class/caller.php';
-
+include 'class/logs.php';
 
 if (!isset($_GET['patient_id']) || empty($_GET['patient_id'])) {
     echo "Invalid patient ID.";
@@ -26,6 +26,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $admission_type = $_POST['admission_type'];
     $admission->admit($patient_id, $bed_id, $assigned_date, $admission_type);
 }
+
+$user_id = $_SESSION['user_id'];
+logAction($conn, $user_id, 'Patient_Admitted', $patient_id);
 ?>
 
 <!DOCTYPE html>
