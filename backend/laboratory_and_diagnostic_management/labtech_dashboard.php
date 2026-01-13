@@ -79,6 +79,8 @@ $schedules = $schedule->getTodaysSchedules();
                     </li>
                     <li class="sidebar-item">
                         <a href="mod1/room_available.php" class="sidebar-link">Room Overview</a>
+                    </li><li class="sidebar-item">
+                        <a href="purchase_request.php" class="sidebar-link">req</a>
                     </li>
                 </ul>
             </li>

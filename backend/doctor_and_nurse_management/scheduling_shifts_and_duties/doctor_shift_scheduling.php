@@ -155,7 +155,7 @@ if (isset($_GET['view_sched_id'])) {
             LEFT JOIN rooms_table r5 ON s.fri_room_id = r5.room_id
             LEFT JOIN rooms_table r6 ON s.sat_room_id = r6.room_id
             LEFT JOIN rooms_table r7 ON s.sun_room_id = r7.room_id
-            WHERE s.employee_id = ? ORDER BY s.week_start DESC";
+            WHERE s.employee_id = ? ORDER BY s.week_start ASC";
 
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $view_id);
@@ -247,13 +247,13 @@ if (isset($_GET['view_sched_id'])) {
                         <a href="../dnrcl/license_management.php" class="sidebar-link">License Management</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
+                        <a href="../dnrcl/compliance.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notifications & Alerts</a>
+                        <a href="../dnrcl/notif_alert.php" class="sidebar-link">Notifications & Alerts</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Compliance Audit Log</a>
+                        <a href="../dnrcl/audit_log.php" class="sidebar-link">Compliance Audit Log</a>
                     </li>
                 </ul>
             </li>

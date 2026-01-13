@@ -1,10 +1,14 @@
-<?php 
+<?php
+session_start(); // 
+
 include '../../../SQL/config.php';
+include 'logs.php'; // 
 require_once 'patient.php';
 
 $patient = new Patient($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     // Collect form data
     $data = [
         'patient_id'       => $_POST["patient_id"] ?? '',
@@ -18,11 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $doctor_id = $data['doctor_id'];
     $appointment_date = $data['appointment_date'];
 
-    // Split appointment date into day and time
+    // Split appointment date
     $appointmentDay  = date("l", strtotime($appointment_date));
     $appointmentTime = date("H:i:s", strtotime($appointment_date));
 
-    // Map day of week to table columns
     $dayMap = [
         "Monday"    => ["mon_start", "mon_end", "mon_status"],
         "Tuesday"   => ["tue_start", "tue_end", "tue_status"],
@@ -48,59 +51,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $doctor_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    $shift  = $result->fetch_assoc();
+    $shift = $stmt->get_result()->fetch_assoc();
 
     if (!$shift || $shift['shift_status'] == 0) {
-        echo "<script>
-                alert('Doctor not scheduled on $appointmentDay');
-                window.history.back();
-              </script>";
+        echo "<script>alert('Doctor not scheduled on $appointmentDay'); window.history.back();</script>";
         exit();
     }
 
-    $shift_start = $shift['shift_start'];
-    $shift_end   = $shift['shift_end'];
-
-    // Convert to natural format
-    $shift_start_natural = date("g:i A", strtotime($shift_start));
-    $shift_end_natural   = date("g:i A", strtotime($shift_end));
-    $appointmentTime_natural = date("g:i A", strtotime($appointmentTime));
-
-    if ($appointmentTime < $shift_start || $appointmentTime > $shift_end) {
-        echo "<script>
-                alert('Doctor available only between {$shift_start_natural} and {$shift_end_natural}. You selected {$appointmentTime_natural}.');
-                window.history.back();
-              </script>";
+    if ($appointmentTime < $shift['shift_start'] || $appointmentTime > $shift['shift_end']) {
+        echo "<script>alert('Doctor not available at this time.'); window.history.back();</script>";
         exit();
     }
 
-    // 2️⃣ Validate no conflicting appointment
-    $sql = "SELECT * FROM p_appointments 
-            WHERE doctor_id = ? 
-            AND appointment_date = ?";
-    $stmt = $conn->prepare($sql);
+    // 2️⃣ Check conflict
+    $stmt = $conn->prepare("
+        SELECT 1 FROM p_appointments 
+        WHERE doctor_id = ? AND appointment_date = ?
+    ");
     $stmt->bind_param("is", $doctor_id, $appointment_date);
     $stmt->execute();
-    $apptResult = $stmt->get_result();
 
-    if ($apptResult->num_rows > 0) {
-        echo "<script>
-                alert('Doctor already has an appointment at this time.');
-                window.history.back();
-              </script>";
+    if ($stmt->get_result()->num_rows > 0) {
+        echo "<script>alert('Doctor already has an appointment at this time.'); window.history.back();</script>";
         exit();
     }
 
     // 3️⃣ Insert appointment
-    $sql = "INSERT INTO p_appointments (patient_id, doctor_id, appointment_date, purpose, status, notes)
-            VALUES (?, ?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare("
+        INSERT INTO p_appointments 
+        (patient_id, doctor_id, appointment_date, purpose, status, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ");
     $stmt->bind_param(
         "iissss",
         $data['patient_id'],
-        $data['doctor_id'],
-        $data['appointment_date'],
+        $doctor_id,
+        $appointment_date,
         $data['purpose'],
         $data['status'],
         $data['notes']
@@ -108,7 +94,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $success = $stmt->execute();
 
-    // 4️⃣ Redirect based on who submitted
+    // ✅ 4️⃣ LOG AFTER SUCCESSFUL INSERT
+    if ($success) {
+        $user_id = $_SESSION['user_id'] ?? null;
+
+        if ($user_id) {
+            logAction(
+                $conn,
+                $user_id,
+                'CREATE_APPOINTMENT',
+                $data['patient_id']
+            );
+        }
+    }
+
+    // 5️⃣ Redirect
     $submitted_by = $_POST['submitted_by'] ?? 'patient';
 
     if ($submitted_by === 'admin') {

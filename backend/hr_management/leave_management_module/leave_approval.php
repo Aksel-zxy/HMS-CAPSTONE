@@ -44,8 +44,10 @@ $currentYear = date('Y');
 $leaveBalances = [];
 $leaveCredits = $leaveCreditModel->getAllLeaveCredits($currentYear);
 foreach ($leaveCredits as $row) {
-    $remaining = $row['allocated_days'] - $row['used_days'];
-    $leaveBalances[$row['employee_id']][$row['leave_type']] = $remaining;
+    $leaveBalances[$row['employee_id']][$row['leave_type']] = [
+        'allocated_days' => (float)$row['allocated_days'],
+        'used_days'      => (float)$row['used_days'],
+    ];
 }
 
 $pendingLeaves = $leaveApproval->fetchPendingLeavesWithEmployeeInfo();
@@ -272,10 +274,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <tr>
                             <th>Employee</th>
                             <th>Profession</th>
-                            <th>Role</th>
                             <th>Department</th>
                             <th>Leave Type</th>
                             <th>Start/End</th>
+                            <th>Leave Duration</th>
                             <th>Reason</th>
                             <th>Status</th>
                             <th>Attach Document</th>
@@ -287,70 +289,99 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                     <tbody>
                         <?php if ($pendingLeaves && $pendingLeaves->num_rows > 0): ?>
-                            <?php while ($row = $pendingLeaves->fetch_assoc()):
-                                $start = new DateTime($row['leave_start_date']);
-                                $end   = new DateTime($row['leave_end_date']);
-                                $daysRequested = $end->diff($start)->days + 1;
 
-                                $remaining = isset($leaveBalances[$row['employee_id']][$row['leave_type']]) ? (int)$leaveBalances[$row['employee_id']][$row['leave_type']] : 0;
+                            <?php while ($row = $pendingLeaves->fetch_assoc()): ?>
 
-
-                                $insufficient = $daysRequested > $remaining;
-                            ?>
-                            <tr>
-                                <td><?= htmlspecialchars($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name'] . ' ' . $row['suffix_name']) ?></td>
-                                <td><?= htmlspecialchars($row['profession']) ?></td>
-                                <td><?= htmlspecialchars($row['role']) ?></td>
-                                <td><?= htmlspecialchars($row['department']) ?></td>
-                                <td><?= htmlspecialchars($row['leave_type']) ?></td>
-                                <td><?= htmlspecialchars($row['leave_start_date']) . ' - ' . htmlspecialchars($row['leave_end_date']) ?></td>
-                                <td><?= htmlspecialchars($row['leave_reason']) ?></td>
-                                <td><?= htmlspecialchars($row['leave_status']) ?></td>
-                                <td>
-                                    <?php if (!empty($row['medical_cert'])): ?>
-                                        <a href="download_med_cert.php?leave_id=<?= htmlspecialchars($row['leave_id']); ?>" target="_blank">View</a>
-                                    <?php else: ?>
-                                        <span class="text-muted">None</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?= htmlspecialchars($row['submit_at']) ?></td>
                                 <?php
+                                    $start = new DateTime($row['leave_start_date']);
+                                    $end   = new DateTime($row['leave_end_date']);
+
+                                    // Correct date diff
+                                    $daysRequested = $start->diff($end)->days + 1;
+
+                                    // Half day only if same date
+                                    if (
+                                        isset($row['leave_duration']) &&
+                                        $row['leave_duration'] === 'Half Day' &&
+                                        $row['leave_start_date'] === $row['leave_end_date']
+                                    ) {
+                                        $daysRequested = 0.5;
+                                    }
+
+                                    $allocatedDays = $leaveBalances[$row['employee_id']][$row['leave_type']]['allocated_days'] ?? 0;
+                                    $usedDays      = $leaveBalances[$row['employee_id']][$row['leave_type']]['used_days'] ?? 0;
+
+                                    $remaining    = max(0, $allocatedDays - $usedDays);
+                                    $insufficient = $daysRequested > $remaining;
+
                                     $leaveMessage = $leaveCreditModel->generateLeaveMessage(
                                         [
-                                            'full_name' => $row['first_name'] . ' ' . $row['last_name'],
-                                            'role'      => $row['role'],
-                                            'leave_type'=> $row['leave_type'],
-                                            'allocated_days' => isset($leaveBalances[$row['employee_id']][$row['leave_type']])
-                                                                ? (int)$leaveBalances[$row['employee_id']][$row['leave_type']]
-                                                                : 0,
-                                            'used_days' => 0, // or actual used days if tracked elsewhere
+                                            'full_name'      => trim(
+                                                $row['first_name'] . ' ' .
+                                                ($row['middle_name'] ?? '') . ' ' .
+                                                $row['last_name'] . ' ' .
+                                                ($row['suffix_name'] ?? '')
+                                            ),
+                                            'role'           => $row['role'],
+                                            'leave_type'     => $row['leave_type'],
+                                            'allocated_days' => $allocatedDays,
+                                            'used_days'      => $usedDays,
                                         ],
                                         $daysRequested
                                     );
                                 ?>
-                                <td><?= $leaveMessage ?></td>
-                                <td>
-                                    <?php if ($row['leave_status'] === 'Pending'): ?>
-                                        <form method="POST" class="d-flex gap-1">
-                                            <input type="hidden" name="leave_id" value="<?= (int)$row['leave_id'] ?>">
-                                            <button type="submit" name="action" value="approve"
-                                                    class="btn btn-success btn-sm" title="Approve"
-                                                    <?= $insufficient ? 'disabled' : '' ?>>
-                                                <i class="fas fa-check"></i>
-                                            </button>
-                                            <button type="submit" name="action" value="reject"
-                                                    class="btn btn-danger btn-sm" title="Reject">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </form>
-                                    <?php else: ?>
-                                        <span class="text-muted">No Action</span>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
+
+                                <tr>
+                                    <td>
+                                        <?= htmlspecialchars(trim(
+                                            $row['first_name'] . ' ' .
+                                            ($row['middle_name'] ?? '') . ' ' .
+                                            $row['last_name'] . ' ' .
+                                            ($row['suffix_name'] ?? '')
+                                        )) ?>
+                                    </td>
+                                    <td><?= htmlspecialchars($row['profession']) ?></td>
+                                    <td><?= htmlspecialchars($row['department']) ?></td>
+                                    <td><?= htmlspecialchars($row['leave_type']) ?></td>
+                                    <td><?= htmlspecialchars($row['leave_start_date']) ?> - <?= htmlspecialchars($row['leave_end_date']) ?></td>
+                                    <td><?= htmlspecialchars($row['leave_duration']) ?></td>
+                                    <td><?= htmlspecialchars($row['leave_reason']) ?></td>
+                                    <td><?= htmlspecialchars($row['leave_status']) ?></td>
+                                    <td>
+                                        <?php if (!empty($row['medical_cert'])): ?>
+                                            <a href="download_med_cert.php?leave_id=<?= (int)$row['leave_id'] ?>" target="_blank">View</a>
+                                        <?php else: ?>
+                                            <span class="text-muted">None</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?= htmlspecialchars($row['submit_at']) ?></td>
+                                    <td><?= $leaveMessage ?></td>
+                                    <td>
+                                        <?php if ($row['leave_status'] === 'Pending'): ?>
+                                            <form method="POST" class="d-flex gap-1">
+                                                <input type="hidden" name="leave_id" value="<?= (int)$row['leave_id'] ?>">
+                                                <button type="submit" name="action" value="approve"
+                                                        class="btn btn-success btn-sm"
+                                                        <?= $insufficient ? 'disabled title="Insufficient leave balance"' : '' ?>>
+                                                    <i class="fas fa-check"></i>
+                                                </button>
+                                                <button type="submit" name="action" value="reject"
+                                                        class="btn btn-danger btn-sm">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="text-muted">No Action</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+
                             <?php endwhile; ?>
+
                         <?php else: ?>
-                            <tr><td colspan="13" class="text-center">No leave applications found.</td></tr>
+                            <tr>
+                                <td colspan="13" class="text-center">No leave applications found.</td>
+                            </tr>
                         <?php endif; ?>
                     </tbody>
                 </table>

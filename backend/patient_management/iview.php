@@ -2,7 +2,7 @@
 include '../../SQL/config.php';
 require_once 'class/patient.php';
 require_once 'class/caller.php';
-
+include 'class/logs.php';
 $patientObj = new Patient($conn);
 
 $callerObj = new Caller($conn); // create Caller instance
@@ -31,6 +31,9 @@ try {
     echo $e->getMessage();
     exit;
 }
+$user_id = $_SESSION['user_id'];
+
+logAction($conn, $user_id, 'VIEW_PATIENT', $patient_id);
 ?>
 
 

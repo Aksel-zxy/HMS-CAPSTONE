@@ -123,9 +123,15 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <li class="sidebar-item">
                         <a href="attendance_reports.php" class="sidebar-link">Attendance Reports</a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="enroll_fingerprint.php" class="sidebar-link">Fingerprint Enrollment</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="scan_fingerprint.php" class="sidebar-link">Fingerprint Scan</a>
+                    </li>
                 </ul>
             </li>
-
+            
             <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#geralddd" aria-expanded="true" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-right" viewBox="0 0 16 16">

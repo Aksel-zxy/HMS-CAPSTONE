@@ -245,7 +245,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <option value="">----- Select Employee -----</option>
                         <?php foreach ($employees as $emp): ?>
                             <option value="<?= $emp['employee_id'] ?>" data-profession="<?= $emp['profession'] ?>">
-                                <?= htmlspecialchars($emp['full_name']) ?> (ID: <?= $emp['employee_id'] ?>)
+                                <?= htmlspecialchars($emp['full_name'] ?? '') ?> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Employee ID: <?= $emp['employee_id'] ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>

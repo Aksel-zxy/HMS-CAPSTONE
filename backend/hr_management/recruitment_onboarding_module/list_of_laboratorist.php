@@ -122,26 +122,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $i = 1;
                         while ($row = $laboratorists->fetch_assoc()): 
                     ?>
-                        <tr>
-                            <td><?= $i++ ?></td>
-                            <td><?= htmlspecialchars($row['employee_id']); ?></td>
-                            <td><?= htmlspecialchars($row['license_number']); ?></td>
-                            <td><?= htmlspecialchars($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name'] . ' ' . $row['suffix_name']); ?></td>
-                            <td><?= htmlspecialchars($row['department']); ?></td>
-                            <td><?= htmlspecialchars($row['specialization']); ?></td>
-                            <td>
-                                <?php
-                                    $statusText = htmlspecialchars($row['status']);
-                                    $statusClass = 'status-' . strtolower($statusText);
-                                ?>
-                                <span class="status-badge <?= $statusClass; ?>"><?= $statusText; ?></span>
-                            </td>
-                            <td>
-                                <center>
-                                    <a href="view_laboratorist.php?employee_id=<?= htmlspecialchars($row['employee_id']); ?>" class="view-link">View Details</a>
-                                </center>
-                            </td>
-                        </tr>
+                    <tr>
+                        <td><?= $i++ ?></td>
+                        <td><?= htmlspecialchars($row['employee_id'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($row['license_number'] ?? '') ?></td>
+                        <td>
+                            <?php
+                                $fullName = trim(
+                                    ($row['first_name'] ?? '') . ' ' .
+                                    ($row['middle_name'] ?? '') . ' ' .
+                                    ($row['last_name'] ?? '') . ' ' .
+                                    ($row['suffix_name'] ?? '')
+                                );
+                                echo htmlspecialchars($fullName);
+                            ?>
+                        </td>
+                        <td><?= htmlspecialchars($row['department'] ?? '') ?></td>
+                        <td><?= htmlspecialchars($row['specialization'] ?? '') ?></td>
+                        <td>
+                            <?php
+                                $rawStatus   = $row['status'] ?? '';
+                                $statusText  = htmlspecialchars($rawStatus);
+                                $statusClass = 'status-' . strtolower($rawStatus);
+                            ?>
+                            <span class="status-badge <?= $statusClass ?>"><?= $statusText ?></span>
+                        </td>
+                        <td>
+                            <center>
+                                <a href="view_laboratorist.php?employee_id=<?= htmlspecialchars($row['employee_id'] ?? '') ?>" class="view-link">
+                                    View Details
+                                </a>
+                            </center>
+                        </td>
+                    </tr>
+
                     <?php endwhile; 
                         else: 
                     ?>

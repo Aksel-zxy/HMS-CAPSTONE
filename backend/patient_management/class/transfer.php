@@ -2,6 +2,14 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 include __DIR__ . '/../../../SQL/config.php';
+include 'logs.php'; // Include logs
+
+// Check session
+$user_id = $_SESSION['user_id'];
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+    header('Location: ../../login.php');
+    exit();
+}
 
 if (!isset($conn)) {
     header("Location: ../bedding.php?status=error&message=" . urlencode("DB connection missing"));
@@ -54,6 +62,8 @@ try {
     }
 
     $conn->commit();
+      //  Log the update action
+        logAction($conn, $user_id, 'Patient_Transferred', $patient_id);
     header("Location: ../bedding.php?status=1&message=" . urlencode("Patient bed updated successfully"));
     exit();
 

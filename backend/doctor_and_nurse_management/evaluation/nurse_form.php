@@ -18,21 +18,17 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+// 1. FETCH QUESTIONS AND GROUP THEM BY CATEGORY
+$questions_query = "SELECT * FROM evaluation_questions ORDER BY category ASC, question_id ASC";
+$result = $conn->query($questions_query);
 
-// Fetch all duties and group them by doctor_id
-$duties_query = "SELECT * FROM duty_assignments ORDER BY created_at DESC";
-$all_duties_res = $conn->query($duties_query);
-$duties_by_doctor = [];
-
-while ($d = $all_duties_res->fetch_assoc()) {
-    // Use the doctor_id (e.g., 101) as the key
-    $duties_by_doctor[$d['doctor_id']][] = $d;
+$grouped_questions = [];
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        // Grouping logic: $array['CategoryName'][] = RowData
+        $grouped_questions[$row['category']][] = $row;
+    }
 }
-
-// Fetch Doctors
-$query = "SELECT e.employee_id, e.first_name, e.last_name, e.profession FROM hr_employees e 
-          WHERE e.profession IN ('Doctor', 'Nurse')";
-$doctors_result = $conn->query($query);
 ?>
 
 <!DOCTYPE html>
@@ -127,13 +123,25 @@ $doctors_result = $conn->query($query);
             </li>
 
             <li class="sidebar-item">
-                <a href="doctor_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#evaluation"
+                    aria-expanded="true" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
                         <path d="M96 96C113.7 96 128 110.3 128 128L128 464C128 472.8 135.2 480 144 480L544 480C561.7 480 576 494.3 576 512C576 529.7 561.7 544 544 544L144 544C99.8 544 64 508.2 64 464L64 128C64 110.3 78.3 96 96 96zM208 288C225.7 288 240 302.3 240 320L240 384C240 401.7 225.7 416 208 416C190.3 416 176 401.7 176 384L176 320C176 302.3 190.3 288 208 288zM352 224L352 384C352 401.7 337.7 416 320 416C302.3 416 288 401.7 288 384L288 224C288 206.3 302.3 192 320 192C337.7 192 352 206.3 352 224zM432 256C449.7 256 464 270.3 464 288L464 384C464 401.7 449.7 416 432 416C414.3 416 400 401.7 400 384L400 288C400 270.3 414.3 256 432 256zM576 160L576 384C576 401.7 561.7 416 544 416C526.3 416 512 401.7 512 384L512 160C512 142.3 526.3 128 544 128C561.7 128 576 142.3 576 160z" />
                     </svg>
                     <span style="font-size: 18px;">Performance and Evaluation</span>
                 </a>
+
+                <ul id="evaluation" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="doc_feedback.php" class="sidebar-link">View Nurse Evaluation</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="analytics.php" class="sidebar-link">Evaluation Report & Analytics</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="criteria.php" class="sidebar-link">Manage Evaluation Criteria</a>
+                    </li>
+                </ul>
             </li>
         </aside>
         <!----- End of Sidebar ----->
@@ -170,145 +178,101 @@ $doctors_result = $conn->query($query);
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div style="width:95%; margin:20px auto; padding:20px;">
-                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
-                    👨‍⚕️ Medical Staff Duty Overview
-                </h2>
-
-                <div class="row" id="doctorContainer">
-                    <?php while ($doc = $doctors_result->fetch_assoc()):
-                        $doc_id = $doc['employee_id'];
-                        $my_duties = isset($duties_by_doctor[$doc_id]) ? $duties_by_doctor[$doc_id] : [];
-                    ?>
-                        <div class="col-md-4 mb-4 doctor-card" data-name="<?php echo strtolower($doc['first_name'] . ' ' . $doc['last_name']); ?>">
-                            <div class="card shadow-sm h-100 text-center p-3" style="border-radius:15px; border:none;">
-                                <div class="mb-2">
-                                    <img src="https://ui-avatars.com/api/?name=<?php echo $doc['first_name'] . '+' . $doc['last_name']; ?>&background=0d6efd&color=fff"
-                                        class="rounded-circle" width="60">
-                                </div>
-                                <h5 class="mb-0">
-                                    <?php
-                                    $prefix = ($doc['profession'] === 'Doctor') ? 'Dr. ' : '';
-                                    echo $prefix . htmlspecialchars($doc['first_name'] . " " . $doc['last_name']);
-                                    ?>
-                                </h5>
-                                <p class="text-muted small"><?php echo htmlspecialchars($doc['profession']); ?></p>
-                                <div class="badge bg-light text-primary border mb-3">
-                                    <?php echo count($my_duties); ?> Active Duties
-                                </div>
-                                <button class="btn btn-primary w-100 rounded-pill view-duties-btn"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#dutyModal"
-                                    data-doctor-name="Dr. <?php echo htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']); ?>"
-                                    data-duties='<?php echo htmlspecialchars(json_encode($my_duties), ENT_QUOTES, 'UTF-8'); ?>'>
-                                    View Duties
-                                </button>
+            <div class="container py-5">
+                <div class="row justify-content-center">
+                    <div class="col-lg-10">
+                        <div class="card shadow border-0">
+                            <div class="card-header bg-primary text-white py-3">
+                                <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Nurse Performance Evaluation</h5>
+                                <small class="opacity-75">Dynamic Form • Doctor's Perspective</small>
                             </div>
-                        </div>
-                    <?php endwhile; ?>
-                </div>
-            </div>
-            <div class="modal fade" id="dutyModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-lg modal-dialog-centered">
-                    <div class="modal-content" style="border-radius:15px; border:none;">
-                        <div class="modal-header bg-primary text-white" style="border-radius:15px 15px 0 0;">
-                            <h5 class="modal-title" id="modalDoctorName">Doctor's Duties</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body" id="modalDutyList">
-                            <div class="text-center p-4">
-                                <p class="text-muted">Loading assigned duties...</p>
+
+                            <div class="card-body p-5">
+                                <form action="submit_evaluation_process.php" method="POST">
+
+                                    <div class="mb-5 p-4 bg-light rounded border">
+                                        <label class="form-label fw-bold text-uppercase text-secondary small">Select Nurse to Evaluate</label>
+                                        <select name="evaluatee_id" class="form-select form-select-lg" required>
+                                            <option value="" selected disabled>-- Choose a Nurse --</option>
+                                            <?php
+                                            $nurses = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse'");
+                                            while ($nurse = $nurses->fetch_assoc()): ?>
+                                                <option value="<?= $nurse['employee_id'] ?>">
+                                                    <?= htmlspecialchars($nurse['first_name'] . " " . $nurse['last_name']) ?>
+                                                </option>
+                                            <?php endwhile; ?>
+                                        </select>
+                                    </div>
+
+                                    <?php if (empty($grouped_questions)): ?>
+                                        <div class="alert alert-warning">
+                                            No evaluation criteria found. Please go to <a href="manage_criteria.php">Manage Criteria</a> to add questions.
+                                        </div>
+                                    <?php else: ?>
+
+                                        <?php foreach ($grouped_questions as $category => $questions): ?>
+                                            <h5 class="text-primary fw-bold border-bottom pb-2 mb-4 mt-5 text-uppercase">
+                                                <i class="bi bi-layers me-2"></i><?= htmlspecialchars($category) ?>
+                                            </h5>
+
+                                            <?php foreach ($questions as $q): ?>
+                                                <div class="mb-4">
+                                                    <label class="fw-bold mb-1"><?= htmlspecialchars($q['criteria']) ?></label>
+
+                                                    <p class="text-muted small mb-3 fst-italic">
+                                                        <?= htmlspecialchars($q['description']) ?>
+                                                    </p>
+
+                                                    <div class="d-flex gap-3 align-items-center">
+                                                        <span class="small text-danger fw-bold">Poor</span>
+
+                                                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input border-secondary" type="radio"
+                                                                    name="ratings[<?= $q['question_id'] ?>]"
+                                                                    value="<?= $i ?>"
+                                                                    id="q_<?= $q['question_id'] ?>_<?= $i ?>" required>
+                                                                <label class="form-check-label fw-bold" for="q_<?= $q['question_id'] ?>_<?= $i ?>">
+                                                                    <?= $i ?>
+                                                                </label>
+                                                            </div>
+                                                        <?php endfor; ?>
+
+                                                        <span class="small text-success fw-bold">Excellent</span>
+                                                    </div>
+                                                </div>
+                                                <hr class="text-muted opacity-25">
+                                            <?php endforeach; ?>
+
+                                        <?php endforeach; ?>
+
+                                    <?php endif; ?>
+
+                                    <div class="mb-4 mt-5">
+                                        <label class="form-label fw-bold">Additional Comments / Summary</label>
+                                        <textarea name="comments" class="form-control" rows="4" placeholder="Specific feedback..."></textarea>
+                                    </div>
+
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary btn-lg">Submit Evaluation</button>
+                                    </div>
+
+                                </form>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <!-- END CODING HERE -->
-            <!----- End of Main Content ----->
-        </div>
-        <script>
-            const toggler = document.querySelector(".toggler-btn");
-            toggler.addEventListener("click", function() {
-                document.querySelector("#sidebar").classList.toggle("collapsed");
-            });
-
-            // FIX: Check if the element exists before adding the listener
-            const searchInput = document.getElementById('dutySearchInput');
-            if (searchInput) {
-                searchInput.addEventListener('keyup', function() {
-                    let filter = this.value.toLowerCase();
-                    let rows = document.querySelectorAll('tbody tr');
-                    rows.forEach(row => {
-                        let text = row.innerText.toLowerCase();
-                        row.style.display = text.includes(filter) ? '' : 'none';
-                    });
+            <script>
+                const toggler = document.querySelector(".toggler-btn");
+                toggler.addEventListener("click", function() {
+                    document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
-            }
-
-            document.addEventListener('DOMContentLoaded', function() {
-                const dutyModal = document.getElementById('dutyModal');
-
-                // Added a safety check here as well
-                if (dutyModal) {
-                    dutyModal.addEventListener('show.bs.modal', function(event) {
-                        const button = event.relatedTarget;
-                        const doctorName = button.getAttribute('data-doctor-name');
-                        const dutiesJSON = button.getAttribute('data-duties');
-
-                        const titleElement = document.getElementById('modalDoctorName');
-                        const bodyElement = document.getElementById('modalDutyList');
-
-                        titleElement.textContent = "Assignments: " + doctorName;
-
-                        try {
-                            const duties = JSON.parse(dutiesJSON);
-
-                            if (!duties || duties.length === 0) {
-                                bodyElement.innerHTML = '<div class="alert alert-info text-center">No active duties assigned.</div>';
-                                return;
-                            }
-
-                            let html = `
-                        <table class="table table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Procedure</th>
-                                    <th>Bed</th>
-                                    <th>Status</th>
-                                    <th>Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>`;
-
-                            duties.forEach(duty => {
-                                const statusBadge = duty.status === 'Pending' ? 'bg-warning text-dark' : 'bg-success';
-                                // Handle potential nulls in date
-                                const dateObj = duty.created_at ? new Date(duty.created_at) : new Date();
-
-                                html += `
-                            <tr>
-                                <td><strong>${duty.procedure}</strong><br><small class="text-muted">${duty.notes || ''}</small></td>
-                                <td><span class="badge bg-secondary">Bed ${duty.bed_id}</span></td>
-                                <td><span class="badge ${statusBadge}">${duty.status}</span></td>
-                                <td>${dateObj.toLocaleDateString()}</td>
-                            </tr>`;
-                            });
-
-                            html += `</tbody></table>`;
-                            bodyElement.innerHTML = html;
-
-                        } catch (e) {
-                            console.error("JSON Error:", e);
-                            bodyElement.innerHTML = '<div class="alert alert-danger">Error: Could not load data. Check console (F12).</div>';
-                        }
-                    });
-                }
-            });
-        </script>
-        <script src="../assets/Bootstrap/all.min.js"></script>
-        <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-        <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-        <script src="../assets/Bootstrap/jq.js"></script>
+            </script>
+            <script src="../assets/Bootstrap/all.min.js"></script>
+            <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+            <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+            <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

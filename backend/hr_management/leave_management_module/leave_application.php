@@ -345,6 +345,22 @@ $employees = $empResult ? $empResult->fetch_all(MYSQLI_ASSOC) : [];
                         <input type="text" id="remaining_days" readonly>
                         <p id="leave_warning" style="color:red; display:none; margin-top:5px; font-weight:bold; text-align:center;"></p>
 
+                        <!-- Leave Duration -->
+                        <label>Leave Duration</label>
+                        <select name="leave_duration" id="leave_duration" required>
+                            <option value="Whole Day">Full Day</option>
+                            <option value="Half Day">Half Day</option>
+                        </select>
+
+                        <!-- Half Day AM/PM -->
+                        <div id="halfDayOptions" style="display:none;">
+                            <label>Half Day Type</label>
+                            <select name="half_day_type">
+                                <option value="AM">Morning</option>
+                                <option value="PM">Afternoon</option>
+                            </select>
+                        </div>
+
                         <label>Start Date:</label>
                         <input type="date" name="leave_start_date" required>
                         
@@ -373,7 +389,6 @@ $employees = $empResult ? $empResult->fetch_all(MYSQLI_ASSOC) : [];
     <!----- End of Footer Content ----->
 
     <script>
-
         window.addEventListener("load", function(){
             setTimeout(function(){
                 document.getElementById("loading-screen").style.display = "none";
@@ -394,6 +409,8 @@ $employees = $empResult ? $empResult->fetch_all(MYSQLI_ASSOC) : [];
         }
 
         const leaveTypeSelect = document.getElementById('leave_type');
+        const leaveDurationSelect = document.getElementById('leave_duration'); // NEW
+        const halfDayOptionsDiv = document.getElementById('halfDayOptions'); // NEW
         const remainingInput = document.getElementById('remaining_days');
         let selectedEmployee = null;
 
@@ -407,6 +424,8 @@ $employees = $empResult ? $empResult->fetch_all(MYSQLI_ASSOC) : [];
             document.getElementById('employee_department').value = department;
 
             leaveTypeSelect.value = "";
+            leaveDurationSelect.value = "Whole Day"; // reset
+            halfDayOptionsDiv.style.display = "none"; // hide AM/PM
             remainingInput.value = "";
 
             filterLeaveTypesByGender(gender);
@@ -422,48 +441,33 @@ $employees = $empResult ? $empResult->fetch_all(MYSQLI_ASSOC) : [];
             });
         }
 
+        // Toggle Half Day AM/PM
+        leaveDurationSelect.addEventListener('change', function() {
+            halfDayOptionsDiv.style.display = this.value === 'Half Day' ? 'block' : 'none';
+            refreshRemaining(); // update remaining preview when duration changes
+        });
+
         function refreshRemaining() {
             if (!selectedEmployee || !leaveTypeSelect.value) return;
-
-            fetch(`get_remaining_days.php?employee_id=${selectedEmployee.id}&leave_type=${encodeURIComponent(leaveTypeSelect.value)}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.remaining !== undefined) {
-                        remainingInput.value = data.remaining;
-                    } else {
-                        remainingInput.value = "Error";
-                    }
-                })
-                .catch(() => {
-                    remainingInput.value = "Error";
-                });
-        }
-
-        leaveTypeSelect.addEventListener("change", function () {
-            const leaveType = this.value;
-            const submitBtn = document.querySelector("button[type='submit']");
-            const warningMsg = document.getElementById("leave_warning");
-
-            if (!selectedEmployee || !leaveType) {
-                remainingInput.value = "";
-                submitBtn.disabled = true; 
-                warningMsg.style.display = "none";
-                return;
-            }
 
             fetch("get_remaining_days.php", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: "employee_id=" + encodeURIComponent(selectedEmployee.id) +
-                    "&leave_type=" + encodeURIComponent(leaveType) +
+                    "&leave_type=" + encodeURIComponent(leaveTypeSelect.value) +
                     "&year=" + new Date().getFullYear()
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    remainingInput.value = data.remaining_days;
+                const submitBtn = document.querySelector("button[type='submit']");
+                const warningMsg = document.getElementById("leave_warning");
 
-                    if (data.remaining_days <= 0) {
+                if (data.success) {
+                    let remaining = parseFloat(data.remaining_days);
+
+                    remainingInput.value = remaining;
+
+                    if (remaining < 0) {
                         submitBtn.disabled = true;
                         warningMsg.textContent = "No remaining leave credits for this type.";
                         warningMsg.style.display = "block";
@@ -480,10 +484,13 @@ $employees = $empResult ? $empResult->fetch_all(MYSQLI_ASSOC) : [];
             .catch(err => {
                 console.error("Error:", err);
                 remainingInput.value = "Error";
-                submitBtn.disabled = true;
-                warningMsg.style.display = "none";
+                document.querySelector("button[type='submit']").disabled = true;
+                document.getElementById("leave_warning").style.display = "none";
             });
-        });
+        }
+
+        // Refresh remaining when leave type changes
+        leaveTypeSelect.addEventListener("change", refreshRemaining);
 
         document.addEventListener("DOMContentLoaded", function () {
             const table = document.getElementById("EmployeesTable");
@@ -505,7 +512,7 @@ $employees = $empResult ? $empResult->fetch_all(MYSQLI_ASSOC) : [];
 
             function updatePagination() {
                 pagination.innerHTML = ""; 
-    
+
                 const createButton = (text, page, isDisabled = false, isActive = false) => {
                     const button = document.createElement("button");
                     button.textContent = text;

@@ -163,13 +163,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <a href="license_management.php" class="sidebar-link">License Management</a>
                     </li>
                      <li class="sidebar-item">
-                        <a href="duty_assignment.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
+                        <a href="compliance.php" class="sidebar-link">Compliance Monitoring Dashboard</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Notifications & Alerts</a>
+                        <a href="notif_alert.php" class="sidebar-link">Notifications & Alerts</a>
                     </li>
                        <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Compliance Audit Log</a>
+                        <a href="audit_log.php" class="sidebar-link">Compliance Audit Log</a>
                     </li>
                 </ul>
             </li>

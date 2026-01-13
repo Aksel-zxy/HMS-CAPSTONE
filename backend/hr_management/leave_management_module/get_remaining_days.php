@@ -22,7 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $row = $result->fetch_assoc();
 
     if ($row) {
-        $remaining_days = max(0, (int)$row['allocated_days'] - (int)$row['used_days']); 
+        $remaining_days = max(
+            0,
+            (float)$row['allocated_days'] - (float)$row['used_days']
+        );
 
         echo json_encode([
             'success' => true,
