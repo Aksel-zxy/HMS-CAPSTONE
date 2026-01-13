@@ -86,6 +86,10 @@ function cardColor($company) {
 <div class="container mt-4">
     <h2 class="mb-4">🏥 Patient Insurance Cards</h2>
 
+     <div class="main-sidebar">
+        <?php include 'billing_sidebar.php'; ?>
+    </div>
+
     <div class="row g-4">
         <?php
         $cards = $conn->query("
