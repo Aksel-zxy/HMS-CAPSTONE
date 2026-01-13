@@ -155,7 +155,7 @@ if (isset($_GET['view_sched_id'])) {
             LEFT JOIN rooms_table r5 ON s.fri_room_id = r5.room_id
             LEFT JOIN rooms_table r6 ON s.sat_room_id = r6.room_id
             LEFT JOIN rooms_table r7 ON s.sun_room_id = r7.room_id
-            WHERE s.employee_id = ? ORDER BY s.week_start DESC";
+            WHERE s.employee_id = ? ORDER BY s.week_start ASC";
 
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $view_id);

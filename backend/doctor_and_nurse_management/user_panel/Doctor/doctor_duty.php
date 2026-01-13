@@ -1,37 +1,24 @@
 <?php
 session_start();
 
-// Database connection
 include '../../../../SQL/config.php';
-require '../../../pharmacy_management/classes/prescription.php';
-require '../../../pharmacy_management/classes/medicine.php';
 
-// =========================
-// Database Wrapper
-// =========================
-class Database
-{
-    private $conn;
-    public function __construct($conn)
-    {
-        $this->conn = $conn;
-    }
-    public function getConnection()
-    {
-        return $this->conn;
-    }
+if (file_exists('../../../pharmacy_management/classes/prescription.php')) {
+    require_once '../../../pharmacy_management/classes/prescription.php';
+}
+if (file_exists('../../../pharmacy_management/classes/medicine.php')) {
+    require_once '../../../pharmacy_management/classes/medicine.php';
 }
 
-// =========================
-// User (Doctor)
-// =========================
 class User
 {
     private $conn;
+
     public function __construct($conn)
     {
         $this->conn = $conn;
     }
+
     public function getById($id)
     {
         $stmt = $this->conn->prepare("SELECT * FROM hr_employees WHERE employee_id = ?");
@@ -42,18 +29,16 @@ class User
     }
 }
 
-// =========================
-// Appointment Handling
-// =========================
 class Appointment
 {
     private $conn;
+
     public function __construct($conn)
     {
         $this->conn = $conn;
     }
 
-    public function getUnassigned($assigned = [])
+    public function getUnassigned($assigned = [], $doctorId = null)
     {
         $sql = "SELECT pa.*, CONCAT(p.fname, ' ', p.lname) AS patient_name
                 FROM p_appointments pa
@@ -61,7 +46,12 @@ class Appointment
                 WHERE pa.status != 'Managed'";
 
         if (!empty($assigned)) {
-            $sql .= " AND pa.appointment_id NOT IN (" . implode(',', array_map('intval', $assigned)) . ")";
+            $ids = implode(',', array_map('intval', $assigned));
+            $sql .= " AND pa.appointment_id NOT IN ($ids)";
+        }
+
+        if ($doctorId) {
+            $sql .= " AND pa.doctor_id = " . intval($doctorId);
         }
 
         $sql .= " ORDER BY pa.appointment_date DESC";
@@ -81,6 +71,21 @@ class Appointment
         return $doctor_id;
     }
 
+    public function getById($appointment_id)
+    {
+        $stmt = $this->conn->prepare("
+            SELECT pa.*, CONCAT(p.fname, ' ', p.lname) AS patient_name
+            FROM p_appointments pa
+            JOIN patientinfo p ON pa.patient_id = p.patient_id
+            WHERE pa.appointment_id = ?
+            LIMIT 1
+        ");
+        $stmt->bind_param("i", $appointment_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        return $res->fetch_assoc();
+    }
+
     public function update($data)
     {
         $stmt = $this->conn->prepare("UPDATE p_appointments 
@@ -90,9 +95,6 @@ class Appointment
     }
 }
 
-// =========================
-// Duty Assignment
-// =========================
 class Duty
 {
     private $conn;
@@ -106,13 +108,15 @@ class Duty
     {
         $assigned = [];
         $res = $this->conn->query("SELECT appointment_id FROM duty_assignments");
-        while ($row = $res->fetch_assoc()) {
-            $assigned[] = $row['appointment_id'];
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $assigned[] = $row['appointment_id'];
+            }
         }
         return $assigned;
     }
 
-    public function getAllActive()
+    public function getAllActive($doctorId = null)
     {
         $sql = "
         SELECT 
@@ -128,18 +132,22 @@ class Duty
         INNER JOIN patientinfo pat ON a.patient_id = pat.patient_id
         LEFT JOIN dl_results r ON r.patientID = pat.patient_id
         WHERE d.status != 'Completed'
-        ORDER BY d.created_at DESC
-    ";
+        ";
+
+        if ($doctorId) {
+            $sql .= " AND d.doctor_id = " . intval($doctorId);
+        }
+
+        $sql .= " ORDER BY d.created_at DESC";
+
         $res = $this->conn->query($sql);
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
+
     public function save($data)
     {
-        // Start a transaction to ensure both operations are consistent
         $this->conn->begin_transaction();
-
         try {
-            // 1️⃣ Insert into duty_assignments
             $stmt = $this->conn->prepare("INSERT INTO duty_assignments 
             (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, notes, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
@@ -155,7 +163,6 @@ class Duty
             );
             $stmt->execute();
 
-            // 2️⃣ Update p_appointments table’s purpose and notes fields
             $update = $this->conn->prepare("UPDATE p_appointments 
             SET purpose = ?, notes = ? 
             WHERE appointment_id = ?");
@@ -167,12 +174,9 @@ class Duty
             );
             $update->execute();
 
-            // Commit the transaction if both queries succeed
             $this->conn->commit();
-
             return true;
         } catch (Exception $e) {
-            // Rollback if something fails
             $this->conn->rollback();
             error_log("Save failed: " . $e->getMessage());
             return false;
@@ -181,23 +185,16 @@ class Duty
 
     public function complete($duty_id)
     {
-        $stmt = $this->conn->prepare("
-            UPDATE duty_assignments 
-            SET status = 'Completed', updated_at = NOW() 
-            WHERE duty_id = ?
-        ");
+        $stmt = $this->conn->prepare("UPDATE duty_assignments SET status = 'Completed', updated_at = NOW() WHERE duty_id = ?");
         $stmt->bind_param("i", $duty_id);
         return $stmt->execute();
     }
 }
 
-
-// =========================
-// Hospital Resources
-// =========================
 class HospitalResource
 {
     private $conn;
+
     public function __construct($conn)
     {
         $this->conn = $conn;
@@ -212,16 +209,60 @@ class HospitalResource
     public function getNurses()
     {
         $res = $this->conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse' AND status = 'active'");
-        return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
+        $nurses = [];
+        if ($res) {
+            while ($row = $res->fetch_assoc()) {
+                $row['full_name'] = $row['first_name'] . ' ' . $row['last_name'];
+                $nurses[] = $row;
+            }
+        }
+        return $nurses;
     }
 }
 
-// =========================
-// Main Controller
-// =========================
+class PrescriptionHandler
+{
+    private $conn;
+    public function __construct($conn)
+    {
+        $this->conn = $conn;
+    }
+
+    public function getPrescriptionsByDoctor($doctor_id)
+    {
+        $sql = "
+            SELECT 
+                p.prescription_id,
+                CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+                CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
+                GROUP_CONCAT(
+                    CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
+                    SEPARATOR '<br>'
+                ) AS medicines_list,
+                SUM(i.quantity_prescribed) AS total_quantity,
+                p.note,
+                DATE_FORMAT(p.prescription_date, '%b %e, %Y %l:%i%p') AS formatted_date,
+                p.status
+            FROM pharmacy_prescription p
+            JOIN patientinfo pi ON p.patient_id = pi.patient_id
+            JOIN hr_employees e ON p.doctor_id = e.employee_id AND LOWER(e.profession) = 'doctor'
+            JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
+            JOIN pharmacy_inventory m ON i.med_id = m.med_id
+            WHERE p.doctor_id = ?
+            GROUP BY p.prescription_id
+            ORDER BY p.prescription_date DESC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param("i", $doctor_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+    }
+}
+
 class DoctorDutyController
 {
-    private $conn, $user, $appointment, $duty, $resources;
+    private $conn, $user, $appointment, $duty, $resources, $prescriptionHandler;
 
     public function __construct($conn)
     {
@@ -230,6 +271,7 @@ class DoctorDutyController
         $this->appointment = new Appointment($conn);
         $this->duty = new Duty($conn);
         $this->resources = new HospitalResource($conn);
+        $this->prescriptionHandler = new PrescriptionHandler($conn);
     }
 
     public function authenticate()
@@ -250,18 +292,22 @@ class DoctorDutyController
 
     public function handleActions()
     {
-        // Save duty
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
             $appointment_id = (int) $_POST['appointment_id'];
             $doctor_id = $this->appointment->getDoctorId($appointment_id);
 
+            $procedure = htmlspecialchars($_POST['procedure'] ?? '');
+            $notes = htmlspecialchars($_POST['notes'] ?? '');
+            $bed_id = !empty($_POST['bed_id']) ? $_POST['bed_id'] : null;
+            $nurse_assistant = !empty($_POST['nurse_assistant']) ? $_POST['nurse_assistant'] : null;
+
             $data = [
                 'appointment_id' => $appointment_id,
                 'doctor_id' => $doctor_id,
-                'bed_id' => $_POST['bed_id'] ?? null,
-                'nurse_assistant' => $_POST['nurse_assistant'] ?? null,
-                'procedure' => $_POST['procedure'],
-                'notes' => $_POST['notes'],
+                'bed_id' => $bed_id,
+                'nurse_assistant' => $nurse_assistant,
+                'procedure' => $procedure,
+                'notes' => $notes,
                 'status' => 'Pending'
             ];
 
@@ -274,21 +320,19 @@ class DoctorDutyController
             }
         }
 
-        // Complete duty
         if (isset($_GET['complete_duty_id'])) {
             $this->duty->complete((int) $_GET['complete_duty_id']);
             header("Location: doctor_duty.php");
             exit;
         }
 
-        // Update appointment
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_appointment'])) {
             $data = [
                 'appointment_id' => $_POST['appointment_id'],
                 'appointment_date' => $_POST['appointment_date'],
-                'purpose' => $_POST['purpose'],
+                'purpose' => htmlspecialchars($_POST['purpose']),
                 'status' => $_POST['status'],
-                'notes' => $_POST['notes']
+                'notes' => htmlspecialchars($_POST['notes'])
             ];
             $this->appointment->update($data);
             header("Location: doctor_duty.php?success=1");
@@ -298,30 +342,12 @@ class DoctorDutyController
 
     public function getViewData()
     {
-        $assigned = $this->duty->getAssignedAppointments();
         $employee_id = $_SESSION['employee_id'] ?? null;
+        $assigned = $this->duty->getAssignedAppointments();
 
-        // Only show appointments assigned to this doctor
-        $appointments = [];
-        if ($employee_id) {
-            $all = $this->appointment->getUnassigned($assigned);
-            foreach ($all as $appt) {
-                if (isset($appt['doctor_id']) && $appt['doctor_id'] == $employee_id) {
-                    $appointments[] = $appt;
-                }
-            }
-        }
+        $appointments = $this->appointment->getUnassigned($assigned, $employee_id);
 
-        // Only show duties assigned to this doctor
-        $duties = [];
-        if ($employee_id) {
-            $allDuties = $this->duty->getAllActive();
-            foreach ($allDuties as $duty) {
-                if (isset($duty['doctor_id']) && $duty['doctor_id'] == $employee_id) {
-                    $duties[] = $duty;
-                }
-            }
-        }
+        $duties = $this->duty->getAllActive($employee_id);
 
         return [
             'appointments' => $appointments,
@@ -331,136 +357,113 @@ class DoctorDutyController
         ];
     }
 
+    public function getAppointmentById($id)
+    {
+        return $this->appointment->getById($id);
+    }
+
     public function getAllBeds()
     {
         return $this->resources->getBeds();
     }
-
     public function getAllNurses()
     {
-        // Get nurses and add a 'full_name' field for convenience
-        $nurses = $this->resources->getNurses();
-        foreach ($nurses as &$nurse) {
-            $nurse['full_name'] = $nurse['first_name'] . ' ' . $nurse['last_name'];
-        }
-        return $nurses;
+        return $this->resources->getNurses();
+    }
+    public function getPrescriptions($doctorId)
+    {
+        return $this->prescriptionHandler->getPrescriptionsByDoctor($doctorId);
     }
 
-    public function getAppointmentById($appointment_id)
+    public function getAssignedNurseForToday($doctorId)
     {
-        $stmt = $this->conn->prepare("
-        SELECT 
-            pa.*,
-            CONCAT(p.fname, ' ', p.lname) AS patient_name
-        FROM p_appointments pa
-        JOIN patientinfo p ON pa.patient_id = p.patient_id
-        WHERE pa.appointment_id = ?
-        LIMIT 1
-    ");
-        $stmt->bind_param("i", $appointment_id);
+        date_default_timezone_set('Asia/Manila');
+
+        $assigned_nurse = null;
+        $today = date('Y-m-d');
+
+        $day_prefix = strtolower(date('D'));
+        $room_col = $day_prefix . '_room_id';
+
+        $valid_cols = ['mon_room_id', 'tue_room_id', 'wed_room_id', 'thu_room_id', 'fri_room_id', 'sat_room_id', 'sun_room_id'];
+        if (!in_array($room_col, $valid_cols)) {
+            return null;
+        }
+
+        $stmt = $this->conn->prepare("SELECT $room_col as room_id 
+                                      FROM shift_scheduling 
+                                      WHERE employee_id = ? 
+                                      AND week_start <= ? 
+                                      ORDER BY week_start DESC LIMIT 1");
+        $stmt->bind_param("is", $doctorId, $today);
         $stmt->execute();
         $res = $stmt->get_result();
-        return $res->fetch_assoc();
+        $doc_schedule = $res->fetch_assoc();
+
+        if ($doc_schedule && !empty($doc_schedule['room_id'])) {
+            $my_room_id = $doc_schedule['room_id'];
+
+            $nurse_query = "SELECT e.employee_id, e.first_name, e.last_name 
+                            FROM shift_scheduling s
+                            JOIN hr_employees e ON s.employee_id = e.employee_id
+                            WHERE s.week_start <= ? 
+                            AND s.$room_col = ? 
+                            AND e.profession = 'Nurse' 
+                            ORDER BY s.week_start DESC 
+                            LIMIT 1";
+
+            $stmt = $this->conn->prepare($nurse_query);
+            $stmt->bind_param("si", $today, $my_room_id);
+            $stmt->execute();
+            $nurse_res = $stmt->get_result();
+
+            if ($nurse_res->num_rows > 0) {
+                $assigned_nurse = $nurse_res->fetch_assoc();
+            }
+        }
+
+        return $assigned_nurse;
     }
 }
-
-
-class Axl
-{
-    private $conn;
-
-    public function __construct($conn)
-    {
-        $this->conn = $conn;
-    }
-
-    // ✅ Get all prescriptions for a specific doctor (with joined data)
-    public function getPrescriptionsByDoctor($doctor_id)
-    {
-        $sql = "
-            SELECT 
-                p.prescription_id,
-                CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
-                CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
-                GROUP_CONCAT(
-                    CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
-                    SEPARATOR '<br>'
-                ) AS medicines_list,
-                SUM(i.quantity_prescribed) AS total_quantity,
-                p.note,
-                DATE_FORMAT(p.prescription_date, '%b %e, %Y %l:%i%p') AS formatted_date,
-                p.status
-            FROM pharmacy_prescription p
-            JOIN patientinfo pi 
-                ON p.patient_id = pi.patient_id
-            JOIN hr_employees e 
-                ON p.doctor_id = e.employee_id 
-                AND LOWER(e.profession) = 'doctor'
-            JOIN pharmacy_prescription_items i 
-                ON p.prescription_id = i.prescription_id
-            JOIN pharmacy_inventory m 
-                ON i.med_id = m.med_id
-            WHERE p.doctor_id = ?
-            GROUP BY p.prescription_id
-            ORDER BY p.prescription_date DESC";
-
-        $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("i", $doctor_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-    }
-}
-
-
-
-// =========================
-// Initialize Controller
-// =========================
-$database = new Database($conn);
-$conn = $database->getConnection();
 
 $controller = new DoctorDutyController($conn);
 $user = $controller->authenticate();
 $controller->handleActions();
 $viewData = $controller->getViewData();
 
-// Medicines and Prescriptions
-$medicineObj = new Medicine($conn);
-$prescription = new Prescription($conn);
-$medicines = $medicineObj->getAllMedicines();
-$doctors = $prescription->getDoctors()->fetch_all(MYSQLI_ASSOC);
-$patients = $prescription->getPatients()->fetch_all(MYSQLI_ASSOC);
-
-$prescriptionData = new Axl($conn);
-$prescriptionsByDoctor = $prescriptionData->getPrescriptionsByDoctor($_SESSION['employee_id']);
-
-
-
-// Example usage:
-// echo "<pre>"; print_r($viewData); echo "</pre>";
-// --- GET IDs from URL ---
+$prescriptionsByDoctor = $controller->getPrescriptions($_SESSION['employee_id']);
 
 $manage_id = $_GET['manage_id'] ?? null;
 $edit_id = $_GET['edit_id'] ?? null;
 
-// --- Initialize variables ---
 $appointment = null;
-$appointment_id = null;
-
-// --- Fetch appointments if editing or managing ---
-if ($manage_id) {
-    $appointment_id = $manage_id; // used for the "Manage" form
-}
+$appointment_id = $manage_id ? $manage_id : null;
 
 if ($edit_id) {
-    $appointment = $controller->getAppointmentById($edit_id); // Fetch full appointment details
+    $appointment = $controller->getAppointmentById($edit_id);
 }
 
-// --- Fetch available beds and nurses ---
 $beds = $controller->getAllBeds();
 $nurses = $controller->getAllNurses();
 
+$assigned_nurse = null;
+if (isset($_SESSION['employee_id'])) {
+    $assigned_nurse = $controller->getAssignedNurseForToday($_SESSION['employee_id']);
+}
+
+$medicines = [];
+$doctors = [];
+$patients = [];
+
+if (class_exists('Medicine')) {
+    $medicineObj = new Medicine($conn);
+    $medicines = $medicineObj->getAllMedicines();
+}
+if (class_exists('Prescription')) {
+    $prescriptionObj = new Prescription($conn);
+    $doctors = $prescriptionObj->getDoctors()->fetch_all(MYSQLI_ASSOC);
+    $patients = $prescriptionObj->getPatients()->fetch_all(MYSQLI_ASSOC);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -538,7 +541,7 @@ $nurses = $controller->getAllNurses();
                         </svg>
                     </div>
 
-                    <div class="mt-2 text-primary fw-bold" style="font-size: 14px;">View Profile</div>
+                    <div class="mt-2 text-primary fw-bold" style="font-size: 14px;"><?php echo $user['first_name']; ?> <?php echo $user['last_name']; ?></div>
                 </a>
             </div>
             <div class="menu-title">Navigation</div>
@@ -741,17 +744,26 @@ $nurses = $controller->getAllNurses();
                                             </select>
                                         </div>
 
-                                        <!-- Nurse Assistant -->
                                         <div class="mb-3">
                                             <label class="form-label">Nurse Assistant</label>
-                                            <select name="nurse_assistant" class="form-select form-select-sm">
-                                                <option value="">-- Select Nurse --</option>
-                                                <?php foreach ($nurses as $row): ?>
-                                                    <option value="<?= $row['employee_id'] ?>">
-                                                        <?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
+                                            <?php if ($assigned_nurse): ?>
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-light text-success"><i class="bi bi-check-circle-fill"></i></span>
+                                                    <input type="text" class="form-control"
+                                                        value="<?= htmlspecialchars($assigned_nurse['first_name'] . ' ' . $assigned_nurse['last_name']) ?> (Auto-detected)"
+                                                        readonly>
+                                                    <input type="hidden" name="nurse_assistant" value="<?= $assigned_nurse['employee_id'] ?>">
+                                                </div>
+                                            <?php else: ?>
+                                                <select name="nurse_assistant" class="form-select form-select-sm">
+                                                    <option value="">-- Select Nurse --</option>
+                                                    <?php foreach ($nurses as $row): ?>
+                                                        <option value="<?= $row['employee_id'] ?>">
+                                                            <?= htmlspecialchars($row['first_name'] . ' ' . $row['last_name']) ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            <?php endif; ?>
                                         </div>
 
                                         <!-- Procedure -->
