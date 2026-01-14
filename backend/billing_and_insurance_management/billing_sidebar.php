@@ -260,6 +260,7 @@ body {
             <ul>
                 <!-- Dashboard -->
                 <li><a href="billing_dashboard.php">Dashboard</a></li>
+                <li><a href="insurance.php">Patient Insurance</a></li>
 
                 <!-- Billing Management -->
                 <li>

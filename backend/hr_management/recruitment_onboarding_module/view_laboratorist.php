@@ -277,191 +277,194 @@ if (isset($uploadedDocs[$docType])) {
                 </center>
 
                 <form action="update_laboratorist.php" method="post" enctype="multipart/form-data">
-                    <input type="hidden" name="employee_id" value="<?= $employee['employee_id']; ?>">
+                    <input type="hidden" name="employee_id" value="<?= htmlspecialchars($employee['employee_id'] ?? '') ?>">
 
                     <br />
                     <br />
-                    
+
                     <center>
                         <h4 style="font-weight: bold;">Personal Information</h4>
                     </center>
 
                     <label>First Name:</label>
-                    <input type="text" name="first_name" value="<?= htmlspecialchars($employee['first_name']); ?>" required>
+                    <input type="text" name="first_name" value="<?= htmlspecialchars($employee['first_name'] ?? '') ?>" required>
 
                     <label>Middle Name:</label>
-                    <input type="text" name="middle_name" value="<?= htmlspecialchars($employee['middle_name']); ?>">
+                    <input type="text" name="middle_name" value="<?= htmlspecialchars($employee['middle_name'] ?? '') ?>">
 
                     <label>Last Name:</label>
-                    <input type="text" name="last_name" value="<?= htmlspecialchars($employee['last_name']); ?>" required>
+                    <input type="text" name="last_name" value="<?= htmlspecialchars($employee['last_name'] ?? '') ?>" required>
 
                     <label>Suffix:</label>
-                    <input type="text" name="suffix_name" value="<?= htmlspecialchars($employee['suffix_name']); ?>">
+                    <input type="text" name="suffix_name" value="<?= htmlspecialchars($employee['suffix_name'] ?? '') ?>">
 
                     <label>Gender:</label>
                     <select name="gender" required>
-                        <option value="Male" <?= $employee['gender'] == 'Male' ? 'selected' : '' ?>>Male</option>
-                        <option value="Female" <?= $employee['gender'] == 'Female' ? 'selected' : '' ?>>Female</option>
+                        <option value="Male" <?= ($employee['gender'] ?? '') == 'Male' ? 'selected' : '' ?>>Male</option>
+                        <option value="Female" <?= ($employee['gender'] ?? '') == 'Female' ? 'selected' : '' ?>>Female</option>
                     </select>
 
                     <label>Date of Birth:</label>
-                    <input type="date" name="date_of_birth" value="<?= $employee['date_of_birth']; ?>" required>
+                    <input type="date" name="date_of_birth" value="<?= htmlspecialchars($employee['date_of_birth'] ?? '') ?>" required>
 
                     <label>Contact Number:</label>
-                    <input type="text" name="contact_number" value="<?= htmlspecialchars($employee['contact_number']); ?>" required>
+                    <input type="text" name="contact_number" value="<?= htmlspecialchars($employee['contact_number'] ?? '') ?>" required>
 
                     <label>Email:</label>
-                    <input type="email" name="email" value="<?= htmlspecialchars($employee['email']); ?>" required>
+                    <input type="email" name="email" value="<?= htmlspecialchars($employee['email'] ?? '') ?>" required>
 
                     <label for="citizenship">Citizenship:</label>
                     <select id="citizenship" name="citizenship" required>
-                        <option value="Filipino" <?= $employee['citizenship'] == 'Filipino' ? 'selected' : '' ?>>Filipino</option>
-                        <option value="American" <?= $employee['citizenship'] == 'American' ? 'selected' : '' ?>>American</option>
-                        <option value="Indian" <?= $employee['citizenship'] == 'Indian' ? 'selected' : '' ?>>Indian</option>
-                        <option value="British" <?= $employee['citizenship'] == 'British' ? 'selected' : '' ?>>British</option>
-                        <option value="Australian" <?= $employee['citizenship'] == 'Australian' ? 'selected' : '' ?>>Australian</option>
-                        <option value="Canadian" <?= $employee['citizenship'] == 'Canadian' ? 'selected' : '' ?>>Canadian</option>
-                        <option value="Thai" <?= $employee['citizenship'] == 'Thai' ? 'selected' : '' ?>>Thai</option>
-                        <option value="French" <?= $employee['citizenship'] == 'French' ? 'selected' : '' ?>>French</option>
-                        <option value="Saudi Arabian" <?= $employee['citizenship'] == 'Saudi Arabian' ? 'selected' : '' ?>>Saudi Arabian</option>
-                        <option value="Singaporean" <?= $employee['citizenship'] == 'Singaporean' ? 'selected' : '' ?>>Singaporean</option>
-                        <option value="Chinese" <?= $employee['citizenship'] == 'Chinese' ? 'selected' : '' ?>>Chinese</option>
-                        <option value="Korean" <?= $employee['citizenship'] == 'Korean' ? 'selected' : '' ?>>Korean</option>
-                        <option value="Japanese" <?= $employee['citizenship'] == 'Japanese' ? 'selected' : '' ?>>Japanese</option>
+                        <?php 
+                        $citizenships = ['Filipino','American','Indian','British','Australian','Canadian','Thai','French','Saudi Arabian','Singaporean','Chinese','Korean','Japanese'];
+                        foreach ($citizenships as $c) : ?>
+                            <option value="<?= $c ?>" <?= ($employee['citizenship'] ?? '') == $c ? 'selected' : '' ?>><?= $c ?></option>
+                        <?php endforeach; ?>
                     </select>
 
                     <label>House No.:</label>
-                    <input type="text" name="house_no" value="<?= htmlspecialchars($employee['house_no']); ?>">
+                    <input type="text" name="house_no" value="<?= htmlspecialchars($employee['house_no'] ?? '') ?>">
 
                     <label>Barangay:</label>
-                    <input type="text" name="barangay" value="<?= htmlspecialchars($employee['barangay']); ?>">
+                    <input type="text" name="barangay" value="<?= htmlspecialchars($employee['barangay'] ?? '') ?>">
 
                     <label>City:</label>
-                    <input type="text" name="city" value="<?= htmlspecialchars($employee['city']); ?>">
+                    <input type="text" name="city" value="<?= htmlspecialchars($employee['city'] ?? '') ?>">
 
                     <label>Province:</label>
-                    <input type="text" name="province" value="<?= htmlspecialchars($employee['province']); ?>">
+                    <input type="text" name="province" value="<?= htmlspecialchars($employee['province'] ?? '') ?>">
 
                     <label for="region">Region:</label>
                     <select id="region" name="region" required>
-                        <option value="Region 1 - Ilocos Region" <?= $employee['region'] == 'Region 1 - Ilocos Region' ? 'selected' : '' ?>>Region 1 - Ilocos Region</option>
-                        <option value="Region 2 - Cagayan Valley" <?= $employee['region'] == 'Region 2 - Cagayan Valley' ? 'selected' : '' ?>>Region 2 - Cagayan Valley</option>
-                        <option value="Region 3 - Central Luzon" <?= $employee['region'] == 'Region 3 - Central Luzon' ? 'selected' : '' ?>>Region 3 - Central Luzon</option>
-                        <option value="Region 4A - CALABARZON" <?= $employee['region'] == 'Region 4A - CALABARZON' ? 'selected' : '' ?>>Region 4A - CALABARZON</option>
-                        <option value="Region 4B - MIMAROPA" <?= $employee['region'] == 'Region 4B - MIMAROPA' ? 'selected' : '' ?>>Region 4B - MIMAROPA</option>
-                        <option value="Region 5 - Bicol Region" <?= $employee['region'] == 'Region 5 - Bicol Region' ? 'selected' : '' ?>>Region 5 - Bicol Region</option>
-                        <option value="Region 6 - Western Visayas" <?= $employee['region'] == 'Region 6 - Western Visayas' ? 'selected' : '' ?>>Region 6 - Western Visayas</option>
-                        <option value="Region 7 - Central Visayas" <?= $employee['region'] == 'Region 7 - Central Visayas' ? 'selected' : '' ?>>Region 7 - Central Visayas</option>
-                        <option value="Region 8 - Eastern Visayas" <?= $employee['region'] == 'Region 8 - Eastern Visayas' ? 'selected' : '' ?>>Region 8 - Eastern Visayas</option>
-                        <option value="Region 9 - Zamboanga Peninsula" <?= $employee['region'] == 'Region 9 - Zamboanga Peninsula' ? 'selected' : '' ?>>Region 9 - Zamboanga Peninsula</option>
-                        <option value="Region 10 - Northern Mindanao" <?= $employee['region'] == 'Region 10 - Northern Mindanao' ? 'selected' : '' ?>>Region 10 - Northern Mindanao</option>
-                        <option value="Region 11 - Davao Region" <?= $employee['region'] == 'Region 11 - Davao Region' ? 'selected' : '' ?>>Region 11 - Davao Region</option>
-                        <option value="Region 12 - SOCCSKSARGEN" <?= $employee['region'] == 'Region 12 - SOCCSKSARGEN' ? 'selected' : '' ?>>Region 12 - SOCCSKSARGEN</option>
-                        <option value="Region 13 - Caraga" <?= $employee['region'] == 'Region 13 - Caraga' ? 'selected' : '' ?>>Region 13 - Caraga</option>
-                        <option value="CAR - Cordillera Administrative Region" <?= $employee['region'] == 'CAR - Cordillera Administrative Region' ? 'selected' : '' ?>>CAR - Cordillera Administrative Region</option>
-                        <option value="NCR - National Capital Region" <?= $employee['region'] == 'NCR - National Capital Region' ? 'selected' : '' ?>>NCR - National Capital Region</option>
-                        <option value="ARMM - Autonomous Region in Muslim Mindanao" <?= $employee['region'] == 'ARMM - Autonomous Region in Muslim Mindanao' ? 'selected' : '' ?>>ARMM - Autonomous Region in Muslim Mindanao</option>
-                        <option value="BARMM - Bangsamoro Autonomous Region" <?= $employee['region'] == 'BARMM - Bangsamoro Autonomous Region' ? 'selected' : '' ?>>BARMM - Bangsamoro Autonomous Region</option>
+                        <?php
+                        $regions = [
+                            "Region 1 - Ilocos Region","Region 2 - Cagayan Valley","Region 3 - Central Luzon",
+                            "Region 4A - CALABARZON","Region 4B - MIMAROPA","Region 5 - Bicol Region",
+                            "Region 6 - Western Visayas","Region 7 - Central Visayas","Region 8 - Eastern Visayas",
+                            "Region 9 - Zamboanga Peninsula","Region 10 - Northern Mindanao","Region 11 - Davao Region",
+                            "Region 12 - SOCCSKSARGEN","Region 13 - Caraga","CAR - Cordillera Administrative Region",
+                            "NCR - National Capital Region","ARMM - Autonomous Region in Muslim Mindanao",
+                            "BARMM - Bangsamoro Autonomous Region"
+                        ];
+                        foreach ($regions as $r) {
+                            $selected = ($employee['region'] ?? '') == $r ? 'selected' : '';
+                            echo "<option value=\"$r\" $selected>$r</option>";
+                        }
+                        ?>
                     </select>
+
                     <br />
                     <br />
 
                     <center>
-                        <h4 style="font-weight: bold;">Role and Employment</h4> 
+                        <h4 style="font-weight: bold;">Role and Employment</h4>
                     </center>
-                    
+
                     <label for="profession">Profession:</label>
                     <select id="profession" name="profession" required>
-                    <option value="Laboratorist" <?= ($employee['profession'] == 'Laboratorist') ? 'selected' : ''; ?>>Laboratorist</option>
+                        <option value="Laboratorist" <?= ($employee['profession'] ?? '') == 'Laboratorist' ? 'selected' : '' ?>>Laboratorist</option>
                     </select>
 
                     <label for="role">Role:</label>
                     <select id="role" name="role" required>
-                        <option value="Medical Technologist" <?= ($employee['role'] == 'Medical Technologist') ? 'selected' : ''; ?>>Medical Technologist</option>
+                        <option value="Medical Technologist" <?= ($employee['role'] ?? '') == 'Medical Technologist' ? 'selected' : '' ?>>Medical Technologist</option>
                     </select>
 
                     <label for="department">Department:</label>
                     <select id="department" name="department" required>
-                        <option value="Laboratory Department" <?= ($employee['department'] == 'Laboratory Department') ? 'selected' : ''; ?>>Laboratory Department</option>
+                        <option value="Laboratory Department" <?= ($employee['department'] ?? '') == 'Laboratory Department' ? 'selected' : '' ?>>Laboratory Department</option>
                     </select>
 
                     <label for="specialization">Specialization:</label>
                     <select id="specialization" name="specialization" required>
-                        <option value="Clinical Chemistry" <?= ($employee['specialization'] == 'Clinical Chemistry') ? 'selected' : ''; ?>>Clinical Chemistry</option>
-                        <option value="Hematology" <?= ($employee['specialization'] == 'Hematology') ? 'selected' : ''; ?>>Hematology</option>
-                        <option value="Microbiology" <?= ($employee['specialization'] == 'Microbiology') ? 'selected' : ''; ?>>Microbiology</option>
-                        <option value="Parasitology" <?= ($employee['specialization'] == 'Parasitology') ? 'selected' : ''; ?>>Parasitology</option>
-                        <option value="Blood Bank / Immunohematology" <?= ($employee['specialization'] == 'Blood Bank / Immunohematology') ? 'selected' : ''; ?>>Blood Bank / Immunohematology</option>
-                        <option value="Immunology / Serology" <?= ($employee['specialization'] == 'Immunology / Serology') ? 'selected' : ''; ?>>Immunology / Serology</option>
-                        <option value="Histopathology" <?= ($employee['specialization'] == 'Histopathology') ? 'selected' : ''; ?>>Histopathology</option>
+                        <?php
+                        $specializations = [
+                            'Clinical Chemistry', 'Hematology', 'Microbiology', 'Parasitology',
+                            'Blood Bank / Immunohematology', 'Immunology / Serology', 'Histopathology'
+                        ];
+                        foreach ($specializations as $s) {
+                            $selected = ($employee['specialization'] ?? '') == $s ? 'selected' : '';
+                            echo "<option value=\"$s\" $selected>$s</option>";
+                        }
+                        ?>
                     </select>
 
                     <label for="employment_type">Employment Type:</label>
                     <select id="employment_type" name="employment_type" required>
-                        <option value="Full-Time" <?= $employee['employment_type'] == 'Full-Time' ? 'selected' : '' ?>>Full-Time</option>
-                        <option value="Part-Time" <?= $employee['employment_type'] == 'Part-Time' ? 'selected' : '' ?>>Part-Time</option>
-                        <option value="Contractual" <?= $employee['employment_type'] == 'Contractual' ? 'selected' : '' ?>>Contractual</option>
-                        <option value="Consultant" <?= $employee['employment_type'] == 'Consultant' ? 'selected' : '' ?>>Consultant</option>
+                        <?php
+                        $employmentTypes = ['Full-Time', 'Part-Time', 'Contractual', 'Consultant'];
+                        foreach ($employmentTypes as $type) {
+                            $selected = ($employee['employment_type'] ?? '') == $type ? 'selected' : '';
+                            echo "<option value=\"$type\" $selected>$type</option>";
+                        }
+                        ?>
                     </select>
 
                     <label>Status:</label>
                     <select name="status">
-                        <option value="Active" <?= $employee['status'] == 'Active' ? 'selected' : '' ?>>Active</option>
-                        <option value="Inactive" <?= $employee['status'] == 'Inactive' ? 'selected' : '' ?>>Inactive</option>
-                        <option value="Resigned" <?= $employee['status'] == 'Resigned' ? 'selected' : '' ?>>Resigned</option>
+                        <?php
+                        $statuses = ['Active','Inactive','Resigned'];
+                        foreach ($statuses as $status) {
+                            $selected = ($employee['status'] ?? '') == $status ? 'selected' : '';
+                            echo "<option value=\"$status\" $selected>$status</option>";
+                        }
+                        ?>
                     </select>
+
                     <br />
                     <br />
 
                     <center>
-                    <h4 style="font-weight: bold;">License and Education</h4> 
+                        <h4 style="font-weight: bold;">License and Education</h4>
                     </center>
 
                     <label for="educational_status">Educational Status:</label>
                     <select id="educational_status" name="educational_status" required>
-                        <option value="Graduate" <?= ($employee['educational_status'] == 'Graduate') ? 'selected' : ''; ?>>Graduate</option>
-                        <option value="Post Graduate" <?= ($employee['educational_status'] == 'Post Graduate') ? 'selected' : ''; ?>>Post Graduate</option>
+                        <option value="Graduate" <?= ($employee['educational_status'] ?? '') == 'Graduate' ? 'selected' : '' ?>>Graduate</option>
+                        <option value="Post Graduate" <?= ($employee['educational_status'] ?? '') == 'Post Graduate' ? 'selected' : '' ?>>Post Graduate</option>
                     </select>
 
                     <label for="degree_type">Degree Type:</label>
                     <select id="degree_type" name="degree_type" required>
-                        <option value="Bachelor of Science in Medical Technology (BSMT)" <?= ($employee['degree_type'] == 'Bachelor of Science in Medical Technology (BSMT)') ? 'selected' : ''; ?>>Bachelor of Science in Medical Technology (BSMT)</option>
+                        <option value="Bachelor of Science in Medical Technology (BSMT)" <?= ($employee['degree_type'] ?? '') == 'Bachelor of Science in Medical Technology (BSMT)' ? 'selected' : '' ?>>Bachelor of Science in Medical Technology (BSMT)</option>
                     </select>
-            
+
                     <label for="medical_school">Medical School:</label>
-                    <input type="text" id="medical_school" name="medical_school" value="<?= $employee['medical_school']; ?>">
+                    <input type="text" id="medical_school" name="medical_school" value="<?= htmlspecialchars($employee['medical_school'] ?? '') ?>">
 
                     <label for="graduation_year">Graduation Year:</label>
-                    <input type="number" name="graduation_year" id="graduation_year" min="1980" max="<?= date('Y'); ?>" value="<?= htmlspecialchars($employee['graduation_year'] ?? '') ?>">
+                    <input type="number" name="graduation_year" min="1980" max="<?= date('Y'); ?>" value="<?= htmlspecialchars($employee['graduation_year'] ?? '') ?>">
 
                     <label>License Type:</label>
                     <select id="license_type" name="license_type">
-                        <option value="Registered Medical Technologist" <?= ($employee['license_type'] == 'Registered Medical Technologist') ? 'selected' : ''; ?>>Registered Medical Technologist</option>
+                        <option value="Registered Medical Technologist" <?= ($employee['license_type'] ?? '') == 'Registered Medical Technologist' ? 'selected' : '' ?>>Registered Medical Technologist</option>
                     </select>
 
                     <label>License Number:</label>
-                    <input type="text" name="license_number" value="<?= htmlspecialchars($employee['license_number']); ?>">
+                    <input type="text" name="license_number" value="<?= htmlspecialchars($employee['license_number'] ?? '') ?>">
 
                     <label>License Issued:</label>
-                    <input type="date" name="license_issued" value="<?= $employee['license_issued']; ?>">
+                    <input type="date" name="license_issued" value="<?= htmlspecialchars($employee['license_issued'] ?? '') ?>">
 
                     <label>License Expiry:</label>
-                    <input type="date" name="license_expiry" value="<?= $employee['license_expiry']; ?>">
+                    <input type="date" name="license_expiry" value="<?= htmlspecialchars($employee['license_expiry'] ?? '') ?>">
+
                     <br />
                     <br />
 
                     <center>
-                        <h4 style="font-weight: bold;">Emergency Contact</h4> 
+                        <h4 style="font-weight: bold;">Emergency Contact</h4>
                     </center>
 
                     <label>Name:</label>
-                    <input type="text" name="eg_name" value="<?= htmlspecialchars($employee['eg_name']); ?>">
+                    <input type="text" name="eg_name" value="<?= htmlspecialchars($employee['eg_name'] ?? '') ?>">
 
                     <label>Relationship:</label>
-                    <input type="text" name="eg_relationship" value="<?= htmlspecialchars($employee['eg_relationship']); ?>">
+                    <input type="text" name="eg_relationship" value="<?= htmlspecialchars($employee['eg_relationship'] ?? '') ?>">
 
                     <label>Contact Number:</label>
-                    <input type="text" name="eg_cn" value="<?= htmlspecialchars($employee['eg_cn']); ?>">
+                    <input type="text" name="eg_cn" value="<?= htmlspecialchars($employee['eg_cn'] ?? '') ?>">
+
                     <br />
                     <br />
 

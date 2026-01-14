@@ -5,7 +5,7 @@ include '../../SQL/config.php';
 require_once 'class/patient.php';
 
 $patientObj = new Patient($conn);
-$patients = $patientObj->getAllPatients();
+$patients = $patientObj->getRegisteredPatients();
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
     header('Location: login.php');
@@ -125,7 +125,7 @@ $user = $result->fetch_assoc();
             </li>
 
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
+                <a href="logs.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#" aria-expanded="false"
                     aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="fa-regular fa-folder-closed" viewBox="0 0 16 16">
@@ -136,7 +136,7 @@ $user = $result->fetch_assoc();
                         144C355.8 144 349 141.8 343.5 137.6L305.1 108.8C294 100.5 280.5 96 266.7 96L128 96C92.7 96 64
                         124.7 64 160L64 448C64 483.3 92.7 512 128 512z" />
                     </svg>
-                    <span style="font-size: 18px;">Summary</span>
+                    <span style="font-size: 18px;">Logs</span>
                 </a>
             </li>
 

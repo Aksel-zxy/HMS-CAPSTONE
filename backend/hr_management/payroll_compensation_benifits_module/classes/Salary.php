@@ -19,17 +19,29 @@ class Salary {
 
     public function getEmployees() {
         $employees = [];
-        $sql = "SELECT employee_id, 
-                       CONCAT(first_name, ' ', middle_name, ' ', last_name, ' ', suffix_name) AS full_name, 
-                       profession 
-                FROM hr_employees 
-                ORDER BY employee_id ASC";
+
+        $sql = "
+            SELECT 
+                employee_id,
+                TRIM(CONCAT(
+                    COALESCE(first_name, ''), ' ',
+                    COALESCE(middle_name, ''), ' ',
+                    COALESCE(last_name, ''), ' ',
+                    COALESCE(suffix_name, '')
+                )) AS full_name,
+                profession
+            FROM hr_employees
+            ORDER BY employee_id ASC
+        ";
+
         $result = $this->conn->query($sql);
+
         if ($result && $result->num_rows > 0) {
             while ($row = $result->fetch_assoc()) {
                 $employees[] = $row;
             }
         }
+
         return $employees;
     }
 

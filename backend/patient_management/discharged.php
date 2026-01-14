@@ -1,7 +1,7 @@
 <?php
 session_start();
 include '../../SQL/config.php';
-
+include 'class/logs.php';
 require_once 'class/caller.php';
 
 //  Ensure patient_id is passed
@@ -27,6 +27,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $released_date = $_POST['released_date'];
     $discharge->discharge($assignment['assignment_id'], $bed_id, $patient_id, $released_date);
 }
+
+$user_id = $_SESSION['user_id'];
+
+logAction($conn, $user_id, 'Discharged Patient', $patient_id);
 ?>
 
 <!DOCTYPE html>

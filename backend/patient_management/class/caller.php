@@ -332,13 +332,14 @@ class PatientAdmission {
         return $this->patient;
     }
 
-     public function admit($patient_id, $bed_id, $assigned_date, $admission_type) {
+     public function admit($patient_id, $bed_id, $assigned_date, $admission_type, $severity, $predicted_los) {
+        
         //  Insert into bed_assignment
-        $insert = "INSERT INTO p_bed_assignments (patient_id, bed_id, assigned_date) VALUES (?, ?, ?)";
+        $insert = "INSERT INTO p_bed_assignments (patient_id, bed_id, assigned_date, severity_level, predicted_los) VALUES (?, ?, ?, ?, ?)";
         $stmt = $this->conn->prepare($insert);
-        $stmt->bind_param("iis", $patient_id, $bed_id, $assigned_date);
-
+        $stmt->bind_param("iissd", $patient_id, $bed_id, $assigned_date, $severity, $predicted_los);
         if ($stmt->execute()) {
+
             //  Update bed status
             $updateBed = "UPDATE p_beds SET status = 'Occupied' WHERE bed_id = ?";
             $stmt2 = $this->conn->prepare($updateBed);
@@ -360,7 +361,7 @@ class PatientAdmission {
 
     // Get available beds
     public function getAvailableBeds() {
-        $beds = $this->conn->query("SELECT bed_id, bed_number FROM p_beds WHERE status = 'Available'");
+            $beds = $this->conn->query("SELECT DISTINCT bed_id, bed_number FROM p_beds WHERE status = 'Available'");
         return $beds;
     }
 }

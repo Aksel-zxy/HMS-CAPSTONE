@@ -1,7 +1,7 @@
 <?php
 include '../../SQL/config.php';
 include 'class/dashb.php';
-
+include 'class/logs.php';
 
 $callerObj = new Dashboard($conn);
 $beds= $callerObj->getAvailableBedsCount($conn);
@@ -36,6 +36,7 @@ echo "No user found.";
 exit();
 }
 
+logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
 
 
 ?>

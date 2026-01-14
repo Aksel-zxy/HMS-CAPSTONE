@@ -24,6 +24,24 @@ class Patient {
         return $result;
     }
     
+    public function getRegisteredPatients() {
+        $sql = "SELECT p.patient_id, p.fname, p.mname, p.lname, p.address, p.gender, 
+                   p.civil_status, p.admission_type, 
+                   CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
+            FROM patientinfo p 
+            LEFT JOIN hr_employees e 
+                   ON p.attending_doctor = e.employee_id
+                   where p.admission_type = 'Registered Patient'
+                    order by p.patient_id desc";
+        $result = $this->conn->query($sql);
+
+        if (!$result) {
+            die("Invalid query: " . $this->conn->error);
+        }
+
+        return $result;
+    }
+    
     public function getinPatients() {
         $sql = "SELECT p.patient_id, p.fname, p.mname, p.lname, p.address, p.gender, 
                    p.civil_status, p.admission_type, 
