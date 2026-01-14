@@ -5,7 +5,7 @@ include '../../SQL/config.php';
 require_once 'class/patient.php';
 
 $patientObj = new Patient($conn);
-$patients = $patientObj->getAllPatients();
+$patients = $patientObj->getRegisteredPatients();
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
     header('Location: login.php');

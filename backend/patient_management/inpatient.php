@@ -241,7 +241,7 @@ $user = $result->fetch_assoc();
                                     <?= htmlspecialchars($row['admission_type']) ?>
                                 </td>
                                 <td style="padding:12px; text-align:center;">
-                                    <?= htmlspecialchars($row['doctor_name']) ?>
+                                    <?= htmlspecialchars($row['doctor_name'] ?? 'N/A') ?>
                                 </td>
                                 <td style="text-align:center;">
                                     <a class="btn btn-sm"
