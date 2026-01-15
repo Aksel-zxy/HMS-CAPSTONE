@@ -8,28 +8,109 @@ require_once 'classes/Salary.php';
 
 Auth::checkHR();
 
-$conn = $conn;
-
+// USER DATA
 $userId = Auth::getUserId();
-if (!$userId) {
-    die("User ID not set.");
-}
-
-$userModel = new User($conn);
-$leaveNotif = new LeaveNotification($conn);
-$salary = new Salary($conn);
+if (!$userId) die("User ID not set.");
 
 $userObj = new User($conn);
 $user = $userObj->getById($userId);
-if (!$user) {
-    die("User not found.");
-}
+if (!$user) die("User not found.");
 
-$employees = $salary->getEmployees();
-$perDayRates = $salary->getAllPerDayRates();
+// NOTIFICATIONS
+$leaveNotif = new LeaveNotification($conn);
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
+// SALARY OBJECT
+$salary = new Salary($conn);
+$employees = $salary->getEmployees();
+
+$salaryResult = null;
+
+// COMPUTE SALARY
+if (isset($_POST['compute_salary'])) {
+
+    $employee_id = (int)$_POST['employee_id'];
+    $pay_period  = $_POST['pay_period'];      // YYYY-MM
+    $period_type = $_POST['period_type'];     // full | first | second
+
+    $salaryResult = $salary->computeEmployeeSalary(
+        $employee_id,
+        $pay_period,
+        $period_type
+    );
+
+    if ($salaryResult) {
+
+        // Attach employee name (UI ONLY)
+        foreach ($employees as $emp) {
+            if ($emp['employee_id'] == $employee_id) {
+                $salaryResult['full_name'] = $emp['full_name'];
+                break;
+            }
+        }
+
+        // Save computed salary to session
+        $_SESSION['computed_salary'] = $salaryResult;
+
+    } else {
+        echo "<script>
+                alert('No compensation data found for this employee.');
+              </script>";
+    }
+}
+
+//  SAVE PAYROLL
+if (isset($_POST['save_payroll'])) {
+    if (!isset($_SESSION['computed_salary'])) {
+        $_SESSION['message'] = "No computed salary to save.";
+        header("Location: salary_computation.php");
+        exit;
+    } else {
+        $salaryData = $_SESSION['computed_salary'];
+        $payrollId = $salary->savePayroll($salaryData);
+        if ($payrollId) {
+            $_SESSION['computed_salary']['payroll_id'] = $payrollId;
+            $_SESSION['computed_salary']['status'] = 'Unpaid';
+            $salaryResult = $_SESSION['computed_salary'];
+            $_SESSION['message'] = "Payroll saved successfully!";
+            header("Location: salary_computation.php");
+            exit;
+        } else {
+            $_SESSION['message'] = "Failed to generate payroll.";
+            header("Location: salary_computation.php");
+            exit;
+        }
+    }
+}
+
+// MARK PAYROLL AS PAID
+if (isset($_POST['mark_paid'])) {
+    $payroll_id = (int)$_POST['payroll_id'];
+    if ($salary->markAsPaid($payroll_id)) {
+        echo "<script>
+                alert('Payroll marked as Paid successfully!');
+              </script>";
+
+        // Reload updated payroll
+        $salaryResult = $salary->getPayrollById($payroll_id);
+        $_SESSION['computed_salary'] = $salaryResult;
+
+        // Redirect to avoid resubmission
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit;
+    } else {
+        echo "<script>
+                alert('Failed to mark Payroll as Paid.');
+              </script>";
+    }
+}
+
+if (!empty($_SESSION['message'])) {
+    echo "<script>alert('" . $_SESSION['message'] . "');</script>";
+    unset($_SESSION['message']);
+}
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -46,16 +127,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 <body>
 
-    <!----- Full-page Loader ----->
-    <div id="loading-screen">
-        <div class="loader">
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-        </div>
-    </div>
+
 
     <div class="d-flex">
         <!----- Sidebar ----->
@@ -228,66 +300,147 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             </div>
             <!-- START CODING HERE -->
             <div class="card">
-                <h3>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" fill="currentColor" class="bi bi-cash-coin" viewBox="0 0 16 16">
-                        <path fill-rule="evenodd" d="M11 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8m5-4a5 5 0 1 1-10 0 5 5 0 0 1 10 0"/>
-                        <path d="M9.438 11.944c.047.596.518 1.06 1.363 1.116v.44h.375v-.443c.875-.061 1.386-.529 1.386-1.207 0-.618-.39-.936-1.09-1.1l-.296-.07v-1.2c.376.043.614.248.671.532h.658c-.047-.575-.54-1.024-1.329-1.073V8.5h-.375v.45c-.747.073-1.255.522-1.255 1.158 0 .562.378.92 1.007 1.066l.248.061v1.272c-.384-.058-.639-.27-.696-.563h-.668zm1.36-1.354c-.369-.085-.569-.26-.569-.522 0-.294.216-.514.572-.578v1.1zm.432.746c.449.104.655.272.655.569 0 .339-.257.571-.709.614v-1.195z"/>
-                        <path d="M1 0a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h4.083q.088-.517.258-1H3a2 2 0 0 0-2-2V3a2 2 0 0 0 2-2h10a2 2 0 0 0 2 2v3.528c.38.34.717.728 1 1.154V1a1 1 0 0 0-1-1z"/>
-                        <path d="M9.998 5.083 10 5a2 2 0 1 0-3.132 1.65 6 6 0 0 1 3.13-1.567"/>
-                    </svg>
-                    Salary Computation
-                </h3>
+                <h3> Salary Computation (Per Employee) </h3>
 
-            <div class="grid">
-                <div>
-                    <label for="employee_id">Employee</label>
-                    <select id="employee_id" required>
-                        <option value="">----- Select Employee -----</option>
-                        <?php foreach ($employees as $emp): ?>
-                            <option value="<?= $emp['employee_id'] ?>" data-profession="<?= $emp['profession'] ?>">
-                                <?= htmlspecialchars($emp['full_name'] ?? '') ?> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Employee ID: <?= $emp['employee_id'] ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+                <form method="POST">
+                    <div class="form-grid">
+                        <div>
+                            <label>Employee</label>
+                            <select name="employee_id" id="employee_select" required>
+                                <option value="">----- Select Employee -----</option>
+                                <?php foreach ($employees as $emp): ?>
+                                    <option value="<?= $emp['employee_id']; ?>"
+                                        <?= isset($_POST['employee_id']) && $_POST['employee_id'] == $emp['employee_id'] ? 'selected' : ''; ?>>
+                                        <?= htmlspecialchars($emp['full_name']); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
 
-                <div>
-                    <label>Month</label>
-                    <select id="salaryMonth">
-                        <?php for($m=1; $m<=12; $m++): ?>
-                            <option value="<?= str_pad($m,2,'0',STR_PAD_LEFT) ?>"><?= date('F', mktime(0,0,0,$m,1)) ?></option>
-                        <?php endfor; ?>
-                    </select>
-                </div>
+                        <div>
+                            <label>Pay Period</label>
+                            <input type="month" name="pay_period" id="pay_period" value="<?= $_POST['pay_period'] ?? date('Y-m'); ?>" required>
+                        </div>
 
-                <div><label>Rate (per day)</label><input type="number" id="rate" readonly value="0"></div>
-                <div><label>Days Worked</label><input type="number" id="daysWorked" value="0"></div>
-                <div><label>Overtime Hours</label><input type="number" id="otHours" value="0"></div>
-                <div><label>Allowances</label><input type="number" id="allowances" value="0"></div>
-                <div><label>Bonuses</label><input type="number" id="bonuses" value="0"></div>
-                <div><label>SSS Deduction</label><input type="number" id="sss" readonly value="0"></div>
-                <div><label>PhilHealth Deduction</label><input type="number" id="philhealth" readonly value="0"></div>
-                <div><label>Pag-IBIG Deduction</label><input type="number" id="pagibig" readonly value="0"></div>
-                <div><label>Absence Deduction</label><input type="number" id="absence" readonly value="0"></div>
+                        <div>
+                            <label>Period Type</label>
+                            <select name="period_type">
+                                <option value="full" <?= (isset($_POST['period_type']) && $_POST['period_type']=='full') ? 'selected' : '' ?>>Full Month</option>
+                                <option value="first" <?= (isset($_POST['period_type']) && $_POST['period_type']=='first') ? 'selected' : '' ?>>1st Half</option>
+                                <option value="second" <?= (isset($_POST['period_type']) && $_POST['period_type']=='second') ? 'selected' : '' ?>>2nd Half</option>
+                            </select>
+                        </div>
 
-                <bttn type="button"  style="font-size: 25px;" onclick="computeSalary()">Compute Salary</bttn>
+                        <div>
+                            <button type="submit" name="compute_salary">Compute Salary</button>
+                        </div>
+                    </div>
+                </form>
 
-            </div>
+                <!-- RESULT -->
+                <?php if ($salaryResult): ?>
+                    <div class="salary-box">
 
-            <br />
-            <br />
-            
-            <center>
-                <bttn type="submit" name="savePayrollBtn">Save Payroll</bttn>
-            </center>
+                        <div class="salary-header">
+                            Salary Breakdown
+                        </div>
 
-                <div class="result-box" id="resultBox">
-                    Gross Pay: ₱0.00 
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
-                    Total Deductions: ₱0.00 
-                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
-                    Net Pay: ₱0.00
-                </div>
+                        <div class="salary-body">
+                            <table class="salary-table">
+                                <tr>
+                                    <th>Employee</th>
+                                    <td><?= htmlspecialchars($salaryResult['full_name'] ?? 'N/A'); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Pay Period</th>
+                                    <td>
+                                        <?= htmlspecialchars($salaryResult['pay_period_start'] ?? 'N/A'); ?>
+                                        to
+                                        <?= htmlspecialchars($salaryResult['pay_period_end'] ?? 'N/A'); ?>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Days Worked</th>
+                                    <td><?= number_format($salaryResult['days_worked'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Overtime Hours</th>
+                                    <td><?= number_format($salaryResult['overtime_hours'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Undertime Hours</th>
+                                    <td><?= number_format($salaryResult['undertime_hours'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Basic Pay</th>
+                                    <td><?= number_format($salaryResult['basic_pay'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Allowances</th>
+                                    <td><?= number_format($salaryResult['allowances'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Bonuses</th>
+                                    <td><?= number_format($salaryResult['bonuses'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>13th Month</th>
+                                    <td><?= number_format($salaryResult['thirteenth_month'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Overtime Pay</th>
+                                    <td><?= number_format($salaryResult['overtime_pay'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Undertime Deduction</th>
+                                    <td><?= number_format($salaryResult['undertime_deduction'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Absence Deduction</th>
+                                    <td><?= number_format($salaryResult['absence_deduction'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>SSS Deduction</th>
+                                    <td><?= number_format($salaryResult['sss_deduction'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>PhilHealth Deduction</th>
+                                    <td><?= number_format($salaryResult['philhealth_deduction'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Pag-IBIG Deduction</th>
+                                    <td><?= number_format($salaryResult['pagibig_deduction'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Total Deductions</th>
+                                    <td><?= number_format($salaryResult['total_deductions'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr class="net-pay">
+                                    <th>Net Pay</th>
+                                    <td><?= number_format($salaryResult['net_pay'] ?? 0, 2); ?></td>
+                                </tr>
+                            </table>
+
+                            <?php if (!isset($salaryResult['payroll_id'])): ?>
+                                <form method="POST">
+                                    <button type="submit" name="save_payroll" class="action-btn success">
+                                        Save to Payroll
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+
+                            <?php if (isset($salaryResult['payroll_id']) && ($salaryResult['status'] ?? '') != 'Paid'): ?>
+                                <form method="POST">
+                                    <input type="hidden" name="payroll_id" value="<?= $salaryResult['payroll_id']; ?>">
+                                    <button type="submit" name="mark_paid" class="action-btn primary">
+                                        Mark as Paid
+                                    </button>
+                                </form>
+                            <?php endif; ?>
+
+                        </div>
+                    </div>
+                <?php endif; ?>
 
             </div>
             <!-- END CODING HERE -->
@@ -313,73 +466,26 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
 
-        // Elements
-        const employeeSelect = document.getElementById('employee_id');
-        const rateInput = document.getElementById('rate');
-        const daysWorkedInput = document.getElementById('daysWorked');
-        const otHoursInput = document.getElementById('otHours');
-
-        // Per-day rates from PHP
-        const professionRates = <?= json_encode($perDayRates) ?>;
-
-        // Update rate and attendance
-        employeeSelect.addEventListener('change', updateRateAndAttendance);
-        document.getElementById('salaryMonth').addEventListener('change', updateRateAndAttendance);
-
-        function updateRateAndAttendance() {
-            const employeeId = employeeSelect.value;
-            const month = document.getElementById('salaryMonth').value;
-            if (!employeeId) return;
-
-            const profession = employeeSelect.selectedOptions[0]?.dataset.profession || '';
-            // Limit rate to 2 decimal places
-            const rate = professionRates[profession] ? parseFloat(professionRates[profession]).toFixed(2) : "0.00";
-            rateInput.value = rate;
-
-            fetch(`get_attendance.php?employee_id=${employeeId}&month=${month}`)
+        function fetchAttendance(employeeId, payPeriod) {
+            fetch(`get_attendance.php?employee_id=${employeeId}&pay_period=${payPeriod}`)
                 .then(res => res.json())
                 .then(data => {
-                    daysWorkedInput.value = data.days_worked || 0;
-                    otHoursInput.value = data.overtime_hours || 0;
-                });
+                    if(data.error) {
+                        alert(data.error);
+                    } else {
+                        // Fill table or form
+                        console.log(data);
+                    }
+                })
+                .catch(err => console.error(err));
         }
 
-        function computeSalary() {
-            const rate = parseFloat(rateInput.value) || 0;
-            const daysWorked = parseFloat(daysWorkedInput.value) || 0;
-            const otHours = parseFloat(otHoursInput.value) || 0;
-            const allowances = parseFloat(document.getElementById('allowances').value) || 0;
-            const bonuses = parseFloat(document.getElementById('bonuses').value) || 0;
-
-            const profession = employeeSelect.selectedOptions[0]?.dataset.profession || '';
-            let sss = 0, philhealth = 0, pagibig = 100;
-
-            switch(profession) {
-                case 'Doctor': sss=2250; philhealth=1250; break;
-                case 'Nurse': sss=1350; philhealth=750; break;
-                case 'Pharmacist': sss=1800; philhealth=1000; break;
-                case 'Laboratorist': sss=1035; philhealth=575; break;
-                case 'Accountant': sss=1125; philhealth=625; break;
-                default: sss = rate*daysWorked*0.045; philhealth = rate*daysWorked*0.025;
-            }
-
-            const workingDays = 26;
-            const absence = Math.max(0, workingDays - daysWorked) * rate;
-
-            const basicPay = rate * daysWorked;
-            const otPay = (rate / 8) * otHours * 1.25;
-            const grossPay = basicPay + otPay + allowances + bonuses;
-            const totalDeductions = sss + philhealth + pagibig + absence;
-            const netPay = grossPay - totalDeductions;
-
-            document.getElementById('sss').value = sss.toFixed(2);
-            document.getElementById('philhealth').value = philhealth.toFixed(2);
-            document.getElementById('pagibig').value = pagibig.toFixed(2);
-            document.getElementById('absence').value = absence.toFixed(2);
-
-            document.getElementById('resultBox').innerText =
-                `Gross Pay: ₱${grossPay.toFixed(2)} | Total Deductions: ₱${totalDeductions.toFixed(2)} | Net Pay: ₱${netPay.toFixed(2)}`;
-        }
+        // Example: when employee or period changes
+        document.getElementById('employee_select').addEventListener('change', function() {
+            const empId = this.value;
+            const period = document.getElementById('pay_period').value;
+            fetchAttendance(empId, period);
+        });
 
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>

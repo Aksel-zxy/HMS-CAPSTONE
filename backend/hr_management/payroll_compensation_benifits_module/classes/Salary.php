@@ -2,179 +2,186 @@
 class Salary {
     private $conn;
 
-    // Monthly salary base per profession
-    private $monthlySalaries = [
-        "Doctor" => 50000,
-        "Nurse" => 30000,
-        "Pharmacist" => 40000,
-        "Laboratorist" => 23000,
-        "Accountant" => 25000,
-    ];
-
-    private $working_days = 26; // Default monthly working days
-
     public function __construct($conn) {
         $this->conn = $conn;
     }
 
+    // Get all employees
     public function getEmployees() {
-        $employees = [];
-
-        $sql = "
+        $stmt = $this->conn->prepare("
             SELECT 
                 employee_id,
                 TRIM(CONCAT(
-                    COALESCE(first_name, ''), ' ',
-                    COALESCE(middle_name, ''), ' ',
-                    COALESCE(last_name, ''), ' ',
-                    COALESCE(suffix_name, '')
-                )) AS full_name,
-                profession
+                    COALESCE(first_name,''),' ',
+                    COALESCE(middle_name,''),' ',
+                    COALESCE(last_name,'')
+                )) AS full_name
             FROM hr_employees
-            ORDER BY employee_id ASC
-        ";
-
-        $result = $this->conn->query($sql);
-
-        if ($result && $result->num_rows > 0) {
-            while ($row = $result->fetch_assoc()) {
-                $employees[] = $row;
-            }
-        }
-
-        return $employees;
-    }
-
-    // Get all per-day rates for all professions
-    public function getAllPerDayRates() {
-        $rates = [];
-        foreach ($this->monthlySalaries as $profession => $monthly) {
-            $rates[$profession] = $this->getPerDayRate($profession);
-        }
-        return $rates;
-    }
-
-    public function getPerDayRate($profession) {
-        return isset($this->monthlySalaries[$profession])
-            ? $this->monthlySalaries[$profession] / $this->working_days
-            : 0;
-    }
-
-    public function getAttendanceSummary($employee_id, $start_date, $end_date) {
-        $stmt = $this->conn->prepare("
-            SELECT 
-                COUNT(*) AS days_worked,
-                SUM(overtime_minutes) / 60 AS overtime_hours
-            FROM hr_daily_attendance
-            WHERE employee_id = ? 
-            AND DATE(attendance_date) BETWEEN ? AND ?
-            AND status IN ('Present', 'Overtime', 'Undertime')
+            ORDER BY employee_id
         ");
-        $stmt->bind_param("iss", $employee_id, $start_date, $end_date);
         $stmt->execute();
-        $result = $stmt->get_result()->fetch_assoc();
-        return [
-            'days_worked' => $result['days_worked'] ?? 0,
-            'overtime_hours' => $result['overtime_hours'] ?? 0
-        ];
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
 
-    public function computeSalary($employee_id, $profession, $start_date, $end_date, $allowances = 0, $bonuses = 0) {
-        $rate_per_day = $this->getPerDayRate($profession);
-        $attendance = $this->getAttendanceSummary($employee_id, $start_date, $end_date);
+    // Fetch payroll if exists
+    public function getPayroll($employee_id, $start, $end) {
+        $stmt = $this->conn->prepare("
+            SELECT * 
+            FROM hr_payroll
+            WHERE employee_id = ? AND pay_period_start = ? AND pay_period_end = ?
+        ");
+        $stmt->bind_param("iss", $employee_id, $start, $end);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_assoc();
+    }
 
-        $days_worked = $attendance['days_worked'];
-        $overtime_hours = $attendance['overtime_hours'];
+    // Get full month compensation (fallback)
+    public function getCompensation($employee_id, $pay_period) {
+        $stmt = $this->conn->prepare("
+            SELECT * 
+            FROM hr_compensation_benefits
+            WHERE employee_id = ? AND pay_period = ?
+        ");
+        $stmt->bind_param("is", $employee_id, $pay_period);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_assoc();
+    }
 
-        // Basic & overtime pay
-        $basic_pay = $rate_per_day * $days_worked;
-        $overtime_pay = ($rate_per_day / 8) * $overtime_hours * 1.25;
+    public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 'full') {
 
-        // ✅ Automatic government deductions based on profession
-        switch ($profession) {
-            case 'Doctor':
-                $sss = 2250;
-                $philhealth = 1250;
-                break;
-            case 'Nurse':
-                $sss = 1350;
-                $philhealth = 750;
-                break;
-            case 'Pharmacist':
-                $sss = 1800;
-                $philhealth = 1000;
-                break;
-            case 'Laboratorist':
-                $sss = 1035;
-                $philhealth = 575;
-                break;
-            case 'Accountant':
-                $sss = 1125;
-                $philhealth = 625;
-                break;
-            default:
-                $sss = $basic_pay * 0.045;
-                $philhealth = $basic_pay * 0.025;
-                break;
+        // FETCH COMPENSATION
+        $stmt = $this->conn->prepare("
+            SELECT basic_pay, allowances, bonuses, thirteenth_month, sss, philhealth, pagibig
+            FROM hr_compensation_benefits
+            WHERE employee_id = ? LIMIT 1
+        ");
+        $stmt->bind_param("i", $employee_id);
+        $stmt->execute();
+        $comp = $stmt->get_result()->fetch_assoc();
+        if (!$comp) return null;
+
+        // PAY PERIOD DATES
+        [$year, $month] = explode('-', $pay_period);
+        $first_day = "$year-$month-01";
+        $last_day  = date("Y-m-t", strtotime($first_day));
+
+        if ($period_type === 'first') {
+            $start_date = $first_day;
+            $end_date   = "$year-$month-15";
+        } elseif ($period_type === 'second') {
+            $start_date = "$year-$month-16";
+            $end_date   = $last_day;
+        } else {
+            $start_date = $first_day;
+            $end_date   = $last_day;
         }
 
-        $pagibig = 100; // fixed
-        $absence = max(0, ($this->working_days - $days_worked)) * $rate_per_day;
+    // ATTENDANCE (FIXED: commands out of sync)
+    $stmt = $this->conn->prepare("
+        SELECT status, overtime_minutes, undertime_minutes
+        FROM hr_daily_attendance
+        WHERE employee_id = ? AND attendance_date BETWEEN ? AND ?
+    ");
+    $stmt->bind_param("iss", $employee_id, $start_date, $end_date);
+    $stmt->execute();
 
-        // Computations
-        $gross_pay = $basic_pay + $overtime_pay + $allowances + $bonuses;
-        $total_deductions = $sss + $philhealth + $pagibig + $absence;
-        $net_pay = $gross_pay - $total_deductions;
+    $result = $stmt->get_result(); // ✅ GET RESULT ONCE
 
+    $days_worked = 0;
+    $overtime_minutes = 0;
+    $undertime_minutes = 0;
+
+    while ($row = $result->fetch_assoc()) {
+        if (in_array($row['status'], ['Present','Late','Overtime','Undertime','On Leave'])) {
+            $days_worked++;
+        }
+        $overtime_minutes += (float)$row['overtime_minutes'];
+        $undertime_minutes += (float)$row['undertime_minutes'];
+    }
+
+    $stmt->close(); 
+
+        // RATES
+        $working_days = 22;
+        $daily_rate  = $comp['basic_pay'] / $working_days;
+        $hourly_rate = $daily_rate / 8; // FIX: standard 8 hrs
+
+        $overtime_hours  = round($overtime_minutes / 60, 2);
+        $undertime_hours = round($undertime_minutes / 60, 2);
+
+        // PERIOD COMPUTATION (FIXED)
+        $period_working_days = ($period_type === 'full') ? $working_days : ($working_days / 2);
+        $days_worked = min($days_worked, $period_working_days);
+        $absent_days = max(0, $period_working_days - $days_worked);
+
+        // EARNINGS
+        $basic_pay = $daily_rate * $days_worked;
+        $allowances = ($comp['allowances'] / $working_days) * $days_worked;
+        $bonuses = ($comp['bonuses'] / $working_days) * $days_worked;
+        $thirteenth_month = ($comp['thirteenth_month'] / $working_days) * $days_worked;
+
+        $overtime_pay = $hourly_rate * 1.25 * $overtime_hours;
+
+        // DEDUCTIONS (FIXED)
+        $undertime_deduction = $hourly_rate * $undertime_hours;
+        $absence_deduction  = $daily_rate * $absent_days;
+
+        // ✅ FIX: HALF per cutoff
+        if ($period_type === 'first' || $period_type === 'second') {
+            $sss        = $comp['sss'] / 2;
+            $philhealth = $comp['philhealth'] / 2;
+            $pagibig    = $comp['pagibig'] / 2;
+        } else {
+            $sss        = $comp['sss'];
+            $philhealth = $comp['philhealth'];
+            $pagibig    = $comp['pagibig'];
+        }
+
+        $gross_pay = $basic_pay + $allowances + $bonuses + $thirteenth_month + $overtime_pay;
+        $total_deductions = $sss + $philhealth + $pagibig + $undertime_deduction + $absence_deduction;
+
+        $net_pay = max(0, $gross_pay - $total_deductions); // FIX: no negative
+
+        // RETURN
         return [
+            'employee_id' => $employee_id,
+            'pay_period_start' => $start_date,
+            'pay_period_end' => $end_date,
             'days_worked' => $days_worked,
             'overtime_hours' => $overtime_hours,
-            'basic_pay' => $basic_pay,
-            'overtime_pay' => $overtime_pay,
-            'allowances' => $allowances,
-            'bonuses' => $bonuses,
-            'sss' => $sss,
-            'philhealth' => $philhealth,
-            'pagibig' => $pagibig,
-            'absence' => $absence,
-            'gross_pay' => $gross_pay,
-            'total_deductions' => $total_deductions,
-            'net_pay' => $net_pay
+            'undertime_hours' => $undertime_hours,
+            'basic_pay' => round($basic_pay, 2),
+            'allowances' => round($allowances, 2),
+            'bonuses' => round($bonuses, 2),
+            'thirteenth_month' => round($thirteenth_month, 2),
+            'overtime_pay' => round($overtime_pay, 2),
+            'undertime_deduction' => round($undertime_deduction, 2),
+            'absence_deduction' => round($absence_deduction, 2),
+            'sss_deduction' => round($sss, 2),
+            'philhealth_deduction' => round($philhealth, 2),
+            'pagibig_deduction' => round($pagibig, 2),
+            'gross_pay' => round($gross_pay, 2),
+            'total_deductions' => round($total_deductions, 2),
+            'net_pay' => round($net_pay, 2),
         ];
     }
 
-    public function savePayroll($employee_id, $start_date, $end_date, $data, $disbursement = 'Manual') {
+    public function markAsPaid($payroll_id) {
         $stmt = $this->conn->prepare("
-            INSERT INTO hr_payroll (
-                employee_id, pay_period_start, pay_period_end, 
-                days_worked, overtime_hours, basic_pay, overtime_pay, 
-                allowances, bonuses, sss_deduction, philhealth_deduction, 
-                pagibig_deduction, absence_deduction, gross_pay, 
-                total_deductions, net_pay, disbursement_method, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+            UPDATE hr_payroll
+            SET status = 'Paid'
+            WHERE payroll_id = ?
         ");
-
-        $stmt->bind_param(
-            "issiddddddddddddds",
-            $employee_id,
-            $start_date,
-            $end_date,
-            $data['days_worked'],
-            $data['overtime_hours'],
-            $data['basic_pay'],
-            $data['overtime_pay'],
-            $data['allowances'],
-            $data['bonuses'],
-            $data['sss'],
-            $data['philhealth'],
-            $data['pagibig'],
-            $data['absence'],
-            $data['gross_pay'],
-            $data['total_deductions'],
-            $data['net_pay'],
-            $disbursement
-        );
-
+        $stmt->bind_param("i", $payroll_id);
         return $stmt->execute();
     }
+
+    public function getPayrollById($payroll_id) {
+        $stmt = $this->conn->prepare("SELECT * FROM hr_payroll WHERE payroll_id = ?");
+        $stmt->bind_param("i", $payroll_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_assoc(); // return as associative array
+    }
 }
+?>
