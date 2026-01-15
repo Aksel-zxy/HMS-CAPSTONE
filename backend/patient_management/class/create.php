@@ -2,8 +2,8 @@
 ob_start(); // Prevent "headers already sent" errors
 include '../../../SQL/config.php';
 require_once 'patient.php';
-include `class/logs.php`;
-
+include 'logs.php';
+    
 $patient = new Patient($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

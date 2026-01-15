@@ -156,7 +156,8 @@ logAction($conn, $_SESSION['user_id'], 'UPDATE_PATIENT', $patient_id);
                             <label class="col-sm-3 col-form-label">Admission Type</label>
                             <div class="col-sm-6">
                                 <select class="form-select" name="admission_type" required>
-                                    <option value="">-- Select Admission Type --</option>
+                                    <option value="<?= $patient['admission_type'] ?>"><?= $patient['admission_type'] ?>
+                                    </option>
                                     <option value="Emergency"
                                         <?=($patient['admission_type'] == 'Emergency') ? 'selected': ''; ?>>Emergency
                                     </option>

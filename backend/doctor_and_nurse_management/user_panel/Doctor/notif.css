@@ -1,0 +1,81 @@
+.custom-notify-dropdown {
+  position: absolute;
+  right: -50px; /* Adjust alignment */
+  top: 40px;
+  width: 300px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 9999; /* Ensure it floats above everything */
+  overflow: hidden;
+}
+
+.hidden {
+  display: none;
+}
+
+.notify-header {
+  background: #f8f9fa;
+  padding: 10px 15px;
+  font-weight: bold;
+  border-bottom: 1px solid #eee;
+  color: #333;
+}
+
+#notification-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+#notification-list li {
+  padding: 10px 15px;
+  border-bottom: 1px solid #f1f1f1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Status Colors */
+.status-expired {
+  border-left: 4px solid #dc3545; /* Red border */
+  background-color: #fff5f5;
+}
+
+.status-soon {
+  border-left: 4px solid #ffc107; /* Yellow border */
+  background-color: #fffbf0;
+}
+
+.notify-title {
+  font-weight: 600;
+  display: block;
+  color: #000;
+}
+.notify-date {
+  font-size: 11px;
+  color: #666;
+}
+
+.profile-icon-circle {
+  width: 90px;
+  height: 90px;
+  background-color: #f8f9fa;
+  border: 2px solid #0d6efd;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  color: #0d6efd;
+  transition: all 0.3s ease;
+}
+
+.profile-trigger:hover .profile-icon-circle {
+  background-color: #0d6efd;
+  color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}

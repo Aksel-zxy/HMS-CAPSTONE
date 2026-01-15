@@ -3,7 +3,7 @@ require_once 'class/patient.php';
 require_once 'class/caller.php';
 
 $patientObj = new Patient($conn);
-$patients = $patientObj->getAllPatients();
+$patients = $patientObj->getinPatients();
 
 $CallerObj = new PatientAdmission($conn);
 $beds = $CallerObj->getAvailableBeds();
