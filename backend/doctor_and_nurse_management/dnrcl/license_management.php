@@ -84,7 +84,7 @@ if ($modal_emp_id) {
     $emp_data = $emp_stmt->get_result()->fetch_assoc();
 
     // Fetch associated files
-    $doc_query = "SELECT document_id, document_type, file_blob, uploaded_at FROM hr_employees_documents WHERE employee_id = ? ORDER BY uploaded_at DESC";
+    $doc_query = "SELECT document_id, document_type, file_blob, uploaded_at FROM hr_employees_documents WHERE employee_id = ? ORDER BY uploaded_at ASC";
     $stmt = $conn->prepare($doc_query);
     $stmt->bind_param("i", $modal_emp_id);
     $stmt->execute();
