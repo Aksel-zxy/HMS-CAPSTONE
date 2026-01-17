@@ -1,6 +1,9 @@
 <?php
+// START SESSION AND INCLUDE CONFIG
+// Ensure this matches your actual file path
 include '../../../../SQL/config.php';
 
+// --- 1. AUTHENTICATION & USER DATA ---
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
     header('Location: login.php');
     exit();
@@ -11,6 +14,7 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
+// Fetch Logged-in Doctor's Profile Data
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
@@ -22,15 +26,105 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
-// 1. FETCH QUESTIONS AND GROUP THEM BY CATEGORY
-$questions_query = "SELECT * FROM evaluation_questions ORDER BY category ASC, question_id ASC";
-$result = $conn->query($questions_query);
 
+// --- CONFIGURATION ---
+$evaluator_id = $_SESSION['employee_id'];
+$current_date = date('Y-m-d');
+$show_form    = false; // Default to false until we find a valid nurse
+$assigned_nurse = null;
+$error_message = "";
+
+// --- 2. FIND ASSIGNED NURSE (Room Logic) ---
+date_default_timezone_set('Asia/Manila');
+
+// Determine which column to check based on today's day (e.g., 'mon_room_id')
+$day_prefix = strtolower(date('D'));
+$room_col   = $day_prefix . '_room_id';
+$valid_cols = ['mon_room_id', 'tue_room_id', 'wed_room_id', 'thu_room_id', 'fri_room_id', 'sat_room_id', 'sun_room_id'];
+
+if (in_array($room_col, $valid_cols)) {
+
+    // A. Find Doctor's Room for Today
+    $doc_sql = "SELECT $room_col as room_id 
+                FROM shift_scheduling 
+                WHERE employee_id = ? 
+                AND week_start <= ? 
+                ORDER BY week_start DESC LIMIT 1";
+
+    $stmt = $conn->prepare($doc_sql);
+    $stmt->bind_param("is", $evaluator_id, $current_date);
+    $stmt->execute();
+    $doc_res = $stmt->get_result();
+    $doc_schedule = $doc_res->fetch_assoc();
+
+    if ($doc_schedule && !empty($doc_schedule['room_id'])) {
+        $shared_room_id = $doc_schedule['room_id'];
+
+        // B. Find the Nurse in that SAME Room
+        $nurse_sql = "SELECT e.employee_id, e.first_name, e.last_name 
+                      FROM shift_scheduling s
+                      JOIN hr_employees e ON s.employee_id = e.employee_id
+                      WHERE s.week_start <= ? 
+                      AND s.$room_col = ? 
+                      AND e.profession = 'Nurse' 
+                      ORDER BY s.week_start DESC 
+                      LIMIT 1";
+
+        $stmt = $conn->prepare($nurse_sql);
+        $stmt->bind_param("si", $current_date, $shared_room_id);
+        $stmt->execute();
+        $nurse_res = $stmt->get_result();
+
+        if ($nurse_res->num_rows > 0) {
+            $assigned_nurse = $nurse_res->fetch_assoc();
+        } else {
+            // Doctor has a room, but no nurse is there
+            $error_message = "You are in Room #$shared_room_id, but no Nurse is assigned there today.";
+        }
+    } else {
+        // Doctor is not scheduled today
+        $error_message = "You do not have a room assignment in the schedule for today ($day_prefix).";
+    }
+} else {
+    $error_message = "System Error: Invalid day configuration.";
+}
+
+// --- 3. CHECK IF ALREADY EVALUATED ---
+if ($assigned_nurse) {
+    $target_nurse_id = $assigned_nurse['employee_id'];
+
+    // Check table 'evaluations'
+    $check_sql = "SELECT evaluation_id 
+                  FROM evaluations 
+                  WHERE evaluator_id = ? 
+                  AND evaluatee_id = ? 
+                  AND DATE(evaluation_date) = ?";
+
+    $stmt = $conn->prepare($check_sql);
+    $stmt->bind_param("iis", $evaluator_id, $target_nurse_id, $current_date);
+    $stmt->execute();
+    $check_result = $stmt->get_result();
+
+    if ($check_result->num_rows > 0) {
+        // ALREADY DONE
+        $error_message = "You have already evaluated Nurse " . htmlspecialchars($assigned_nurse['first_name']) . " " . htmlspecialchars($assigned_nurse['last_name']) . " today.";
+        $show_form = false;
+    } else {
+        // ALLOWED
+        $show_form = true;
+    }
+}
+
+// --- 4. FETCH QUESTIONS (Only if form is shown) ---
 $grouped_questions = [];
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        // Grouping logic: $array['CategoryName'][] = RowData
-        $grouped_questions[$row['category']][] = $row;
+if ($show_form) {
+    $questions_query = "SELECT * FROM evaluation_questions ORDER BY category ASC, question_id ASC";
+    $result = $conn->query($questions_query);
+
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $grouped_questions[$row['category']][] = $row;
+        }
     }
 }
 ?>
@@ -48,57 +142,6 @@ if ($result) {
     <link rel="stylesheet" href="../../assets/CSS/my_schedule.css">
     <link rel="stylesheet" href="notif.css">
     <style>
-        .custom-notify-dropdown {
-            position: absolute;
-            right: 0;
-            top: 45px;
-            width: 320px;
-            background: white;
-            border: 0;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-            z-index: 1050;
-            overflow: hidden;
-            display: none;
-            /* Hidden by default */
-        }
-
-        .custom-notify-dropdown.show {
-            display: block;
-        }
-
-        .notify-header {
-            background: #0d6efd;
-            color: white;
-            padding: 12px 15px;
-            font-weight: 600;
-        }
-
-        #notification-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            max-height: 350px;
-            overflow-y: auto;
-        }
-
-        #notification-list li {
-            padding: 12px 15px;
-            border-bottom: 1px solid #f0f0f0;
-            font-size: 0.9rem;
-        }
-
-        /* Status Colors for Notifications */
-        .status-expired {
-            border-left: 4px solid #dc3545;
-            background: #fff5f5;
-        }
-
-        .status-soon {
-            border-left: 4px solid #ffc107;
-            background: #fffbf0;
-        }
-
         /* Rating System UI Improvements */
         .rating-label {
             width: 45px;
@@ -164,12 +207,12 @@ if ($result) {
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="renew.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
                         <path d="M32 160C32 124.7 60.7 96 96 96L544 96C579.3 96 608 124.7 608 160L32 160zM32 208L608 208L608 480C608 515.3 579.3 544 544 544L96 544C60.7 544 32 515.3 32 480L32 208zM279.3 480C299.5 480 314.6 460.6 301.7 445C287 427.3 264.8 416 240 416L176 416C151.2 416 129 427.3 114.3 445C101.4 460.6 116.5 480 136.7 480L279.2 480zM208 376C238.9 376 264 350.9 264 320C264 289.1 238.9 264 208 264C177.1 264 152 289.1 152 320C152 350.9 177.1 376 208 376zM392 272C378.7 272 368 282.7 368 296C368 309.3 378.7 320 392 320L504 320C517.3 320 528 309.3 528 296C528 282.7 517.3 272 504 272L392 272zM392 368C378.7 368 368 378.7 368 392C368 405.3 378.7 416 392 416L504 416C517.3 416 528 405.3 528 392C528 378.7 517.3 368 504 368L392 368z" />
                     </svg>
-                    <span style="font-size: 18px;">License & Compliance Viewer</span>
+                    <span style="font-size: 18px;">Compliance Licensing</span>
                 </a>
             </li>
             <li class="sidebar-item">
@@ -232,183 +275,188 @@ if ($result) {
 
                 </div>
             </div>
-            <div class="container-fluid py-5">
-                <div class="row justify-content-center">
-                    <div class="col-lg-9 col-xl-8">
+            <div class="container-fluid py-4">
+                <h2 class="schedule-title">🧑‍⚕️Performance Evaluation</h2>
+                <div class="row justify-content-center" style="max-height: 75vh; overflow-y: auto; padding-right: 5px;">
+                    <div class="col-lg-10 col-xl-9">
 
-                        <form action="submit_evaluation_process.php" method="POST">
-                            <div class="card evaluation-card mb-4">
-                                <div class="card-body p-4 bg-primary text-white rounded-top">
-                                    <h4 class="mb-1"><i class="bi bi-clipboard2-pulse me-2"></i>Nurse Performance Evaluation</h4>
-                                    <p class="mb-0 opacity-75">Please provide an honest assessment of the nursing staff.</p>
-                                </div>
-                                <div class="card-body p-4 bg-white">
-                                    <label class="form-label fw-bold text-uppercase text-secondary small">Who are you evaluating?</label>
-                                    <select name="evaluatee_id" class="form-select form-select-lg border-2" required>
-                                        <option value="" selected disabled>Select a Nurse...</option>
-                                        <?php
-                                        $nurses = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse'");
-                                        while ($nurse = $nurses->fetch_assoc()): ?>
-                                            <option value="<?= $nurse['employee_id'] ?>">
-                                                Nurse <?= htmlspecialchars($nurse['first_name'] . " " . $nurse['last_name']) ?>
-                                            </option>
-                                        <?php endwhile; ?>
-                                    </select>
+                        <?php if (!empty($error_message)): ?>
+                            <div class="alert alert-warning shadow-sm border-0 d-flex align-items-center p-4 mb-5">
+                                <i class="bi bi-exclamation-triangle-fill fs-1 me-4 text-warning"></i>
+                                <div>
+                                    <h4 class="alert-heading fw-bold">Notice</h4>
+                                    <p class="mb-0 fs-5"><?= $error_message ?></p>
                                 </div>
                             </div>
 
-                            <?php if (empty($grouped_questions)): ?>
-                                <div class="alert alert-warning text-center">
-                                    <i class="bi bi-exclamation-triangle me-2"></i> No evaluation questions found. Contact HR.
-                                </div>
-                            <?php else: ?>
-
-                                <?php foreach ($grouped_questions as $category => $questions): ?>
-                                    <div class="card evaluation-card mb-4">
-                                        <div class="card-header bg-white py-3 border-bottom">
-                                            <h5 class="m-0 text-primary fw-bold text-uppercase">
-                                                <i class="bi bi-layers-half me-2"></i><?= htmlspecialchars($category) ?>
-                                            </h5>
-                                        </div>
-                                        <div class="card-body p-4">
-                                            <?php foreach ($questions as $index => $q): ?>
-                                                <div class="mb-5">
-                                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                                        <div>
-                                                            <h6 class="fw-bold mb-1"><?= htmlspecialchars($q['criteria']) ?></h6>
-                                                            <p class="text-muted small fst-italic mb-0"><?= htmlspecialchars($q['description']) ?></p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div class="d-flex align-items-center justify-content-center bg-light p-3 rounded mt-3">
-                                                        <span class="fw-bold text-danger me-3 small">POOR</span>
-
-                                                        <div class="btn-group" role="group" aria-label="Rating for Question <?= $q['question_id'] ?>">
-                                                            <?php for ($i = 1; $i <= 5; $i++): ?>
-                                                                <input type="radio" class="btn-check"
-                                                                    name="ratings[<?= $q['question_id'] ?>]"
-                                                                    id="q_<?= $q['question_id'] ?>_<?= $i ?>"
-                                                                    value="<?= $i ?>" required>
-
-                                                                <label class="btn btn-outline-primary rating-label" for="q_<?= $q['question_id'] ?>_<?= $i ?>">
-                                                                    <?= $i ?>
-                                                                </label>
-                                                            <?php endfor; ?>
-                                                        </div>
-
-                                                        <span class="fw-bold text-success ms-3 small">EXCELLENT</span>
-                                                    </div>
-                                                </div>
-                                                <?php if ($index !== array_key_last($questions)) echo '<hr class="text-muted opacity-25">'; ?>
-                                            <?php endforeach; ?>
-                                        </div>
+                        <?php elseif ($show_form && $assigned_nurse): ?>
+                            <div class="card border-0 shadow-sm mb-5 bg-white rounded-3">
+                                <div class="card-body p-5 text-center">
+                                    <div class="mb-4">
+                                        <span class="d-inline-block p-3 rounded-circle bg-light text-primary mb-3">
+                                            <i class="bi bi-person-check-fill fs-1"></i>
+                                        </span>
+                                        <h3 class="fw-bold text-dark">Evaluation Pending</h3>
+                                        <p class="text-muted fs-5">
+                                            You are assigned with <strong class="text-primary">Nurse <?= htmlspecialchars($assigned_nurse['first_name'] . ' ' . $assigned_nurse['last_name']) ?></strong> today.
+                                        </p>
+                                        <p class="text-muted small">Please submit your daily performance assessment.</p>
                                     </div>
-                                <?php endforeach; ?>
-
-                                <div class="card evaluation-card mb-5">
-                                    <div class="card-body p-4">
-                                        <label class="form-label fw-bold">Additional Feedback / Summary</label>
-                                        <textarea name="comments" class="form-control" rows="4" placeholder="Write any specific incidents or general feedback here..."></textarea>
-
-                                        <div class="d-grid mt-4">
-                                            <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold shadow-sm">
-                                                <i class="bi bi-send-check me-2"></i> Submit Evaluation
-                                            </button>
-                                        </div>
-                                    </div>
+                                    <button type="button" class="btn btn-primary btn-lg px-5 py-3 fw-bold rounded-pill shadow hover-shadow" data-bs-toggle="modal" data-bs-target="#evaluationModal">
+                                        <i class="bi bi-pencil-square me-2"></i> Start Evaluation
+                                    </button>
                                 </div>
-                            <?php endif; ?>
-                        </form>
-                        <div class="card shadow border-0 mt-5">
-                            <div class="card-header bg-white py-3">
-                                <h5 class="mb-0 text-secondary fw-bold">
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-info">System: No schedule or actions available for today.</div>
+                        <?php endif; ?>
+
+                        <div class="mb-4 border rounded p-3 bg-white shadow-sm mt-4">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-0">
+                                <h6 class="fw-bold text-secondary mb-0">
                                     <i class="bi bi-clock-history me-2"></i>Your Evaluation History
-                                </h5>
+                                </h6>
                             </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover align-middle mb-0">
-                                        <thead class="bg-light">
-                                            <tr>
-                                                <th class="ps-4">Date</th>
-                                                <th>Nurse Name</th>
-                                                <th class="text-center">Score</th>
-                                                <th class="text-center">Rating</th>
-                                                <th style="width: 25%;">Comments</th>
-                                                <th style="width: 25%;">A.I Feedback</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php
-                                            // Fetch history for the logged-in Doctor
-                                            $history_query = "SELECT e.*, 
-                                  emp.first_name, emp.last_name 
-                                  FROM evaluations e 
-                                  JOIN hr_employees emp ON e.evaluatee_id = emp.employee_id 
-                                  WHERE e.evaluator_id = ? 
-                                  ORDER BY e.evaluation_date DESC";
+                            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                <table class="table table-hover table-bordered mb-0 align-middle">
+                                    <thead class="bg-light sticky-top" style="z-index: 1;">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Nurse Name</th>
+                                            <th class="text-center">Score</th>
+                                            <th class="text-center">Rating</th>
+                                            <th style="width: 30%;">Comments</th>
+                                            <th style="width: 25%;">AI Feedback</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php
+                                        $history_query = "SELECT e.*, emp.first_name, emp.last_name 
+                                                      FROM evaluations e 
+                                                      JOIN hr_employees emp ON e.evaluatee_id = emp.employee_id 
+                                                      WHERE e.evaluator_id = ? ORDER BY e.evaluation_date asc";
+                                        $stmt_hist = $conn->prepare($history_query);
+                                        $stmt_hist->bind_param("i", $_SESSION['employee_id']);
+                                        $stmt_hist->execute();
+                                        $history_result = $stmt_hist->get_result();
 
-                                            $stmt_hist = $conn->prepare($history_query);
-                                            $stmt_hist->bind_param("i", $_SESSION['employee_id']);
-                                            $stmt_hist->execute();
-                                            $history_result = $stmt_hist->get_result();
-
-                                            if ($history_result->num_rows > 0):
-                                                while ($row = $history_result->fetch_assoc()):
-                                                    // Color coding for badges
-                                                    $badge_color = 'bg-secondary';
-                                                    if ($row['performance_level'] == 'Excellent') $badge_color = 'bg-success';
-                                                    if ($row['performance_level'] == 'Good') $badge_color = 'bg-primary';
-                                                    if ($row['performance_level'] == 'Poor') $badge_color = 'bg-danger';
-                                            ?>
-                                                    <tr>
-                                                        <td class="ps-4 text-muted small">
-                                                            <?= date("M d, Y", strtotime($row['evaluation_date'])) ?>
-                                                        </td>
-                                                        <td class="fw-bold">
-                                                            <?= htmlspecialchars($row['first_name'] . " " . $row['last_name']) ?>
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <span class="fw-bold text-dark"><?= $row['average_score'] ?></span> / 5.00
-                                                        </td>
-                                                        <td class="text-center">
-                                                            <span class="badge rounded-pill <?= $badge_color ?>">
-                                                                <?= $row['performance_level'] ?>
-                                                            </span>
-                                                        </td>
-
-                                                        <td class="small text-muted" style="white-space: normal;">
-                                                            <?= htmlspecialchars($row['comments'] ?: "No comments") ?>
-                                                        </td>
-
-                                                        <td class="small text-primary fst-italic" style="white-space: normal;">
-                                                            <?= htmlspecialchars($row['ai_feedback'] ?: "No AI feedback") ?>
-                                                        </td>
-                                                    </tr>
-                                                <?php
-                                                endwhile;
-                                            else:
-                                                ?>
+                                        if ($history_result->num_rows > 0):
+                                            while ($row = $history_result->fetch_assoc()):
+                                                $badge_color = ($row['performance_level'] == 'Excellent') ? 'bg-success' : (($row['performance_level'] == 'Poor') ? 'bg-danger' : 'bg-primary');
+                                        ?>
                                                 <tr>
-                                                    <td colspan="6" class="text-center py-4 text-muted">
-                                                        You haven't submitted any evaluations yet.
-                                                    </td>
+                                                    <td><?= date("M d, Y", strtotime($row['evaluation_date'])) ?></td>
+                                                    <td class="fw-bold text-primary"><?= htmlspecialchars($row['first_name'] . " " . $row['last_name']) ?></td>
+                                                    <td class="text-center fw-bold"><?= $row['average_score'] ?></td>
+                                                    <td class="text-center"><span class="badge rounded-pill <?= $badge_color ?>"><?= $row['performance_level'] ?></span></td>
+                                                    <td class="small text-muted"><?= htmlspecialchars($row['comments'] ?: "No comments") ?></td>
+                                                    <td class="small text-primary fst-italic"><?= htmlspecialchars($row['ai_feedback'] ?: "No AI feedback") ?></td>
                                                 </tr>
-                                            <?php endif; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            <?php endwhile;
+                                        else: ?>
+                                            <tr>
+                                                <td colspan="6" class="text-center py-4 text-muted">No evaluations found.</td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+            <?php if ($show_form && $assigned_nurse): ?>
+                <div class="modal fade" id="evaluationModal" tabindex="-1" aria-labelledby="evalModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content">
+
+                            <form action="submit_evaluation_process.php" method="POST">
+
+                                <div class="modal-header modal-header-primary text-white" style="background-color: #0d6efd;">
+                                    <div>
+                                        <h5 class="modal-title fw-bold" id="evalModalLabel">
+                                            <i class="bi bi-clipboard2-pulse me-2"></i>Evaluating: Nurse <?= htmlspecialchars($assigned_nurse['last_name']) ?>
+                                        </h5>
+                                        <p class="mb-0 small opacity-75">Room Assignment: Auto-Detected</p>
+                                    </div>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+
+                                <div class="modal-body bg-light">
+
+                                    <input type="hidden" name="evaluatee_id" value="<?= $assigned_nurse['employee_id'] ?>">
+
+                                    <div class="px-2" style="max-height: 60vh; overflow-y: auto; overflow-x: hidden;">
+
+                                        <?php if (!empty($grouped_questions)): ?>
+                                            <?php foreach ($grouped_questions as $category => $questions): ?>
+                                                <div class="card mb-4 border-0 shadow-sm">
+                                                    <div class="card-header bg-white border-bottom sticky-top" style="top: 0; z-index: 10;">
+                                                        <h6 class="text-primary fw-bold text-uppercase mb-0"><?= htmlspecialchars($category) ?></h6>
+                                                    </div>
+                                                    <div class="card-body">
+                                                        <?php foreach ($questions as $q): ?>
+                                                            <div class="mb-4 border-bottom pb-3">
+                                                                <label class="fw-bold text-dark mb-1 d-block"><?= htmlspecialchars($q['criteria']) ?></label>
+                                                                <small class="text-muted fst-italic d-block mb-3"><?= htmlspecialchars($q['description']) ?></small>
+
+                                                                <div class="d-flex justify-content-center align-items-center gap-2">
+                                                                    <span class="small fw-bold text-danger">Poor</span>
+
+                                                                    <div class="btn-group" role="group">
+                                                                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                                                                            <input type="radio" class="btn-check" name="ratings[<?= $q['question_id'] ?>]" id="m_q_<?= $q['question_id'] ?>_<?= $i ?>" value="<?= $i ?>" required>
+                                                                            <label class="btn btn-outline-primary rating-label mx-1 rounded-circle" style="width: 35px; height: 35px; display: flex; align-items: center; justify-content: center;" for="m_q_<?= $q['question_id'] ?>_<?= $i ?>">
+                                                                                <?= $i ?>
+                                                                            </label>
+                                                                        <?php endfor; ?>
+                                                                    </div>
+
+                                                                    <span class="small fw-bold text-success">Excellent</span>
+                                                                </div>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php else: ?>
+                                            <div class="alert alert-danger">No questions loaded. Contact Admin.</div>
+                                        <?php endif; ?>
+
+                                        <div class="card border-0 shadow-sm mt-3">
+                                            <div class="card-body">
+                                                <label class="form-label fw-bold">Additional Comments / Summary</label>
+                                                <textarea name="comments" class="form-control" rows="3" placeholder="Describe any specific incidents..."></textarea>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                                <div class="modal-footer bg-white">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <button type="submit" class="btn btn-primary fw-bold px-4">
+                                        <i class="bi bi-send-check me-2"></i> Submit Evaluation
+                                    </button>
+                                </div>
+
+                            </form>
+
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
+
         <?php include 'doctor_profile.php'; ?>
         <script>
             const toggler = document.querySelector(".toggler-btn");
             toggler.addEventListener("click", function() {
                 document.querySelector("#sidebar").classList.toggle("collapsed");
+            });
+            document.addEventListener('DOMContentLoaded', function() {
+                var myModal = new bootstrap.Modal(document.getElementById('evaluationModal'));
+                myModal.show();
             });
         </script>
         <script src="notif.js"></script>
