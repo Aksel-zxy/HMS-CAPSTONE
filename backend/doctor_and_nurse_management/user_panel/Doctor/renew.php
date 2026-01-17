@@ -11,7 +11,6 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// 1. Fetch user details
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
@@ -23,55 +22,28 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+$target_employee_id = $_GET['employee_id'] ?? $_SESSION['employee_id'];
 
-// 2. Fetch Rooms Lookup List
-$rooms_lookup = [];
-$room_query = "SELECT room_id, room_name FROM rooms_table";
-$room_result = $conn->query($room_query);
+$license_info = null;
 
-if ($room_result) {
-    while ($r_row = $room_result->fetch_assoc()) {
-        $rooms_lookup[$r_row['room_id']] = $r_row['room_name'];
+if ($target_employee_id) {
+    // We only need metadata, not the heavy blob yet
+    $sql_fetch = "SELECT document_id, uploaded_at 
+                  FROM hr_employees_documents 
+                  WHERE employee_id = ? 
+                  AND document_type = 'License ID' 
+                  LIMIT 1";
+
+    $stmt = $conn->prepare($sql_fetch);
+    $stmt->bind_param("i", $target_employee_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows > 0) {
+        $license_info = $result->fetch_assoc();
     }
+    $stmt->close();
 }
-// 3. Fetch Nurse Schedules
-$nurse_lookup = [];
-
-$nurse_sql = "SELECT s.*, e.first_name, e.last_name 
-              FROM shift_scheduling s
-              JOIN hr_employees e ON s.employee_id = e.employee_id
-              WHERE e.profession = 'Nurse'";
-
-$nurse_result = $conn->query($nurse_sql);
-
-if ($nurse_result) {
-    while ($n_row = $nurse_result->fetch_assoc()) {
-        $week = $n_row['week_start'];
-        $nurse_name = $n_row['first_name'] . ' ' . $n_row['last_name'];
-        $day_prefixes = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-        foreach ($day_prefixes as $d_prefix) {
-            $r_id = $n_row[$d_prefix . '_room_id'];
-            if (!empty($r_id)) {
-                $nurse_lookup[$week][$d_prefix][$r_id][] = $nurse_name;
-            }
-        }
-    }
-}
-// 4. Fetch schedule for the logged-in doctor
-$modal_schedules = [];
-$employee_id = $_SESSION['employee_id'];
-// NOTE: You might want to remove "ORDER BY week_start ASC" or change to DESC if you want newest weeks first
-$stmt = $conn->prepare("SELECT * FROM shift_scheduling WHERE employee_id = ? ORDER BY week_start ASC");
-$stmt->bind_param("i", $employee_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) {
-    $modal_schedules[] = $row;
-}
-
-// Define days of the week
-$days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 ?>
 
 <!DOCTYPE html>
@@ -198,105 +170,89 @@ $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Su
 
                 </div>
             </div>
-            <div class="container-fluid">
-                <h2 class="schedule-title">🧑‍⚕️My Schedule</h2>
+            <div class="container-fluid py-4">
+                <h2 class="schedule-title">
+                    Compliance License Renewal
+                </h2>
 
-                <?php if (!empty($modal_schedules)): ?>
+                <div class="row justify-content-center">
+                    <div class="col-lg-8 col-xl-7">
 
-                    <div class="schedule-list-container" style="max-height: 75vh; overflow-y: auto; padding-right: 5px;">
-
-                        <?php foreach ($modal_schedules as $modal_schedule): ?>
-
-                            <?php
-                            // --- THIS IS THE NEW LOGIC TO HIDE PAST WEEKS ---
-                            $week_start = $modal_schedule['week_start'];
-                            // Calculate the Sunday of that week (Start + 6 days)
-                            $week_end_date = date('Y-m-d', strtotime($week_start . ' + 6 days'));
-                            // Get today's date
-                            $today = date('Y-m-d');
-
-                            // If today is greater than the end of the week, skip this loop iteration
-                            if ($today > $week_end_date) {
-                                continue;
-                            }
-                            // ------------------------------------------------
-                            ?>
-
-                            <div class="mb-4 border rounded p-3 schedule-list-view">
-                                <h6 class="schedule-date">Week: <?= htmlspecialchars($modal_schedule['week_start']) ?></h6>
-                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                    <table class="table table-bordered bg-white schedule-calendar-table mb-0">
-                                        <thead style="position: sticky; top: 0; background-color: #ffffff; z-index: 1; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);">
-                                            <tr class="schedule-table-header">
-                                                <th>Day</th>
-                                                <th>Start Time</th>
-                                                <th>End Time</th>
-                                                <th>Status</th>
-                                                <th>Room</th>
-                                                <th>Nurse on Duty</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($days as $day): ?>
-                                                <?php $prefix = strtolower(substr($day, 0, 3)); ?>
-                                                <tr>
-                                                    <td><?= $day ?></td>
-                                                    <td>
-                                                        <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>---<?php else: ?><?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?><?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>---<?php else: ?><?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?><?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?= htmlspecialchars($modal_schedule[$prefix . '_status'] ?? '') ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php
-                                                        $room_col = $prefix . '_room_id';
-                                                        $current_room_id = $modal_schedule[$room_col] ?? null; // Saved ID for next step
-
-                                                        if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])) {
-                                                            echo '---';
-                                                        } else {
-                                                            echo htmlspecialchars($rooms_lookup[$current_room_id] ?? '---');
-                                                        }
-                                                        ?>
-                                                    </td>
-
-                                                    <td>
-                                                        <?php
-                                                        // Logic: Check if there is a nurse in this room, on this day, in this week
-                                                        $current_week = $modal_schedule['week_start'];
-
-                                                        // Only check if you (the doctor) are actually assigned a room
-                                                        if (!empty($current_room_id) && !in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])) {
-
-                                                            // Check our lookup array
-                                                            if (isset($nurse_lookup[$current_week][$prefix][$current_room_id])) {
-                                                                // Implode handles cases where 2 nurses might be in the same room
-                                                                echo implode(', ', $nurse_lookup[$current_week][$prefix][$current_room_id]);
-                                                            } else {
-                                                                echo '<span class="text-muted">None</span>';
-                                                            }
-                                                        } else {
-                                                            echo '---';
-                                                        }
-                                                        ?>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
+                        <?php if ($license_info): ?>
+                            <div class="alert alert-success shadow-sm border-0 p-4 mb-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-check-circle-fill fs-1 me-4 text-success"></i>
+                                        <div>
+                                            <h5 class="alert-heading fw-bold">License Uploaded</h5>
+                                            <p class="mb-0 text-muted">
+                                                Last updated: 
+                                                <strong><?= date("M d, Y h:i A", strtotime($license_info['uploaded_at'])) ?></strong>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <a href="view_license.php?employee_id=<?= $target_employee_id ?>" 
+                                       target="_blank" 
+                                       class="btn btn-outline-success fw-bold px-4">
+                                        <i class="bi bi-eye me-2"></i> View File
+                                    </a>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
+                        <?php else: ?>
+                            <div class="alert alert-warning d-flex align-items-center shadow-sm border-0 p-4 mb-4">
+                                <i class="bi bi-exclamation-triangle-fill fs-1 me-4 text-warning"></i>
+                                <div>
+                                    <h5 class="alert-heading fw-bold">Action Required</h5>
+                                    <p class="mb-0">No valid License ID found. Please upload your latest document immediately.</p>
+                                </div>
+                            </div>
+                        <?php endif; ?>
 
-                    </div> <?php else: ?>
-                    <div class="alert alert-info mt-4">No schedule found for you.</div>
-                <?php endif; ?>
+                        <div class="card border-0 shadow-sm rounded-3">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="mb-0 text-primary fw-bold"><i class="bi bi-cloud-upload me-2"></i>Update Document</h5>
+                            </div>
+                            <div class="card-body p-4">
+
+                                <form action="upd_license.php" method="POST" enctype="multipart/form-data">
+                                    <input type="hidden" name="employee_id" value="<?= $target_employee_id ?>">
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">Select Document</label>
+
+                                        <div class="upload-zone position-relative">
+                                            <i class="bi bi-file-earmark-pdf text-primary fs-1 mb-2"></i>
+                                            <h6 class="fw-bold">Click to Browse or Drag File Here</h6>
+                                            <p class="text-muted small mb-0">Supported formats: JPG, PNG, PDF (Max 4MB)</p>
+
+                                            <input type="file" name="license_file" class="form-control position-absolute top-0 start-0 w-100 h-100 opacity-0"
+                                                style="cursor: pointer;" required onchange="showFileName(this)">
+                                        </div>
+                                        <div id="file-name-display" class="mt-2 text-center text-success small fw-bold"></div>
+                                    </div>
+
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold shadow-sm">
+                                            <i class="bi bi-save me-2"></i> Save / Update License
+                                        </button>
+                                    </div>
+                                </form>
+
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <small class="text-muted">
+                                <i class="bi bi-lock-fill me-1"></i>
+                                Documents are stored securely and encrypted in the database.
+                            </small>
+                        </div>
+
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
     </div>
     <?php include 'doctor_profile.php'; ?>
     <script>
