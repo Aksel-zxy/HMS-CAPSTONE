@@ -1,92 +1,97 @@
 <?php
+// billing_summary.php
+
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-// ======================= QR SETUP =======================
-$vendorAutoload = __DIR__ . '/vendor/autoload.php';
-$qrLocalAvailable = false;
-if (file_exists($vendorAutoload)) {
-    require_once $vendorAutoload;
-    $qrLocalAvailable = class_exists('chillerlan\\QRCode\\QRCode') && class_exists('chillerlan\\QRCode\\QROptions');
+require_once __DIR__ . '/vendor/autoload.php'; // Correct path for XAMPP
+
+use GuzzleHttp\Client;
+
+// -----------------------------
+// SET PAYMONGO SECRET KEY DIRECTLY
+// -----------------------------
+define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV'); // Your secret key here
+if (empty(PAYMONGO_SECRET_KEY)) {
+    die("PayMongo secret key is not set. Please set PAYMONGO_API_KEY.");
 }
 
-$gcash_number = "09123456789";
-$payment_text = "GCash Payment to Hospital - Number: $gcash_number";
+define('PAYMONGO_API_BASE', 'https://api.paymongo.com/v1/');
 
-$qrImageSrc = null;
-if ($qrLocalAvailable) {
+// -----------------------------
+// Helper: Create a PayMongo payment link
+// -----------------------------
+function create_paymongo_payment_link($amount, $description = '', $remarks = '') {
+    $amount = max((int)$amount, 100); // Minimum 100 centavos (₱1)
+
+    $payload = [
+        'data' => [
+            'attributes' => [
+                'amount'      => $amount,
+                'description' => $description ?: 'Billing Payment',
+                'remarks'     => $remarks
+            ]
+        ]
+    ];
+
     try {
-        $optsClass = 'chillerlan\\QRCode\\QROptions';
-        $qrClass   = 'chillerlan\\QRCode\\QRCode';
-        $options = new $optsClass([
-            'version'    => 5,
-            'outputType' => $qrClass::OUTPUT_IMAGE_PNG,
-            'eccLevel'   => $qrClass::ECC_L,
-            'scale'      => 5,
+        $client = new Client([
+            'base_uri' => PAYMONGO_API_BASE,
+            'headers'  => [
+                'Accept'        => 'application/json',
+                'Content-Type'  => 'application/json',
+                'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
+            ]
         ]);
-        $png = (new $qrClass($options))->render($payment_text);
-        $qrImageSrc = 'data:image/png;base64,' . base64_encode($png);
-    } catch (Throwable $e) {
-        $qrImageSrc = null;
+
+        $resp = $client->post('links', ['body' => json_encode($payload)]);
+        $body = json_decode($resp->getBody(), true);
+
+        // Correct checkout URL
+        $url = $body['data']['attributes']['checkout_url'] ?? null;
+
+        return ['success' => true, 'url' => $url, 'response' => $body];
+
+    } catch (\GuzzleHttp\Exception\ClientException $e) {
+        $res = $e->getResponse();
+        $body = $res ? (string)$res->getBody() : '';
+        return [
+            'success' => false,
+            'url' => null,
+            'error' => $body ?: $e->getMessage(),
+            'payload' => $payload
+        ];
+    } catch (\Exception $e) {
+        return [
+            'success' => false,
+            'url' => null,
+            'error' => $e->getMessage(),
+            'payload' => $payload
+        ];
     }
 }
-if (!$qrImageSrc) {
-    $qrImageSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&format=png&data=' . urlencode($payment_text);
-}
 
-// ======================= PATIENT DATA =======================
-$patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
+// -----------------------------
+// Patient & Billing Lookup
+// -----------------------------
+$patient_id = intval($_GET['patient_id'] ?? 0);
 $billing_id = null;
-$selected_patient = null;
-$insurance_discount = 0;
-$insurance_discount_type = null;
-$insurance_plan = null;
 
-if ($patient_id > 0) {
-    $stmt = $conn->prepare("SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id = ?");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    $selected_patient = $stmt->get_result()->fetch_assoc();
-}
+$stmt = $conn->prepare("SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id = ?");
+$stmt->bind_param("i", $patient_id);
+$stmt->execute();
+$patient = $stmt->get_result()->fetch_assoc();
 
-// ======================= BILLING =======================
-if ($patient_id > 0) {
-    $stmt = $conn->prepare("SELECT MAX(billing_id) AS latest_billing_id FROM billing_items WHERE patient_id = ? AND finalized=1");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    $res = $stmt->get_result()->fetch_assoc();
-    $billing_id = $res['latest_billing_id'] ?? null;
-}
+$stmt = $conn->prepare("SELECT MAX(billing_id) AS bid FROM billing_items WHERE patient_id = ? AND finalized = 1");
+$stmt->bind_param("i", $patient_id);
+$stmt->execute();
+$billing_id = $stmt->get_result()->fetch_assoc()['bid'] ?? null;
 
-// ======================= INSURANCE =======================
-$insurance_covered = 0;
-if ($patient_id > 0 && !empty($selected_patient['full_name'])) {
-    $full_name = $selected_patient['full_name'];
+$items = [];
+$total = 0;
+if ($billing_id) {
     $stmt = $conn->prepare("
-        SELECT insurance_number, promo_name, discount_type, discount_value
-        FROM patient_insurance
-        WHERE full_name = ? AND status = 'Active'
-        LIMIT 1
-    ");
-    $stmt->bind_param("s", $full_name);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-
-    if ($row) {
-        $insurance_plan = $row['promo_name'] ?? 'N/A';
-        $insurance_discount = floatval($row['discount_value'] ?? 0);
-        $insurance_discount_type = $row['discount_type'] ?? 'Fixed';
-    }
-}
-
-// ======================= BILLING ITEMS =======================
-$billing_items = [];
-$total_charges = 0;
-$total_discount = 0;
-
-if ($patient_id > 0 && $billing_id) {
-    $stmt = $conn->prepare("
-        SELECT bi.*, ds.description, ds.serviceName
+        SELECT bi.*, ds.serviceName, ds.description
         FROM billing_items bi
         LEFT JOIN dl_services ds ON bi.service_id = ds.serviceID
         WHERE bi.patient_id = ? AND bi.billing_id = ?
@@ -95,171 +100,148 @@ if ($patient_id > 0 && $billing_id) {
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
-        $billing_items[] = $row;
-        $total_charges += floatval($row['total_price'] ?? 0);
+        $items[] = $row;
+        $total += floatval($row['total_price']);
     }
 }
 
-// ======================= APPLY INSURANCE =======================
-if ($insurance_discount > 0) {
-    if ($insurance_discount_type === 'Percentage') {
-        $insurance_covered = $total_charges * ($insurance_discount / 100);
+// -----------------------------
+// Create PayMongo Payment Link
+// -----------------------------
+$enableLink = true;
+$payLinkUrl = null;
+$linkError = null;
+
+if ($enableLink && $total > 0) {
+    $linkResult = create_paymongo_payment_link(
+        (int)($total * 100),
+        "Billing #{$billing_id} - Patient {$patient_id}",
+        "Total: ₱" . number_format($total, 2)
+    );
+
+    if ($linkResult['success'] && !empty($linkResult['url'])) {
+        $payLinkUrl = $linkResult['url'];
     } else {
-        $insurance_covered = min($insurance_discount, $total_charges);
+        $linkError = $linkResult['error'] ?? 'Unknown error creating payment link';
     }
 }
 
-// ======================= TOTALS =======================
-$grand_total = $total_charges - $total_discount;
-$total_out_of_pocket = max($grand_total - $insurance_covered, 0);
+// -----------------------------
+// Generate GCash QR (optional)
+// -----------------------------
+$qrImage = null;
+if ($total > 0) {
+    try {
+        $client = new Client([
+            'base_uri' => PAYMONGO_API_BASE,
+            'headers'  => [
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+                'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
+            ]
+        ]);
 
-// ======================= PAYMENT PROCESSING =======================
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $payment_method = null;
-    $txn_id = 'TXN' . uniqid();
-    $ref = 'N/A';
+        $response = $client->post('sources', [
+            'json' => [
+                'data' => [
+                    'attributes' => [
+                        'type'     => 'gcash_qr',
+                        'amount'   => intval($total * 100),
+                        'currency' => 'PHP',
+                        'redirect' => [
+                            'success' => 'https://yourdomain.com/payment_callback.php?status=success',
+                            'failed'  => 'https://yourdomain.com/payment_callback.php?status=failed'
+                        ],
+                        'metadata' => [
+                            'patient_id' => $patient_id,
+                            'billing_id' => $billing_id
+                        ]
+                    ]
+                ]
+            ]
+        ]);
 
-    if (isset($_POST['confirm_paid']) && $total_out_of_pocket == 0) {
-        $payment_method = $insurance_plan ?: "Insurance";
-        $ref = "Covered by Insurance";
-    } elseif (isset($_POST['make_payment'])) {
-        $payment_method = trim($_POST['payment_method'] ?? '');
-        $ref = $_POST['payment_reference_' . strtolower($payment_method)] ?? 'N/A';
-        $payment_method = ucfirst(strtolower($payment_method));
-        if ($payment_method === 'Cash') $ref = "Cash Payment";
-    }
-
-    if (!empty($payment_method)) {
-        if ($insurance_covered > 0 && $total_out_of_pocket > 0) {
-            $payment_method = ($insurance_plan ?: "Insurance") . " / " . $payment_method;
+        $source = json_decode($response->getBody(), true);
+        $qrString = $source['data']['attributes']['flow']['qr_string'] ?? null;
+        if ($qrString) {
+            $qrImage = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($qrString);
         }
-
-        $is_pwd = $selected_patient['is_pwd'] ?? 0;
-
-        // -------------------- INSERT INTO patient_receipt --------------------
-        $stmt = $conn->prepare("INSERT INTO patient_receipt 
-            (patient_id, billing_id, total_charges, total_vat, total_discount, total_out_of_pocket, grand_total, billing_date, insurance_covered, payment_method, status, transaction_id, payment_reference, is_pwd)
-            VALUES (?, ?, ?, 0, ?, ?, ?, CURDATE(), ?, ?, 'Paid', ?, ?, ?)
-        ");
-        $stmt->bind_param(
-            "iidddddsssi",
-            $patient_id,
-            $billing_id,
-            $total_charges,
-            $total_discount,
-            $total_out_of_pocket,
-            $grand_total,
-            $insurance_covered,
-            $payment_method,
-            $txn_id,
-            $ref,
-            $is_pwd
-        );
-        if ($stmt->execute()) {
-            $receipt_id = $stmt->insert_id;
-
-            // -------------------- AUTOMATIC JOURNAL ENTRY --------------------
-            $journal_stmt = $conn->prepare("
-                INSERT INTO journal_entries 
-                (entry_date, description, reference_type, reference_id, reference, status, module, created_by) 
-                VALUES (NOW(), ?, 'Patient Billing', ?, ?, 'Posted', 'billing', ?)
-            ");
-            $journal_desc = "Payment received for patient " . ($selected_patient['full_name'] ?? 'N/A');
-            $journal_stmt->bind_param("siss", $journal_desc, $receipt_id, $txn_id, $_SESSION['username']);
-            $journal_stmt->execute();
-
-            echo "<script>alert('Payment recorded and journal entry created successfully!'); window.location='billing_records.php';</script>";
-            exit;
-        } else {
-            echo "<script>alert('Error saving receipt.');</script>";
-        }
+    } catch (\Exception $e) {
+        $qrImage = null;
     }
 }
 ?>
 
-<!-- ======================= HTML / DESIGN ======================= -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Billing Summary</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="assets/CSS/billing_summary.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>
 <body class="bg-light p-4">
+<div class="container">
+<div class="card p-4 shadow-sm">
+
+<h4 class="mb-3">Billing Summary</h4>
+
+<p><strong>Patient:</strong> <?= htmlspecialchars($patient['full_name'] ?? 'N/A') ?></p>
+
+<table class="table table-bordered">
+<thead class="table-primary">
+<tr>
+    <th>Service</th>
+    <th>Description</th>
+    <th class="text-end">Amount</th>
+</tr>
+</thead>
+<tbody>
+<?php if ($items): ?>
+    <?php foreach ($items as $item): ?>
+    <tr>
+        <td><?= htmlspecialchars($item['serviceName']) ?></td>
+        <td><?= htmlspecialchars($item['description']) ?></td>
+        <td class="text-end">₱<?= number_format($item['total_price'], 2) ?></td>
+    </tr>
+    <?php endforeach; ?>
+<?php else: ?>
+    <tr><td colspan="3" class="text-center">No billing items found.</td></tr>
+<?php endif; ?>
+</tbody>
+</table>
+
+<h5 class="text-end mt-3">
+    Total Payable: ₱<?= number_format($total, 2) ?>
+</h5>
+
+<?php if ($payLinkUrl): ?>
+<div class="mt-3 text-center">
+    <a href="<?= htmlspecialchars($payLinkUrl) ?>" target="_blank" class="btn btn-primary btn-lg">
+        Pay Now
+    </a>
+    <p class="text-muted mt-2">Open the PayMongo payment link in a new tab.</p>
+</div>
+<?php elseif ($linkError): ?>
+<div class="alert alert-warning mt-3" role="alert">
+    Payment link error: <?= htmlspecialchars($linkError) ?>
+</div>
+<?php endif; ?>
+
+<?php if ($qrImage): ?>
+<hr>
+<div class="text-center mt-4">
+    <h5>Scan to Pay via GCash</h5>
+    <img src="<?= $qrImage ?>" alt="PayMongo GCash QR">
+    <p class="text-muted mt-2">Powered by PayMongo</p>
+</div>
+<?php endif; ?>
 
 <div class="main-sidebar">
-    <?php include 'billing_sidebar.php'; ?>
+<?php include 'billing_sidebar.php'; ?>
 </div>
 
-<div class="receipt-box">
-    <h4>Billing Summary</h4>
-    <div><strong>Billed To:</strong> <?= htmlspecialchars($selected_patient['full_name'] ?? '') ?></div>
-    <div>Phone: <?= htmlspecialchars($selected_patient['phone_number'] ?? 'N/A') ?></div>
-    <div>Address: <?= htmlspecialchars($selected_patient['address'] ?? 'N/A') ?></div>
-    <?php if($insurance_plan): ?>
-        <div><strong>Insurance:</strong> <?= htmlspecialchars($insurance_plan) ?> (<?= htmlspecialchars($insurance_discount_type) ?> <?= number_format($insurance_discount,2) ?>)</div>
-    <?php endif; ?>
-
-    <table class="table table-sm table-bordered mt-2">
-        <thead class="table-primary">
-            <tr>
-                <th>Service</th>
-                <th>Description</th>
-                <th class="text-end">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php if($billing_items): ?>
-            <?php foreach($billing_items as $it): ?>
-            <tr>
-                <td><?= htmlspecialchars($it['serviceName'] ?? '') ?></td>
-                <td><?= htmlspecialchars($it['description'] ?? '') ?></td>
-                <td class="text-end">₱<?= number_format($it['total_price'] ?? 0,2) ?></td>
-            </tr>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <tr><td colspan="3" class="text-center">No billed services found.</td></tr>
-        <?php endif; ?>
-        </tbody>
-    </table>
-
-    <div class="text-end mt-2">
-        <strong>Total Charges:</strong> ₱<?= number_format($total_charges,2) ?><br>
-        <strong>Discount:</strong> ₱<?= number_format($total_discount,2) ?><br>
-        <strong>Insurance Covered:</strong> ₱<?= number_format($insurance_covered,2) ?><br>
-        <strong>Total Payable:</strong> ₱<?= number_format($total_out_of_pocket,2) ?>
-    </div>
-
-    <?php if($total_out_of_pocket > 0): ?>
-    <div class="text-end mt-3">
-        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#paymentModal">Proceed to Payment</button>
-    </div>
-    <?php else: ?>
-    <form method="POST" class="text-end mt-3">
-        <button type="submit" name="confirm_paid" class="btn btn-primary">Confirm & Mark as Paid</button>
-    </form>
-    <?php endif; ?>
 </div>
-
-<!-- PAYMENT MODAL ... (same as before) -->
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-document.querySelectorAll('.payment-card').forEach(card=>{
-    card.addEventListener('click',function(){
-        document.querySelectorAll('.payment-card').forEach(c=>c.classList.remove('active'));
-        this.classList.add('active');
-        document.getElementById('payment_method').value=this.dataset.value;
-        document.querySelectorAll('.payment-extra').forEach(el=>el.style.display='none');
-        if(this.dataset.value==='GCash') document.getElementById('gcash_box').style.display='block';
-        if(this.dataset.value==='Bank') document.getElementById('bank_box').style.display='block';
-        if(this.dataset.value==='Card') document.getElementById('card_box').style.display='block';
-        if(this.dataset.value==='Cash') document.getElementById('cash_box').style.display='block';
-    });
-});
-</script>
+</div>
 </body>
 </html>
