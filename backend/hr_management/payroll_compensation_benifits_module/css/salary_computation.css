@@ -47,7 +47,7 @@
     border-radius: 6px;
     box-shadow: 0 8px 10px rgba(0, 0, 0, 1);
     border: 1px solid #ccc;
-    max-width: 1000px;
+    max-width: 1100px;
     width: 100%;
     margin: 0 auto;
 }
@@ -61,33 +61,83 @@
     font-size: 25px;
 }
 
-.grid {
+.form-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    align-items: end;
 }
 
-label {
+.form-grid label {
+    font-weight: bold;
     display: block;
-    font-weight: 600;
-    color: #333;
-    font-size: 15px;
+    margin-bottom: 4px;
 }
 
-input {
+.form-grid select,
+.form-grid input,
+.form-grid button {
     width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    font-size: 13px;
-    transition: all 0.3s ease;
+    padding: 6px;
+    box-sizing: border-box;
 }
 
-select {
-    width: 100%;
-    padding: 8px;
+.salary-box {
     border: 1px solid #ccc;
-    font-size: 13px;
-    transition: all 0.3s ease;
+    margin-top: 20px;
+}
+
+.salary-header {
+    background: #6c757d;
+    color: #fff;
+    padding: 10px;
+    font-weight: bold;
+}
+
+.salary-body {
+    padding: 15px;
+}
+
+.salary-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.salary-table th,
+.salary-table td {
+    border: 1px solid #ccc;
+    padding: 8px;
+    text-align: left;
+}
+
+.salary-table th {
+    background: #f2f2f2;
+    width: 30%;
+}
+
+.net-pay {
+    background: #d4edda;
+    font-weight: bold;
+}
+
+.action-btn {
+    padding: 8px 14px;
+    margin-top: 12px;
+    cursor: pointer;
+    border: 1px solid #333;
+    background: #eee;
+}
+
+.action-btn.primary {
+    background: #007bff;
+    color: #fff;
+    border-color: #007bff;
+}
+
+.action-btn.success {
+    background: #28a745;
+    color: #fff;
+    border-color: #28a745;
 }
 
 .result-box {
@@ -101,24 +151,8 @@ select {
     color: #2a4d69;
 }
 
-bttn {
-    padding: 10px;
-    background-color: #0047ab;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-weight: bold;
-    width: 100%;
-    border-radius: 5px;
-    text-align: center;
-}
-
-bttn:hover {
-    background-color: #0096c7;
-    transition: background-color 0.3s;
-    font-weight: bold;
-}
-
-@media(max-width: 700px){
-    .grid{ grid-template-columns: 1fr; }
+@media (max-width: 700px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
 }

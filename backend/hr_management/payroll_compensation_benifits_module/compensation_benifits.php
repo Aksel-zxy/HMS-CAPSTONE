@@ -4,6 +4,7 @@ include '../includes/FooterComponent.php';
 require_once '../classes/Auth.php';
 require_once '../classes/User.php';
 require_once '../classes/LeaveNotification.php';
+require_once 'classes/CompensationBenefits.php';
 
 Auth::checkHR();
 
@@ -16,6 +17,7 @@ if (!$userId) {
 
 $userModel = new User($conn);
 $leaveNotif = new LeaveNotification($conn);
+$cbObj = new CompensationBenefits($conn);
 
 $userObj = new User($conn);
 $user = $userObj->getById($userId);
@@ -23,6 +25,36 @@ if (!$user) {
     die("User not found.");
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $data = [
+        'employee_id' => $_POST['employee_id'],
+        'pay_period' => $_POST['pay_period'],
+        'basic_pay' => $_POST['basic_pay'],
+        'allowances' => $_POST['allowances'],
+        'bonuses' => $_POST['bonuses'],
+        'sss' => $_POST['sss'],
+        'philhealth' => $_POST['philhealth'],
+        'pagibig' => $_POST['pagibig'],
+        'thirteenth_month' => $_POST['thirteenth_month'] ?? 0
+    ];
+
+    if (isset($_POST['generate_payroll'])) {
+        if ($cbObj->generatePayroll($_POST['pay_period'])) {
+            echo "<script>
+                alert('Payroll generated for this period!');
+            </script>";
+        } else {
+            echo "<script>
+                alert('Failed to generate payroll.');
+            </script>";
+        }
+    }
+
+    // Redirect to the same page or another page
+    echo "<script>window.location.href='compensation_benifits.php';</script>";
+}
+
+$employees = $cbObj->getEmployees();
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 ?>
@@ -37,9 +69,22 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="stylesheet" href="css/compensation_benifits.css">
 </head>
 
 <body>
+
+    <!----- Full-page Loader ----->
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -210,9 +255,84 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>COMPENSATION & BENIFITS</h1> 
-            </div>
+                <div class="card">
+                    <h3>Compensation & Benefits</h3>
+
+                    <form method="POST" action="">
+                        <div class="grid">
+
+                            <!-- Employee Selection -->
+                            <div>
+                                <label>Employee</label>
+                                <select name="employee_id" id="employee_id" required>
+                                    <option value="">----- Select Employee -----</option>
+                                    <?php foreach ($employees as $emp): ?>
+                                        <option value="<?php echo $emp['employee_id']; ?>">
+                                            <?php echo htmlspecialchars($emp['full_name'] ?? ''); ?> 
+                                            (Employee ID: <?php echo $emp['employee_id']; ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <!-- Pay Period -->
+                            <div>
+                                <label for="pay_period">Pay Period</label>
+                                <input type="month" name="pay_period" id="pay_period" required>
+                            </div>
+
+                            <!-- Basic Pay -->
+                            <div>
+                                <label for="basic_pay">Basic Pay</label>
+                                <input type="number" name="basic_pay" id="basic_pay" step="0.01" required>
+                            </div>
+
+                            <!-- Allowances -->
+                            <div>
+                                <label for="allowances">Allowances</label>
+                                <input type="number" name="allowances" id="allowances" step="0.01" required>
+                            </div>
+                        </div>
+
+                        <div class="grid">
+                            <!-- Bonuses -->
+                            <div>
+                                <label for="bonuses">Bonuses</label>
+                                <input type="number" name="bonuses" id="bonuses" step="0.01" required>
+                            </div>
+
+                            <!-- SSS -->
+                            <div>
+                                <label for="sss">SSS (Employee Share)</label>
+                                <input type="number" name="sss" id="sss" step="0.01" required>
+                            </div>
+
+                            <!-- PhilHealth -->
+                            <div>
+                                <label for="philhealth">PhilHealth (Employee Share)</label>
+                                <input type="number" name="philhealth" id="philhealth" step="0.01" required>
+                            </div>
+
+                            <!-- Pag-IBIG -->
+                            <div>
+                                <label for="pagibig">Pag-IBIG (Employee Share)</label>
+                                <input type="number" name="pagibig" id="pagibig" step="0.01" required>
+                            </div>
+
+                            <!-- 13th Month -->
+                            <div>
+                                <label for="thirteenth_month">13th Month Pay (optional)</label>
+                                <input type="number" name="thirteenth_month" id="thirteenth_month" step="0.01">
+                            </div>
+
+                            <!-- Submit -->
+                            <div>
+                                <button type="submit" name="generate_payroll" class="hahaha" style="margin-top: 10px;">Save & Generate Payroll</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
             <!-- END CODING HERE -->
         </div>
         
@@ -225,9 +345,39 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <!----- End of Footer Content ----->
 
     <script>
+        window.addEventListener("load", function(){
+            setTimeout(function(){
+                document.getElementById("loading-screen").style.display = "none";
+            }, 2000);
+        });
+
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+
+        // Initialize manual flags
+        ['sss','philhealth','pagibig'].forEach(id => {
+            let el = document.getElementById(id);
+            el.dataset.manual = false;
+
+            // mark as manual if HR types something
+            el.addEventListener('input', function() {
+                this.dataset.manual = true;
+            });
+        });
+
+        // Auto-suggest contributions based on basic pay
+        document.getElementById('basic_pay').addEventListener('input', function() {
+            let basicPay = parseFloat(this.value) || 0;
+
+            let sss = (basicPay * 0.05).toFixed(2);
+            let philhealth = (basicPay * 0.025).toFixed(2);
+            let pagibig = 500;
+
+            if (document.getElementById('sss').dataset.manual == 'false') document.getElementById('sss').value = sss;
+            if (document.getElementById('philhealth').dataset.manual == 'false') document.getElementById('philhealth').value = philhealth;
+            if (document.getElementById('pagibig').dataset.manual == 'false') document.getElementById('pagibig').value = pagibig;
         });
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>

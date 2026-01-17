@@ -1,0 +1,16 @@
+<?php
+// Load environment variables (if you're using a library like vlucas/phpdotenv)
+require_once __DIR__ . '/vendor/autoload.php';
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
+// Get the Paymongo API key from environment variables
+$PAYMENTGO_API_KEY = getenv('PAYMENTGO_API_KEY') ?? '';
+
+// PayMongo API URL
+$PAYMENTGO_API_URL = "https://api.paymongo.com/v1/links";
+
+// Example usage
+echo "Key: " . $PAYMENTGO_API_KEY . PHP_EOL;
+echo "URL: " . $PAYMENTGO_API_URL . PHP_EOL;
