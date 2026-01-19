@@ -268,7 +268,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             ?>
 
             <div class="employees">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Leave Applications for Approval</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Leave Applications for Approval</p>
                 <table id="EmployeesTable">
                     <thead>
                         <tr>

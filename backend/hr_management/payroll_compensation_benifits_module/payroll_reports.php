@@ -4,18 +4,16 @@ include '../includes/FooterComponent.php';
 require_once '../classes/Auth.php';
 require_once '../classes/User.php';
 require_once '../classes/LeaveNotification.php';
+require_once 'classes/PayrollReports.php';
 
 Auth::checkHR();
 
-$conn = $conn;
+$conn = $conn; // already connected
 
 $userId = Auth::getUserId();
 if (!$userId) {
     die("User ID not set.");
 }
-
-$userModel = new User($conn);
-$leaveNotif = new LeaveNotification($conn);
 
 $userObj = new User($conn);
 $user = $userObj->getById($userId);
@@ -23,8 +21,19 @@ if (!$user) {
     die("User not found.");
 }
 
-$pendingCount = $leaveNotif->getPendingLeaveCount();
+$leaveNotif = new LeaveNotification($conn);
 
+// Initialize PayrollReports
+$report = new PayrollReports($conn);
+
+// Filter
+$start = $_GET['start'] ?? '';
+$end = $_GET['end'] ?? '';
+
+$payrolls = $report->getPayrolls($start, $end);
+$totals = $report->getSummaryTotals($payrolls);
+
+$pendingCount = $leaveNotif->getPendingLeaveCount();
 ?>
 
 <!DOCTYPE html>
@@ -37,9 +46,22 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="stylesheet" href="css/payroll_reports.css">
 </head>
 
 <body>
+
+    <!----- Full-page Loader ----->
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -210,8 +232,70 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div class="container-fluid">
-                <h1>PAYROLL REPORTS</h1>
+            <div class="payrollreports">
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Payroll Reports</p>
+
+                <!-- FILTER FORM -->
+                <form method="GET" class="payrollreports-nav-inline">
+                    <label>Start Date:</label>
+                    <input type="date" name="start" value="<?= htmlspecialchars($start) ?>">
+
+                    <label>End Date:</label>
+                    <input type="date" name="end" value="<?= htmlspecialchars($end) ?>">
+
+                    <button type="submit">Filter</button>
+                    <a href="payroll_reports.php" style="text-decoration:none; padding:8px 16px; background:#404040; color:white; border-radius:5px;">Reset</a>
+                </form>
+
+                <!-- PAYROLL TABLE -->
+                <div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Employee</th>
+                                <th>Position</th>
+                                <th>Department</th>
+                                <th>Pay Period</th>
+                                <th>Gross Pay</th>
+                                <th>Total Deductions</th>
+                                <th>Net Pay</th>
+                                <th>Date Paid</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($payrolls)): ?>
+                                <?php $i = 1; foreach ($payrolls as $row): ?>
+                                    <tr>
+                                        <td><?= $i++ ?></td>
+                                        <td><?= htmlspecialchars($row['employee_name']) ?></td>
+                                        <td><?= htmlspecialchars($row['profession']) ?></td>
+                                        <td><?= htmlspecialchars($row['department']) ?></td>
+                                        <td>
+                                            <?= $row['pay_period_start'] ?>
+                                            <br />
+                                            to
+                                            <br />
+                                            <?= $row['pay_period_end'] ?>
+                                        </td>
+                                        <td><?= number_format($row['gross_pay'], 2) ?></td>
+                                        <td><?= number_format($row['total_deductions'], 2) ?></td>
+                                        <td><strong><?= number_format($row['net_pay'], 2) ?></strong></td>
+                                        <td><?= $row['date_generated'] ?></td>
+                                        <td>
+                                            <a href="view_payslip.php?payroll_id=<?= $row['payroll_id'] ?>" target="_blank" class="view-link"> View Payslip </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="10" style="text-align:center;">No payroll records found.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             <!-- END CODING HERE -->
         </div>
@@ -224,6 +308,13 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <!----- End of Footer Content ----->
 
     <script>
+
+        window.addEventListener("load", function(){
+            setTimeout(function(){
+                document.getElementById("loading-screen").style.display = "none";
+            }, 2000);
+        });
+
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");

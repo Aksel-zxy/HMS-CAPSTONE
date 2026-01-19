@@ -60,7 +60,7 @@ $hiredApplicants = $applicantManager->getHiredApplicants();
             </a>
 
             <div class="history">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Hired Applicant History</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Hired Applicant History</p>
                 <table>
                     <thead>
                         <tr>

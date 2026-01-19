@@ -253,7 +253,7 @@ $employees = $empResult ? $empResult->fetch_all(MYSQLI_ASSOC) : [];
 
             <!-- ----- Table ----- -->
             <div class="employees">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Employee List</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Employee List</p>
                 <table id="EmployeesTable">
                     <thead>
                         <tr>

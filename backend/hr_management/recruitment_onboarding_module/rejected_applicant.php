@@ -60,7 +60,7 @@ $rejectedApplicants = $applicantManager->getRejectedApplicants();
             </a>
 
             <div class="history">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Rejected Applicant History</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Rejected Applicant History</p>
                 <table>
                     <thead>
                         <tr>
