@@ -127,8 +127,17 @@ if (!empty($_SESSION['message'])) {
 
 <body>
 
-
-
+    <!----- Full-page Loader ----->
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+    
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -306,12 +315,11 @@ if (!empty($_SESSION['message'])) {
                     <div class="form-grid">
                         <div>
                             <label>Employee</label>
-                            <select name="employee_id" id="employee_select" required>
+                            <select name="employee_id" id="employee_id" required>
                                 <option value="">----- Select Employee -----</option>
                                 <?php foreach ($employees as $emp): ?>
-                                    <option value="<?= $emp['employee_id']; ?>"
-                                        <?= isset($_POST['employee_id']) && $_POST['employee_id'] == $emp['employee_id'] ? 'selected' : ''; ?>>
-                                        <?= htmlspecialchars($emp['full_name']); ?>
+                                    <option value="<?php echo $emp['employee_id']; ?>">
+                                        <?php echo htmlspecialchars($emp['full_name'] ?? ''); ?> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Employee ID: <?php echo $emp['employee_id']; ?>)
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -332,7 +340,7 @@ if (!empty($_SESSION['message'])) {
                         </div>
 
                         <div>
-                            <button type="submit" name="compute_salary">Compute Salary</button>
+                            <button type="submit" name="compute_salary" class="haha">Compute Salary</button>
                         </div>
                     </div>
                 </form>
@@ -360,16 +368,16 @@ if (!empty($_SESSION['message'])) {
                                     </td>
                                 </tr>
                                 <tr>
+                                    <th>Profession</th>
+                                    <td><?= htmlspecialchars($salaryResult['profession'] ?? 'N/A'); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Daily Rate</th>
+                                    <td><?= number_format($salaryResult['daily_rate'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
                                     <th>Days Worked</th>
                                     <td><?= number_format($salaryResult['days_worked'] ?? 0, 2); ?></td>
-                                </tr>
-                                <tr>
-                                    <th>Overtime Hours</th>
-                                    <td><?= number_format($salaryResult['overtime_hours'] ?? 0, 2); ?></td>
-                                </tr>
-                                <tr>
-                                    <th>Undertime Hours</th>
-                                    <td><?= number_format($salaryResult['undertime_hours'] ?? 0, 2); ?></td>
                                 </tr>
                                 <tr>
                                     <th>Basic Pay</th>
@@ -388,8 +396,24 @@ if (!empty($_SESSION['message'])) {
                                     <td><?= number_format($salaryResult['thirteenth_month'] ?? 0, 2); ?></td>
                                 </tr>
                                 <tr>
+                                    <th>Overtime Hours</th>
+                                    <td><?= number_format($salaryResult['overtime_hours'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
                                     <th>Overtime Pay</th>
                                     <td><?= number_format($salaryResult['overtime_pay'] ?? 0, 2); ?></td>
+                                </tr>
+                                <tr>
+                                    <th>Gross Pay (Basic + Allowances + Bonuses + OT + 13th Month)</th>
+                                    <td class="gross-pay"><?= number_format($salaryResult['gross_pay'] ?? 0, 2); ?></td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="salary-body">
+                            <table class="salary-table">
+                                <tr>
+                                    <th>Undertime Hours</th>
+                                    <td><?= number_format($salaryResult['undertime_hours'] ?? 0, 2); ?></td>
                                 </tr>
                                 <tr>
                                     <th>Undertime Deduction</th>
@@ -413,31 +437,38 @@ if (!empty($_SESSION['message'])) {
                                 </tr>
                                 <tr>
                                     <th>Total Deductions</th>
-                                    <td><?= number_format($salaryResult['total_deductions'] ?? 0, 2); ?></td>
+                                    <td class="total-deductions"><?= number_format($salaryResult['total_deductions'] ?? 0, 2); ?></td>
                                 </tr>
+                            </table>
+                        </div>
+                        <div class="salary-body">
+                            <table class="salary-table">
                                 <tr class="net-pay">
-                                    <th>Net Pay</th>
+                                    <th>Gross Pay - Total Deductions = Net Pay</th>
                                     <td><?= number_format($salaryResult['net_pay'] ?? 0, 2); ?></td>
                                 </tr>
                             </table>
 
-                            <?php if (!isset($salaryResult['payroll_id'])): ?>
-                                <form method="POST">
-                                    <button type="submit" name="save_payroll" class="action-btn success">
-                                        Save to Payroll
-                                    </button>
-                                </form>
-                            <?php endif; ?>
+                            <br />
 
-                            <?php if (isset($salaryResult['payroll_id']) && ($salaryResult['status'] ?? '') != 'Paid'): ?>
-                                <form method="POST">
-                                    <input type="hidden" name="payroll_id" value="<?= $salaryResult['payroll_id']; ?>">
-                                    <button type="submit" name="mark_paid" class="action-btn primary">
-                                        Mark as Paid
-                                    </button>
-                                </form>
-                            <?php endif; ?>
+                            <center>
+                                <?php if (!isset($salaryResult['payroll_id'])): ?>
+                                    <form method="POST">
+                                        <button type="submit" name="save_payroll" class="hahaha">
+                                            Save to Payroll
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
 
+                                <?php if (isset($salaryResult['payroll_id']) && ($salaryResult['status'] ?? '') != 'Paid'): ?>
+                                    <form method="POST">
+                                        <input type="hidden" name="payroll_id" value="<?= $salaryResult['payroll_id']; ?>">
+                                        <button type="submit" name="mark_paid" class="hahahaha">
+                                            Mark as Paid
+                                        </button>
+                                    </form>
+                                <?php endif; ?>
+                            </center>
                         </div>
                     </div>
                 <?php endif; ?>

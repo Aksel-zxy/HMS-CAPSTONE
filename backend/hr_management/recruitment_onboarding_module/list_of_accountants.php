@@ -108,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <!-- ----- Table ----- -->
         <div class="employees">
-            <p style="text-align: center;font-size: 35px;font-weight: bold;padding-bottom: 20px;color: black;">Accountants List</p>
+            <p style="text-align: center;font-size: 35px;font-weight: bold;padding-bottom: 20px;color: #0047ab;">Accountants List</p>
             <table id="AccountantsTable">
                 <thead>
                     <tr>

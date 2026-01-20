@@ -239,7 +239,7 @@ $result = $attendanceRecords->getDailyRecords($date);
             </div>
             <!-- START CODING HERE -->
             <div class="attendance">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Daily Attendance Records (<?php echo $date; ?>)</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Daily Attendance Records (<?php echo $date; ?>)</p>
 
                 <!-- Navigation -->
                 <form method="GET" class="attendance-nav" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 900px; margin-left: auto; margin-right: auto;">

@@ -252,7 +252,7 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
 
             <!-- START CODING HERE -->
             <div class="history">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Ready for Registration</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Ready for Registration</p>
                 <table>
                     <thead>
                         <tr>
@@ -299,7 +299,7 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
             </div>
             
             <!-- ----- Card-List of Employees ----- -->
-            <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Registration of Applicant</p>
+            <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Registration of Applicant</p>
 
             <div class="row1">
                 <div class="card">

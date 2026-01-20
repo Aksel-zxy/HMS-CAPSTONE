@@ -50,6 +50,7 @@
     max-width: 1100px;
     width: 100%;
     margin: 0 auto;
+    margin-bottom: 50px;
 }
 
 /* ---------- Form ---------- */
@@ -64,7 +65,7 @@
 .form-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 5px;
+    gap: 15px;
     align-items: end;
 }
 
@@ -85,13 +86,19 @@
 .salary-box {
     border: 1px solid #ccc;
     margin-top: 20px;
+    border-radius: 10px;
 }
 
 .salary-header {
-    background: #6c757d;
+    background: #0047ab;
     color: #fff;
     padding: 10px;
     font-weight: bold;
+    text-align: center;
+    font-size: 18px;
+    width: 100%;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
 }
 
 .salary-body {
@@ -115,29 +122,74 @@
     width: 30%;
 }
 
+.gross-pay {
+    background: lightgreen;
+}
+
+.total-deductions {
+    background: #ffdddd;
+}
+
 .net-pay {
-    background: #d4edda;
+    background: #4cbb17;
     font-weight: bold;
 }
 
-.action-btn {
-    padding: 8px 14px;
-    margin-top: 12px;
+.haha {
+    padding: 10px;
+    background-color: #0047ab;
+    color: white;
+    border: none;
     cursor: pointer;
-    border: 1px solid #333;
-    background: #eee;
+    font-weight: bold;
+    width: 100%;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 15px;
 }
 
-.action-btn.primary {
-    background: #007bff;
-    color: #fff;
-    border-color: #007bff;
+.haha:hover {
+    background-color: #0096c7;
+    transition: background-color 0.3s;
+    font-weight: bold;
 }
 
-.action-btn.success {
-    background: #28a745;
-    color: #fff;
-    border-color: #28a745;
+.hahaha {
+    padding: 10px;
+    background-color: #0047ab;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    width: 20%;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 15px;
+}
+
+.hahaha:hover {
+    background-color: #0096c7;
+    transition: background-color 0.3s;
+    font-weight: bold;
+}
+
+.hahahaha {
+    padding: 10px;
+    background-color: #0047ab;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    width: 20%;
+    border-radius: 5px;
+    text-align: center;
+    font-size: 15px;
+}
+
+.hahahaha:hover {
+    background-color: #0096c7;
+    transition: background-color 0.3s;
+    font-weight: bold;
 }
 
 .result-box {
