@@ -2,7 +2,7 @@
 session_start();
 include '../../../SQL/config.php';
 
-$GEMINI_API_KEY = "AIzaSyAVrqAAgrw37Tfs7sNgaqjd61oCQmozJeA"; 
+$GEMINI_API_KEY = getenv('GERALD_KEY') ?? ''; 
 
 if (isset($_SESSION['user_id'])) {
     
