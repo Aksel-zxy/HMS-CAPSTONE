@@ -76,16 +76,27 @@ function create_paymongo_payment_link($amount, $description = '', $remarks = '')
 // -----------------------------
 $patient_id = intval($_GET['patient_id'] ?? 0);
 $billing_id = null;
+$transaction_id = null;
 
 $stmt = $conn->prepare("SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id = ?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
 
+// Get the latest billing with transaction_id
 $stmt = $conn->prepare("SELECT MAX(billing_id) AS bid FROM billing_items WHERE patient_id = ? AND finalized = 1");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $billing_id = $stmt->get_result()->fetch_assoc()['bid'] ?? null;
+
+// Get transaction_id from billing_records
+if ($billing_id) {
+    $stmt = $conn->prepare("SELECT transaction_id FROM billing_records WHERE patient_id = ? AND billing_id = ?");
+    $stmt->bind_param("ii", $patient_id, $billing_id);
+    $stmt->execute();
+    $txn_record = $stmt->get_result()->fetch_assoc();
+    $transaction_id = $txn_record['transaction_id'] ?? null;
+}
 
 $items = [];
 $total = 0;
@@ -107,23 +118,36 @@ if ($billing_id) {
 
 // -----------------------------
 // Create PayMongo Payment Link
+// NOTE: We pass transaction_id as part of remarks so webhook can match it
+// PayMongo doesn't support custom metadata on links, so we encode it in remarks
 // -----------------------------
 $enableLink = true;
 $payLinkUrl = null;
 $linkError = null;
+$paymongo_response = null;
 
-if ($enableLink && $total > 0) {
+if ($enableLink && $total > 0 && $transaction_id) {
+    // Create payment link with transaction ID embedded in remarks
+    $description = "Billing #{$billing_id} - Patient {$patient_id}";
+    $remarks = "TXN:{$transaction_id}";
+    
     $linkResult = create_paymongo_payment_link(
         (int)($total * 100),
-        "Billing #{$billing_id} - Patient {$patient_id}",
-        "Total: ₱" . number_format($total, 2)
+        $description,
+        $remarks
     );
+    
+    $paymongo_response = $linkResult['response'] ?? null;
 
     if ($linkResult['success'] && !empty($linkResult['url'])) {
         $payLinkUrl = $linkResult['url'];
+        error_log("[BILLING] Payment link created - Patient: {$patient_id}, Billing: {$billing_id}, TXN: {$transaction_id}, Amount: {$total}");
     } else {
         $linkError = $linkResult['error'] ?? 'Unknown error creating payment link';
+        error_log("[BILLING] Payment link error - " . $linkError);
     }
+} elseif (!$transaction_id) {
+    $linkError = "Transaction ID not found. Please finalize billing first.";
 }
 
 // -----------------------------
