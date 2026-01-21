@@ -18,6 +18,23 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+$sql = "SELECT 
+                e.evaluation_id,
+                e.evaluation_date,
+                e.average_score,
+                e.performance_level,
+                e.comments,
+                e.ai_feedback,
+                doc.first_name AS doc_fname,
+                doc.last_name AS doc_lname,
+                nurse.first_name AS nurse_fname,
+                nurse.last_name AS nurse_lname
+            FROM evaluations e
+            JOIN hr_employees doc ON e.evaluator_id = doc.employee_id
+            JOIN hr_employees nurse ON e.evaluatee_id = nurse.employee_id
+            ORDER BY e.evaluation_date DESC";
+
+$result = $conn->query($sql);
 ?>
 
 <!DOCTYPE html>
@@ -69,16 +86,16 @@ if (!$user) {
 
                 <ul id="schedule" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
+                        <a href="../scheduling_shifts_and_duties/doctor_shift_scheduling.php" class="sidebar-link">Doctor Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
+                        <a href="../scheduling_shifts_and_duties/nurse_shift_scheduling.php" class="sidebar-link">Nurse Shift Scheduling</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="duty_assignment.php" class="sidebar-link">Duty Assignment</a>
+                        <a href="../scheduling_shifts_and_duties/duty_assignment.php" class="sidebar-link">Duty Assignment</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
+                        <a href="../scheduling_shifts_and_duties/schedule_calendar.php" class="sidebar-link">Schedule Calendar</a>
                     </li>
                 </ul>
             </li>
@@ -169,22 +186,87 @@ if (!$user) {
             <!-- START CODING HERE -->
             <div style="width:95%; margin:20px auto; padding:20px;">
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
-                    👨‍⚕️ Medical Staff Duty Overview
+                    🧑‍⚕️ Nurse Performance Evaluations
                 </h2>
+                <div class="table-responsive" style="max-height: 700px; overflow-y: auto; overflow-x: auto;">
 
-            <!-- END CODING HERE -->
-            <!----- End of Main Content ----->
-        </div>
-        <script>
-            const toggler = document.querySelector(".toggler-btn");
-            toggler.addEventListener("click", function() {
-                document.querySelector("#sidebar").classList.toggle("collapsed");
-            });
-        </script>
-        <script src="../assets/Bootstrap/all.min.js"></script>
-        <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-        <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-        <script src="../assets/Bootstrap/jq.js"></script>
+                    <table class="table table-hover table-bordered align-middle" style="background-color: white; box-shadow: 0 2px 15px rgba(0,0,0,0.05);">
+
+                        <thead class="bg-light text-secondary" style="position: sticky; top: 0; z-index: 1;">
+                            <tr>
+                                <th style="width: 12%;">Date</th>
+                                <th style="width: 15%;">Evaluator (Doctor)</th>
+                                <th style="width: 15%;">Evaluatee (Nurse)</th>
+                                <th class="text-center" style="width: 8%;">Score</th>
+                                <th class="text-center" style="width: 10%;">Rating</th>
+                                <th style="width: 20%;">Doctor's Comments</th>
+                                <th style="width: 20%;">AI Analysis</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if ($result && $result->num_rows > 0): ?>
+                                <?php while ($row = $result->fetch_assoc()): ?>
+                                    <?php
+                                    $badge_class = 'bg-secondary';
+                                    if ($row['performance_level'] === 'Excellent') $badge_class = 'bg-success';
+                                    if ($row['performance_level'] === 'Good') $badge_class = 'bg-primary';
+                                    if ($row['performance_level'] === 'Poor') $badge_class = 'bg-danger';
+                                    ?>
+                                    <tr>
+                                        <td class="small text-muted">
+                                            <?= date("M d, Y", strtotime($row['evaluation_date'])) ?>
+                                        </td>
+                                        <td class="fw-bold text-dark">
+                                            Dr. <?= htmlspecialchars($row['doc_fname'] . ' ' . $row['doc_lname']) ?>
+                                        </td>
+                                        <td class="text-primary">
+                                            Nurse <?= htmlspecialchars($row['nurse_fname'] . ' ' . $row['nurse_lname']) ?>
+                                        </td>
+                                        <td class="text-center fw-bold fs-5">
+                                            <?= $row['average_score'] ?>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="badge rounded-pill <?= $badge_class ?>">
+                                                <?= htmlspecialchars($row['performance_level']) ?>
+                                            </span>
+                                        </td>
+                                        <td class="small text-muted fst-italic">
+                                            "<?= htmlspecialchars($row['comments'] ?: 'No comments provided.') ?>"
+                                        </td>
+                                        <td class="small" style="font-size: 0.85rem;">
+                                            <?php if (!empty($row['ai_feedback']) && $row['ai_feedback'] !== 'Pending Generation...'): ?>
+                                                <i class="bi bi-robot text-primary me-1"></i>
+                                                <?= htmlspecialchars($row['ai_feedback']) ?>
+                                            <?php else: ?>
+                                                <span class="text-muted opacity-50">Not generated yet.</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-muted">
+                                        <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                                        No evaluation records found in the database.
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- END CODING HERE -->
+                <!----- End of Main Content ----->
+            </div>
+            <script>
+                const toggler = document.querySelector(".toggler-btn");
+                toggler.addEventListener("click", function() {
+                    document.querySelector("#sidebar").classList.toggle("collapsed");
+                });
+            </script>
+            <script src="../assets/Bootstrap/all.min.js"></script>
+            <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+            <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+            <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

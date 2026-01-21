@@ -230,7 +230,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             </div>
             <!-- START CODING HERE -->
             <div class="summary">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Leave Credits per Employees</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Leave Credits per Employees</p>
 
                 <center>
                     <button class="hahaha" onclick="openForm()">Add Leave Credits</button>

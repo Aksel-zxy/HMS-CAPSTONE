@@ -237,7 +237,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             <br />
 
             <div class="summary">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Leave Reports — Summary by Employee</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Leave Reports — Summary by Employee</p>
                 <table id="ReportsTable">
                     <thead>
                         <tr>

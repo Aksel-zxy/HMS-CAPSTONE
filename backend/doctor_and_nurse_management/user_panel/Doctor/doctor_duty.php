@@ -144,6 +144,10 @@ class Duty
         return $res ? $res->fetch_all(MYSQLI_ASSOC) : [];
     }
 
+    /**
+     * UPDATED SAVE FUNCTION
+     * Returns TRUE on success, or the ERROR MESSAGE string on failure.
+     */
     public function save($data)
     {
         $this->conn->begin_transaction();
@@ -151,6 +155,7 @@ class Duty
             $stmt = $this->conn->prepare("INSERT INTO duty_assignments 
             (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, notes, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+            
             $stmt->bind_param(
                 "iiissss",
                 $data['appointment_id'],
@@ -175,11 +180,11 @@ class Duty
             $update->execute();
 
             $this->conn->commit();
-            return true;
+            return true; // Success
         } catch (Exception $e) {
             $this->conn->rollback();
-            error_log("Save failed: " . $e->getMessage());
-            return false;
+            // Return the actual error message so the controller can see it
+            return $e->getMessage(); 
         }
     }
 
@@ -294,12 +299,19 @@ class DoctorDutyController
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
             $appointment_id = (int) $_POST['appointment_id'];
+            
+            // FIX: Get doctor ID, fall back to Session ID if appointment has no doctor assigned
             $doctor_id = $this->appointment->getDoctorId($appointment_id);
+            if (empty($doctor_id) && isset($_SESSION['employee_id'])) {
+                $doctor_id = $_SESSION['employee_id'];
+            }
 
             $procedure = htmlspecialchars($_POST['procedure'] ?? '');
             $notes = htmlspecialchars($_POST['notes'] ?? '');
-            $bed_id = !empty($_POST['bed_id']) ? $_POST['bed_id'] : null;
-            $nurse_assistant = !empty($_POST['nurse_assistant']) ? $_POST['nurse_assistant'] : null;
+            
+            // FIX: Strict check for empty strings to ensure NULL is passed to DB
+            $bed_id = (!empty($_POST['bed_id']) && $_POST['bed_id'] !== '') ? $_POST['bed_id'] : null;
+            $nurse_assistant = (!empty($_POST['nurse_assistant']) && $_POST['nurse_assistant'] !== '') ? $_POST['nurse_assistant'] : null;
 
             $data = [
                 'appointment_id' => $appointment_id,
@@ -311,11 +323,16 @@ class DoctorDutyController
                 'status' => 'Pending'
             ];
 
-            if ($this->duty->save($data)) {
+            // FIX: Check return value. If it's NOT true, it's an error message.
+            $result = $this->duty->save($data);
+
+            if ($result === true) {
                 header("Location: doctor_duty.php?success=1");
                 exit;
             } else {
-                header("Location: doctor_duty.php?error=save_failed");
+                // Pass the actual error message to the URL so you can see it
+                $errorMsg = urlencode($result);
+                header("Location: doctor_duty.php?error=" . $errorMsg);
                 exit;
             }
         }
@@ -548,12 +565,12 @@ if (class_exists('Prescription')) {
                 </a>
             </li>
             <li class="sidebar-item">
-                <a href="#" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                <a href="renew.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
                         <path d="M32 160C32 124.7 60.7 96 96 96L544 96C579.3 96 608 124.7 608 160L32 160zM32 208L608 208L608 480C608 515.3 579.3 544 544 544L96 544C60.7 544 32 515.3 32 480L32 208zM279.3 480C299.5 480 314.6 460.6 301.7 445C287 427.3 264.8 416 240 416L176 416C151.2 416 129 427.3 114.3 445C101.4 460.6 116.5 480 136.7 480L279.2 480zM208 376C238.9 376 264 350.9 264 320C264 289.1 238.9 264 208 264C177.1 264 152 289.1 152 320C152 350.9 177.1 376 208 376zM392 272C378.7 272 368 282.7 368 296C368 309.3 378.7 320 392 320L504 320C517.3 320 528 309.3 528 296C528 282.7 517.3 272 504 272L392 272zM392 368C378.7 368 368 378.7 368 392C368 405.3 378.7 416 392 416L504 416C517.3 416 528 405.3 528 392C528 378.7 517.3 368 504 368L392 368z" />
                     </svg>
-                    <span style="font-size: 18px;">License & Compliance Viewer</span>
+                    <span style="font-size: 18px;">Compliance Licensing</span>
                 </a>
             </li>
             <li class="sidebar-item">
@@ -759,7 +776,7 @@ if (class_exists('Prescription')) {
                                             <label class="form-label">Purpose</label>
                                             <select name="procedure" class="form-select form-select-sm" required>
                                                 <?php
-                                                $purposes = ["consultation", "ob-gyn", "pediatric", "psychiatric", "cardiology", "laboratory"];
+                                                $purposes = ["Consultation", "Ob-gyn", "Pediatric", "Psychiatric", "Cardiology", "Laboratory"];
                                                 foreach ($purposes as $purpose):
                                                     $selected = (strcasecmp($purpose, $appointment['purpose']) == 0) ? 'selected' : '';
                                                 ?>

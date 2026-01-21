@@ -59,7 +59,7 @@ $approvedLeaves = $leaveManager->getApprovedLeaves();
             </a>
 
             <div class="history">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Approved Leave History</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Approved Leave History</p>
                 <table>
                     <thead>
                         <tr>
