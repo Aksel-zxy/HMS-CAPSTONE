@@ -156,8 +156,83 @@ if ($target_employee_id) {
             </div>
 
             <div class="container-fluid py-4">
-                <h2 class="schedule-title">Duty Assignment</h2>
+                <h2 class="schedule-title">Compliance License Renewal</h2>
 
+                <div class="row justify-content-center">
+                    <div class="col-lg-8 col-xl-7">
+
+                        <?php if ($license_info): ?>
+                            <div class="alert alert-success shadow-sm border-0 p-4 mb-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-check-circle-fill fs-1 me-4 text-success"></i>
+                                        <div>
+                                            <h5 class="alert-heading fw-bold">License Uploaded</h5>
+                                            <p class="mb-0 text-muted">
+                                                Last updated: 
+                                                <strong><?= date("M d, Y h:i A", strtotime($license_info['uploaded_at'])) ?></strong>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <a href="view_license.php?employee_id=<?= $target_employee_id ?>" 
+                                       target="_blank" 
+                                       class="btn btn-outline-success fw-bold px-4">
+                                        <i class="bi bi-eye me-2"></i> View File
+                                    </a>
+                                </div>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-warning d-flex align-items-center shadow-sm border-0 p-4 mb-4">
+                                <i class="bi bi-exclamation-triangle-fill fs-1 me-4 text-warning"></i>
+                                <div>
+                                    <h5 class="alert-heading fw-bold">Action Required</h5>
+                                    <p class="mb-0">No valid License ID found. Please upload your latest document immediately.</p>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="card border-0 shadow-sm rounded-3">
+                            <div class="card-header bg-white py-3 border-bottom">
+                                <h5 class="mb-0 text-primary fw-bold"><i class="bi bi-cloud-upload me-2"></i>Update Document</h5>
+                            </div>
+                            <div class="card-body p-4">
+
+                                <form action="upd_license.php" method="POST" enctype="multipart/form-data">
+                                    <input type="hidden" name="employee_id" value="<?= $target_employee_id ?>">
+
+                                    <div class="mb-4">
+                                        <label class="form-label fw-bold">Select Document</label>
+
+                                        <div class="upload-zone position-relative">
+                                            <i class="bi bi-file-earmark-pdf text-primary fs-1 mb-2"></i>
+                                            <h6 class="fw-bold">Click to Browse or Drag File Here</h6>
+                                            <p class="text-muted small mb-0">Supported formats: JPG, PNG, PDF (Max 4MB)</p>
+
+                                            <input type="file" name="license_file" class="form-control position-absolute top-0 start-0 w-100 h-100 opacity-0"
+                                                style="cursor: pointer;" required onchange="showFileName(this)">
+                                        </div>
+                                        <div id="file-name-display" class="mt-2 text-center text-success small fw-bold"></div>
+                                    </div>
+
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold shadow-sm">
+                                            <i class="bi bi-save me-2"></i> Save / Update License
+                                        </button>
+                                    </div>
+                                </form>
+
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4">
+                            <small class="text-muted">
+                                <i class="bi bi-lock-fill me-1"></i>
+                                Documents are stored securely and encrypted in the database.
+                            </small>
+                        </div>
+
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -169,6 +244,15 @@ if ($target_employee_id) {
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+
+        function showFileName(input) {
+            const display = document.getElementById('file-name-display');
+            if (input.files && input.files.length > 0) {
+                display.textContent = "Selected: " + input.files[0].name;
+            } else {
+                display.textContent = "";
+            }
+        }
     </script>
     <script src="../Doctor/notif.js"></script>
     <script src="../../assets/Bootstrap/all.min.js"></script>

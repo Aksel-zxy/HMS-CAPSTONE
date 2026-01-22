@@ -198,102 +198,133 @@ $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Su
 
                 </div>
             </div>
-            <div class="container-fluid">
-                <h2 class="schedule-title">🧑‍⚕️My Schedule</h2>
+            <?php
+            // --- 1. LOGIC: Separate Upcoming vs History ---
+            $upcoming_schedules = [];
+            $history_schedules = [];
+            $today = date('Y-m-d');
 
-                <?php if (!empty($modal_schedules)): ?>
+            if (!empty($modal_schedules)) {
+                foreach ($modal_schedules as $sched) {
+                    $week_start = $sched['week_start'];
+                    // Calculate Sunday (End of week)
+                    $week_end_date = date('Y-m-d', strtotime($week_start . ' + 6 days'));
 
+                    if ($today > $week_end_date) {
+                        $history_schedules[] = $sched;
+                    } else {
+                        $upcoming_schedules[] = $sched;
+                    }
+                }
+                // Reverse history (Newest past week at top)
+                $history_schedules = array_reverse($history_schedules);
+            }
+
+            // --- 2. HELPER: Function to render the table card ---
+            // Defined here to avoid copying the table code twice
+            if (!function_exists('render_schedule_card')) {
+                function render_schedule_card($modal_schedule, $days, $rooms_lookup, $nurse_lookup)
+                {
+                    $week_start = $modal_schedule['week_start'];
+            ?>
+                    <div class="mb-4 border rounded p-3 schedule-list-view">
+                        <h6 class="schedule-date">Week: <?= htmlspecialchars($week_start) ?></h6>
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-bordered bg-white schedule-calendar-table mb-0">
+                                <thead style="position: sticky; top: 0; background-color: #ffffff; z-index: 1;">
+                                    <tr class="schedule-table-header">
+                                        <th>Day</th>
+                                        <th>Start</th>
+                                        <th>End</th>
+                                        <th>Status</th>
+                                        <th>Room</th>
+                                        <th>Nurse</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($days as $day): ?>
+                                        <?php
+                                        $prefix = strtolower(substr($day, 0, 3));
+                                        $status = $modal_schedule[$prefix . '_status'] ?? '';
+                                        $is_off = in_array($status, ['Off Duty', 'Leave', 'Sick']);
+                                        $room_id = $modal_schedule[$prefix . '_room_id'] ?? null;
+                                        ?>
+                                        <tr>
+                                            <td><?= $day ?></td>
+                                            <td><?= $is_off ? '---' : htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?></td>
+                                            <td><?= $is_off ? '---' : htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?></td>
+                                            <td><?= htmlspecialchars($status) ?></td>
+                                            <td>
+                                                <?= ($is_off) ? '---' : htmlspecialchars($rooms_lookup[$room_id] ?? '---'); ?>
+                                            </td>
+                                            <td>
+                                                <?php
+                                                if (!$is_off && !empty($room_id) && isset($nurse_lookup[$week_start][$prefix][$room_id])) {
+                                                    echo implode(', ', $nurse_lookup[$week_start][$prefix][$room_id]);
+                                                } else {
+                                                    echo ($is_off) ? '---' : '<span class="text-muted">None</span>';
+                                                }
+                                                ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+            <?php
+                }
+            }
+            ?>
+            <div class="container-fluid mt-3">
+
+                <div class="row align-items-center mb-3">
+
+                    <div class="col">
+                        <h2 class="schedule-title mb-0">🧑‍⚕️ My Schedule</h2>
+                    </div>
+
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#historyModal">
+                            <i class="fas fa-history"></i> View History
+                        </button>
+                    </div>
+
+                </div>
+
+                <?php if (!empty($upcoming_schedules)): ?>
                     <div class="schedule-list-container" style="max-height: 75vh; overflow-y: auto; padding-right: 5px;">
-
-                        <?php foreach ($modal_schedules as $modal_schedule): ?>
-
-                            <?php
-                            // --- THIS IS THE NEW LOGIC TO HIDE PAST WEEKS ---
-                            $week_start = $modal_schedule['week_start'];
-                            // Calculate the Sunday of that week (Start + 6 days)
-                            $week_end_date = date('Y-m-d', strtotime($week_start . ' + 6 days'));
-                            // Get today's date
-                            $today = date('Y-m-d');
-
-                            // If today is greater than the end of the week, skip this loop iteration
-                            if ($today > $week_end_date) {
-                                continue;
-                            }
-                            // ------------------------------------------------
-                            ?>
-
-                            <div class="mb-4 border rounded p-3 schedule-list-view">
-                                <h6 class="schedule-date">Week: <?= htmlspecialchars($modal_schedule['week_start']) ?></h6>
-                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                    <table class="table table-bordered bg-white schedule-calendar-table mb-0">
-                                        <thead style="position: sticky; top: 0; background-color: #ffffff; z-index: 1; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);">
-                                            <tr class="schedule-table-header">
-                                                <th>Day</th>
-                                                <th>Start Time</th>
-                                                <th>End Time</th>
-                                                <th>Status</th>
-                                                <th>Room</th>
-                                                <th>Nurse on Duty</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($days as $day): ?>
-                                                <?php $prefix = strtolower(substr($day, 0, 3)); ?>
-                                                <tr>
-                                                    <td><?= $day ?></td>
-                                                    <td>
-                                                        <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>---<?php else: ?><?= htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?><?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])): ?>---<?php else: ?><?= htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?><?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?= htmlspecialchars($modal_schedule[$prefix . '_status'] ?? '') ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php
-                                                        $room_col = $prefix . '_room_id';
-                                                        $current_room_id = $modal_schedule[$room_col] ?? null; // Saved ID for next step
-
-                                                        if (in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])) {
-                                                            echo '---';
-                                                        } else {
-                                                            echo htmlspecialchars($rooms_lookup[$current_room_id] ?? '---');
-                                                        }
-                                                        ?>
-                                                    </td>
-
-                                                    <td>
-                                                        <?php
-                                                        // Logic: Check if there is a nurse in this room, on this day, in this week
-                                                        $current_week = $modal_schedule['week_start'];
-
-                                                        // Only check if you (the doctor) are actually assigned a room
-                                                        if (!empty($current_room_id) && !in_array(($modal_schedule[$prefix . '_status'] ?? ''), ['Off Duty', 'Leave', 'Sick'])) {
-
-                                                            // Check our lookup array
-                                                            if (isset($nurse_lookup[$current_week][$prefix][$current_room_id])) {
-                                                                // Implode handles cases where 2 nurses might be in the same room
-                                                                echo implode(', ', $nurse_lookup[$current_week][$prefix][$current_room_id]);
-                                                            } else {
-                                                                echo '<span class="text-muted">None</span>';
-                                                            }
-                                                        } else {
-                                                            echo '---';
-                                                        }
-                                                        ?>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
+                        <?php foreach ($upcoming_schedules as $sched): ?>
+                            <?php render_schedule_card($sched, $days, $rooms_lookup, $nurse_lookup); ?>
                         <?php endforeach; ?>
-
-                    </div> <?php else: ?>
-                    <div class="alert alert-info mt-4">No schedule found for you.</div>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-info">You have no upcoming schedules.</div>
                 <?php endif; ?>
+
+            </div>
+
+            <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">📜 Schedule History</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body bg-light">
+                            <?php if (!empty($history_schedules)): ?>
+                                <?php foreach ($history_schedules as $sched): ?>
+                                    <?php render_schedule_card($sched, $days, $rooms_lookup, $nurse_lookup); ?>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <div class="alert alert-secondary text-center">No past schedule history found.</div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
