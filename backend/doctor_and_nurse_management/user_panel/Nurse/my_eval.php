@@ -1,9 +1,4 @@
 <?php
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 include '../../../../SQL/config.php';
 
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Nurse') {
@@ -16,57 +11,28 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-$nurse_id = $_SESSION['employee_id'];
-
-// Fetch User Info
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
-$stmt->bind_param("i", $nurse_id);
+$stmt->bind_param("i", $_SESSION['employee_id']);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 
-// Fetch License Info (Logic from target)
-$target_employee_id = $_GET['employee_id'] ?? $_SESSION['employee_id'];
-$license_info = null;
-if ($target_employee_id) {
-    $sql_fetch = "SELECT document_id, uploaded_at FROM hr_employees_documents WHERE employee_id = ? AND document_type = 'License ID' LIMIT 1";
-    $stmt = $conn->prepare($sql_fetch);
-    $stmt->bind_param("i", $target_employee_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $license_info = $result->fetch_assoc();
-    }
-    $stmt->close();
+if (!$user) {
+    echo "No user found.";
+    exit();
 }
 
-// Fetch Pending Duties
-$dutyQuery = "
-    SELECT 
-        d.duty_id,
-        d.doctor_id,
-        CONCAT(e.first_name, ' ', e.middle_name, ' ', e.last_name, ' ', e.suffix_name) AS doctor_name,
-        d.bed_id,
-        d.nurse_assistant,
-        d.`procedure`,
-        d.equipment,
-        d.tools,
-        d.notes
-    FROM duty_assignments AS d
-    LEFT JOIN hr_employees AS e ON d.doctor_id = e.employee_id
-    WHERE d.nurse_assistant = ? AND (d.status = 'Pending' OR d.status IS NULL)
-";
-$dutyStmt = $conn->prepare($dutyQuery);
-$dutyStmt->bind_param("i", $nurse_id);
-$dutyStmt->execute();
-$dutyResult = $dutyStmt->get_result();
+$nurse_id = $_SESSION['employee_id'];
+$current_date = date('Y-m-d');
+date_default_timezone_set('Asia/Manila');
 
-$duties = [];
-while ($row = $dutyResult->fetch_assoc()) {
-    $duties[] = $row;
-}
-$dutyStmt->close();
+$stats_sql = "SELECT AVG(average_score) as overall_avg, COUNT(*) as total_evals 
+              FROM evaluations WHERE evaluatee_id = ?";
+$stmt = $conn->prepare($stats_sql);
+$stmt->bind_param("i", $nurse_id);
+$stmt->execute();
+$stats = $stmt->get_result()->fetch_assoc();
 ?>
 
 <!DOCTYPE html>
@@ -80,10 +46,7 @@ $dutyStmt->close();
     <link rel="stylesheet" href="../../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../../assets/CSS/super.css">
     <link rel="stylesheet" href="../../assets/CSS/my_schedule.css">
-    <link rel="stylesheet" href="../../assets/CSS/user_duty.css">
     <link rel="stylesheet" href="../Doctor/notif.css">
-    
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -183,159 +146,135 @@ $dutyStmt->close();
             </div>
 
             <div class="container-fluid py-4">
-                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
-                    📋 Active Duty Assignments
-                </h2>
+                <h2 class="schedule-title">📋Performace and Evaluation</h2>
+            </div>
+            <div class="row justify-content-center" style="max-height: 75vh; overflow-y: auto; padding-right: 5px;">
+                <div class="col-lg-10 col-xl-9">
 
-                <div class="table-responsive" style="max-height:700px; height: 700px; overflow-y: auto;">
-                    <table class="table table-bordered table-hover duty-table">
-                        <thead class="table-info">
-                            <tr>
-                                <th>Doctor</th>
-                                <th>Bed/Patient</th>
-                                <th>Procedure</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (!empty($duties)): ?>
-                                <?php foreach ($duties as $duty): ?>
-                                    <tr id="row-<?= $duty['duty_id'] ?>">
-                                        <td><?= htmlspecialchars($duty['doctor_name']) ?></td>
-                                        <td><?= htmlspecialchars($duty['bed_id']) ?></td>
-                                        <td><?= htmlspecialchars($duty['procedure']) ?></td>
-                                        <td>
-                                            <button type="button" class="btn btn-primary btn-sm view-details-btn"
-                                                data-id="<?= $duty['duty_id'] ?>"
-                                                data-doctor="<?= htmlspecialchars($duty['doctor_name']) ?>"
-                                                data-bed="<?= htmlspecialchars($duty['bed_id']) ?>"
-                                                data-proc="<?= htmlspecialchars($duty['procedure']) ?>"
-                                                data-notes="<?= htmlspecialchars($duty['notes']) ?>"
-                                                data-tools="<?= htmlspecialchars($duty['tools']) ?>"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#dutyModal">
-                                                View & Complete
-                                            </button>
-                                        </td>
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm h-100 bg-primary text-white">
+                                <div class="card-body d-flex align-items-center justify-content-between p-4">
+                                    <div>
+                                        <h6 class="text-uppercase text-white-50 small fw-bold mb-1">Overall Average</h6>
+                                        <h2 class="display-6 fw-bold mb-0">
+                                            <?= number_format($stats['overall_avg'] ?? 0, 2) ?>
+                                        </h2>
+                                    </div>
+                                    <i class="bi bi-graph-up-arrow fs-1 opacity-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm h-100 bg-white">
+                                <div class="card-body d-flex align-items-center justify-content-between p-4">
+                                    <div>
+                                        <h6 class="text-uppercase text-muted small fw-bold mb-1">Total Evaluations</h6>
+                                        <h2 class="display-6 fw-bold text-dark mb-0">
+                                            <?= $stats['total_evals'] ?? 0 ?>
+                                        </h2>
+                                    </div>
+                                    <i class="bi bi-file-earmark-check fs-1 text-primary opacity-50"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 border rounded p-3 bg-white shadow-sm mt-2">
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-0">
+                            <h6 class="fw-bold text-secondary mb-0">
+                                <i class="bi bi-clipboard-data me-2"></i>My Performance Reviews
+                            </h6>
+                        </div>
+
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-hover table-bordered mb-0 align-middle">
+                                <thead class="bg-light sticky-top" style="z-index: 1;">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Evaluated By</th>
+                                        <th class="text-center">Score</th>
+                                        <th class="text-center">Rating</th>
+                                        <th style="width: 30%;">Comments</th>
+                                        <th style="width: 25%;">AI Feedback</th>
                                     </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted">No pending duties. Good job!</td>
-                                </tr>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    // LOGIC CHANGE: Select where evaluatee_id is ME (the nurse), join with evaluator (the doctor)
+                                    $history_query = "SELECT e.*, doc.first_name, doc.last_name 
+                                          FROM evaluations e 
+                                          JOIN hr_employees doc ON e.evaluator_id = doc.employee_id 
+                                          WHERE e.evaluatee_id = ? 
+                                          ORDER BY e.evaluation_date DESC";
+
+                                    $stmt_hist = $conn->prepare($history_query);
+                                    $stmt_hist->bind_param("i", $nurse_id);
+                                    $stmt_hist->execute();
+                                    $history_result = $stmt_hist->get_result();
+
+                                    if ($history_result->num_rows > 0):
+                                        while ($row = $history_result->fetch_assoc()):
+                                            $badge_color = ($row['performance_level'] == 'Excellent') ? 'bg-success' : (($row['performance_level'] == 'Poor') ? 'bg-danger' : 'bg-primary');
+                                    ?>
+                                            <tr>
+                                                <td><?= date("M d, Y", strtotime($row['evaluation_date'])) ?></td>
+                                                <td class="fw-bold text-dark">
+                                                    Dr. <?= htmlspecialchars($row['first_name'] . " " . $row['last_name']) ?>
+                                                </td>
+                                                <td class="text-center fw-bold"><?= $row['average_score'] ?></td>
+                                                <td class="text-center">
+                                                    <span class="badge rounded-pill <?= $badge_color ?>"><?= $row['performance_level'] ?></span>
+                                                </td>
+                                                <td class="small text-muted">
+                                                    <?= htmlspecialchars($row['comments'] ?: "No comments provided.") ?>
+                                                </td>
+                                                <td class="small text-primary fst-italic">
+                                                    <?= htmlspecialchars($row['ai_feedback'] ?: "No AI analysis available.") ?>
+                                                </td>
+                                            </tr>
+                                        <?php endwhile;
+                                    else: ?>
+                                        <tr>
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                <i class="bi bi-inbox fs-1 d-block mb-3 opacity-25"></i>
+                                                You have not received any performance evaluations yet.
+                                            </td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
+
         </div>
     </div>
 
     <?php include 'nurse_profile.php'; ?>
-    
-    <div class="modal fade" id="dutyModal" tabindex="-1" aria-labelledby="dutyModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="dutyModalLabel">Duty Details</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p><strong>Doctor:</strong> <span id="modal-doctor"></span></p>
-                    <p><strong>Bed ID:</strong> <span id="modal-bed"></span></p>
-                    <hr>
-                    <p><strong>Procedure:</strong> <br> <span id="modal-proc" class="text-primary fw-bold"></span></p>
-                    <!-- <p><strong>Tools/Equipment:</strong> <br> <span id="modal-tools"></span></p> -->
-                    <p><strong>Notes/Instructions:</strong> <br> <span id="modal-notes" class="text-danger"></span></p>
-
-                    <input type="hidden" id="modal-duty-id">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-success" onclick="markAsComplete()">
-                        <i class="fa fa-check"></i> Task Complete
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="../../assets/Bootstrap/jq.js"></script> <script src="../../assets/Bootstrap/all.min.js"></script>
-    <script src="../../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="../../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="../Doctor/notif.js"></script>
 
     <script>
-        // Handle sidebar toggle
         const toggler = document.querySelector(".toggler-btn");
-        if (toggler) {
-            toggler.addEventListener("click", function() {
-                document.querySelector("#sidebar").classList.toggle("collapsed");
-            });
-        }
-
-        // Pass data from Table to Modal
-        $(document).on("click", ".view-details-btn", function() {
-            var dutyId = $(this).data('id');
-            var doctor = $(this).data('doctor');
-            var bed = $(this).data('bed');
-            var proc = $(this).data('proc');
-            var notes = $(this).data('notes');
-            var tools = $(this).data('tools');
-
-            $("#modal-duty-id").val(dutyId);
-            $("#modal-doctor").text(doctor);
-            $("#modal-bed").text(bed);
-            $("#modal-proc").text(proc);
-            $("#modal-notes").text(notes);
-            $("#modal-tools").text(tools);
+        toggler.addEventListener("click", function() {
+            document.querySelector("#sidebar").classList.toggle("collapsed");
         });
 
-        // Function to Mark as Complete
-        function markAsComplete() {
-            var dutyId = $("#modal-duty-id").val();
-
-            // Ask for confirmation
-            Swal.fire({
-                title: 'Are you sure?',
-                text: "You are about to mark this task as completed.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#198754',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, complete it!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // AJAX Request
-                    $.ajax({
-                        url: 'complete_duty.php',
-                        type: 'POST',
-                        data: {
-                            duty_id: dutyId
-                        },
-                        success: function(response) {
-                            if (response.trim() == "success") {
-                                Swal.fire(
-                                    'Completed!',
-                                    'Task has been removed from your list.',
-                                    'success'
-                                ).then(() => {
-                                    // Hide modal and remove row
-                                    $('#dutyModal').modal('hide');
-                                    $('#row-' + dutyId).fadeOut();
-                                });
-                            } else {
-                                Swal.fire('Error', 'Something went wrong.', 'error');
-                            }
-                        },
-                        error: function() {
-                            Swal.fire('Error', 'AJAX request failed.', 'error');
-                        }
-                    });
-                }
-            })
+        function showFileName(input) {
+            const display = document.getElementById('file-name-display');
+            if (input.files && input.files.length > 0) {
+                display.textContent = "Selected: " + input.files[0].name;
+            } else {
+                display.textContent = "";
+            }
         }
     </script>
+    <script src="../Doctor/notif.js"></script>
+    <script src="../../assets/Bootstrap/all.min.js"></script>
+    <script src="../../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../../assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="../../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>

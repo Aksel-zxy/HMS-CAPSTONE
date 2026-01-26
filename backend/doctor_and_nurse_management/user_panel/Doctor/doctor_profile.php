@@ -1,16 +1,13 @@
 <?php
-// We assume $conn and $_SESSION['employee_id'] are already available from the main page
 
 if (isset($_SESSION['employee_id'])) {
     $emp_id_modal = $_SESSION['employee_id'];
 
-    // 1. Fetch Employee Details for the Modal
     $modalEmpQuery = $conn->prepare("SELECT * FROM hr_employees WHERE employee_id = ?");
     $modalEmpQuery->bind_param("i", $emp_id_modal);
     $modalEmpQuery->execute();
     $m_emp = $modalEmpQuery->get_result()->fetch_assoc();
 
-    // 2. Fetch Clinical Profile for the Modal
     $modalProfQuery = $conn->prepare("SELECT * FROM clinical_profiles WHERE employee_id = ?");
     $modalProfQuery->bind_param("i", $emp_id_modal);
     $modalProfQuery->execute();
@@ -29,11 +26,10 @@ if (isset($_SESSION['employee_id'])) {
             <div class="modal-body p-0">
                 <?php if (isset($m_emp) && $m_emp): ?>
                     <div class="card border-0">
-                        <div style="background: linear-gradient(45deg, #0d6efd, #0a58ca); padding: 30px; text-align: center; color: white;">
+                        <div style="background: linear-gradient(45deg, #009688, #20c997); padding: 30px; text-align: center; color: white;">
                             <div style="width: 100px; height: 100px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; color: #0d6efd; font-size: 40px; font-weight: bold; border: 4px solid rgba(255,255,255,0.3);">
 
                                 <?php
-                                // Get the first letter of first name and last name
                                 $initials = substr($m_emp['first_name'], 0, 1) . substr($m_emp['last_name'], 0, 1);
                                 echo strtoupper($initials);
                                 ?>

@@ -1,51 +1,154 @@
 <?php
-// paymongo_webhook.php
+// paymongo_webhook.php - Webhook handler for PayMongo payment notifications
 
-include '../../SQL/config.php'; // database connection
-if (session_status() === PHP_SESSION_NONE) session_start();
+include '../../SQL/config.php';
 
+// Log function for detailed debugging
+function log_webhook($message, $data = null) {
+    $log_file = __DIR__ . '/paymongo_webhook.log';
+    $timestamp = date('Y-m-d H:i:s');
+    $log_msg = "[{$timestamp}] {$message}";
+    if ($data) {
+        $log_msg .= " | " . json_encode($data);
+    }
+    $log_msg .= PHP_EOL;
+    file_put_contents($log_file, $log_msg, FILE_APPEND);
+}
+
+// Read webhook payload
 $input = file_get_contents('php://input');
 $data = json_decode($input, true);
 
-// Log the webhook for debugging
-file_put_contents(__DIR__.'/paymongo_webhook.log', date('Y-m-d H:i:s')." - ".json_encode($data)."\n", FILE_APPEND);
+log_webhook('Webhook received', $data);
 
-// Only handle payment links events
-$eventType = $data['type'] ?? '';
-$paymentData = $data['data']['attributes'] ?? [];
+// Validate payload structure
+if (!$data || !is_array($data)) {
+    log_webhook('ERROR: Invalid JSON payload');
+    http_response_code(400);
+    exit;
+}
 
-if ($eventType === 'link.paid') { // fired when a payment link is paid
-    $reference = $paymentData['reference_number'] ?? '';
-    $amount = $paymentData['amount'] ?? 0;
-    $currency = $paymentData['currency'] ?? '';
-    $paidAt = date('Y-m-d H:i:s', $paymentData['updated_at'] ?? time());
+if (!isset($data['type'])) {
+    log_webhook('ERROR: No event type in payload');
+    http_response_code(400);
+    exit;
+}
 
-    // Find the billing record by reference_number
-    $stmt = $conn->prepare("SELECT * FROM billing_records WHERE transaction_id = ?");
+$eventType = $data['type'];
+$eventData = $data['data'] ?? [];
+$attributes = $eventData['attributes'] ?? [];
+
+log_webhook('Processing event type', ['type' => $eventType]);
+
+// Handle payment-related events
+// PayMongo sends: 'link.payment.paid', 'payment.paid', 'link.paid', etc.
+$isPaidEvent = (strpos($eventType, 'paid') !== false);
+
+if ($isPaidEvent) {
+    
+    // Extract transaction reference from multiple possible fields
+    $reference = null;
+    
+    // Priority 1: Check remarks (where we encode TXN:xxx)
+    if (!empty($attributes['remarks']) && strpos($attributes['remarks'], 'TXN:') !== false) {
+        if (preg_match('/TXN:([\w]+)/', $attributes['remarks'], $matches)) {
+            $reference = $matches[1];
+            log_webhook('Reference extracted from remarks', ['reference' => $reference]);
+        }
+    }
+    
+    // Priority 2: Check reference_number
+    if (!$reference && !empty($attributes['reference_number'])) {
+        $reference = $attributes['reference_number'];
+        log_webhook('Reference extracted from reference_number', ['reference' => $reference]);
+    }
+    
+    // Priority 3: Check description
+    if (!$reference && !empty($attributes['description']) && strpos($attributes['description'], 'TXN:') !== false) {
+        if (preg_match('/TXN:([\w]+)/', $attributes['description'], $matches)) {
+            $reference = $matches[1];
+            log_webhook('Reference extracted from description', ['reference' => $reference]);
+        }
+    }
+    
+    $amount = isset($attributes['amount']) ? ($attributes['amount'] / 100) : 0;
+    
+    if (!$reference) {
+        log_webhook('ERROR: Could not extract transaction reference', $attributes);
+        http_response_code(200);
+        exit;
+    }
+    
+    log_webhook('Processing payment', ['transaction_id' => $reference, 'amount' => $amount]);
+    
+    // Find billing record by transaction_id
+    $stmt = $conn->prepare(
+        "SELECT * FROM billing_records WHERE transaction_id = ? LIMIT 1"
+    );
     $stmt->bind_param("s", $reference);
     $stmt->execute();
     $record = $stmt->get_result()->fetch_assoc();
-
-    if ($record) {
-        $billingId = $record['billing_id'];
-        $patientId = $record['patient_id'];
-
-        // Update billing_records
-        $stmt = $conn->prepare("UPDATE billing_records SET status='Paid', paid_amount=?, balance=0, payment_date=? WHERE transaction_id=?");
-        $stmt->bind_param("dss", $amount, $paidAt, $reference);
-        $stmt->execute();
-
-        // Update patient_receipt
-        $stmt = $conn->prepare("
-            UPDATE patient_receipt 
-            SET status='Paid', balance=0, paid_amount=? 
-            WHERE billing_id=? AND patient_id=?
-        ");
-        $stmt->bind_param("dii", $amount, $billingId, $patientId);
-        $stmt->execute();
+    
+    if (!$record) {
+        log_webhook('ERROR: No billing record found', ['transaction_id' => $reference]);
+        http_response_code(200);
+        exit;
+    }
+    
+    log_webhook('Found billing record', ['billing_id' => $record['billing_id'], 'patient_id' => $record['patient_id']]);
+    
+    // Update billing_records
+    $update_status = 'Paid';
+    $payment_method_val = 'PayMongo';
+    $paymongo_ref = $attributes['id'] ?? substr($reference, 0, 50);
+    
+    $stmt = $conn->prepare("
+        UPDATE billing_records
+        SET 
+            status = ?,
+            payment_method = ?,
+            paymongo_reference = ?
+        WHERE transaction_id = ?
+    ");
+    $stmt->bind_param("ssss", $update_status, $payment_method_val, $paymongo_ref, $reference);
+    $result1 = $stmt->execute();
+    
+    if (!$result1) {
+        log_webhook('ERROR: Failed to update billing_records', ['error' => $stmt->error]);
+    } else {
+        log_webhook('SUCCESS: Updated billing_records');
+    }
+    
+    // Update patient_receipt
+    $stmt = $conn->prepare("
+        UPDATE patient_receipt
+        SET 
+            status = ?,
+            payment_method = ?,
+            paymongo_reference = ?
+        WHERE transaction_id = ?
+    ");
+    $stmt->bind_param("ssss", $update_status, $payment_method_val, $paymongo_ref, $reference);
+    $result2 = $stmt->execute();
+    
+    if (!$result2) {
+        log_webhook('ERROR: Failed to update patient_receipt', ['error' => $stmt->error]);
+    } else {
+        log_webhook('SUCCESS: Updated patient_receipt');
+    }
+    
+    if ($result1 || $result2) {
+        log_webhook('✓ PAYMENT MARKED AS PAID', [
+            'transaction_id' => $reference,
+            'billing_id' => $record['billing_id'],
+            'patient_id' => $record['patient_id'],
+            'amount' => $amount
+        ]);
     }
 }
 
-// Respond with 200 OK
+// Always return 200 to PayMongo to acknowledge receipt
 http_response_code(200);
-echo json_encode(['success'=>true]);
+echo json_encode(['status' => 'received', 'timestamp' => date('c')]);
+exit;
+?>
