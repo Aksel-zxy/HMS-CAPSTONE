@@ -1,4 +1,9 @@
 <?php
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 include '../../../../SQL/config.php';
 
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Nurse') {
@@ -11,38 +16,57 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
+$nurse_id = $_SESSION['employee_id'];
+
+// Fetch User Info
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['employee_id']);
+$stmt->bind_param("i", $nurse_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-
+// Fetch License Info (Logic from target)
 $target_employee_id = $_GET['employee_id'] ?? $_SESSION['employee_id'];
 $license_info = null;
-
 if ($target_employee_id) {
-    $sql_fetch = "SELECT document_id, uploaded_at 
-                  FROM hr_employees_documents 
-                  WHERE employee_id = ? 
-                  AND document_type = 'License ID' 
-                  LIMIT 1";
-
+    $sql_fetch = "SELECT document_id, uploaded_at FROM hr_employees_documents WHERE employee_id = ? AND document_type = 'License ID' LIMIT 1";
     $stmt = $conn->prepare($sql_fetch);
     $stmt->bind_param("i", $target_employee_id);
     $stmt->execute();
     $result = $stmt->get_result();
-
     if ($result->num_rows > 0) {
         $license_info = $result->fetch_assoc();
     }
     $stmt->close();
 }
+
+// Fetch Pending Duties
+$dutyQuery = "
+    SELECT 
+        d.duty_id,
+        d.doctor_id,
+        CONCAT(e.first_name, ' ', e.middle_name, ' ', e.last_name, ' ', e.suffix_name) AS doctor_name,
+        d.bed_id,
+        d.nurse_assistant,
+        d.`procedure`,
+        d.equipment,
+        d.tools,
+        d.notes
+    FROM duty_assignments AS d
+    LEFT JOIN hr_employees AS e ON d.doctor_id = e.employee_id
+    WHERE d.nurse_assistant = ? AND (d.status = 'Pending' OR d.status IS NULL)
+";
+$dutyStmt = $conn->prepare($dutyQuery);
+$dutyStmt->bind_param("i", $nurse_id);
+$dutyStmt->execute();
+$dutyResult = $dutyStmt->get_result();
+
+$duties = [];
+while ($row = $dutyResult->fetch_assoc()) {
+    $duties[] = $row;
+}
+$dutyStmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -56,7 +80,10 @@ if ($target_employee_id) {
     <link rel="stylesheet" href="../../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../../assets/CSS/super.css">
     <link rel="stylesheet" href="../../assets/CSS/my_schedule.css">
+    <link rel="stylesheet" href="../../assets/CSS/user_duty.css">
     <link rel="stylesheet" href="../Doctor/notif.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
@@ -79,7 +106,7 @@ if ($target_employee_id) {
                 </a>
             </div>
             <div class="menu-title">Navigation</div>
-            
+
             <li class="sidebar-item">
                 <a href="my_nurse_schedule.php" class="sidebar-link">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
@@ -91,17 +118,17 @@ if ($target_employee_id) {
             <li class="sidebar-item">
                 <a href="nurse_duty.php" class="sidebar-link">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
-                         <path d="M160 96C160 78.3 174.3 64 192 64L448 64C465.7 64 480 78.3 480 96C480 113.7 465.7 128 448 128L418.5 128L428.8 262.1C465.9 283.3 494.6 318.5 507 361.8L510.8 375.2C513.6 384.9 511.6 395.2 505.6 403.3C499.6 411.4 490 416 480 416L160 416C150 416 140.5 411.3 134.5 403.3C128.5 395.3 126.5 384.9 129.3 375.2L133 361.8C145.4 318.5 174 283.3 211.2 262.1L221.5 128L192 128C174.3 128 160 113.7 160 96zM288 464L352 464L352 576C352 593.7 337.7 608 320 608C302.3 608 288 593.7 288 576L288 464z" />
+                        <path d="M160 96C160 78.3 174.3 64 192 64L448 64C465.7 64 480 78.3 480 96C480 113.7 465.7 128 448 128L418.5 128L428.8 262.1C465.9 283.3 494.6 318.5 507 361.8L510.8 375.2C513.6 384.9 511.6 395.2 505.6 403.3C499.6 411.4 490 416 480 416L160 416C150 416 140.5 411.3 134.5 403.3C128.5 395.3 126.5 384.9 129.3 375.2L133 361.8C145.4 318.5 174 283.3 211.2 262.1L221.5 128L192 128C174.3 128 160 113.7 160 96zM288 464L352 464L352 576C352 593.7 337.7 608 320 608C302.3 608 288 593.7 288 576L288 464z" />
                     </svg>
                     <span style="font-size: 18px;">Duty Assignment</span>
                 </a>
             </li>
             <li class="sidebar-item">
                 <a href="nurse_renew.php" class="sidebar-link">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 640 640">
                         <path d="M32 160C32 124.7 60.7 96 96 96L544 96C579.3 96 608 124.7 608 160L32 160zM32 208L608 208L608 480C608 515.3 579.3 544 544 544L96 544C60.7 544 32 515.3 32 480L32 208zM279.3 480C299.5 480 314.6 460.6 301.7 445C287 427.3 264.8 416 240 416L176 416C151.2 416 129 427.3 114.3 445C101.4 460.6 116.5 480 136.7 480L279.2 480zM208 376C238.9 376 264 350.9 264 320C264 289.1 238.9 264 208 264C177.1 264 152 289.1 152 320C152 350.9 177.1 376 208 376zM392 272C378.7 272 368 282.7 368 296C368 309.3 378.7 320 392 320L504 320C517.3 320 528 309.3 528 296C528 282.7 517.3 272 504 272L392 272zM392 368C378.7 368 368 378.7 368 392C368 405.3 378.7 416 392 416L504 416C517.3 416 528 405.3 528 392C528 378.7 517.3 368 504 368L392 368z" />
-                   </svg>
-                   <span style="font-size: 18px;">Compliance Licensing</span>
+                    </svg>
+                    <span style="font-size: 18px;">Compliance Licensing</span>
                 </a>
             </li>
             <li class="sidebar-item">
@@ -113,7 +140,7 @@ if ($target_employee_id) {
                 </a>
             </li>
         </aside>
-        
+
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -156,25 +183,159 @@ if ($target_employee_id) {
             </div>
 
             <div class="container-fluid py-4">
-                <h2 class="schedule-title">Duty Assignment</h2>
+                <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
+                    📋 Active Duty Assignments
+                </h2>
 
+                <div class="table-responsive" style="max-height:700px; height: 700px; overflow-y: auto;">
+                    <table class="table table-bordered table-hover duty-table">
+                        <thead class="table-info">
+                            <tr>
+                                <th>Doctor</th>
+                                <th>Bed/Patient</th>
+                                <th>Procedure</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($duties)): ?>
+                                <?php foreach ($duties as $duty): ?>
+                                    <tr id="row-<?= $duty['duty_id'] ?>">
+                                        <td><?= htmlspecialchars($duty['doctor_name']) ?></td>
+                                        <td><?= htmlspecialchars($duty['bed_id']) ?></td>
+                                        <td><?= htmlspecialchars($duty['procedure']) ?></td>
+                                        <td>
+                                            <button type="button" class="btn btn-primary btn-sm view-details-btn"
+                                                data-id="<?= $duty['duty_id'] ?>"
+                                                data-doctor="<?= htmlspecialchars($duty['doctor_name']) ?>"
+                                                data-bed="<?= htmlspecialchars($duty['bed_id']) ?>"
+                                                data-proc="<?= htmlspecialchars($duty['procedure']) ?>"
+                                                data-notes="<?= htmlspecialchars($duty['notes']) ?>"
+                                                data-tools="<?= htmlspecialchars($duty['tools']) ?>"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#dutyModal">
+                                                View & Complete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No pending duties. Good job!</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <?php include 'nurse_profile.php'; ?>
     
-    <script>
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    </script>
-    <script src="../Doctor/notif.js"></script>
-    <script src="../../assets/Bootstrap/all.min.js"></script>
+    <div class="modal fade" id="dutyModal" tabindex="-1" aria-labelledby="dutyModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="dutyModalLabel">Duty Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Doctor:</strong> <span id="modal-doctor"></span></p>
+                    <p><strong>Bed ID:</strong> <span id="modal-bed"></span></p>
+                    <hr>
+                    <p><strong>Procedure:</strong> <br> <span id="modal-proc" class="text-primary fw-bold"></span></p>
+                    <!-- <p><strong>Tools/Equipment:</strong> <br> <span id="modal-tools"></span></p> -->
+                    <p><strong>Notes/Instructions:</strong> <br> <span id="modal-notes" class="text-danger"></span></p>
+
+                    <input type="hidden" id="modal-duty-id">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" onclick="markAsComplete()">
+                        <i class="fa fa-check"></i> Task Complete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../assets/Bootstrap/jq.js"></script> <script src="../../assets/Bootstrap/all.min.js"></script>
     <script src="../../assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="../../assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="../../assets/Bootstrap/jq.js"></script>
+    <script src="../Doctor/notif.js"></script>
+
+    <script>
+        // Handle sidebar toggle
+        const toggler = document.querySelector(".toggler-btn");
+        if (toggler) {
+            toggler.addEventListener("click", function() {
+                document.querySelector("#sidebar").classList.toggle("collapsed");
+            });
+        }
+
+        // Pass data from Table to Modal
+        $(document).on("click", ".view-details-btn", function() {
+            var dutyId = $(this).data('id');
+            var doctor = $(this).data('doctor');
+            var bed = $(this).data('bed');
+            var proc = $(this).data('proc');
+            var notes = $(this).data('notes');
+            var tools = $(this).data('tools');
+
+            $("#modal-duty-id").val(dutyId);
+            $("#modal-doctor").text(doctor);
+            $("#modal-bed").text(bed);
+            $("#modal-proc").text(proc);
+            $("#modal-notes").text(notes);
+            $("#modal-tools").text(tools);
+        });
+
+        // Function to Mark as Complete
+        function markAsComplete() {
+            var dutyId = $("#modal-duty-id").val();
+
+            // Ask for confirmation
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You are about to mark this task as completed.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#198754',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, complete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // AJAX Request
+                    $.ajax({
+                        url: 'complete_duty.php',
+                        type: 'POST',
+                        data: {
+                            duty_id: dutyId
+                        },
+                        success: function(response) {
+                            if (response.trim() == "success") {
+                                Swal.fire(
+                                    'Completed!',
+                                    'Task has been removed from your list.',
+                                    'success'
+                                ).then(() => {
+                                    // Hide modal and remove row
+                                    $('#dutyModal').modal('hide');
+                                    $('#row-' + dutyId).fadeOut();
+                                });
+                            } else {
+                                Swal.fire('Error', 'Something went wrong.', 'error');
+                            }
+                        },
+                        error: function() {
+                            Swal.fire('Error', 'AJAX request failed.', 'error');
+                        }
+                    });
+                }
+            })
+        }
+    </script>
 </body>
 
 </html>
