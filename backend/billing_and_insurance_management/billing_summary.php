@@ -4,32 +4,27 @@
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-require_once __DIR__ . '/vendor/autoload.php'; // Correct path for XAMPP
-
+require_once __DIR__ . '/vendor/autoload.php';
 use GuzzleHttp\Client;
 
-// -----------------------------
-// SET PAYMONGO SECRET KEY DIRECTLY
-// -----------------------------
-define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV'); // Your secret key here
-if (empty(PAYMONGO_SECRET_KEY)) {
-    die("PayMongo secret key is not set. Please set PAYMONGO_API_KEY.");
-}
-
+// ==============================
+// PAYMONGO CONFIG
+// ==============================
+define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
 define('PAYMONGO_API_BASE', 'https://api.paymongo.com/v1/');
 
-// -----------------------------
-// Helper: Create a PayMongo payment link
-// -----------------------------
-function create_paymongo_payment_link($amount, $description = '', $remarks = '') {
-    $amount = max((int)$amount, 100); // Minimum 100 centavos (₱1)
+// ==============================
+// CREATE PAYMONGO PAYMENT INTENT
+// ==============================
+function create_paymongo_payment_intent($amount, $billing_id, $patient_id) {
 
     $payload = [
         'data' => [
             'attributes' => [
-                'amount'      => $amount,
-                'description' => $description ?: 'Billing Payment',
-                'remarks'     => $remarks
+                'amount' => $amount,
+                'currency' => 'PHP',
+                'description' => "Billing #$billing_id - Patient $patient_id",
+                'payment_method_allowed' => ['card', 'gcash', 'paymaya'],
             ]
         ]
     ];
@@ -37,69 +32,56 @@ function create_paymongo_payment_link($amount, $description = '', $remarks = '')
     try {
         $client = new Client([
             'base_uri' => PAYMONGO_API_BASE,
-            'headers'  => [
-                'Accept'        => 'application/json',
-                'Content-Type'  => 'application/json',
+            'headers' => [
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
                 'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
             ]
         ]);
 
-        $resp = $client->post('links', ['body' => json_encode($payload)]);
-        $body = json_decode($resp->getBody(), true);
+        $response = $client->post('payment_intents', [
+            'json' => $payload
+        ]);
 
-        // Correct checkout URL
-        $url = $body['data']['attributes']['checkout_url'] ?? null;
+        return json_decode($response->getBody(), true);
 
-        return ['success' => true, 'url' => $url, 'response' => $body];
-
-    } catch (\GuzzleHttp\Exception\ClientException $e) {
-        $res = $e->getResponse();
-        $body = $res ? (string)$res->getBody() : '';
-        return [
-            'success' => false,
-            'url' => null,
-            'error' => $body ?: $e->getMessage(),
-            'payload' => $payload
-        ];
-    } catch (\Exception $e) {
-        return [
-            'success' => false,
-            'url' => null,
-            'error' => $e->getMessage(),
-            'payload' => $payload
-        ];
+    } catch (Exception $e) {
+        return null;
     }
 }
 
-// -----------------------------
-// Patient & Billing Lookup
-// -----------------------------
+// ==============================
+// PATIENT & BILLING LOOKUP
+// ==============================
 $patient_id = intval($_GET['patient_id'] ?? 0);
 $billing_id = null;
-$transaction_id = null;
 
-$stmt = $conn->prepare("SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id = ?");
+// Patient info
+$stmt = $conn->prepare("
+    SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name
+    FROM patientinfo
+    WHERE patient_id = ?
+");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
 
-// Get the latest billing with transaction_id
-$stmt = $conn->prepare("SELECT MAX(billing_id) AS bid FROM billing_items WHERE patient_id = ? AND finalized = 1");
+// Latest finalized billing
+$stmt = $conn->prepare("
+    SELECT MAX(billing_id) AS bid
+    FROM billing_items
+    WHERE patient_id = ? AND finalized = 1
+");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $billing_id = $stmt->get_result()->fetch_assoc()['bid'] ?? null;
 
-// Get transaction_id from billing_records
-if ($billing_id) {
-    $stmt = $conn->prepare("SELECT transaction_id FROM billing_records WHERE patient_id = ? AND billing_id = ?");
-    $stmt->bind_param("ii", $patient_id, $billing_id);
-    $stmt->execute();
-    $txn_record = $stmt->get_result()->fetch_assoc();
-    $transaction_id = $txn_record['transaction_id'] ?? null;
-}
-
+// ==============================
+// BILLING ITEMS
+// ==============================
 $items = [];
 $total = 0;
+
 if ($billing_id) {
     $stmt = $conn->prepare("
         SELECT bi.*, ds.serviceName, ds.description
@@ -110,88 +92,79 @@ if ($billing_id) {
     $stmt->bind_param("ii", $patient_id, $billing_id);
     $stmt->execute();
     $res = $stmt->get_result();
+
     while ($row = $res->fetch_assoc()) {
         $items[] = $row;
-        $total += floatval($row['total_price']);
+        $total += (float)$row['total_price'];
     }
 }
 
-// -----------------------------
-// Create PayMongo Payment Link
-// NOTE: We pass transaction_id as part of remarks so webhook can match it
-// PayMongo doesn't support custom metadata on links, so we encode it in remarks
-// -----------------------------
-$enableLink = true;
+// ==============================
+// BILLING RECORD VALUES
+// ==============================
+$insurance_covered = 0;
+$out_of_pocket = 0;
+$grand_total = 0;
+$status = 'Pending';
+$paymongo_intent_id = null;
+
+if ($billing_id) {
+    $stmt = $conn->prepare("
+        SELECT insurance_covered, out_of_pocket, grand_total, status, paymongo_payment_intent_id
+        FROM billing_records
+        WHERE patient_id = ? AND billing_id = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("ii", $patient_id, $billing_id);
+    $stmt->execute();
+    $br = $stmt->get_result()->fetch_assoc();
+
+    if ($br) {
+        $insurance_covered = (float)$br['insurance_covered'];
+        $out_of_pocket     = (float)$br['out_of_pocket'];
+        $grand_total       = (float)$br['grand_total'];
+        $status            = $br['status'];
+        $paymongo_intent_id = $br['paymongo_payment_intent_id'];
+    }
+}
+
+// Amount to pay
+$payableAmount = ($out_of_pocket > 0) ? $out_of_pocket : $total;
+
+// ==============================
+// CREATE PAYMONGO PAYMENT
+// ==============================
 $payLinkUrl = null;
 $linkError = null;
-$paymongo_response = null;
 
-if ($enableLink && $total > 0 && $transaction_id) {
-    // Create payment link with transaction ID embedded in remarks
-    $description = "Billing #{$billing_id} - Patient {$patient_id}";
-    $remarks = "TXN:{$transaction_id}";
-    
-    $linkResult = create_paymongo_payment_link(
-        (int)($total * 100),
-        $description,
-        $remarks
+if (
+    $billing_id &&
+    $payableAmount > 0 &&
+    $status !== 'Paid' &&
+    empty($paymongo_intent_id)
+) {
+    $intent = create_paymongo_payment_intent(
+        (int)($payableAmount * 100),
+        $billing_id,
+        $patient_id
     );
-    
-    $paymongo_response = $linkResult['response'] ?? null;
 
-    if ($linkResult['success'] && !empty($linkResult['url'])) {
-        $payLinkUrl = $linkResult['url'];
-        error_log("[BILLING] Payment link created - Patient: {$patient_id}, Billing: {$billing_id}, TXN: {$transaction_id}, Amount: {$total}");
+    if ($intent && isset($intent['data']['id'])) {
+
+        $paymongo_intent_id = $intent['data']['id'];
+        $payLinkUrl = $intent['data']['attributes']['next_action']['redirect']['url'] ?? null;
+
+        // Save PayMongo intent ID
+        $stmt = $conn->prepare("
+            UPDATE billing_records
+            SET paymongo_payment_intent_id = ?
+            WHERE billing_id = ?
+        ");
+        $stmt->bind_param("si", $paymongo_intent_id, $billing_id);
+        $stmt->execute();
+
     } else {
-        $linkError = $linkResult['error'] ?? 'Unknown error creating payment link';
-        error_log("[BILLING] Payment link error - " . $linkError);
-    }
-} elseif (!$transaction_id) {
-    $linkError = "Transaction ID not found. Please finalize billing first.";
-}
-
-// -----------------------------
-// Generate GCash QR (optional)
-// -----------------------------
-$qrImage = null;
-if ($total > 0) {
-    try {
-        $client = new Client([
-            'base_uri' => PAYMONGO_API_BASE,
-            'headers'  => [
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-                'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
-            ]
-        ]);
-
-        $response = $client->post('sources', [
-            'json' => [
-                'data' => [
-                    'attributes' => [
-                        'type'     => 'gcash_qr',
-                        'amount'   => intval($total * 100),
-                        'currency' => 'PHP',
-                        'redirect' => [
-                            'success' => 'https://yourdomain.com/payment_callback.php?status=success',
-                            'failed'  => 'https://yourdomain.com/payment_callback.php?status=failed'
-                        ],
-                        'metadata' => [
-                            'patient_id' => $patient_id,
-                            'billing_id' => $billing_id
-                        ]
-                    ]
-                ]
-            ]
-        ]);
-
-        $source = json_decode($response->getBody(), true);
-        $qrString = $source['data']['attributes']['flow']['qr_string'] ?? null;
-        if ($qrString) {
-            $qrImage = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($qrString);
-        }
-    } catch (\Exception $e) {
-        $qrImage = null;
+        $linkError = "Unable to create PayMongo payment.";
     }
 }
 ?>
@@ -204,6 +177,7 @@ if ($total > 0) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
+
 <body class="bg-light p-4">
 <div class="container">
 <div class="card p-4 shadow-sm">
@@ -221,49 +195,59 @@ if ($total > 0) {
 </tr>
 </thead>
 <tbody>
-<?php if ($items): ?>
-    <?php foreach ($items as $item): ?>
-    <tr>
-        <td><?= htmlspecialchars($item['serviceName']) ?></td>
-        <td><?= htmlspecialchars($item['description']) ?></td>
-        <td class="text-end">₱<?= number_format($item['total_price'], 2) ?></td>
-    </tr>
-    <?php endforeach; ?>
-<?php else: ?>
-    <tr><td colspan="3" class="text-center">No billing items found.</td></tr>
-<?php endif; ?>
+<?php foreach ($items as $item): ?>
+<tr>
+    <td><?= htmlspecialchars($item['serviceName']) ?></td>
+    <td><?= htmlspecialchars($item['description']) ?></td>
+    <td class="text-end">₱<?= number_format($item['total_price'], 2) ?></td>
+</tr>
+<?php endforeach; ?>
 </tbody>
 </table>
 
-<h5 class="text-end mt-3">
-    Total Payable: ₱<?= number_format($total, 2) ?>
-</h5>
+<table class="table mt-3">
+<tr>
+    <th>Subtotal</th>
+    <td class="text-end">₱<?= number_format($total, 2) ?></td>
+</tr>
 
-<?php if ($payLinkUrl): ?>
-<div class="mt-3 text-center">
+<?php if ($insurance_covered > 0): ?>
+<tr>
+    <th>Insurance Covered</th>
+    <td class="text-end text-success">
+        - ₱<?= number_format($insurance_covered, 2) ?>
+    </td>
+</tr>
+<?php endif; ?>
+
+<tr class="table-success">
+    <th>Amount to Pay</th>
+    <td class="text-end fw-bold">
+        ₱<?= number_format($payableAmount, 2) ?>
+    </td>
+</tr>
+</table>
+
+<?php if ($status === 'Paid'): ?>
+<div class="alert alert-success text-center">
+    Payment completed successfully.
+</div>
+
+<?php elseif ($payableAmount <= 0): ?>
+<div class="alert alert-success text-center">
+    Fully covered by insurance. No payment required.
+</div>
+
+<?php elseif ($payLinkUrl): ?>
+<div class="text-center mt-3">
     <a href="<?= htmlspecialchars($payLinkUrl) ?>" target="_blank" class="btn btn-primary btn-lg">
         Pay Now
     </a>
-    <p class="text-muted mt-2">Open the PayMongo payment link in a new tab.</p>
 </div>
+
 <?php elseif ($linkError): ?>
-<div class="alert alert-warning mt-3" role="alert">
-    Payment link error: <?= htmlspecialchars($linkError) ?>
-</div>
+<div class="alert alert-danger"><?= htmlspecialchars($linkError) ?></div>
 <?php endif; ?>
-
-<?php if ($qrImage): ?>
-<hr>
-<div class="text-center mt-4">
-    <h5>Scan to Pay via GCash</h5>
-    <img src="<?= $qrImage ?>" alt="PayMongo GCash QR">
-    <p class="text-muted mt-2">Powered by PayMongo</p>
-</div>
-<?php endif; ?>
-
-<div class="main-sidebar">
-<?php include 'billing_sidebar.php'; ?>
-</div>
 
 </div>
 </div>
