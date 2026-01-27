@@ -90,6 +90,7 @@ if (isset($_SESSION['employee_id'])) {
 
                         <div class="modal-footer bg-light">
                             <small class="text-muted me-auto">Nurse ID: #<?= htmlspecialchars($m_emp['employee_id']) ?></small>
+                            <small class="text-muted me-auto">License: #<?= htmlspecialchars($m_emp['license_number']) ?></small>
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
