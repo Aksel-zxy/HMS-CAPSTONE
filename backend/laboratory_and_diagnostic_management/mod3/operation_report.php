@@ -108,10 +108,10 @@ if (!$user) {
                 </a>
                 <ul id="report" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../mod3/results.php" class="sidebar-link">Test Results</a>
+                        <a href="results.php" class="sidebar-link">Test Results</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
+                        <a href="result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                 </ul>
             </li>

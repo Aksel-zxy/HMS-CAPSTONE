@@ -114,6 +114,9 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="../mod3/operation_report.php" class="sidebar-link">Laboratory Report</a>
+                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -130,9 +133,6 @@ if (!$user) {
                     </li>
                     <li class="sidebar-item">
                         <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -185,7 +185,7 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
                     ⚙️ Laboratory & Diagnostic Equipment and Maintenance Schedule
                 </h2>
