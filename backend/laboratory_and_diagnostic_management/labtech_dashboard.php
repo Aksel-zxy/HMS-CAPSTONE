@@ -79,9 +79,6 @@ $schedules = $schedule->getTodaysSchedules();
                     </li>
                     <li class="sidebar-item">
                         <a href="mod1/room_available.php" class="sidebar-link">Room Overview</a>
-                    </li><li class="sidebar-item">
-                        <a href="purchase_request.php" class="sidebar-link">req</a>
-                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -120,6 +117,9 @@ $schedules = $schedule->getTodaysSchedules();
                     <li class="sidebar-item">
                         <a href="mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="mod3/operation_report.php" class="sidebar-link">Laboratory Report</a>
+                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -136,9 +136,6 @@ $schedules = $schedule->getTodaysSchedules();
                     </li>
                     <li class="sidebar-item">
                         <a href="mod4/maintenance.php" class="sidebar-link">Maintenance Schedule</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="mod4/operation_report.php" class="sidebar-link">Operation Equipment</a>
                     </li>
                 </ul>
             </li>
@@ -290,31 +287,47 @@ $schedules = $schedule->getTodaysSchedules();
                 //chart
                 const ctx = document.getElementById('reportsChart').getContext('2d');
 
-new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: <?php echo json_encode($labels); ?>,
-        datasets: <?php echo json_encode($datasets); ?>
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: { display: true, position: 'bottom' },
-            title: { display: true, text: "Weekly Completed Tests" }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                grid: { color: '#f0f0f0' },
-                title: { display: true, text: 'Number of Completed Tests' }
-            },
-            x: {
-                grid: { color: '#f9f9f9' },
-                title: { display: true, text: 'Day of the Week' }
-            }
-        }
-    }
-});
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: <?php echo json_encode($labels); ?>,
+                        datasets: <?php echo json_encode($datasets); ?>
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom'
+                            },
+                            title: {
+                                display: true,
+                                text: "Weekly Completed Tests"
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: '#f0f0f0'
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Number of Completed Tests'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: '#f9f9f9'
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Day of the Week'
+                                }
+                            }
+                        }
+                    }
+                });
             </script>
             <script src="assets/Bootstrap/all.min.js"></script>
             <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>

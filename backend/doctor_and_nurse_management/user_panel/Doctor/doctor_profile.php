@@ -37,7 +37,7 @@ if (isset($_SESSION['employee_id'])) {
                             </div>
                             <h3 class="mb-0"><?= htmlspecialchars($m_emp['first_name'] . " " . $m_emp['last_name']) ?></h3>
                             <p class="mb-0 text-white-50"><?= htmlspecialchars($m_emp['role']) ?></p>
-                            <span class="badge bg-light text-primary mt-2 rounded-pill px-3"><?= htmlspecialchars($m_emp['status'] ?? 'Active') ?></span>
+                            <span class="badge bg-light text-primary mt-2 rounded-pill px-3"><?= htmlspecialchars($m_emp['status'] ?? 'Active') ?></span> 
                         </div>
 
                         <div class="card-body p-4">
@@ -71,6 +71,7 @@ if (isset($_SESSION['employee_id'])) {
 
                         <div class="modal-footer bg-light">
                             <small class="text-muted me-auto">ID: #<?= htmlspecialchars($m_emp['employee_id']) ?></small>
+                            <small class="text-muted me-auto">License: #<?= htmlspecialchars($m_emp['license_number']) ?></small>
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
