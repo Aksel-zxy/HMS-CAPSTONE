@@ -24,7 +24,7 @@ $roomManager = new RoomManager($conn);
 
 $roomTypes = [
     'laboratory'   => 'CBC Laboratory',
-    'xray' => 'X-Ray',
+    'X-Ray' => 'X-Ray',
     'MRI'   => 'MRI',
     'CT'    => 'CT Scan'
 ];

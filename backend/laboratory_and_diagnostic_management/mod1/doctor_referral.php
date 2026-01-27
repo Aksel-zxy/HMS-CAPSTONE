@@ -326,53 +326,62 @@
                                 <form id="scheduleForm" method="POST" action="oop/fetchdetails.php">
                                     <input type="hidden" name="patient_id" id="modalPatientId">
                                     <input type="hidden" name="appointment_id" id="modalAppointmentId">
+
+                                    <input type="hidden" name="schedule_datetime" id="finalDateTime">
+
                                     <div class="mb-3">
                                         <label class="form-label">Patient Name</label>
                                         <input type="text" class="form-control" id="modalPatientName" name="patient_name" readonly>
                                     </div>
+
                                     <div class="mb-3">
                                         <label class="form-label">Test Name</label>
                                         <select class="form-select" name="service_id" id="modalTestNameSelect" required>
                                             <option value="" id="modalTestNamePlaceholder" disabled selected>-- Select Test --</option>
                                             <?php
-                                            // Example: Fetch laboratory services from DB
-                                            $servicesQuery = $conn->query("
-                                                SELECT serviceID, serviceName
-                                                FROM dl_services
-                                            ");
+                                            $servicesQuery = $conn->query("SELECT serviceID, serviceName FROM dl_services");
                                             while ($srv = $servicesQuery->fetch_assoc()):
                                             ?>
-                                                <option value="<?= $srv['serviceID'] ?>">
-                                                    <?= htmlspecialchars($srv['serviceName']) ?>
-                                                </option>
+                                                <option value="<?= $srv['serviceID'] ?>"><?= htmlspecialchars($srv['serviceName']) ?></option>
                                             <?php endwhile; ?>
                                         </select>
                                     </div>
+
                                     <div class="mb-3">
-                                        <label class="form-label">Assign Laboratorist</label>
-                                        <select class="form-select" name="laboratorist_id" required>
-                                            <option value="">-- Select Laboratorist --</option>
-                                            <?php
-                                            // Fetch laboratorists from DB
-                                            $labQuery = $conn->query("
-                                                SELECT employee_id, first_name, last_name 
-                                                FROM hr_employees 
-                                                WHERE profession = 'Laboratorist' 
-                                                ORDER BY first_name
-                                            ");
-                                            while ($lab = $labQuery->fetch_assoc()):
-                                            ?>
-                                                <option value="<?= $lab['employee_id'] ?>">
-                                                    <?= htmlspecialchars($lab['first_name'] . ' ' . $lab['last_name']) ?>
-                                                </option>
-                                            <?php endwhile; ?>
-                                        </select>
+                                        <label class="form-label">Preferred Date</label>
+                                        <div class="input-group">
+                                            <input type="date" class="form-control" id="scheduleDateInput" required>
+                                            <button type="button" class="btn btn-outline-primary" onclick="runAIScheduling()">
+                                                <i class="bi bi-cpu"></i> Auto-Assign Slot
+                                            </button>
+                                        </div>
+                                        <small class="text-muted">Select a date and click Auto-Assign to find the best slot.</small>
                                     </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Schedule Date & Time</label>
-                                        <input type="datetime-local" class="form-control" name="schedule_datetime" required>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Suggested Time</label>
+                                            <input type="time" class="form-control" id="suggestedTime" readonly required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Assigned Laboratorist</label>
+                                            <select class="form-select" name="laboratorist_id" id="modalLaboratoristSelect" required>
+                                                <option value="">Choose Laboratorist</option>
+                                                <?php
+                                                $labQuery = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Laboratorist' ORDER BY first_name");
+                                                while ($lab = $labQuery->fetch_assoc()):
+                                                ?>
+                                                    <option value="<?= $lab['employee_id'] ?>">
+                                                        <?= htmlspecialchars($lab['first_name'] . ' ' . $lab['last_name']) ?>
+                                                    </option>
+                                                <?php endwhile; ?>
+                                            </select>
+                                        </div>
                                     </div>
-                                    <button type="submit" class="btn btn-success">Save Schedule</button>
+                                    <div class="modal-footer px-0 pb-0">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                        <button type="submit" class="btn btn-success">Save Schedule</button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
@@ -417,6 +426,118 @@
                             }
                         });
                     });
+                    // 1. Setup the Modal when "Lab Scheduling (+)" is clicked
+                    document.querySelectorAll('.addScheduleBtn').forEach(button => {
+                        button.addEventListener('click', function() {
+                            const id = this.getAttribute('data-id');
+                            const appointmentId = this.getAttribute('data-appointment-id');
+                            const name = this.getAttribute('data-name');
+
+                            // Fill basic hidden fields
+                            document.getElementById('modalPatientId').value = id;
+                            document.getElementById('modalAppointmentId').value = appointmentId;
+                            document.getElementById('modalPatientName').value = name;
+
+                            // Reset the form for a fresh start
+                            document.getElementById('suggestedTime').value = '';
+                            document.getElementById('modalLaboratoristSelect').value = '';
+                            document.getElementById('scheduleDateInput').value = '';
+
+                            // Reset visual styles
+                            document.getElementById('modalLaboratoristSelect').classList.remove('is-valid');
+                            document.getElementById('suggestedTime').classList.remove('is-valid');
+                        });
+                    });
+
+                    // 2. The AI Logic
+                    function runAIScheduling() {
+                        const serviceId = document.getElementById('modalTestNameSelect').value;
+                        const date = document.getElementById('scheduleDateInput').value;
+                        const btn = document.querySelector('.btn-outline-primary'); // The Auto-Assign button
+
+                        if (!serviceId) {
+                            alert("Please select a Test Name first.");
+                            return;
+                        }
+                        if (!date) {
+                            alert("Please select a Date first.");
+                            return;
+                        }
+
+                        // UI Feedback
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Finding Slot...';
+                        btn.disabled = true;
+
+                        const formData = new FormData();
+                        formData.append('action', 'ai_suggest');
+                        formData.append('service_id', serviceId);
+                        formData.append('date', date);
+
+                        // FIX: Ensure this path is correct relative to your browser URL
+                        // If your HTML is in the root folder, use 'oop/fetchdetails.php'
+                        // If your HTML is in a subfolder, use '../oop/fetchdetails.php'
+                        fetch('oop/fetchdetails.php', {
+                                method: 'POST',
+                                body: formData
+                            })
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok');
+                                }
+                                return response.text(); // Get text first to debug if it's not JSON
+                            })
+                            .then(text => {
+                                try {
+                                    return JSON.parse(text); // Try parsing JSON
+                                } catch (e) {
+                                    console.error("Server returned non-JSON:", text);
+                                    throw new Error("Server Error: Check console for details.");
+                                }
+                            })
+                            .then(data => {
+                                if (data.success) {
+                                    // Fill Time
+                                    document.getElementById('suggestedTime').value = data.recommended_time.substring(0, 5);
+
+                                    // Fill Laboratorist (User can still change this!)
+                                    const labSelect = document.getElementById('modalLaboratoristSelect');
+                                    labSelect.value = data.recommended_staff_id;
+
+                                    // Visual Success Indicators (Green borders)
+                                    labSelect.classList.add('is-valid');
+                                    document.getElementById('suggestedTime').classList.add('is-valid');
+
+                                } else {
+                                    alert("AI Message: " + data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                                alert("Could not connect to the scheduling AI. Check console (F12) for details.");
+                            })
+                            .finally(() => {
+                                btn.innerHTML = originalText;
+                                btn.disabled = false;
+                            });
+                    }
+
+                    // 3. Handle Form Submit (Combine Date + Time)
+                    document.getElementById('scheduleForm').addEventListener('submit', function(e) {
+                        const date = document.getElementById('scheduleDateInput').value;
+                        const time = document.getElementById('suggestedTime').value;
+
+                        // If user used AI or manually picked date/time
+                        if (date && time) {
+                            // Create YYYY-MM-DDTHH:MM format for the hidden input
+                            document.getElementById('finalDateTime').value = date + 'T' + time;
+                        } else {
+                            // Fallback: If they didn't use the new inputs, check if they used the old one?
+                            // But since we hid the old one, we must enforce this.
+                            e.preventDefault();
+                            alert("Please ensure a Date and Time are selected.");
+                        }
+                    }); 
                 </script>
 
                 <script src="../assets/Bootstrap/all.min.js"></script>
