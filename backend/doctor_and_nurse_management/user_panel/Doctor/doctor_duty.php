@@ -145,8 +145,7 @@ class Duty
     }
 
     /**
-     * UPDATED SAVE FUNCTION
-     * Returns TRUE on success, or the ERROR MESSAGE string on failure.
+     * UPDATED: Returns the NEW DUTY ID on success, or Error Message on failure.
      */
     public function save($data)
     {
@@ -155,7 +154,7 @@ class Duty
             $stmt = $this->conn->prepare("INSERT INTO duty_assignments 
             (appointment_id, doctor_id, bed_id, nurse_assistant, `procedure`, notes, status, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-            
+
             $stmt->bind_param(
                 "iiissss",
                 $data['appointment_id'],
@@ -167,6 +166,9 @@ class Duty
                 $data['status']
             );
             $stmt->execute();
+
+            // 1. Capture the new ID
+            $new_duty_id = $this->conn->insert_id;
 
             $update = $this->conn->prepare("UPDATE p_appointments 
             SET purpose = ?, notes = ? 
@@ -180,12 +182,31 @@ class Duty
             $update->execute();
 
             $this->conn->commit();
-            return true; // Success
+
+            // 2. Return the ID instead of just true
+            return $new_duty_id;
         } catch (Exception $e) {
             $this->conn->rollback();
-            // Return the actual error message so the controller can see it
-            return $e->getMessage(); 
+            return $e->getMessage();
         }
+    }
+
+    /**
+     * NEW: Save to dnm_records
+     */
+    public function saveDnmRecord($duty_id, $doctor_id, $procedure_name, $amount)
+    {
+        $stmt = $this->conn->prepare("INSERT INTO dnm_records 
+            (duty_id, doctor_id, procedure_name, amount, created_at) 
+            VALUES (?, ?, ?, ?, NOW())");
+
+        // If procedure_name is empty, default to 'Consultation'
+        if (empty($procedure_name)) {
+            $procedure_name = 'Consultation';
+        }
+
+        $stmt->bind_param("iisd", $duty_id, $doctor_id, $procedure_name, $amount);
+        return $stmt->execute();
     }
 
     public function complete($duty_id)
@@ -222,6 +243,26 @@ class HospitalResource
             }
         }
         return $nurses;
+    }
+
+    /**
+     * NEW: Get Procedure Price
+     */
+    public function getProcedurePrice($procedure_name)
+    {
+        $price = 0.00;
+        // Check if table exists first to avoid fatal errors
+        $check = $this->conn->query("SHOW TABLES LIKE 'dnm_procedure_list'");
+        if ($check->num_rows > 0) {
+            $stmt = $this->conn->prepare("SELECT price FROM dnm_procedure_list WHERE procedure_name = ?");
+            $stmt->bind_param("s", $procedure_name);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($row = $result->fetch_assoc()) {
+                $price = $row['price'];
+            }
+        }
+        return $price;
     }
 }
 
@@ -299,17 +340,20 @@ class DoctorDutyController
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_duty'])) {
             $appointment_id = (int) $_POST['appointment_id'];
-            
-            // FIX: Get doctor ID, fall back to Session ID if appointment has no doctor assigned
+
+            // Get doctor ID, fall back to Session ID
             $doctor_id = $this->appointment->getDoctorId($appointment_id);
             if (empty($doctor_id) && isset($_SESSION['employee_id'])) {
                 $doctor_id = $_SESSION['employee_id'];
             }
 
-            $procedure = htmlspecialchars($_POST['procedure'] ?? '');
+            // Determine Procedure (Default to 'Consultation' if empty)
+            $raw_procedure = $_POST['procedure'] ?? '';
+            $procedure_name = !empty($raw_procedure) ? htmlspecialchars($raw_procedure) : 'Consultation';
+
             $notes = htmlspecialchars($_POST['notes'] ?? '');
-            
-            // FIX: Strict check for empty strings to ensure NULL is passed to DB
+
+            // Strict check for empty strings
             $bed_id = (!empty($_POST['bed_id']) && $_POST['bed_id'] !== '') ? $_POST['bed_id'] : null;
             $nurse_assistant = (!empty($_POST['nurse_assistant']) && $_POST['nurse_assistant'] !== '') ? $_POST['nurse_assistant'] : null;
 
@@ -318,19 +362,28 @@ class DoctorDutyController
                 'doctor_id' => $doctor_id,
                 'bed_id' => $bed_id,
                 'nurse_assistant' => $nurse_assistant,
-                'procedure' => $procedure,
+                'procedure' => $procedure_name,
                 'notes' => $notes,
                 'status' => 'Pending'
             ];
 
-            // FIX: Check return value. If it's NOT true, it's an error message.
+            // 1. Save the Duty
             $result = $this->duty->save($data);
 
-            if ($result === true) {
+            // 2. Check if Result is Numeric (Success returns the ID)
+            if (is_numeric($result)) {
+                $new_duty_id = $result;
+
+                // 3. Fetch Price from dnm_procedure_list
+                $price = $this->resources->getProcedurePrice($procedure_name);
+
+                // 4. Insert into dnm_records
+                $this->duty->saveDnmRecord($new_duty_id, $doctor_id, $procedure_name, $price);
+
                 header("Location: doctor_duty.php?success=1");
                 exit;
             } else {
-                // Pass the actual error message to the URL so you can see it
+                // Failure returns an error string
                 $errorMsg = urlencode($result);
                 header("Location: doctor_duty.php?error=" . $errorMsg);
                 exit;
@@ -338,8 +391,27 @@ class DoctorDutyController
         }
 
         if (isset($_GET['complete_duty_id'])) {
-            $this->duty->complete((int) $_GET['complete_duty_id']);
-            header("Location: doctor_duty.php");
+            $duty_id = (int) $_GET['complete_duty_id'];
+
+
+            $stmt = $this->conn->prepare("SELECT doctor_id, `procedure` FROM duty_assignments WHERE duty_id = ?");
+            $stmt->bind_param("i", $duty_id);
+            $stmt->execute();
+            $res = $stmt->get_result();
+
+            if ($row = $res->fetch_assoc()) {
+                $doctor_id = $row['doctor_id'];
+
+                $procedure_name = !empty($row['procedure']) ? $row['procedure'] : 'Consultation';
+
+                $price = $this->resources->getProcedurePrice($procedure_name);
+
+                $this->duty->saveDnmRecord($duty_id, $doctor_id, $procedure_name, $price);
+            }
+
+            $this->duty->complete($duty_id);
+
+            header("Location: doctor_duty.php?success=completed");
             exit;
         }
 
