@@ -205,6 +205,7 @@ if (!$user) {
                                 <th style="padding:12px; text-align:center;">#</th>
                                 <th style="padding:12px; text-align:center;">Machine Name</th>
                                 <th style="padding:12px; text-align:center;">Machine Type</th>
+                                <th style="padding:12px; text-align:center;">Status</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -214,11 +215,31 @@ if (!$user) {
                                         <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['machine_id']) ?></td>
                                         <td style="padding:12px; text-align:left;"><?= htmlspecialchars($row['machine_name']) ?></td>
                                         <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['machine_type']) ?></td>
+
+                                        <td style="padding:12px; text-align:center;">
+                                            <?php
+                                            // Check the status (ensure your DB has a 'status' column)
+                                            $status = isset($row['status']) ? $row['status'] : 'Available';
+
+                                            // Set color based on status
+                                            if ($status == 'Under Maintenance') {
+                                                $badgeClass = 'bg-danger'; // Red for Maintenance
+                                            } elseif ($status == 'In Use') {
+                                                $badgeClass = 'bg-warning text-dark'; // Yellow for In Use
+                                            } else {
+                                                $badgeClass = 'bg-success'; // Green for Available/active
+                                            }
+                                            ?>
+                                            <span class="badge rounded-pill <?php echo $badgeClass; ?>" style="font-size: 0.9em; padding: 8px 12px;">
+                                                <?= htmlspecialchars($status) ?>
+                                            </span>
+                                        </td>
+
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="3" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                    <td colspan="4" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
                                         🧾 No Laboratory or Diagnostic equipment found
                                     </td>
                                 </tr>

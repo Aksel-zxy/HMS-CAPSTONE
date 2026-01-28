@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '../../../../../SQL/config.php'; // adjust path if needed
+require_once __DIR__ . '../../../../../SQL/config.php';
 
 class MachineEquipment {
     private $conn;
@@ -8,16 +8,17 @@ class MachineEquipment {
         $this->conn = $dbConn;
     }
 
-    // ✅ Fetch only Laboratory and Diagnostic equipment
     public function getLabAndDiagnostic(): array {
         $sql = "
-            SELECT 
+            SELECT DISTINCT
                 machine_id,
                 machine_type,
-                machine_name
+                machine_name,
+                status
             FROM machine_equipments
             WHERE machine_type IN ('Laboratory', 'Diagnostic')
-            ORDER BY machine_id DESC
+            
+            ORDER BY machine_id ASC
         ";
 
         $result = $this->conn->query($sql);
@@ -34,7 +35,6 @@ class MachineEquipment {
     }
 }
 
-// --- instantiate and fetch ---
 $machine = new MachineEquipment($conn);
 $labDiagnosticEquipments = [];
 $fetchError = '';
