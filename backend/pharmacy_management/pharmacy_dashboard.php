@@ -26,6 +26,35 @@ if (!$user) {
     exit();
 }
 
+
+// Prepare an array to store sales data per year
+$salesData = [];
+
+// Get distinct years from dispensed_date
+$yearsQuery = mysqli_query($conn, "SELECT DISTINCT YEAR(dispensed_date) AS year FROM pharmacy_prescription_items ORDER BY year ASC");
+
+while ($yearRow = mysqli_fetch_assoc($yearsQuery)) {
+    $year = $yearRow['year'];
+
+    // Initialize array for 12 months (Jan-Dec)
+    $salesData[$year] = array_fill(0, 12, 0);
+
+    // Get total sales per month
+    $salesQuery = mysqli_query($conn, "
+        SELECT MONTH(dispensed_date) AS month, SUM(total_price) AS total
+        FROM pharmacy_prescription_items
+        WHERE YEAR(dispensed_date) = $year
+        GROUP BY MONTH(dispensed_date)
+    ");
+
+    while ($row = mysqli_fetch_assoc($salesQuery)) {
+        $monthIndex = $row['month'] - 1; // 0-based index for JS
+        $salesData[$year][$monthIndex] = (float)$row['total'];
+    }
+}
+
+
+
 $sales = new Sales($conn);
 
 // Default period for summary cards
@@ -118,6 +147,68 @@ if ($expiry_res && $expiry_res->num_rows > 0) {
 $notif = new Notification($conn);
 $latestNotifications = $notif->load();
 $notifCount = $notif->notifCount;
+
+
+$cashPayments = 0;
+$billingPayments = 0;
+
+$sql = "
+    SELECT payment_type, COUNT(*) AS total
+    FROM pharmacy_prescription
+    WHERE status = 'Dispensed'
+    GROUP BY payment_type
+";
+
+$result = mysqli_query($conn, $sql);
+
+while ($row = mysqli_fetch_assoc($result)) {
+    if ($row['payment_type'] === 'cash') {
+        $cashPayments = (int)$row['total'];
+    } elseif ($row['payment_type'] === 'post_discharged') {
+        $billingPayments = (int)$row['total'];
+    }
+}
+
+// Weekly (Sun-Sat current week) and Monthly (Jan-Dec)
+$weeklyRevenue = array_fill(0, 7, 0); // Sun-Sat
+$monthlyRevenue = array_fill(0, 12, 0);
+
+// --- WEEKLY REVENUE (Sun-Sat this week) ---
+$startOfWeek = date('Y-m-d', strtotime('last Sunday')); // last Sunday
+$weeklyQuery = "
+    SELECT DAYOFWEEK(pi.dispensed_date) AS day_num, SUM(pi.total_price) AS total
+    FROM pharmacy_prescription_items pi
+    JOIN pharmacy_prescription p ON pi.prescription_id = p.prescription_id
+    WHERE p.status = 'Dispensed' AND pi.dispensed_date BETWEEN '$startOfWeek' AND DATE_ADD('$startOfWeek', INTERVAL 6 DAY)
+    GROUP BY DAYOFWEEK(pi.dispensed_date)
+";
+$result = $conn->query($weeklyQuery);
+$weekDays = [];
+while ($row = $result->fetch_assoc()) {
+    $weekDays[$row['day_num']] = (float)$row['total'];
+}
+for ($i = 1; $i <= 7; $i++) {
+    $weeklyRevenue[$i - 1] = isset($weekDays[$i]) ? $weekDays[$i] : 0;
+}
+
+// --- MONTHLY REVENUE (current year Jan-Dec) ---
+$currentYear = date('Y');
+$monthlyQuery = "
+    SELECT MONTH(pi.dispensed_date) AS month_num, SUM(pi.total_price) AS total
+    FROM pharmacy_prescription_items pi
+    JOIN pharmacy_prescription p ON pi.prescription_id = p.prescription_id
+    WHERE p.status = 'Dispensed' AND YEAR(pi.dispensed_date) = $currentYear
+    GROUP BY MONTH(pi.dispensed_date)
+";
+$result = $conn->query($monthlyQuery);
+$months = [];
+while ($row = $result->fetch_assoc()) {
+    $months[$row['month_num']] = (float)$row['total'];
+}
+for ($i = 1; $i <= 12; $i++) {
+    $monthlyRevenue[$i - 1] = isset($months[$i]) ? $months[$i] : 0;
+}
+
 
 ?>
 
@@ -326,158 +417,92 @@ $notifCount = $notif->notifCount;
             </div>
             <!-- START CODING HERE -->
             <div class="container-fluid py-4">
-                <div class="title-container">
-                    <i class="fa-solid fa-chart-simple"></i>
-                    <h1 class="page-title">Dashboard</h1>
+
+                <!-- PAGE TITLE -->
+                <div class="d-flex align-items-center mb-4">
+                    <i class="fa-solid fa-chart-simple fs-4 me-2"></i>
+                    <h3 class="mb-0 fw-bold">Dashboard</h3>
                 </div>
-                <div id="dashboardContent">
-                    <!-- Row 1: Sales Summary -->
-                    <div class="row mb-4 align-items-center">
-                        <!-- Total Sale -->
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3 text-white"
-                                style="background: linear-gradient(135deg, #007bff, #00bfff); transition: 0.3s;">
-                                <div class="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 class="mb-0" style="font-weight: 700;">Total Sale</h6>
-                                    <div class="d-flex align-items-center">
-                                        <form method="get" class="d-flex align-items-center mb-0 me-2">
-                                            <i class="fa-solid fa-calendar-days me-2"></i>
-                                            <select name="period" class="form-select form-select-sm" onchange="this.form.submit()">
-                                                <option value="all" <?= $period === 'all' ? 'selected' : '' ?>>All Time</option>
-                                                <option value="7days" <?= $period === '7days' ? 'selected' : '' ?>>Last 7 Days</option>
-                                                <option value="month" <?= $period === 'month' ? 'selected' : '' ?>>This Month</option>
-                                                <option value="last_month" <?= $period === 'last_month' ? 'selected' : '' ?>>Last Month</option>
-                                            </select>
-                                        </form>
-                                    </div>
-                                </div>
-                                <h3>₱<?= number_format($totalSales, 2) ?></h3>
-                            </div>
-                        </div>
 
-                        <!-- Total Orders -->
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3 text-white"
-                                style="background: linear-gradient(135deg, #6f42c1, #b07aff); transition: 0.3s;">
-                                <h6 style="font-weight: 700;">Total Orders</h6>
-                                <h3><?= $totalOrders ?></h3>
-                            </div>
-                        </div>
-
-                        <!-- Dispensed Medicines Today -->
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3 text-white"
-                                style="background: linear-gradient(135deg, #20c997, #28a745); transition: 0.3s;">
-                                <h6 style="font-weight: 700;">Dispensed Medicines Today</h6>
-                                <h3><?= $dispensedToday ?></h3>
-                            </div>
-                        </div>
-
-                        <!-- Total Stocks -->
-                        <div class="col-md-6 col-lg-3">
-                            <div class="card shadow-sm p-3 rounded-3 text-white"
-                                style="background: linear-gradient(135deg, #fd7e14, #ffc107); transition: 0.3s;">
-                                <h6 style="font-weight: 700;">Total Stocks</h6>
-                                <h3><?= $totalStocks ?></h3>
-                            </div>
+                <!-- KPI CARDS -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="card shadow-sm rounded-4 p-3">
+                            <small class="text-muted">Total Sales</small>
+                            <h3 class="fw-bold">₱<?= number_format($totalSales, 2) ?></h3>
                         </div>
                     </div>
 
-                    <!-- Stock Thresholds -->
-                    <div class="row mb-4">
-                        <!-- High Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3"
-                                style="background-color: #e8f5e9; border-left: 5px solid #28a745;">
-                                <h6 style="font-weight: 700; color: #28a745;">High Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start" style="font-size: 16px;">
-                                        <?php if (!empty($highStock)): ?>
-                                            <?php foreach ($highStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-success"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Near Low Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3"
-                                style="background-color: #fff8e1; border-left: 5px solid #ffc107;">
-                                <h6 style="font-weight: 700; color: #ffc107;">Near Low Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start" style="font-size: 16px;">
-                                        <?php if (!empty($nearLowStock)): ?>
-                                            <?php foreach ($nearLowStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-warning text-dark"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm rounded-4 p-3">
+                            <small class="text-muted">Total Orders</small>
+                            <h3 class="fw-bold"><?= $totalOrders ?></h3>
                         </div>
                     </div>
 
-                    <div class="row mb-4">
-                        <!-- Low Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3"
-                                style="background-color: #fff3e0; border-left: 5px solid #fd7e14;">
-                                <h6 style="font-weight: 700; color: #fd7e14;">Low Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start" style="font-size: 16px;">
-                                        <?php if (!empty($lowStock)): ?>
-                                            <?php foreach ($lowStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-danger"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm rounded-4 p-3">
+                            <small class="text-muted">Dispensed Today</small>
+                            <h3 class="fw-bold"><?= $dispensedToday ?></h3>
                         </div>
+                    </div>
 
-                        <!-- No Stock -->
-                        <div class="col-md-6">
-                            <div class="card shadow-sm p-3 rounded-3"
-                                style="background-color: #fdecea; border-left: 5px solid #dc3545;">
-                                <h6 style="font-weight: 700; color: #dc3545;">No Stock</h6>
-                                <div style="max-height: 300px; overflow-y: auto;">
-                                    <ul class="mt-2 mb-0 text-start" style="font-size: 16px;">
-                                        <?php if (!empty($noStock)): ?>
-                                            <?php foreach ($noStock as $med): ?>
-                                                <li>
-                                                    <?= htmlspecialchars($med['med_name']) ?>
-                                                    <span class="badge bg-secondary"><?= $med['stock_quantity'] ?></span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <li>None</li>
-                                        <?php endif; ?>
-                                    </ul>
-                                </div>
-                            </div>
+                    <div class="col-md-3">
+                        <div class="card shadow-sm rounded-4 p-3">
+                            <small class="text-muted">Total Stocks</small>
+                            <h3 class="fw-bold"><?= $totalStocks ?></h3>
                         </div>
                     </div>
                 </div>
+
+                <!-- MAIN CHART ROW -->
+                <div class="row mb-4">
+                    <!-- SALES PERFORMANCE -->
+                    <div class="col-lg-8">
+                        <div class="card shadow-sm rounded-4 p-4">
+                            <div class="d-flex justify-content-between mb-3 align-items-center">
+                                <h6 class="fw-bold mb-0">Sales Performance</h6>
+                                <div class="d-flex gap-2">
+                                    <select id="yearFilter1" class="form-select form-select-sm w-auto"></select>
+                                    <select id="yearFilter2" class="form-select form-select-sm w-auto"></select>
+                                </div>
+                            </div>
+                            <div id="salesChart"></div>
+                        </div>
+                    </div>
+
+                    <!-- STOCK STATUS -->
+                    <div class="col-lg-4">
+                        <div class="card shadow-sm rounded-4 p-4">
+                            <h6 class="fw-bold mb-3">Payment Methods</h6>
+                            <div id="stockChart"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTTOM CHART -->
+                <div class="row mb-4">
+                    <div class="col-lg-6">
+                        <div class="card shadow-sm rounded-4 p-4">
+                            <div class="d-flex justify-content-between mb-3 align-items-center">
+                                <h6 class="fw-bold mb-0">Revenue Performance</h6>
+                                <div class="d-flex gap-2">
+                                    <select id="revenueFilter" class="form-select form-select-sm w-auto">
+                                        <option value="weekly" selected>Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="revenueChart"></div>
+                        </div>
+                    </div>
+
+                </div>
+
+
 
             </div>
+
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
@@ -494,6 +519,200 @@ $notifCount = $notif->notifCount;
             }
         });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+
+            // ---------- SALES PERFORMANCE (2 YEAR FILTER) ----------
+            var salesData = <?= json_encode($salesData) ?>;
+            var currentYear = new Date().getFullYear();
+            var startYear = 2025;
+            var years = [];
+            for (var y = startYear; y <= currentYear; y++) {
+                years.push(y.toString());
+                if (!salesData[y]) salesData[y] = Array(12).fill(0);
+            }
+
+            var yearFilter1 = document.getElementById('yearFilter1');
+            var yearFilter2 = document.getElementById('yearFilter2');
+
+            years.forEach(year => {
+                yearFilter1.add(new Option(year, year));
+                yearFilter2.add(new Option(year, year));
+            });
+
+            // Default to latest two years
+            yearFilter1.value = currentYear.toString();
+            yearFilter2.value = (currentYear - 1).toString();
+
+            function getSalesSeries(y1, y2) {
+                var series = [];
+                if (y1) series.push({
+                    name: y1,
+                    data: salesData[y1]
+                });
+                if (y2) series.push({
+                    name: y2,
+                    data: salesData[y2]
+                });
+                return series;
+            }
+
+            var salesChart = new ApexCharts(document.querySelector("#salesChart"), {
+                chart: {
+                    type: 'area',
+                    height: 300,
+                    toolbar: {
+                        show: false
+                    }
+                },
+                series: getSalesSeries(yearFilter1.value, yearFilter2.value),
+                stroke: {
+                    curve: 'smooth',
+                    width: 3
+                },
+                dataLabels: {
+                    enabled: false
+                },
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        opacityFrom: 0.4,
+                        opacityTo: 0.1
+                    }
+                },
+                colors: ['#22c55e', '#6366f1'],
+                xaxis: {
+                    categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                },
+                legend: {
+                    position: 'top'
+                }
+            });
+            salesChart.render();
+
+            yearFilter1.addEventListener('change', () => salesChart.updateSeries(getSalesSeries(yearFilter1.value, yearFilter2.value)));
+            yearFilter2.addEventListener('change', () => salesChart.updateSeries(getSalesSeries(yearFilter1.value, yearFilter2.value)));
+
+
+            // ---------- PAYMENT METHODS (DONUT) ----------
+            new ApexCharts(document.querySelector("#stockChart"), {
+                chart: {
+                    type: 'donut',
+                    height: 250
+                },
+                series: [<?= $cashPayments ?>, <?= $billingPayments ?>],
+                labels: ['Cash', 'Billing'],
+                colors: ['#22c55e', '#6366f1'],
+                legend: {
+                    position: 'bottom'
+                },
+                dataLabels: {
+                    enabled: false
+                },
+                plotOptions: {
+                    pie: {
+                        donut: {
+                            labels: {
+                                show: true,
+                                total: {
+                                    show: true,
+                                    label: 'Total',
+                                    formatter: function(w) {
+                                        return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }).render();
+
+
+            // ---------- REVENUE PERFORMANCE (Weekly / Monthly) ----------
+            var revenueData = {
+                weekly: <?= json_encode($weeklyRevenue) ?>,
+                monthly: <?= json_encode($monthlyRevenue) ?>
+            };
+
+            var xAxisCategories = {
+                weekly: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                monthly: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            };
+
+            var revenueChart = new ApexCharts(document.querySelector("#revenueChart"), {
+                chart: {
+                    type: 'bar',
+                    height: 300,
+                    toolbar: {
+                        show: false
+                    },
+                    animations: {
+                        enabled: true,
+                        easing: 'easeinout',
+                        speed: 800
+                    }
+                },
+                series: [{
+                    name: 'Revenue',
+                    data: revenueData['weekly']
+                }],
+                plotOptions: {
+                    bar: {
+                        borderRadius: 6,
+                        columnWidth: '50%'
+                    }
+                },
+                colors: ['#6366f1'],
+                xaxis: {
+                    categories: xAxisCategories['weekly'],
+                    labels: {
+                        rotate: -45,
+                        style: {
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                        }
+                    }
+                },
+                yaxis: {
+                    labels: {
+                        formatter: val => '₱' + val.toLocaleString()
+                    }
+                },
+                tooltip: {
+                    y: {
+                        formatter: val => '₱' + val.toLocaleString()
+                    }
+                },
+                dataLabels: {
+                    enabled: true,
+                    formatter: val => '₱' + val.toLocaleString(),
+                    style: {
+                        colors: ['#000'],
+                        fontSize: '12px'
+                    }
+                }
+            });
+            revenueChart.render();
+
+            // Revenue filter
+            var revenueFilter = document.getElementById('revenueFilter');
+            revenueFilter.addEventListener('change', function() {
+                var selected = this.value;
+                revenueChart.updateOptions({
+                    xaxis: {
+                        categories: xAxisCategories[selected]
+                    }
+                });
+                revenueChart.updateSeries([{
+                    name: 'Revenue',
+                    data: revenueData[selected]
+                }]);
+            });
+
+        });
+    </script>
+
 
     <script>
         const toggler = document.querySelector(".toggler-btn");

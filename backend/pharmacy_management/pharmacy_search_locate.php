@@ -132,7 +132,7 @@ if (isset($_POST['search_medicine'])) {
 
     $stmt = $conn->prepare("
         SELECT med_name, generic_name, brand_name, dosage,
-               `Shelf No`, `Rack No`, `Bin No`, stock_quantity
+               `shelf_no`, `rack_no`, `bin_no`, stock_quantity
         FROM pharmacy_inventory
         WHERE generic_name = ? AND brand_name = ? AND dosage = ?
         LIMIT 1
@@ -142,7 +142,7 @@ if (isset($_POST['search_medicine'])) {
     $result = $stmt->get_result();
 
     if ($row = $result->fetch_assoc()) {
-        $location = "Shelf {$row['Shelf No']} → Rack {$row['Rack No']} → Bin {$row['Bin No']}";
+        $location = "Shelf {$row['shelf_no']} → Rack {$row['rack_no']} → Bin {$row['bin_no']}";
         array_unshift($_SESSION['recent_searches'], [
             'generic_name' => $row['generic_name'],
             'brand_name'   => $row['brand_name'],

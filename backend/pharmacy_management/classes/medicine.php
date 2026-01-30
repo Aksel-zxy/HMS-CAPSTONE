@@ -3,13 +3,13 @@ class Medicine
 {
     private $conn;
 
-    // ===== NEW: Category-based locations =====
+
     private $category_locations = array(
-        'Antibiotic' => array('Storage Room' => 'Main', 'Shelf No' => 1, 'Rack No' => 1),
-        'Painkiller' => array('Storage Room' => 'Main', 'Shelf No' => 1, 'Rack No' => 2),
-        'Vitamins' => array('Storage Room' => 'Main', 'Shelf No' => 2, 'Rack No' => 1),
-        'Cold & Flu' => array('Storage Room' => 'Main', 'Shelf No' => 2, 'Rack No' => 2),
-        'Others' => array('Storage Room' => 'Main', 'Shelf No' => 3, 'Rack No' => 1)
+        'Antibiotic' => array('storage_room' => 'Main', 'shelf_no' => 1, 'rack_no' => 1),
+        'Painkiller' => array('storage_room' => 'Main', 'shelf_no' => 1, 'rack_no' => 2),
+        'Vitamins' => array('storage_room' => 'Main', 'shelf_no' => 2, 'rack_no' => 1),
+        'Cold & Flu' => array('storage_room' => 'Main', 'shelf_no' => 2, 'rack_no' => 2),
+        'Others' => array('storage_room' => 'Main', 'shelf_no' => 3, 'rack_no' => 1)
     );
 
     public function __construct($dbConnection)
@@ -17,50 +17,50 @@ class Medicine
         $this->conn = $dbConnection;
     }
 
-    // ===== NEW: Assign location based on category =====
+
     private function assignLocationByCategory($category)
     {
         $base = isset($this->category_locations[$category]) ? $this->category_locations[$category] : $this->category_locations['Others'];
 
-        $storage_room = $base['Storage Room'];
-        $shelf_no = $base['Shelf No'];
-        $rack_no = $base['Rack No'];
+        $storage_room = $base['storage_room'];
+        $shelf_no = $base['shelf_no'];
+        $rack_no = $base['rack_no'];
 
-        // Get last used Bin in this Shelf/Rack
-        $query = "SELECT `Bin No` 
+
+        $query = "SELECT `bin_no` 
                   FROM `pharmacy_inventory`
-                  WHERE `Storage Room`='$storage_room' AND `Shelf No`='$shelf_no' AND `Rack No`='$rack_no'
-                  ORDER BY `Bin No` DESC LIMIT 1";
+                  WHERE `storage_room`='$storage_room' AND `shelf_no`='$shelf_no' AND `rack_no`='$rack_no'
+                  ORDER BY `bin_no` DESC LIMIT 1";
         $result = mysqli_query($this->conn, $query);
 
         if (mysqli_num_rows($result) > 0) {
             $row = mysqli_fetch_assoc($result);
-            $bin_no = intval($row['Bin No']) + 1;
+            $bin_no = intval($row['bin_no']) + 1;
         } else {
             $bin_no = 1;
         }
 
-        // Optional: max 10 bins per rack
+
         if ($bin_no > 10) {
             $bin_no = 1;
             $rack_no += 1;
         }
 
         return array(
-            'Storage Room' => $storage_room,
-            'Shelf No' => $shelf_no,
-            'Rack No' => $rack_no,
-            'Bin No' => $bin_no
+            'storage_room' => $storage_room,
+            'shelf_no' => $shelf_no,
+            'rack_no' => $rack_no,
+            'bin_no' => $bin_no
         );
     }
 
-    // ===== NEW: Add medicine with auto-location =====
+
     public function addMedicineWithAutoLocation($med_name, $generic_name, $brand_name, $prescription_required, $category, $dosage, $unit, $unit_price, $stock_quantity)
     {
         $location = $this->assignLocationByCategory($category);
 
         $stmt = $this->conn->prepare("
-            INSERT INTO pharmacy_inventory (med_name, generic_name, brand_name, prescription_required, category, dosage, unit, unit_price, stock_quantity, `Storage Room`, `Shelf No`, `Rack No`, `Bin No`)
+            INSERT INTO pharmacy_inventory (med_name, generic_name, brand_name, prescription_required, category, dosage, unit, unit_price, stock_quantity, storage_room, shelf_no, rack_no, bin_no)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->bind_param(
@@ -74,10 +74,10 @@ class Medicine
             $unit,
             $unit_price,
             $stock_quantity,
-            $location['Storage Room'],
-            $location['Shelf No'],
-            $location['Rack No'],
-            $location['Bin No']
+            $location['storage_room'],
+            $location['shelf_no'],
+            $location['rack_no'],
+            $location['bin_no']
         );
 
         if (!$stmt->execute()) {
@@ -87,7 +87,7 @@ class Medicine
         return true;
     }
 
-    // =================== Existing methods ===================
+
     public function getAllMedicines()
     {
         $query = "SELECT med_id, med_name, generic_name, brand_name, prescription_required, category, dosage, stock_quantity, unit_price, unit, status 
