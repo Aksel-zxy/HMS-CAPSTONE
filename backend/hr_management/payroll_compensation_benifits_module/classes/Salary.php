@@ -81,19 +81,13 @@ public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 
     [$year, $month] = explode('-', $pay_period);
     $start_date = "$year-$month-01";
     $end_date = date("Y-m-t", strtotime($start_date));
-
-    if ($period_type === 'first') {
-        $end_date = "$year-$month-15";
-    } elseif ($period_type === 'second') {
-        $start_date = "$year-$month-16";
-    }
+    if ($period_type === 'first') $end_date = "$year-$month-15";
+    if ($period_type === 'second') $start_date = "$year-$month-16";
 
     /* =======================
        3️⃣ PROFESSION
     ======================== */
-    $stmt = $this->conn->prepare("
-        SELECT profession FROM hr_employees WHERE employee_id = ? LIMIT 1
-    ");
+    $stmt = $this->conn->prepare("SELECT profession FROM hr_employees WHERE employee_id = ? LIMIT 1");
     $stmt->bind_param("i", $employee_id);
     $stmt->execute();
     $profession = $stmt->get_result()->fetch_assoc()['profession'];
@@ -117,16 +111,12 @@ public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 
     $undertime_minutes = 0;
 
     while ($row = $result->fetch_assoc()) {
+        $status = $row['status'];
+        $leave = null;
 
-        // Count normal working days
-        if (in_array($row['status'], ['Present','Late','Overtime','Undertime'])) {
-            $days_worked++;
-        }
-
-        // Count paid leave as worked
-        if ($row['status'] === 'On Leave') {
+        if (in_array($status, ['Half Day','On Leave','On Leave (Half Day)'])) {
             $stmt_leave = $this->conn->prepare("
-                SELECT is_paid
+                SELECT is_paid, half_day_type
                 FROM hr_leave
                 WHERE employee_id = ?
                   AND leave_status = 'Approved'
@@ -138,12 +128,36 @@ public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 
             $stmt_leave->execute();
             $leave = $stmt_leave->get_result()->fetch_assoc();
             $stmt_leave->close();
-
-            if ($leave && $leave['is_paid'] === 'Yes') {
-                $days_worked++; 
-            }
         }
 
+        // Full day worked
+        if (in_array($status, ['Present','Late','Overtime','Undertime'])) {
+            $days_worked += 1;
+        }
+        // Half Day worked
+        elseif ($status === 'Half Day') {
+            if ($leave && $leave['is_paid'] === 'Yes') {
+                $days_worked += 1; // Half worked + Half Paid Leave = Full
+            } else {
+                $days_worked += 0.5;
+            }
+        }
+        // On Leave full or half
+        elseif (in_array($status, ['On Leave','On Leave (Half Day)'])) {
+            if ($leave && $leave['is_paid'] === 'Yes') {
+                if ($status === 'On Leave (Half Day)') {
+                    $days_worked += 0.5; // Paid Half Day leave only
+                } else {
+                    $days_worked += 1;   // Full Paid Leave
+                }
+            }
+        }
+        // Absent Half Day
+        elseif ($status === 'Absent (Half Day)') {
+            $days_worked += 0.5;
+        }
+
+        // OT / Undertime accumulation
         $overtime_minutes += (float)$row['overtime_minutes'];
         $undertime_minutes += (float)$row['undertime_minutes'];
     }
@@ -155,11 +169,10 @@ public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 
     $period_factor = ($period_type === 'full') ? 1 : 0.5;
 
     /* =======================
-       6️⃣ ATTENDANCE-BASED PAY LOGIC (ALL EMPLOYEES)
+       6️⃣ ATTENDANCE-BASED PAY LOGIC
     ======================== */
-    $daily_rate = $monthly_basic / 22; // assume 22 working days in a month
+    $daily_rate = $monthly_basic / 22; 
     $hourly_rate = $daily_rate / 8;
-
     $expected_days = ($period_type === 'full') ? 22 : 11;
 
     $basic_pay_period = $daily_rate * $days_worked;
@@ -175,7 +188,6 @@ public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 
     ======================== */
     $overtime_hours = round($overtime_minutes / 60, 2);
     $undertime_hours = round($undertime_minutes / 60, 2);
-
     $overtime_pay = $hourly_rate * 1.25 * $overtime_hours;
     $undertime_deduction = $hourly_rate * $undertime_hours;
 
@@ -183,23 +195,14 @@ public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 
        8️⃣ GOVERNMENT DEDUCTIONS
     ======================== */
     if ($period_type !== 'full') {
-        $sss /= 2;
-        $philhealth /= 2;
-        $pagibig /= 2;
+        $sss /= 2; $philhealth /= 2; $pagibig /= 2;
     }
 
     /* =======================
        9️⃣ TOTALS
     ======================== */
-    $gross_pay = $basic_pay_period
-               + $allowances_period
-               + $bonuses_period
-               + $thirteenth_month_period
-               + $overtime_pay;
-
-    $total_deductions = $sss + $philhealth + $pagibig
-                      + $undertime_deduction + $absence_deduction;
-
+    $gross_pay = $basic_pay_period + $allowances_period + $bonuses_period + $thirteenth_month_period + $overtime_pay;
+    $total_deductions = $sss + $philhealth + $pagibig + $undertime_deduction + $absence_deduction;
     $net_pay = max(0, $gross_pay - $total_deductions);
 
     return [
@@ -207,35 +210,25 @@ public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 
         'profession' => $profession,
         'pay_period_start' => $start_date,
         'pay_period_end' => $end_date,
-        'daily_rate' => round($daily_rate, 2),
+        'daily_rate' => round($daily_rate,2),
         'days_worked' => $days_worked,
-        'basic_pay' => round($basic_pay_period, 2),
-        'allowances' => round($allowances_period, 2),
-        'bonuses' => round($bonuses_period, 2),
-        'thirteenth_month' => round($thirteenth_month_period, 2),
+        'basic_pay' => round($basic_pay_period,2),
+        'allowances' => round($allowances_period,2),
+        'bonuses' => round($bonuses_period,2),
+        'thirteenth_month' => round($thirteenth_month_period,2),
         'overtime_hours' => $overtime_hours,
-        'overtime_pay' => round($overtime_pay, 2),
+        'overtime_pay' => round($overtime_pay,2),
         'undertime_hours' => $undertime_hours,
-        'undertime_deduction' => round($undertime_deduction, 2),
-        'absence_deduction' => round($absence_deduction, 2),
-        'sss_deduction' => round($sss, 2),
-        'philhealth_deduction' => round($philhealth, 2),
-        'pagibig_deduction' => round($pagibig, 2),
-        'gross_pay' => round($gross_pay, 2),
-        'total_deductions' => round($total_deductions, 2),
-        'net_pay' => round($net_pay, 2),
+        'undertime_deduction' => round($undertime_deduction,2),
+        'absence_deduction' => round($absence_deduction,2),
+        'sss_deduction' => round($sss,2),
+        'philhealth_deduction' => round($philhealth,2),
+        'pagibig_deduction' => round($pagibig,2),
+        'gross_pay' => round($gross_pay,2),
+        'total_deductions' => round($total_deductions,2),
+        'net_pay' => round($net_pay,2),
     ];
 }
-
-
-
-
-
-
-
-
-
-
 
 // Inside Salary.php class
 public function savePayroll($data) {

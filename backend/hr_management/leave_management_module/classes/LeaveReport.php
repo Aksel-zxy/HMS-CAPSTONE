@@ -24,7 +24,7 @@ class LeaveReport {
 
                     -- ✅ FIXED total days
                     CASE 
-                        WHEN l.leave_duration = 'HALF' THEN 0.5
+                        WHEN l.leave_duration = 'Half Day' THEN 0.5
                         ELSE DATEDIFF(l.leave_end_date, l.leave_start_date) + 1
                     END AS total_days,
 

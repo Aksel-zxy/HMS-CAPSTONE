@@ -130,6 +130,21 @@ th {
     color: white;
 }
 
+.status-onleavehalfday {
+    background-color: darkgray;
+    color: white;
+}
+
+.status-halfday {
+    background-color: gray;
+    color: white;
+}
+
+.status-absenthalfday {
+    background-color: black;
+    color: white;
+}
+
 .status-present {
     background-color: green;
     color: white;

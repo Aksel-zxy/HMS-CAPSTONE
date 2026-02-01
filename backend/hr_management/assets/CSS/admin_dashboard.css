@@ -45,8 +45,23 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 20px;
-    margin: 20px auto;
+    gap: 29.6px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 6px;
+    box-shadow: 0 8px 10px rgba(0, 0, 0, 1);
+    border: 1px solid #ccc;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto 30px;
+}
+
+.row-title {
+    text-align: center;
+    color: #0047ab;
+    font-weight: bold;
+    font-size: 22px;
 }
 
 .card {
@@ -65,7 +80,6 @@
     text-align: left;
     opacity: 0;
     transform: translateX(-30px);
-    margin-bottom: 20px;
 }
 
 .card:hover {
@@ -110,6 +124,11 @@
     animation-delay: 0.8s;
 }
 
+.show-cards .row .card:nth-child(6) {
+    animation: fadeInLeft 0.6s ease forwards;
+    animation-delay: 1.0s;
+}
+
 .list {
     border-radius: 10px;
     border: none;
@@ -126,6 +145,230 @@
     color: white;
     text-decoration: underline;
     box-shadow: 0px 3px 5px rgba(0, 0, 0, 1);
+}
+
+.dashboard-attendance-container {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ---------- Dashboard Attendance Per Day Card ---------- */
+.dashboard-attendanceperday-card {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 6px;
+    box-shadow: 0 8px 10px rgba(0, 0, 0, 1);
+    border: 1px solid #ccc;
+    max-width: 550px;
+    width: 100%;
+    margin: 0 auto 30px;
+}
+
+.dashboard-attendanceperday-body { 
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.dashboard-attendanceperday-title {
+    text-align: center;
+    color: #0047ab;
+    font-weight: bold;
+    font-size: 22px;
+}
+
+.dashboard-attendanceperday-body input[type="date"] {
+    width: 200px;
+    align-self: center;
+}
+
+#dashboardAttendancePerDayChart {
+    width: 100% !important;
+    max-height: 300px;
+}
+
+/* ---------- Dashboard Attendance Per Employee Card ---------- */
+.dashboard-attendance-card {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 6px;
+    box-shadow: 0 8px 10px rgba(0, 0, 0, 1);
+    border: 1px solid #ccc;
+    max-width: 550px;
+    width: 100%;
+    margin: 0 auto 30px;
+}
+
+.dashboard-attendance-body { 
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.dashboard-attendance-title {
+    text-align: center;
+    color: #0047ab;
+    font-weight: bold;
+    font-size: 22px;
+}
+
+.employee-filter-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.employee-filter-container label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.employee-filter-container select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+}
+
+#dashboardAttendanceChart {
+    width: 100%;
+    height: 100%;
+}
+
+/* ---------- Pending Leave Card ---------- */
+.dashboard-leave-card {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 6px;
+    box-shadow: 0 8px 10px rgba(0, 0, 0, 1);
+    border: 1px solid #ccc;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    margin-bottom: 30px;
+}
+
+.dashboard-leave-title {
+    text-align: center;
+    color: #0047ab;
+    margin-bottom: 30px;
+    font-weight: bold;
+    font-size: 25px;
+}
+
+.leave-content {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+.leave-chart {
+    flex: 1 1 45%; 
+    min-width: 300px;
+    height: 300px;
+}
+
+.leave-table {
+    flex: 1 1 50%;
+    min-width: 300px;
+}
+
+.leave-chart canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+#pendingLeaveTable {
+    width: 100%;
+    font-size: 12px;
+    border-collapse: collapse;
+    margin: auto;
+    border: 2px solid #404040;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+#pendingLeaveTable tr,
+#pendingLeaveTable td {
+    text-align: center;
+    vertical-align: middle;
+    padding: 10px;
+    border: 1.5px solid black;
+}
+
+#pendingLeaveTable th {
+    padding: 12px;
+    border: 1.5px solid black;
+    background-color: #343434;
+    color: white;
+    text-transform: uppercase;
+    text-align: center;
+}
+
+#pendingLeaveTable tr:hover td {
+    background-color: #d5d5d8 !important;
+    color: black !important;
+}
+
+/* ---------- Dashboard Payroll Per Month, 1st Half and 2nd Half ---------- */
+.dashboard-payroll-card {
+    background: #fff;
+    padding: 30px 40px;
+    border-radius: 6px;
+    box-shadow: 0 8px 10px rgba(0, 0, 0, 1);
+    border: 1px solid #ccc;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto 30px;
+}
+
+.dashboard-payroll-body { 
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.dashboard-payroll-title {
+    text-align: center;
+    color: #0047ab;
+    font-weight: bold;
+    font-size: 25px;
+}
+
+.year-select-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.year-select-container label {
+    font-weight: 600;
+    color: #333;
+    font-size: 15px;
+}
+
+.year-select-container select {
+    padding: 6px 12px;
+    font-size: 15px;
+    border-radius: 4px;
+    border: 1px solid #aaa;
+    background-color: #f9f9f9;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.year-select-container select:hover {
+    border-color: #0047ab;
+    background-color: #fff;
+}
+
+.year-select-container select:focus {
+    outline: none;
+    border-color: #0047ab;
+    box-shadow: 0 0 5px rgba(0, 71, 171, 0.5);
 }
 
 /* ---------- Responsive ---------- */  
@@ -149,5 +392,14 @@
     to {
         opacity: 1;
         transform: translateX(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .leave-content {
+        flex-direction: column;
+    }
+    .leave-chart, .leave-table {
+        height: auto;
     }
 }

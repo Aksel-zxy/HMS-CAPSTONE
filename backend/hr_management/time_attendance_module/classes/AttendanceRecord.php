@@ -28,21 +28,50 @@ class AttendanceRecord {
         return $stmt->get_result();
     }
 
+    // Determine the proper display status for a record
     public function getStatusText($row) {
-        if (empty($row['time_in']) && empty($row['time_out']) && $row['status'] != 'On Leave') {
-            return 'Absent';
-        } elseif (!empty($row['late_minutes']) && $row['late_minutes'] > 0) {
-            return 'Late';
-        } elseif (!empty($row['undertime_minutes']) && $row['undertime_minutes'] > 0) {
-            return 'Undertime';
-        } elseif (!empty($row['overtime_minutes']) && $row['overtime_minutes'] > 0) {
-            return 'Overtime';
-        } else {
-            return !empty($row['status']) ? $row['status'] : '-';
+        $status = $row['status'] ?? 'Absent';
+
+        // Half Day leave but did not attend
+        if (in_array($status, ['On Leave', 'On Leave (Half Day)', 'Absent (Half Day)']) &&
+            empty($row['time_in']) && empty($row['time_out'])) {
+            return $status; // Keep as is
         }
+
+        // If no time in/out and not on leave → Absent
+        if (empty($row['time_in']) && empty($row['time_out']) &&
+            !in_array($status, ['On Leave', 'On Leave (Half Day)'])) {
+            return 'Absent';
+        }
+
+        // If worked partially → prioritize OT/UT/Late
+        if (!empty($row['overtime_minutes']) && $row['overtime_minutes'] > 0) {
+            return 'Overtime';
+        }
+
+        if (!empty($row['undertime_minutes']) && $row['undertime_minutes'] > 0) {
+            return 'Undertime';
+        }
+
+        if (!empty($row['late_minutes']) && $row['late_minutes'] > 0) {
+            return 'Late';
+        }
+
+        // Half Day actually worked
+        if ($status === 'Half Day') {
+            return 'Half Day';
+        }
+
+        // Fallback to status
+        return $status;
     }
 
+    // Map status text to a CSS class
     public function getStatusClass($statusText) {
-        return 'status-' . strtolower(str_replace(' ', '', $statusText));
+        // Remove parentheses, spaces → lowercase
+        $class = strtolower($statusText);
+        $class = str_replace([' ', '(', ')'], ['', '', ''], $class);
+        return 'status-' . $class;
     }
+
 }

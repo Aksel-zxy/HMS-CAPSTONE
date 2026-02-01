@@ -267,15 +267,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 <button class="hahaha" onclick="openForm()">Post a Job</button>
             </center>
 
-            <center>
-                <a href="replacement_button.php" class="hahaha">Mga Button Nyo</a>
-            </center>
-
-            <br />
-            <br />
-            <br />
-            <br />
-
             <div class="request">
                 <table >
                     <thead>

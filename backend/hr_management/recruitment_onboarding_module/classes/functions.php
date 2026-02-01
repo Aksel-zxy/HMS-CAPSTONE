@@ -39,7 +39,7 @@ function sendInterviewEmail($toEmail, $toName, $interviewDate) {
                         <td style='padding:30px; color:#333333; font-size:16px; line-height:1.5;'>
                         <p>Hi <strong>$toName</strong>,</p>
                         <p>You are scheduled for an interview on:</p>
-                        <p style='text-align:center; font-size:18px; font-weight:bold; margin:20px 0; color:#0073e6;'>$interviewDate</p>
+                        <p style='text-align:center; font-size:18px; font-weight:bold; margin:20px 0; color:#0073e6;'>$interviewDate @ exactly 09:00am</p>
                         <p>Please be on time and come prepared.</p>
                         <p>Thank you!</p>
                         </td>

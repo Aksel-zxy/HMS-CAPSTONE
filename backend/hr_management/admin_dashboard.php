@@ -1,41 +1,46 @@
 <?php
 require '../../SQL/config.php';
-include 'includes/FooterComponent.php';
 require_once 'classes/Auth.php';
 require_once 'classes/User.php';
 require_once 'classes/Employee.php';
 require_once 'classes/LeaveNotification.php';
+require_once 'classes/Dashboard.php';
+include 'includes/FooterComponent.php';
 
 Auth::checkHR();
 
 $conn = $conn;
 
 $userId = Auth::getUserId();
-if (!$userId) {
-    die("User ID not set.");
-}
-
-$userModel = new User($conn);
-$leaveNotif = new LeaveNotification($conn);
+if (!$userId) die("User ID not set.");
 
 $userObj = new User($conn);
 $user = $userObj->getById($userId);
-if (!$user) {
-    die("User not found.");
-}
+if (!$user) die("User not found.");
 
+$dashboard = new Dashboard($conn);
+$leaveNotif = new LeaveNotification($conn);
+
+// For cards
 $employee = new Employee($conn);
-
 $totalDoctors    = $employee->countByProfession('Doctor');
 $totalNurses     = $employee->countByProfession('Nurse');
 $totalPharma     = $employee->countByProfession('Pharmacist');
 $totalAccountant = $employee->countByProfession('Accountant');
 $totalLab        = $employee->countByProfession('Laboratorist');
 
-$leaveNotif = new LeaveNotification($conn);
-$pendingCount = $leaveNotif->getPendingLeaveCount();
+// Get all employees for dropdown
+$employees = $dashboard->getAllEmployees();
+$employeeId = $employees[0]['employee_id'] ?? 0; // default first employee
 
+
+// Get attendance summary for default employee
+$attendanceSummary = $dashboard->getEmployeeAttendanceSummary($employeeId);
+
+// Pending leave count
+$pendingCount = $leaveNotif->getPendingLeaveCount();
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -48,12 +53,22 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
     <link rel="stylesheet" href="assets/CSS/admin_dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
 
 <body>
 
     <!----- Full-page Loader ----->
-
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
 
     <div class="d-flex">
         <!----- Sidebar ----->
@@ -227,41 +242,175 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             <!-- START CODING HERE -->
             <!-- ----- Card-List of Employees ----- -->
             <div class="row">
+                <h5 class="row-title">Number of Active Employees per Profession</h5>
                 <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Doctor</h5>
-                        <p class="card-text"><strong><?php echo $totalDoctors; ?></strong> active doctors.</p>
-                    </div>
+                    <a href="recruitment_onboarding_module/list_of_doctors.php">
+                        <div class="card-body">
+                            <h5 class="card-title">Doctor</h5>
+                            <p class="card-text"><strong><?php echo $totalDoctors; ?></strong> active doctors.</p>
+                        </div>
+                    </a>
                 </div>
 
                 <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Nurse</h5>
-                        <p class="card-text"><strong><?php echo $totalNurses; ?></strong> active nurses.</p>
-                    </div>
+                    <a href="recruitment_onboarding_module/list_of_nurses.php">
+                        <div class="card-body">
+                            <h5 class="card-title">Nurse</h5>
+                            <p class="card-text"><strong><?php echo $totalNurses; ?></strong> active nurses.</p>
+                        </div>
+                    </a>
                 </div>
 
                 <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Pharmacist</h5>
-                        <p class="card-text"><strong><?php echo $totalPharma; ?></strong> active pharmacist.</p>
-                    </div>
+                    <a href="recruitment_onboarding_module/list_of_pharmacists.php">
+                        <div class="card-body">
+                            <h5 class="card-title">Pharmacist</h5>
+                            <p class="card-text"><strong><?php echo $totalPharma; ?></strong> active pharmacist.</p>
+                        </div>
+                    </a>
                 </div>
 
                 <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Accountant</h5>
-                        <p class="card-text"><strong><?php echo $totalAccountant; ?></strong> active accountant.</p>
-                    </div>
+                    <a href="recruitment_onboarding_module/list_of_accountants.php">
+                        <div class="card-body">
+                            <h5 class="card-title">Accountant</h5>
+                            <p class="card-text"><strong><?php echo $totalAccountant; ?></strong> active accountant.</p>
+                        </div>
+                    </a>
                 </div>
 
                 <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Laboratorist</h5>
-                        <p class="card-text"><strong><?php echo $totalLab; ?></strong> active laboratorist.</p>
+                    <a href="recruitment_onboarding_module/list_of_laboratorist.php">
+                        <div class="card-body">
+                            <h5 class="card-title">Laboratorist</h5>
+                            <p class="card-text"><strong><?php echo $totalLab; ?></strong> active laboratorist.</p>
+                        </div>
+                    </a>
+                </div>
+
+            </div>
+
+            <div class="dashboard-attendance-container">
+                <!-- ----- Attendance Summary Per Day ----- -->
+                <div class="dashboard-attendanceperday-card">
+                    <div class="dashboard-attendanceperday-body">
+                        <h5 class="dashboard-attendanceperday-title">Daily Attendance Overview</h5>
+
+                        <input 
+                            type="date" 
+                            id="attendanceDate" 
+                            class="form-control"
+                            value="<?php echo date('Y-m-d'); ?>"
+                        >
+
+                        <canvas id="dashboardAttendancePerDayChart"></canvas>
                     </div>
                 </div>
 
+                <!-- ----- Attendance Summary Per Employee ----- -->
+                <div class="dashboard-attendance-card">
+                    <div class="dashboard-attendance-body">
+                        <h5 class="dashboard-attendance-title">Employee Attendance Summary per Month</h5>
+
+                        <!-- Employee Filter Dropdown -->
+                        <div class="employee-filter-container">
+                            <label for="employee_id">Employee</label>
+                            <select name="employee_id" id="employee_id" required>
+                                <option value="">----- Select Employee -----</option>
+                                <?php foreach ($employees as $emp): ?>
+                                    <option value="<?php echo $emp['employee_id']; ?>">
+                                        <?php echo htmlspecialchars($emp['full_name'] ?? ''); ?>
+                                        (ID: <?php echo $emp['employee_id']; ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <canvas id="dashboardAttendanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- ---------- Pending Leave Card ---------- -->
+            <div class="dashboard-leave-card">
+                <div class="dashboard-leave-body">
+                    <h5 class="dashboard-leave-title">Pending Leave Requests</h5>
+
+                    <div class="leave-content">
+                        <!-- Chart Column -->
+                        <div class="leave-chart">
+                            <canvas id="dashboardLeaveChart"></canvas>
+                        </div>
+
+                        <!-- Table Column -->
+                        <div class="leave-table">
+                            <div class="table-responsive">
+                                <table class="table table-bordered" id="pendingLeaveTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Employee</th>
+                                            <th>Leave Type</th>
+                                            <th>Duration</th>
+                                            <th>Dates</th>
+                                            <th>Reason</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php
+                                        $pendingLeaves = $dashboard->getPendingLeaveDetails();
+
+                                        if (empty($pendingLeaves)) :
+                                        ?>
+                                            <tr>
+                                                <td colspan="5" class="text-center">No leave applications found.</td>
+                                            </tr>
+                                        <?php
+                                        else:
+                                            foreach ($pendingLeaves as $leave):
+                                                $start = new DateTime($leave['leave_start_date']);
+                                                $end   = new DateTime($leave['leave_end_date']);
+                                                $interval = $start->diff($end)->days + 1;
+
+                                                if ($leave['leave_duration'] === 'Half Day') {
+                                                    $interval = 0.5;
+                                                }
+                                        ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($leave['full_name']) ?></td>
+                                                <td><?= htmlspecialchars($leave['leave_type']) ?></td>
+                                                <td><?= $interval ?> day<?= $interval != 1 ? 's' : '' ?></td>
+                                                <td><?= htmlspecialchars($leave['leave_start_date']) ?> - <?= htmlspecialchars($leave['leave_end_date']) ?></td>
+                                                <td><?= htmlspecialchars($leave['leave_reason']) ?></td>
+                                            </tr>
+                                        <?php
+                                            endforeach;
+                                        endif;
+                                        ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---------- Dashboard Payroll Per Month, 1st Half and 2nd Half ---------- -->
+            <div class="dashboard-payroll-card">
+                <div class="dashboard-payroll-body">
+                    <h5 class="dashboard-payroll-title">Payroll Overview (Full Month vs 1st Half vs 2nd Half)</h5>
+
+                    <div class="year-select-container">
+                        <label for="year_select">Select Year:</label>
+                        <select id="year_select">
+                            <option value="2026" selected>2026</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                        </select>
+                    </div>
+
+                    <canvas id="payrollLineChart"></canvas>
+                </div>
             </div>
 
             <!-- END CODING HERE -->
@@ -275,11 +424,16 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <!----- End of Footer Content ----->
 
     <script>
-
-        window.addEventListener("load", function(){
-            setTimeout(function(){
+        window.addEventListener("load", function () {
+            setTimeout(() => {
                 document.getElementById("loading-screen").style.display = "none";
                 document.body.classList.add("show-cards");
+
+                // ----- STAGGER RENDER CHARTS -----
+                setTimeout(renderPendingLeaveChart, 200);   // Pending Leave
+                setTimeout(() => loadAttendanceChart(document.getElementById("attendanceDate").value), 400); // Daily Doughnut
+                setTimeout(() => fetchEmployeeAttendance(document.getElementById("employee_id").value), 600); // Employee Bar
+
             }, 2000);
         });
 
@@ -287,6 +441,341 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+
+        // ---------- FORCE CANVAS READY ----------
+        function forceCanvasReady(canvas, defaultHeight=300){
+            canvas.style.display = "block";
+            if (!canvas.height) canvas.height = defaultHeight;
+            if (!canvas.width) canvas.width = canvas.parentElement.offsetWidth || 400;
+            canvas.offsetHeight; // force reflow
+        }
+
+        // ---------------- Pending Leave Bar Chart ----------------
+        let pendingLeaveChart;
+        function renderPendingLeaveChart() {
+            const canvas = document.getElementById("dashboardLeaveChart");
+            forceCanvasReady(canvas);
+            const ctx = canvas.getContext("2d");
+
+            fetch("get_pending_leave.php")
+                .then(res => res.json())
+                .then(data => {
+                    const labels = data.map(d => d.department_name);
+                    const counts = data.map(d => Number(d.total_pending));
+
+                    const departmentColors = {
+                        "Anesthesiology & Pain Management": "#FF6384",
+                        "Cardiology (Heart & Vascular System)": "#36A2EB",
+                        "Dermatology (Skin, Hair, & Nails)": "#FFCE56",
+                        "Ear, Nose, and Throat (ENT)": "#4BC0C0",
+                        "Emergency Department (ER)": "#9966FF",
+                        "Gastroenterology (Digestive System & Liver)": "#FF9F40",
+                        "Geriatrics & Palliative Care": "#C9CBCF",
+                        "Infectious Diseases & Immunology": "#8DD1E1",
+                        "Internal Medicine (General & Subspecialties)": "#FFB6C1",
+                        "Nephrology (Kidneys & Dialysis)": "#FFD700",
+                        "Neurology & Neurosurgery (Brain & Nervous System)": "#20B2AA",
+                        "Obstetrics & Gynecology (OB-GYN)": "#FF7F50",
+                        "Oncology (Cancer Treatment)": "#87CEFA",
+                        "Ophthalmology (Eye Care)": "#DA70D6",
+                        "Orthopedics (Bones, Joints, and Muscles)": "#98FB98",
+                        "Pediatrics (Child Healthcare)": "#FFA07A",
+                        "Psychiatry & Mental Health": "#A0522D",
+                        "Pulmonology (Lungs & Respiratory System)": "#B0E0E6",
+                        "Rehabilitation & Physical Therapy": "#F08080",
+                        "Surgery (General & Subspecialties)": "#4682B4",
+                        "Geriatrics & Palliative Care (Elderly & Terminal Care)": "#C0C0C0",
+                        "Pharmacy": "#FF69B4",
+                        "Laboratory Department": "#7FFF00",
+                        "Billing": "#00CED1",
+                        "Insurance": "#FF4500",
+                        "Expenses": "#8A2BE2"
+                    };
+
+                    const bgColors = labels.map(l => departmentColors[l] || "#36A2EB");
+
+                    if(pendingLeaveChart){
+                        pendingLeaveChart.data.labels = labels;
+                        pendingLeaveChart.data.datasets[0].data = counts;
+                        pendingLeaveChart.data.datasets[0].backgroundColor = bgColors;
+                        pendingLeaveChart.update({duration:1200,easing:'easeOutQuart'});
+                    } else {
+                        pendingLeaveChart = new Chart(ctx, {
+                            type: "bar",
+                            data: { labels, datasets:[{
+                                label: "Pending Leave Requests",
+                                data: counts,
+                                backgroundColor: bgColors,
+                                borderColor: bgColors,
+                                borderWidth: 1,
+                                borderRadius: 6,
+                                base: 0
+                            }]},
+                            options: {
+                                responsive:true,
+                                maintainAspectRatio:false,
+                                indexAxis: "x",
+                                animation:{ duration:1200, easing:"easeOutQuart" },
+                                scales:{ y:{ beginAtZero:true, min:0, ticks:{ stepSize:1 } } },
+                                plugins:{ legend:{ display:false }, tooltip:{ enabled:true } }
+                            }
+                        });
+                    }
+                })
+                .catch(err=>console.error("Pending Leave Chart error:", err));
+        }
+
+        // ---------------- Daily Doughnut Chart ----------------
+        let attendanceChart;
+
+        const centerTextPlugin = {
+            id: 'centerText',
+            afterDraw(chart) {
+                const { ctx, chartArea: { width, height } } = chart;
+
+                // Compute total employees dynamically (count Half Day / Half Leave as 0.5)
+                const totalEmployees = chart.data.labels.reduce((sum, label, idx) => {
+                    let value = chart.data.datasets[0].data[idx];
+                    if(label === 'Half Day' || label === 'On Leave (Half Day)' || label === 'Absent (Half Day)') {
+                        value = value * 0.5;
+                    }
+                    return sum + value;
+                }, 0);
+
+                ctx.save();
+                ctx.font = 'bold 24px Arial';
+                ctx.fillStyle = '#333';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Total employees sa gitna
+                ctx.fillText(totalEmployees, width / 2, height / 2);
+
+                // Label sa ilalim ng number
+                ctx.font = '12px Arial';
+                ctx.fillText('Employees', width / 2, height / 2 + 25);
+
+                ctx.restore();
+            }
+        };
+
+        // Define all statuses and their colors
+        const allStatuses = [
+            'Present', 'Late', 'Undertime', 'Overtime',
+            'Half Day', 'On Leave', 'On Leave (Half Day)',
+            'Absent', 'Absent (Half Day)'
+        ];
+
+        const statusColors = [
+            'green', 'red', 'orange', 'blue',
+            'lightgreen', 'gray', 'darkgray',
+            'black', 'dimgray'
+        ];
+
+        function forceCanvasReady(canvas) {
+            canvas.style.display = 'none';
+            canvas.offsetHeight; // force reflow
+            canvas.style.display = 'block';
+        }
+
+        function loadAttendanceChart(date) {
+            const canvas = document.getElementById('dashboardAttendancePerDayChart');
+            forceCanvasReady(canvas);
+            const ctx = canvas.getContext('2d');
+
+            fetch(`get_daily_attendance.php?date=${date}`)
+                .then(res => res.json())
+                .then(data => {
+                    // Map all statuses to data, default 0
+                    const chartData = allStatuses.map(s => data[s] || 0);
+
+                    if (attendanceChart) {
+                        attendanceChart.data.labels = allStatuses;
+                        attendanceChart.data.datasets[0].data = chartData;
+                        attendanceChart.data.datasets[0].backgroundColor = statusColors;
+                        attendanceChart.update({ duration: 1200, easing: 'easeOutCubic' });
+                    } else {
+                        attendanceChart = new Chart(ctx, {
+                            type: 'doughnut',
+                            data: {
+                                labels: allStatuses,
+                                datasets: [{ 
+                                    data: chartData, 
+                                    backgroundColor: 
+                                    statusColors, 
+                                    borderColor: '#fff', 
+                                    borderWidth: 2 }]
+                            },
+                            plugins: [centerTextPlugin],
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false, 
+                                cutout: '65%',
+                                animation: { animateRotate: true, duration: 1200, easing: 'easeOutCubic' },
+                                plugins: { legend: { position: 'right' } }
+                            }
+                        });
+                    }
+                })
+                .catch(err => console.error("Daily Doughnut Chart error:", err));
+        }
+
+        // Default date load
+        document.addEventListener("DOMContentLoaded", function() {
+            const dateInput = document.getElementById("attendanceDate");
+            loadAttendanceChart(dateInput.value);
+            dateInput.addEventListener("change", function() { loadAttendanceChart(this.value); });
+        });
+
+        // ---------------- Employee Bar Chart ----------------
+        let empChart;
+
+        function fetchEmployeeAttendance(employeeId) {
+            const canvas = document.getElementById('dashboardAttendanceChart');
+            forceCanvasReady(canvas);
+            const ctx = canvas.getContext('2d');
+
+            fetch(`get_attendance_summary.php?employee_id=${employeeId || ''}`)
+                .then(res => res.json())
+                .then(data => {
+                    // Map all statuses to data, default 0
+                    const values = allStatuses.map(s => data[s] || 0);
+
+                    if (empChart) {
+                        empChart.data.labels = allStatuses;
+                        empChart.data.datasets[0].data = values;
+                        empChart.data.datasets[0].backgroundColor = statusColors;
+                        empChart.update({ duration: 800, easing: 'easeOutQuart' });
+                    } else {
+                        empChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: allStatuses,
+                                datasets: [{
+                                    label: 'Days',
+                                    data: values,
+                                    backgroundColor: statusColors,
+                                    borderRadius: 6
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                animation: { duration: 800, easing: 'easeOutQuart' },
+                                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                                plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                            }
+                        });
+                    }
+                })
+                .catch(err => console.error("Employee Chart error:", err));
+        }
+
+        // ---------------- Event Listeners ----------------
+        document.addEventListener("DOMContentLoaded", function () {
+            const dateInput = document.getElementById("attendanceDate");
+            loadAttendanceChart(dateInput.value);
+            dateInput.addEventListener("change", function () { loadAttendanceChart(this.value); });
+
+            const employeeSelect = document.getElementById('employee_id');
+            fetchEmployeeAttendance(employeeSelect.value);
+            employeeSelect.addEventListener('change', function () { fetchEmployeeAttendance(this.value); });
+        });
+
+        // ---------- Dashboard Payroll Per Month, 1st Half and 2nd Half ---------- 
+        let payrollChart;
+
+        // Function to fetch data and render chart
+        function renderPayrollChart(year) {
+            fetch(`get_payroll_lines.php?year=${year}`)
+                .then(res => res.json())
+                .then(data => {
+                    const labels = data.map(item => item.month);
+                    const fullMonth = data.map(item => item.full_month);
+                    const firstHalf = data.map(item => item.first_half);
+                    const secondHalf = data.map(item => item.second_half);
+
+                    const ctx = document.getElementById('payrollLineChart').getContext('2d');
+
+                    if (payrollChart) {
+                        payrollChart.data.labels = labels;
+                        payrollChart.data.datasets[0].data = fullMonth;
+                        payrollChart.data.datasets[1].data = firstHalf;
+                        payrollChart.data.datasets[2].data = secondHalf;
+                        payrollChart.update();
+                    } else {
+                        payrollChart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    {
+                                        label: 'Full Month',
+                                        data: fullMonth,
+                                        borderColor: 'rgba(54, 162, 235, 1)',
+                                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                        fill: true,
+                                        tension: 0.4
+                                    },
+                                    {
+                                        label: '1st Half',
+                                        data: firstHalf,
+                                        borderColor: 'rgba(75, 192, 192, 1)',
+                                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                        fill: false,
+                                        tension: 0.4
+                                    },
+                                    {
+                                        label: '2nd Half',
+                                        data: secondHalf,
+                                        borderColor: 'rgba(255, 206, 86, 1)',
+                                        backgroundColor: 'rgba(255, 206, 86, 0.2)',
+                                        fill: false,
+                                        tension: 0.4
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    title: {
+                                        display: true,
+                                        text: `Payroll Overview (All Employees) - ${year}`
+                                    },
+                                    tooltip: {
+                                        mode: 'index',
+                                        intersect: false,
+                                        callbacks: {
+                                            label: function(context){
+                                                return '₱' + context.raw.toLocaleString();
+                                            }
+                                        }
+                                    },
+                                    legend: {
+                                        display: true
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                            callback: value => '₱' + value.toLocaleString()
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+        }
+
+        // Initial render with current year
+        renderPayrollChart(document.getElementById('year_select').value);
+
+        // Event listener for year change
+        document.getElementById('year_select').addEventListener('change', function() {
+            renderPayrollChart(this.value);
+        });
+
     </script>
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>

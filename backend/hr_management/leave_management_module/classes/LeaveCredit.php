@@ -41,7 +41,7 @@ class LeaveCredit {
                             AND h.leave_type = lc.leave_type 
                             AND YEAR(h.leave_start_date) = ? 
                         THEN CASE 
-                                WHEN h.leave_duration = 'HALF' THEN 0.5
+                                WHEN h.leave_duration = 'Half Day' THEN 0.5
                                 ELSE DATEDIFF(h.leave_end_date, h.leave_start_date) + 1
                              END
                         ELSE 0 
