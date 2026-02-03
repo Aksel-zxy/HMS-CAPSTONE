@@ -14,17 +14,17 @@ define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
 define('PAYMONGO_API_BASE', 'https://api.paymongo.com/v1/');
 
 // ==============================
-// CREATE PAYMONGO PAYMENT INTENT
+// CREATE PAYMONGO PAYMENT LINK
 // ==============================
-function create_paymongo_payment_intent($amount, $billing_id, $patient_id) {
-
+function create_paymongo_payment_link($amount, $billing_id, $patient_id, $transaction_id)
+{
     $payload = [
         'data' => [
             'attributes' => [
-                'amount' => $amount,
-                'currency' => 'PHP',
+                'amount'      => $amount,
+                'currency'    => 'PHP',
                 'description' => "Billing #$billing_id - Patient $patient_id",
-                'payment_method_allowed' => ['card', 'gcash', 'paymaya'],
+                'remarks'     => "TXN:$transaction_id"
             ]
         ]
     ];
@@ -33,20 +33,24 @@ function create_paymongo_payment_intent($amount, $billing_id, $patient_id) {
         $client = new Client([
             'base_uri' => PAYMONGO_API_BASE,
             'headers' => [
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
+                'Accept'        => 'application/json',
+                'Content-Type'  => 'application/json',
                 'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
             ]
         ]);
 
-        $response = $client->post('payment_intents', [
-            'json' => $payload
-        ]);
+        $response = $client->post('links', ['json' => $payload]);
+        $body = json_decode($response->getBody(), true);
 
-        return json_decode($response->getBody(), true);
-
+        return [
+            'success' => true,
+            'url' => $body['data']['attributes']['checkout_url']
+        ];
     } catch (Exception $e) {
-        return null;
+        return [
+            'success' => false,
+            'error' => $e->getMessage()
+        ];
     }
 }
 
@@ -54,7 +58,6 @@ function create_paymongo_payment_intent($amount, $billing_id, $patient_id) {
 // PATIENT & BILLING LOOKUP
 // ==============================
 $patient_id = intval($_GET['patient_id'] ?? 0);
-$billing_id = null;
 
 // Patient info
 $stmt = $conn->prepare("
@@ -68,13 +71,13 @@ $patient = $stmt->get_result()->fetch_assoc();
 
 // Latest finalized billing
 $stmt = $conn->prepare("
-    SELECT MAX(billing_id) AS bid
+    SELECT MAX(billing_id) AS billing_id
     FROM billing_items
     WHERE patient_id = ? AND finalized = 1
 ");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
-$billing_id = $stmt->get_result()->fetch_assoc()['bid'] ?? null;
+$billing_id = $stmt->get_result()->fetch_assoc()['billing_id'] ?? null;
 
 // ==============================
 // BILLING ITEMS
@@ -91,8 +94,8 @@ if ($billing_id) {
     ");
     $stmt->bind_param("ii", $patient_id, $billing_id);
     $stmt->execute();
-    $res = $stmt->get_result();
 
+    $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $items[] = $row;
         $total += (float)$row['total_price'];
@@ -106,11 +109,11 @@ $insurance_covered = 0;
 $out_of_pocket = 0;
 $grand_total = 0;
 $status = 'Pending';
-$paymongo_intent_id = null;
+$transaction_id = null;
 
 if ($billing_id) {
     $stmt = $conn->prepare("
-        SELECT insurance_covered, out_of_pocket, grand_total, status, paymongo_payment_intent_id
+        SELECT insurance_covered, out_of_pocket, grand_total, status, transaction_id
         FROM billing_records
         WHERE patient_id = ? AND billing_id = ?
         LIMIT 1
@@ -124,7 +127,7 @@ if ($billing_id) {
         $out_of_pocket     = (float)$br['out_of_pocket'];
         $grand_total       = (float)$br['grand_total'];
         $status            = $br['status'];
-        $paymongo_intent_id = $br['paymongo_payment_intent_id'];
+        $transaction_id    = $br['transaction_id'];
     }
 }
 
@@ -132,39 +135,23 @@ if ($billing_id) {
 $payableAmount = ($out_of_pocket > 0) ? $out_of_pocket : $total;
 
 // ==============================
-// CREATE PAYMONGO PAYMENT
+// CREATE PAYMONGO PAYMENT LINK
 // ==============================
 $payLinkUrl = null;
 $linkError = null;
 
-if (
-    $billing_id &&
-    $payableAmount > 0 &&
-    $status !== 'Paid' &&
-    empty($paymongo_intent_id)
-) {
-    $intent = create_paymongo_payment_intent(
+if ($billing_id && $payableAmount > 0 && $status !== 'Paid' && $transaction_id) {
+    $link = create_paymongo_payment_link(
         (int)($payableAmount * 100),
         $billing_id,
-        $patient_id
+        $patient_id,
+        $transaction_id
     );
 
-    if ($intent && isset($intent['data']['id'])) {
-
-        $paymongo_intent_id = $intent['data']['id'];
-        $payLinkUrl = $intent['data']['attributes']['next_action']['redirect']['url'] ?? null;
-
-        // Save PayMongo intent ID
-        $stmt = $conn->prepare("
-            UPDATE billing_records
-            SET paymongo_payment_intent_id = ?
-            WHERE billing_id = ?
-        ");
-        $stmt->bind_param("si", $paymongo_intent_id, $billing_id);
-        $stmt->execute();
-
+    if ($link['success']) {
+        $payLinkUrl = $link['url'];
     } else {
-        $linkError = "Unable to create PayMongo payment.";
+        $linkError = $link['error'];
     }
 }
 ?>
