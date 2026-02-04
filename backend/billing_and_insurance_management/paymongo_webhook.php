@@ -1,88 +1,97 @@
 <?php
 include '../../SQL/config.php';
 
-// Read PayMongo payload
+$paymongo_webhook_secret = getenv('PAYMONGO_WEBHOOK_SECRET');
+if (!$paymongo_webhook_secret) {
+    error_log("PAYMONGO_WEBHOOK_SECRET not configured");
+    http_response_code(500);
+    exit;
+}
+
 $payload = file_get_contents('php://input');
 $event = json_decode($payload, true);
 
-// Respond immediately
+// Verify webhook signature
+$signature = $_SERVER['HTTP_X_PAYMONGO_SIGNATURE'] ?? null;
+if (!$signature) {
+    error_log("No webhook signature provided");
+    http_response_code(401);
+    exit;
+}
+
+$computed_signature = hash_hmac('sha256', $payload, $paymongo_webhook_secret);
+if (!hash_equals($computed_signature, $signature)) {
+    error_log("Invalid webhook signature. Expected: $computed_signature, Got: $signature");
+    http_response_code(401);
+    exit;
+}
+
+error_log("PayMongo Webhook verified: " . print_r($event, true));
+
+// Always acknowledge PayMongo immediately
 http_response_code(200);
 
 if (!isset($event['data']['attributes']['type'])) {
+    error_log("No event type found");
     exit;
 }
 
 $type = $event['data']['attributes']['type'];
-$attributes = $event['data']['attributes']['data']['attributes'] ?? [];
 
-// ✅ WE ONLY CARE ABOUT THIS
+// Only process successful payments
 if ($type !== 'payment.paid') {
+    error_log("Event type not payment.paid: " . $type);
     exit;
 }
 
-// -----------------------------
-// EXTRACT DATA
-// -----------------------------
-$amount = ($attributes['amount'] ?? 0) / 100;
+$data       = $event['data']['attributes']['data'] ?? [];
+$attributes = $data['attributes'] ?? [];
+
+$amount      = ($attributes['amount'] ?? 0) / 100;
 $description = $attributes['description'] ?? '';
-$reference = $event['data']['attributes']['data']['id'] ?? null;
+$payment_id  = $data['id'] ?? null;
 
-// -----------------------------
-// EXTRACT TXN ID
-// -----------------------------
-preg_match('/TXN:([\w]+)/', $description, $txnMatch);
-if (!$txnMatch) exit;
+if (!$payment_id || !$description) {
+    error_log("Missing payment_id or description");
+    exit;
+}
 
-$transaction_id = $txnMatch[1];
+// Extract billing_id from description "Billing #6 - Patient 39"
+if (!preg_match('/Billing\s+#(\d+)/', $description, $match)) {
+    error_log("Could not extract billing_id from: " . $description);
+    exit;
+}
 
-// -----------------------------
-// FIND BILLING RECORD
-// -----------------------------
-$stmt = $conn->prepare("
-    SELECT billing_id, status
-    FROM billing_records
-    WHERE transaction_id = ?
-    LIMIT 1
-");
-$stmt->bind_param("s", $transaction_id);
-$stmt->execute();
-$billing = $stmt->get_result()->fetch_assoc();
+$billing_id = (int)$match[1];
+error_log("Processing payment for billing_id: $billing_id, payment_id: $payment_id");
 
-if (!$billing) exit;
-if ($billing['status'] === 'Paid') exit;
-
-// -----------------------------
-// UPDATE BILLING RECORD
-// -----------------------------
+// UPDATE billing_records
 $stmt = $conn->prepare("
     UPDATE billing_records
     SET
-        status='Paid',
-        payment_status='Paid',
-        payment_method='PayMongo',
-        paid_amount=?,
-        balance=0,
-        payment_date=NOW(),
-        paymongo_reference=?
-    WHERE billing_id=?
+        status = 'Paid',
+        payment_method = 'PayMongo',
+        paymongo_payment_id = ?,
+        paymongo_reference = ?
+    WHERE billing_id = ?
+      AND status != 'Paid'
 ");
-$stmt->bind_param("dsi", $amount, $reference, $billing['billing_id']);
+$stmt->bind_param("ssi", $payment_id, $payment_id, $billing_id);
 $stmt->execute();
+error_log("Updated billing_records: " . $stmt->affected_rows . " rows");
 
-// -----------------------------
-// UPDATE RECEIPT
-// -----------------------------
+// UPDATE patient_receipt
 $stmt = $conn->prepare("
     UPDATE patient_receipt
     SET
-        status='Paid',
-        payment_status='Paid',
-        payment_method='PayMongo',
-        paid_amount=?,
-        balance=0
-    WHERE billing_id=?
+        status = 'Paid',
+        payment_method = 'PayMongo',
+        paymongo_reference = ?
+    WHERE billing_id = ?
+      AND status != 'Paid'
 ");
-$stmt->bind_param("di", $amount, $billing['billing_id']);
+$stmt->bind_param("si", $payment_id, $billing_id);
 $stmt->execute();
+error_log("Updated patient_receipt: " . $stmt->affected_rows . " rows");
 
 exit;

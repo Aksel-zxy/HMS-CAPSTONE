@@ -125,81 +125,239 @@ table tbody tr:nth-child(even) {
     white-space: nowrap;
 }
 
-/* Responsive Design */
-
-/* Tablets & smaller laptops */
-@media screen and (max-width: 992px) {
-    .main-content {
-        margin-left: 0; /* remove sidebar margin for tablets */
-        padding: 15px;
-    }
-    table th, table td {
-        font-size: 13px;
-        padding: 10px;
-    }
+/* =====================================================
+   DASHBOARD LAYOUT
+===================================================== */
+.dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+    align-items: stretch;
+    gap: 20px;
+    flex-wrap: wrap;
 }
 
-/* Mobile phones */
-@media screen and (max-width: 768px) {
-    table, thead, tbody, th, td, tr {
-        display: block;
-        width: 100%;
-    }
-
-    table thead {
-        display: none;
-    }
-
-    table tbody tr {
-        margin-bottom: 15px;
-        border-bottom: 2px solid #dee2e6;
-        display: block;
-    }
-
-    table tbody td {
-        display: flex;
-        justify-content: space-between;
-        padding: 10px 0;
-        border: none;
-        border-bottom: 1px solid #eee;
-    }
-
-    table tbody td::before {
-        content: attr(data-label);
-        font-weight: bold;
-        flex: 1;
-        padding-right: 10px;
-        color: #333;
-    }
-
-    table tbody td:last-child {
-        text-align: right;
-    }
-
-    .btn {
-        width: 48%;
-        margin: 5px 1%;
-        font-size: 12px;
-    }
-}
-
-/* Extra small devices */
-@media screen and (max-width: 480px) {
-    body {
-        padding: 10px;
-    }
-    .container, .table-card, .container-fluid {
-        padding: 10px;
-    }
-    .btn {
-        width: 100%;
-        margin: 5px 0;
-        font-size: 12px;
-    }
-}
-
-/* Modal */
-.modal-content {
-    border-radius: 8px;
+.main-content-wrapper {
+    flex: 1 1 calc(100% - 280px);
     padding: 20px;
+    min-width: 0; /* allow flex items to shrink properly */
+    overflow-y: auto;
+    background-color: #f8f9fa;
+}
+
+.main-sidebar {
+    flex: 0 0 260px;
+    width: 260px;
+    padding: 20px 0;
+    position: relative;
+}
+
+/* =====================================================
+   CONTENT CARD
+===================================================== */
+.main-content-wrapper .bg-white {
+    max-width: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-content-wrapper .bg-white .table-responsive {
+    overflow-x: auto;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* =====================================================
+   TABLE STYLING
+===================================================== */
+.table {
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+.table th {
+    background-color: #212529 !important;
+    color: white;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table tbody tr:hover {
+    background-color: #f5f5f5;
+    transition: background-color 0.2s ease;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 12px;
+}
+
+/* =====================================================
+   BADGES
+===================================================== */
+.badge {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* =====================================================
+   ACTION BUTTONS
+===================================================== */
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+td .d-flex {
+    gap: 8px;
+}
+
+/* Prevent action buttons from wrapping on smaller screens */
+.text-end .d-flex {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* =====================================================
+   MODALS
+===================================================== */
+.modal-dialog {
+    max-width: 400px;
+}
+
+.modal-content {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 8px 8px 0 0;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+
+
+/* =====================================================
+   RESPONSIVE DESIGN
+===================================================== */
+
+/* Tablet (992px and below) */
+@media (max-width: 991.98px) {
+    .dashboard-wrapper {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .main-content-wrapper {
+        flex: 1 1 100%;
+        padding: 15px;
+        order: 1;
+    }
+
+    .main-sidebar {
+        flex: 0 0 100%;
+        width: 100%;
+        padding: 15px;
+        order: 2;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .table {
+        font-size: 0.9rem;
+    }
+
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Mobile (576px and below) */
+@media (max-width: 575.98px) {
+    .main-content-wrapper {
+        padding: 10px;
+    }
+
+    .bg-white {
+        padding: 12px !important;
+    }
+
+    .table {
+        font-size: 0.8rem;
+    }
+
+    .table td,
+    .table th {
+        padding: 8px 4px;
+    }
+
+    .btn-sm {
+        padding: 4px 6px;
+        font-size: 0.7rem;
+        margin: 2px;
+    }
+
+    .d-flex.gap-2 {
+        gap: 4px !important;
+    }
+
+    /* Stack action buttons vertically on very small screens */
+    .text-end .d-flex {
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    h3 {
+        font-size: 1.25rem;
+    }
+}
+
+/* =====================================================
+   SCROLLBAR STYLING
+===================================================== */
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* =====================================================
+   UTILITY CLASSES
+===================================================== */
+.text-end {
+    text-align: right;
+}
+
+.align-middle {
+    vertical-align: middle;
+}
+
+.shadow {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+.rounded {
+    border-radius: 0.375rem;
 }
