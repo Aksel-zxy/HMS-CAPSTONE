@@ -7,181 +7,50 @@ body {
     line-height: 1.6;
 }
 
-/* Sidebar-aware main content */
-.main-content {
-    margin-left: 260px; /* width of sidebar + small spacing */
-    padding: 20px;
-    transition: margin-left 0.3s ease-in-out;
-}
-
-/* Adjust content if sidebar collapses (optional) */
-.sidebar.closed ~ .main-content {
-    margin-left: 0;
-}
-
-/* Container/Card */
-.container, .table-card, .container-fluid {
-    max-width: 1100px;
-    width: 100%;
-    margin: auto;
-    background: #fff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    box-sizing: border-box;
-}
-
-/* Table */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: auto;
-}
-
-table th, table td {
-    padding: 12px 15px;
-    text-align: left;
-    border: 1px solid #dee2e6;
-    font-size: 14px;
-    word-wrap: break-word;
-}
-
-table th {
-    background-color: #1976d2;
-    color: #fff;
-    font-weight: bold;
-}
-
-table tbody tr:nth-child(even) {
-    background-color: #f9f9f9;
-}
-
-/* Badges */
-.badge {
-    font-size: 0.85rem;
-    padding: 0.4em 0.6em;
-    border-radius: 4px;
-}
-
-/* Buttons */
-.btn {
-    padding: 6px 12px;
-    font-size: 13px;
-    border-radius: 5px;
-    text-decoration: none;
-    display: inline-block;
-    margin: 4px 2px;
-    transition: 0.2s all ease-in-out;
-    text-align: center;
-    cursor: pointer;
-}
-
-.btn-success {
-    background-color: #28a745;
-    color: #fff;
-    border: none;
-}
-
-.btn-success:hover {
-    background-color: #218838;
-}
-
-.btn-info {
-    background-color: #17a2b8;
-    color: #fff;
-    border: none;
-}
-
-.btn-info:hover {
-    background-color: #138496;
-}
-
-.btn-secondary {
-    background-color: #6c757d;
-    color: #fff;
-    border: none;
-}
-
-.btn-secondary:hover {
-    background-color: #5a6268;
-}
-
-/* Tooltip icon */
-.tooltip-icon {
-    color: #0d6efd;
-    cursor: pointer;
-    font-size: 1.2rem;
-    margin-left: 5px;
-}
-
-/* Pending insurance row highlight */
-.pending-insurance {
-    background-color: #fff3cd !important;
-}
-
-/* Action column: align buttons to right */
-.table td:last-child {
-    text-align: right;
-    white-space: nowrap;
-}
-
 /* =====================================================
-   DASHBOARD LAYOUT
+   MAIN CONTENT WITH SIDEBAR MARGIN
 ===================================================== */
-.dashboard-wrapper {
-    display: flex;
-    min-height: 100vh;
-    align-items: stretch;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
 .main-content-wrapper {
-    flex: 1 1 calc(100% - 280px);
+    margin-left: 280px;
     padding: 20px;
-    min-width: 0; /* allow flex items to shrink properly */
-    overflow-y: auto;
-    background-color: #f8f9fa;
+    min-height: 100vh;
 }
 
-.main-sidebar {
-    flex: 0 0 260px;
-    width: 260px;
-    padding: 20px 0;
-    position: relative;
-}
-
-/* =====================================================
-   CONTENT CARD
-===================================================== */
 .main-content-wrapper .bg-white {
     max-width: 100%;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.main-content-wrapper .bg-white .table-responsive {
-    overflow-x: auto;
-    overflow-y: auto;
-    flex: 1;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background: white;
 }
 
 /* =====================================================
    TABLE STYLING
 ===================================================== */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
 .table {
+    width: 100%;
     margin-bottom: 0;
-    white-space: nowrap;
+    border-collapse: collapse;
 }
 
 .table th {
     background-color: #212529 !important;
     color: white;
     font-weight: 600;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    padding: 12px;
+    text-align: left;
+    border: 1px solid #dee2e6;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 12px;
+    border: 1px solid #dee2e6;
+    text-align: left;
 }
 
 .table tbody tr:hover {
@@ -189,9 +58,8 @@ table tbody tr:nth-child(even) {
     transition: background-color 0.2s ease;
 }
 
-.table td {
-    vertical-align: middle;
-    padding: 12px;
+.table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
 }
 
 /* =====================================================
@@ -201,21 +69,67 @@ table tbody tr:nth-child(even) {
     padding: 6px 12px;
     font-size: 0.85rem;
     font-weight: 500;
+    border-radius: 4px;
+}
+
+/* =====================================================
+   BUTTONS
+===================================================== */
+.btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 5px;
+    text-decoration: none;
+    display: inline-block;
+    transition: 0.2s all ease-in-out;
+    cursor: pointer;
+    border: none;
+}
+
+.btn-sm {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: #fff;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+    color: #fff;
+}
+
+.btn-info:hover {
+    background-color: #138496;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
 }
 
 /* =====================================================
    ACTION BUTTONS
 ===================================================== */
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 0.85rem;
+.table td:last-child {
+    text-align: right;
+    white-space: nowrap;
 }
 
 td .d-flex {
     gap: 8px;
 }
 
-/* Prevent action buttons from wrapping on smaller screens */
 .text-end .d-flex {
     justify-content: flex-end;
     flex-wrap: wrap;
@@ -245,31 +159,14 @@ td .d-flex {
     padding: 20px;
 }
 
-
-
 /* =====================================================
    RESPONSIVE DESIGN
 ===================================================== */
 
-/* Tablet (992px and below) */
-@media (max-width: 991.98px) {
-    .dashboard-wrapper {
-        flex-direction: column;
-        gap: 0;
-    }
-
+@media (max-width: 1024px) {
     .main-content-wrapper {
-        flex: 1 1 100%;
+        margin-left: 0;
         padding: 15px;
-        order: 1;
-    }
-
-    .main-sidebar {
-        flex: 0 0 100%;
-        width: 100%;
-        padding: 15px;
-        order: 2;
-        border-top: 1px solid #dee2e6;
     }
 
     .table {
@@ -282,9 +179,9 @@ td .d-flex {
     }
 }
 
-/* Mobile (576px and below) */
-@media (max-width: 575.98px) {
+@media (max-width: 768px) {
     .main-content-wrapper {
+        margin-left: 0;
         padding: 10px;
     }
 
@@ -296,25 +193,13 @@ td .d-flex {
         font-size: 0.8rem;
     }
 
-    .table td,
-    .table th {
+    .table td, .table th {
         padding: 8px 4px;
     }
 
     .btn-sm {
         padding: 4px 6px;
         font-size: 0.7rem;
-        margin: 2px;
-    }
-
-    .d-flex.gap-2 {
-        gap: 4px !important;
-    }
-
-    /* Stack action buttons vertically on very small screens */
-    .text-end .d-flex {
-        flex-direction: column;
-        align-items: flex-end;
     }
 
     h3 {
@@ -327,7 +212,6 @@ td .d-flex {
 ===================================================== */
 .table-responsive::-webkit-scrollbar {
     height: 8px;
-    width: 8px;
 }
 
 .table-responsive::-webkit-scrollbar-track {
