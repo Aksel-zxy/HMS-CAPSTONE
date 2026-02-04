@@ -2,20 +2,26 @@
 // ------------------------------
 // Load Composer Autoloader
 // ------------------------------
-require __DIR__ . '/../../vendor/autoload.php'; // adjust path to your project
+require __DIR__ . '/../../vendor/autoload.php'; // Adjust if vendor folder is elsewhere
 
 // ------------------------------
-// Load .env
+// Load .env properly
 // ------------------------------
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../../'); // adjust path to your .env
-$dotenv->load();
+$dotenvPath = __DIR__ . '/../../'; // Project root where .env exists
+if (file_exists($dotenvPath . '.env')) {
+    $dotenv = Dotenv\Dotenv::createImmutable($dotenvPath);
+    $dotenv->load();
+}
 
 // ------------------------------
 // Config
 // ------------------------------
-include '../../SQL/config.php'; // your DB connection
+include '../../SQL/config.php'; // Database connection
 
 $webhookSecret = getenv('PAYMONGO_WEBHOOK_SECRET');
+
+// Fallback: hardcode (only for local dev testing)
+// $webhookSecret = $webhookSecret ?: 'whsk_YOUR_SECRET_HERE';
 
 if (!$webhookSecret) {
     http_response_code(500);
@@ -23,7 +29,7 @@ if (!$webhookSecret) {
 }
 
 // ------------------------------
-// Read Raw Payload
+// Read raw payload
 // ------------------------------
 $payload = file_get_contents('php://input');
 if (!$payload) {
@@ -32,7 +38,7 @@ if (!$payload) {
 }
 
 // ------------------------------
-// Normalize Headers (Apache/Nginx safe)
+// Normalize headers for Apache/Nginx/XAMPP
 // ------------------------------
 $headers = [];
 foreach ($_SERVER as $key => $value) {
@@ -41,7 +47,6 @@ foreach ($_SERVER as $key => $value) {
         $headers[$header] = $value;
     }
 }
-
 $signatureHeader = $headers['paymongo-signature'] ?? null;
 
 if (!$signatureHeader) {
@@ -50,7 +55,7 @@ if (!$signatureHeader) {
 }
 
 // ------------------------------
-// Verify Signature
+// Verify signature
 // ------------------------------
 $parts = [];
 foreach (explode(',', $signatureHeader) as $item) {
@@ -66,44 +71,34 @@ if (!isset($parts['t'], $parts['v1'])) {
 $timestamp = (int)$parts['t'];
 $signature = $parts['v1'];
 
-// Prevent replay attacks (5 mins)
+// Prevent replay attacks (5 min)
 if (abs(time() - $timestamp) > 300) {
     http_response_code(400);
     exit('Expired signature');
 }
 
-$expectedSignature = hash_hmac(
-    'sha256',
-    $timestamp . '.' . $payload,
-    $webhookSecret
-);
-
+$expectedSignature = hash_hmac('sha256', $timestamp . '.' . $payload, $webhookSecret);
 if (!hash_equals($expectedSignature, $signature)) {
     http_response_code(401);
     exit('Invalid signature');
 }
 
 // ------------------------------
-// Parse Event
+// Parse event
 // ------------------------------
 $event = json_decode($payload, true);
-
 if (!isset($event['data']['id'], $event['data']['attributes']['type'])) {
     http_response_code(400);
     exit('Invalid payload');
 }
 
-$eventId   = $event['data']['id'];
+$eventId = $event['data']['id'];
 $eventType = $event['data']['attributes']['type'];
 
 // ------------------------------
-// Idempotency Check
+// Idempotency check
 // ------------------------------
-$stmt = $conn->prepare("
-    SELECT id FROM paymongo_webhook_events
-    WHERE event_id = ?
-    LIMIT 1
-");
+$stmt = $conn->prepare("SELECT id FROM paymongo_webhook_events WHERE event_id = ? LIMIT 1");
 $stmt->bind_param("s", $eventId);
 $stmt->execute();
 $exists = $stmt->get_result()->fetch_assoc();
@@ -115,29 +110,26 @@ if ($exists) {
 }
 
 // Log event immediately
-$stmt = $conn->prepare("
-    INSERT INTO paymongo_webhook_events (event_id, event_type, payload)
-    VALUES (?, ?, ?)
-");
+$stmt = $conn->prepare("INSERT INTO paymongo_webhook_events (event_id, event_type, payload) VALUES (?, ?, ?)");
 $stmt->bind_param("sss", $eventId, $eventType, $payload);
 $stmt->execute();
 $stmt->close();
 
 // ------------------------------
-// Handle Only Successful Payments
+// Handle only successful payments
 // ------------------------------
 if ($eventType !== 'payment_intent.succeeded') {
     http_response_code(200);
     exit('Event ignored');
 }
 
-$intent = $event['data']['attributes']['data'];
-$attr   = $intent['attributes'] ?? [];
+$intent = $event['data']['attributes']['data'] ?? [];
+$attr = $intent['attributes'] ?? [];
 
 $intentId = $intent['id'] ?? null;
-$status   = strtolower($attr['status'] ?? '');
+$status = strtolower($attr['status'] ?? '');
 $currency = $attr['currency'] ?? '';
-$amount   = isset($attr['amount']) ? $attr['amount'] / 100 : 0;
+$amount = isset($attr['amount']) ? $attr['amount'] / 100 : 0;
 
 if (!$intentId || $status !== 'succeeded' || $currency !== 'PHP') {
     http_response_code(200);
@@ -145,14 +137,9 @@ if (!$intentId || $status !== 'succeeded' || $currency !== 'PHP') {
 }
 
 // ------------------------------
-// Find Billing Record
+// Find billing record
 // ------------------------------
-$stmt = $conn->prepare("
-    SELECT billing_id, status
-    FROM billing_records
-    WHERE paymongo_payment_intent_id = ?
-    LIMIT 1
-");
+$stmt = $conn->prepare("SELECT billing_id, status FROM billing_records WHERE paymongo_payment_intent_id = ? LIMIT 1");
 $stmt->bind_param("s", $intentId);
 $stmt->execute();
 $billing = $stmt->get_result()->fetch_assoc();
@@ -164,12 +151,11 @@ if (!$billing || strtolower($billing['status']) === 'paid') {
 }
 
 // ------------------------------
-// Update Billing
+// Update billing
 // ------------------------------
 $stmt = $conn->prepare("
     UPDATE billing_records
-    SET
-        status = 'Paid',
+    SET status = 'Paid',
         payment_status = 'Paid',
         payment_method = 'PayMongo',
         paid_amount = ?,
@@ -182,12 +168,11 @@ $stmt->execute();
 $stmt->close();
 
 // ------------------------------
-// Update Patient Receipt
+// Update patient receipt
 // ------------------------------
 $stmt = $conn->prepare("
     UPDATE patient_receipt
-    SET
-        status = 'Paid',
+    SET status = 'Paid',
         payment_status = 'Paid',
         payment_method = 'PayMongo',
         paid_amount = ?,
