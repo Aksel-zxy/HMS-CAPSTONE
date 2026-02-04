@@ -219,6 +219,12 @@ if ($payment_record && $payment_record['paymongo_payment_id']) {
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
+
+<div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
+</div>
+
+
 <body class="bg-light p-4">
 <div class="container">
 <div class="card shadow p-4">
