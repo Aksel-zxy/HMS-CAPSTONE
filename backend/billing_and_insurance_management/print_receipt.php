@@ -16,9 +16,13 @@ if ($receipt_id <= 0) {
 $stmt = $conn->prepare("
     SELECT pr.*, 
            pi.fname, pi.mname, pi.lname,
-           pi.phone_number, pi.address, pi.attending_doctor
+           pi.phone_number, pi.address, pi.attending_doctor,
+           br.total_amount, br.insurance_covered AS billing_insurance,
+           br.out_of_pocket AS billing_out_of_pocket, br.grand_total AS billing_grand_total,
+           br.status AS billing_status
     FROM patient_receipt pr
     INNER JOIN patientinfo pi ON pr.patient_id = pi.patient_id
+    LEFT JOIN billing_records br ON pr.billing_id = br.billing_id
     WHERE pr.receipt_id = ?
 ");
 $stmt->bind_param("i", $receipt_id);
@@ -62,7 +66,7 @@ if (!empty($billing['attending_doctor'])) {
 }
 
 /* ===============================
-   BILLING ITEMS (FIXED SOURCE)
+   BILLING ITEMS
 ================================ */
 $billing_items = [];
 $total_charges = 0;
@@ -89,10 +93,16 @@ while ($row = $res->fetch_assoc()) {
 
 /* ===============================
    TOTALS
+   Compute out-of-pocket if receipt is empty or zero
 ================================ */
-$total_discount      = floatval($billing['total_discount']);
-$insurance_covered   = floatval($billing['insurance_covered']);
+$total_discount = floatval($billing['total_discount'] ?? 0);
+$insurance_covered = floatval($billing['insurance_covered'] ?? $billing['billing_insurance'] ?? 0);
+
+// If receipt out-of-pocket exists and >0, use it; else compute from billing
 $total_out_of_pocket = floatval($billing['total_out_of_pocket']);
+if ($total_out_of_pocket <= 0) {
+    $total_out_of_pocket = floatval($billing['billing_out_of_pocket'] ?? ($total_charges - $insurance_covered));
+}
 ?>
 
 <!DOCTYPE html>
@@ -100,7 +110,6 @@ $total_out_of_pocket = floatval($billing['total_out_of_pocket']);
 <head>
 <meta charset="UTF-8">
 <title>Patient Invoice</title>
-
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="assets/CSS/pdf.css">
 <link rel="stylesheet" href="assets/css/billing_sidebar.css">
@@ -123,7 +132,7 @@ $total_out_of_pocket = floatval($billing['total_out_of_pocket']);
 
 <body>
 
-<?php if ($total_out_of_pocket <= 0): ?>
+<?php if ($total_out_of_pocket <= 0 && $billing['billing_status'] === 'Paid'): ?>
 <div class="fully-covered">FULLY PAID</div>
 <?php endif; ?>
 

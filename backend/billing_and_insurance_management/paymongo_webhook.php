@@ -1,11 +1,11 @@
 <?php
 include '../../SQL/config.php';
 
-// PayMongo sends JSON
+// Read PayMongo payload
 $payload = file_get_contents('php://input');
 $event = json_decode($payload, true);
 
-// Always respond fast
+// Respond immediately
 http_response_code(200);
 
 if (!isset($event['data']['attributes']['type'])) {
@@ -13,15 +13,27 @@ if (!isset($event['data']['attributes']['type'])) {
 }
 
 $type = $event['data']['attributes']['type'];
-$data = $event['data']['attributes']['data'] ?? [];
+$attributes = $event['data']['attributes']['data']['attributes'] ?? [];
 
-if ($type !== 'payment_intent.succeeded') {
-    exit; // ignore other events
+// ✅ WE ONLY CARE ABOUT THIS
+if ($type !== 'payment.paid') {
+    exit;
 }
 
-$intent = $data;
-$payment_intent_id = $intent['id'];
-$amount = $intent['attributes']['amount'] / 100;
+// -----------------------------
+// EXTRACT DATA
+// -----------------------------
+$amount = ($attributes['amount'] ?? 0) / 100;
+$description = $attributes['description'] ?? '';
+$reference = $event['data']['attributes']['data']['id'] ?? null;
+
+// -----------------------------
+// EXTRACT TXN ID
+// -----------------------------
+preg_match('/TXN:([\w]+)/', $description, $txnMatch);
+if (!$txnMatch) exit;
+
+$transaction_id = $txnMatch[1];
 
 // -----------------------------
 // FIND BILLING RECORD
@@ -29,10 +41,10 @@ $amount = $intent['attributes']['amount'] / 100;
 $stmt = $conn->prepare("
     SELECT billing_id, status
     FROM billing_records
-    WHERE paymongo_payment_intent_id = ?
+    WHERE transaction_id = ?
     LIMIT 1
 ");
-$stmt->bind_param("s", $payment_intent_id);
+$stmt->bind_param("s", $transaction_id);
 $stmt->execute();
 $billing = $stmt->get_result()->fetch_assoc();
 
@@ -40,7 +52,7 @@ if (!$billing) exit;
 if ($billing['status'] === 'Paid') exit;
 
 // -----------------------------
-// UPDATE BILLING
+// UPDATE BILLING RECORD
 // -----------------------------
 $stmt = $conn->prepare("
     UPDATE billing_records
@@ -50,10 +62,11 @@ $stmt = $conn->prepare("
         payment_method='PayMongo',
         paid_amount=?,
         balance=0,
-        payment_date=NOW()
+        payment_date=NOW(),
+        paymongo_reference=?
     WHERE billing_id=?
 ");
-$stmt->bind_param("di", $amount, $billing['billing_id']);
+$stmt->bind_param("dsi", $amount, $reference, $billing['billing_id']);
 $stmt->execute();
 
 // -----------------------------

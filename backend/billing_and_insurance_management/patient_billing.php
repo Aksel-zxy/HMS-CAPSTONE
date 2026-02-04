@@ -3,9 +3,9 @@ include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 /*
-|--------------------------------------------------------------------------
+|----------------------------------------------------------------------
 | FETCH PATIENTS WITH UNPAID / PARTIALLY PAID BILLINGS
-|--------------------------------------------------------------------------
+|----------------------------------------------------------------------
 | - billing_items is the source of services
 | - billing_id is the source of truth
 | - patient_receipt defines payment status
@@ -27,7 +27,8 @@ SELECT
     pr.receipt_id,
     pr.status AS payment_status,
     pr.insurance_covered,
-    pr.payment_method
+    pr.payment_method,
+    pr.paymongo_reference
 
 FROM patientinfo p
 
@@ -65,6 +66,34 @@ $result = $conn->query($sql);
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 <link rel="stylesheet" href="assets/CSS/patient_billing.css">
 <link rel="stylesheet" href="assets/css/billing_sidebar.css">
+
+<style>
+.dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+.main-content-wrapper {
+    flex-grow: 1;
+    padding: 20px;
+}
+.main-sidebar {
+    width: 260px;
+    flex-shrink: 0;
+}
+@media (max-width: 992px) {
+    .main-sidebar {
+        width: 100%;
+    }
+}
+</style>
+
+<script>
+// Auto refresh every 10 seconds to show updated payment status and references
+setInterval(() => {
+    location.reload();
+}, 10000);
+</script>
+
 </head>
 
 <body>
@@ -73,7 +102,12 @@ $result = $conn->query($sql);
 <div class="main-content-wrapper">
 <div class="container-fluid bg-white p-4 rounded shadow">
 
-<h1 class="mb-4">Patient Billing</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1>Patient Billing</h1>
+    <a href="patient_billing.php" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-arrow-clockwise"></i> Refresh
+    </a>
+</div>
 
 <table class="table table-bordered table-striped align-middle">
 <thead class="table-dark">
@@ -92,13 +126,25 @@ $result = $conn->query($sql);
 <?php while ($row = $result->fetch_assoc()): ?>
 
 <?php
-$billing_id   = (int)$row['billing_id'];
-$receipt_id   = $row['receipt_id'];
-$totalCharges = (float)$row['total_charges'];
-$status       = $row['payment_status'] ?? 'Pending';
-
+$billing_id       = (int)$row['billing_id'];
+$receipt_id       = $row['receipt_id'];
+$totalCharges     = (float)$row['total_charges'];
+$status           = $row['payment_status'] ?? 'Pending';
+$paymongoRef      = $row['paymongo_reference'] ?? '';
 $insuranceApplied = ((float)$row['insurance_covered'] > 0);
 $insuranceLabel   = $insuranceApplied ? htmlspecialchars($row['payment_method']) : 'N/A';
+
+// ✅ Ensure a receipt exists for "View Bill"
+if (!$receipt_id) {
+    $stmt = $conn->prepare("
+        INSERT INTO patient_receipt (patient_id, billing_id, status, insurance_covered, payment_method)
+        VALUES (?, ?, 'Pending', ?, ?)
+    ");
+    $insuranceCovered = $insuranceApplied ? 1 : 0;
+    $stmt->bind_param("iiis", $row['patient_id'], $billing_id, $insuranceCovered, $insuranceLabel);
+    $stmt->execute();
+    $receipt_id = $conn->insert_id;
+}
 ?>
 
 <tr>
@@ -120,26 +166,24 @@ $insuranceLabel   = $insuranceApplied ? htmlspecialchars($row['payment_method'])
 <?php endif; ?>
 </td>
 
-<td>₱ <?= number_format($totalCharges, 2); ?></td>
+<td>₱ <?= number_format($totalCharges, 2); ?>
+<?php if ($paymongoRef): ?>
+    <br><small class="text-muted">Ref: <?= htmlspecialchars($paymongoRef) ?></small>
+<?php endif; ?>
+</td>
 
 <td class="text-end">
 <div class="d-flex justify-content-end gap-2 flex-wrap">
 
-<?php if ($receipt_id): ?>
-    <a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" 
-       class="btn btn-secondary btn-sm" target="_blank">
-       View Receipt
-    </a>
-<?php else: ?>
-    <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" 
-       class="btn btn-secondary btn-sm">
-       View Bill
-    </a>
-<?php endif; ?>
+<!-- ✅ Always link to print_receipt.php -->
+<a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" 
+   class="btn btn-secondary btn-sm" target="_blank">
+   <i class="bi bi-receipt"></i> View Bill
+</a>
 
 <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" 
    class="btn btn-success btn-sm">
-   Process Payment
+   <i class="bi bi-cash-stack"></i> Process Payment
 </a>
 
 <?php if (!$insuranceApplied): ?>

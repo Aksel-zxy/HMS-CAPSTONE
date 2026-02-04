@@ -1,21 +1,13 @@
 <?php
-// billing_summary.php
-
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 require_once __DIR__ . '/vendor/autoload.php';
 use GuzzleHttp\Client;
 
-// ==============================
-// PAYMONGO CONFIG
-// ==============================
 define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
 define('PAYMONGO_API_BASE', 'https://api.paymongo.com/v1/');
 
-// ==============================
-// CREATE PAYMONGO PAYMENT LINK
-// ==============================
 function create_paymongo_payment_link($amount, $billing_id, $patient_id, $transaction_id)
 {
     $payload = [
@@ -24,7 +16,7 @@ function create_paymongo_payment_link($amount, $billing_id, $patient_id, $transa
                 'amount'      => $amount,
                 'currency'    => 'PHP',
                 'description' => "Billing #$billing_id - Patient $patient_id",
-                'remarks'     => "TXN:$transaction_id"
+                'remarks'     => $transaction_id
             ]
         ]
     ];
@@ -55,36 +47,24 @@ function create_paymongo_payment_link($amount, $billing_id, $patient_id, $transa
 }
 
 // ==============================
-// PATIENT & BILLING LOOKUP
+// PATIENT & BILLING
 // ==============================
 $patient_id = intval($_GET['patient_id'] ?? 0);
 
-// Patient info
-$stmt = $conn->prepare("
-    SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name
-    FROM patientinfo
-    WHERE patient_id = ?
-");
+$stmt = $conn->prepare("SELECT *, CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id = ?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
 
 // Latest finalized billing
-$stmt = $conn->prepare("
-    SELECT MAX(billing_id) AS billing_id
-    FROM billing_items
-    WHERE patient_id = ? AND finalized = 1
-");
+$stmt = $conn->prepare("SELECT MAX(billing_id) AS billing_id FROM billing_items WHERE patient_id = ? AND finalized = 1");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $billing_id = $stmt->get_result()->fetch_assoc()['billing_id'] ?? null;
 
-// ==============================
-// BILLING ITEMS
-// ==============================
+// Billing items
 $items = [];
 $total = 0;
-
 if ($billing_id) {
     $stmt = $conn->prepare("
         SELECT bi.*, ds.serviceName, ds.description
@@ -94,7 +74,6 @@ if ($billing_id) {
     ");
     $stmt->bind_param("ii", $patient_id, $billing_id);
     $stmt->execute();
-
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
         $items[] = $row;
@@ -102,9 +81,7 @@ if ($billing_id) {
     }
 }
 
-// ==============================
-// BILLING RECORD VALUES
-// ==============================
+// Billing record
 $insurance_covered = 0;
 $out_of_pocket = 0;
 $grand_total = 0;
@@ -121,7 +98,6 @@ if ($billing_id) {
     $stmt->bind_param("ii", $patient_id, $billing_id);
     $stmt->execute();
     $br = $stmt->get_result()->fetch_assoc();
-
     if ($br) {
         $insurance_covered = (float)$br['insurance_covered'];
         $out_of_pocket     = (float)$br['out_of_pocket'];
@@ -134,20 +110,24 @@ if ($billing_id) {
 // Amount to pay
 $payableAmount = ($out_of_pocket > 0) ? $out_of_pocket : $total;
 
-// ==============================
-// CREATE PAYMONGO PAYMENT LINK
-// ==============================
+// Generate transaction_id if missing
+if (!$transaction_id && $billing_id && $payableAmount > 0) {
+    $transaction_id = 'TXN' . bin2hex(random_bytes(6));
+
+    $stmt = $conn->prepare("
+        UPDATE billing_records
+        SET transaction_id = ?
+        WHERE patient_id = ? AND billing_id = ?
+    ");
+    $stmt->bind_param("sii", $transaction_id, $patient_id, $billing_id);
+    $stmt->execute();
+}
+
+// Create PayMongo link
 $payLinkUrl = null;
 $linkError = null;
-
-if ($billing_id && $payableAmount > 0 && $status !== 'Paid' && $transaction_id) {
-    $link = create_paymongo_payment_link(
-        (int)($payableAmount * 100),
-        $billing_id,
-        $patient_id,
-        $transaction_id
-    );
-
+if ($billing_id && $payableAmount > 0 && $status !== 'Paid') {
+    $link = create_paymongo_payment_link((int)round($payableAmount * 100), $billing_id, $patient_id, $transaction_id);
     if ($link['success']) {
         $payLinkUrl = $link['url'];
     } else {
@@ -197,44 +177,35 @@ if ($billing_id && $payableAmount > 0 && $status !== 'Paid' && $transaction_id) 
     <th>Subtotal</th>
     <td class="text-end">₱<?= number_format($total, 2) ?></td>
 </tr>
-
 <?php if ($insurance_covered > 0): ?>
 <tr>
     <th>Insurance Covered</th>
-    <td class="text-end text-success">
-        - ₱<?= number_format($insurance_covered, 2) ?>
-    </td>
+    <td class="text-end text-success">- ₱<?= number_format($insurance_covered, 2) ?></td>
 </tr>
 <?php endif; ?>
-
 <tr class="table-success">
     <th>Amount to Pay</th>
-    <td class="text-end fw-bold">
-        ₱<?= number_format($payableAmount, 2) ?>
-    </td>
+    <td class="text-end fw-bold">₱<?= number_format($payableAmount, 2) ?></td>
 </tr>
 </table>
 
 <?php if ($status === 'Paid'): ?>
-<div class="alert alert-success text-center">
-    Payment completed successfully.
-</div>
-
+<div class="alert alert-success text-center">Payment completed successfully.</div>
 <?php elseif ($payableAmount <= 0): ?>
-<div class="alert alert-success text-center">
-    Fully covered by insurance. No payment required.
-</div>
-
+<div class="alert alert-success text-center">Fully covered by insurance. No payment required.</div>
 <?php elseif ($payLinkUrl): ?>
 <div class="text-center mt-3">
     <a href="<?= htmlspecialchars($payLinkUrl) ?>" target="_blank" class="btn btn-primary btn-lg">
         Pay Now
     </a>
 </div>
-
 <?php elseif ($linkError): ?>
 <div class="alert alert-danger"><?= htmlspecialchars($linkError) ?></div>
 <?php endif; ?>
+
+<div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
+</div>
 
 </div>
 </div>
