@@ -22,36 +22,41 @@ if ($patient_id <= 0) {
     <head>
         <meta charset="UTF-8">
         <title>Select Patient for Billing</title>
-        <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
     </head>
     <body class="p-4 bg-light">
+    <div class="container">
+    <div style="background-color: white; border-radius: 30px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 80px; margin-left: 100px;">
+        <h1 class="mb-4">Select Patient for Billing</h1>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle text-left">
+                <thead class="table-white">
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if ($patients && $patients->num_rows > 0): ?>
+                    <?php while ($row = $patients->fetch_assoc()): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['full_name']); ?></td>
+                            <td>
+                                <a href="billing_items.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-primary btn-sm">Manage Billing</a>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr><td colspan="2" class="text-center">No patients with unbilled completed services.</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
     <div class="main-sidebar">
         <?php include 'billing_sidebar.php'; ?>
     </div>
-    <div class="container bg-white p-4 rounded shadow">
-        <h2>Select Patient for Billing</h2>
-        <table class="table table-bordered">
-            <thead class="table-dark">
-                <tr>
-                    <th>Patient Name</th>
-                    <th class="text-end">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php if ($patients && $patients->num_rows > 0): ?>
-                <?php while ($row = $patients->fetch_assoc()): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($row['full_name']); ?></td>
-                        <td class="text-end">
-                            <a href="billing_items.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-primary btn-sm">Manage Billing</a>
-                        </td>
-                    </tr>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <tr><td colspan="2" class="text-center">No patients with unbilled completed services.</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
     </div>
     </body>
     </html>
@@ -147,8 +152,7 @@ $grand_total = $subtotal - $discount;
 <head>
 <meta charset="UTF-8">
 <title>Billing Items</title>
-<link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-<link rel="stylesheet" href="assets/CSS/billing_items.css">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
@@ -182,12 +186,10 @@ function finalizeBilling(){
 </script>
 </head>
 <body class="p-4 bg-light">
-<div class="main-sidebar">
-<?php include 'billing_sidebar.php'; ?>
-</div>
 
-<div class="container bg-white p-4 rounded shadow">
-    <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
+<div class="container">
+<div style="background-color: white; border-radius: 30px; padding: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 80px; margin-left: 100px;">
+    <h1 class="mb-4">Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h1>
 
     <div class="mb-3">
         <label>
@@ -228,32 +230,34 @@ function finalizeBilling(){
         <button type="submit" name="add_service" class="btn btn-primary">Add</button>
     </form>
 
-    <table class="table table-bordered">
-        <thead class="table-dark">
-            <tr>
-                <th>Service</th>
-                <th>Description</th>
-                <th class="text-end">Price</th>
-                <th class="text-center">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php foreach ($cart as $i => $srv): ?>
-            <tr>
-                <td><?= htmlspecialchars($srv['serviceName']) ?></td>
-                <td><?= htmlspecialchars($srv['description']) ?></td>
-                <td class="text-end">₱<?= number_format($srv['price'],2) ?></td>
-                <td class="text-center">
-                    <a href="billing_items.php?patient_id=<?= $patient_id ?>&delete=<?= $i ?>" class="btn btn-danger btn-sm">Delete</a>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped align-middle text-left">
+            <thead class="table-white">
+                <tr>
+                    <th>Service</th>
+                    <th>Description</th>
+                    <th>Price</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ($cart as $i => $srv): ?>
+                <tr>
+                    <td><?= htmlspecialchars($srv['serviceName']) ?></td>
+                    <td><?= htmlspecialchars($srv['description']) ?></td>
+                    <td>₱<?= number_format($srv['price'],2) ?></td>
+                    <td>
+                        <a href="billing_items.php?patient_id=<?= $patient_id ?>&delete=<?= $i ?>" class="btn btn-danger btn-sm">Delete</a>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 
     <div class="text-end mt-3">
-        <p>Subtotal: ₱<?= number_format($subtotal,2) ?></p>
-        <p>Discount: -₱<?= number_format($discount,2) ?></p>
+        <p class="mb-2">Subtotal: <strong>₱<?= number_format($subtotal,2) ?></strong></p>
+        <p class="mb-3">Discount: <strong>-₱<?= number_format($discount,2) ?></strong></p>
         <h5><strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong></h5>
     </div>
 
@@ -261,6 +265,11 @@ function finalizeBilling(){
         <a href="billing_items.php" class="btn btn-secondary">Back</a>
         <button type="button" class="btn btn-success" onclick="finalizeBilling()">Finalize Billing</button>
     </div>
+</div>
+
+<div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
+</div>
 </div>
 </body>
 </html>
