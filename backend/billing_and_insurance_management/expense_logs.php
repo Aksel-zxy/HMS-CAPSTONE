@@ -24,7 +24,7 @@ $result = $conn->query($sql);
     <table class="table table-bordered table-striped align-middle text-left">
       <thead class="table-white">
         <tr>
-          <th>#</th>
+          <th>ID</th>
           <th>Expense Name</th>
           <th>Category</th>
           <th>Amount (₱)</th>
