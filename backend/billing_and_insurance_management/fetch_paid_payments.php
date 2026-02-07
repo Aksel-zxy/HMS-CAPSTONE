@@ -6,9 +6,9 @@ use GuzzleHttp\Client;
 
 header('Content-Type: application/json');
 
-
-   // PAYMONGO CONFIG
-
+/* ===============================
+   PAYMONGO CONFIG
+================================ */
 define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
 
 $client = new Client([
@@ -20,9 +20,9 @@ $client = new Client([
     'timeout' => 10
 ]);
 
-
-  // FETCH PAYMENTS
-
+/* ===============================
+   FETCH PAYMENTS
+================================ */
 try {
     $response = $client->get('payments?limit=50');
     $body = json_decode($response->getBody(), true);
@@ -34,15 +34,16 @@ try {
 
 $payments = $body['data'] ?? [];
 
-
-   // FILTER PAID PAYMENTS
-
+/* ===============================
+   FILTER PAID PAYMENTS
+================================ */
 $paidPayments = array_filter($payments, function ($p) {
     return ($p['attributes']['status'] ?? '') === 'paid';
 });
 
-
-// PAYMONGO PAYMENTS
+/* ===============================
+   UPSERT PAYMONGO PAYMENTS
+================================ */
 $pmStmt = $conn->prepare("
     INSERT INTO paymongo_payments
         (payment_id, payment_intent_id, amount, remarks, payment_method, status, paid_at)
@@ -56,9 +57,9 @@ $pmStmt = $conn->prepare("
         paid_at = VALUES(paid_at)
 ");
 
-/* =====================================================
-   LOOP PAYMENTS
-===================================================== */
+/* ===============================
+   PROCESS PAYMENTS
+================================ */
 $processed = 0;
 
 foreach ($paidPayments as $p) {
@@ -69,14 +70,17 @@ foreach ($paidPayments as $p) {
     $intent_id  = $attr['payment_intent_id'] ?? null;
     $amount     = ($attr['amount'] ?? 0) / 100;
     $remarks    = $attr['remarks'] ?? $attr['description'] ?? null;
-    $method     = strtoupper($attr['source']['type'] ?? 'PAYMONGO');
-    $status     = $attr['status'];
-    $paid_at    = date(
+
+    // PayMongo payment method (gcash, grab_pay, maya, card, etc.)
+    $method = strtoupper($attr['source']['type'] ?? 'PAYMONGO');
+
+    $status  = $attr['status'];
+    $paid_at = date(
         'Y-m-d H:i:s',
         strtotime($attr['paid_at'] ?? $attr['created_at'])
     );
 
-    // Save PayMongo payment
+    /* Save PayMongo payment */
     $pmStmt->bind_param(
         "ssdssss",
         $payment_id,
@@ -89,19 +93,19 @@ foreach ($paidPayments as $p) {
     );
     $pmStmt->execute();
 
-    /* =====================================================
+    /* ===============================
        FIND MATCHING RECEIPT
-    ===================================================== */
+    ================================ */
     $rStmt = $conn->prepare("
         SELECT
-            pr.receipt_id,
-            pr.patient_id,
-            pr.billing_id,
-            pr.grand_total,
-            pr.transaction_id,
-            pr.status
-        FROM patient_receipt pr
-        WHERE pr.paymongo_reference = ?
+            receipt_id,
+            patient_id,
+            billing_id,
+            grand_total,
+            transaction_id,
+            status
+        FROM patient_receipt
+        WHERE paymongo_reference = ?
         LIMIT 1
     ");
     $rStmt->bind_param("s", $payment_id);
@@ -109,22 +113,27 @@ foreach ($paidPayments as $p) {
     $receipt = $rStmt->get_result()->fetch_assoc();
 
     if (!$receipt) {
-        continue; // no matching receipt yet
+        continue;
     }
 
-    /* =====================================================
-       MARK RECEIPT + BILLING AS PAID (IF NOT YET)
-    ===================================================== */
+    /* ===============================
+       UPDATE RECEIPT + BILLING
+    ================================ */
     if ($receipt['status'] !== 'Paid') {
 
         $billing_id = (int)$receipt['billing_id'];
 
-        $conn->query("
+        // Update billing_records
+        $bStmt = $conn->prepare("
             UPDATE billing_records
-            SET status='Paid'
-            WHERE billing_id={$billing_id}
+            SET status='Paid',
+                payment_method=?
+            WHERE billing_id=?
         ");
+        $bStmt->bind_param("si", $method, $billing_id);
+        $bStmt->execute();
 
+        // Update patient_receipt
         $uStmt = $conn->prepare("
             UPDATE patient_receipt
             SET status='Paid',
@@ -141,9 +150,9 @@ foreach ($paidPayments as $p) {
         $uStmt->execute();
     }
 
-    /* =====================================================
-       CREATE JOURNAL ENTRY (ONLY ONCE)
-    ===================================================== */
+    /* ===============================
+       JOURNAL ENTRY (ONCE ONLY)
+    ================================ */
     $txnRef = $receipt['transaction_id'];
     $total  = (float)$receipt['grand_total'];
 
@@ -151,7 +160,7 @@ foreach ($paidPayments as $p) {
         continue;
     }
 
-    // check if journal entry already exists
+    // Prevent duplicate journal entries
     $chk = $conn->prepare("
         SELECT entry_id
         FROM journal_entries
@@ -160,15 +169,13 @@ foreach ($paidPayments as $p) {
     ");
     $chk->bind_param("s", $txnRef);
     $chk->execute();
-    $exists = $chk->get_result()->fetch_assoc();
-
-    if ($exists) {
+    if ($chk->get_result()->fetch_assoc()) {
         continue;
     }
 
-    // create journal entry
     $desc = "Payment received for Patient ID {$receipt['patient_id']}. Receipt TXN: {$txnRef}";
 
+    // Journal entry header
     $jeStmt = $conn->prepare("
         INSERT INTO journal_entries
             (entry_date, description, reference_type, reference, status, module, created_by)
@@ -180,7 +187,7 @@ foreach ($paidPayments as $p) {
 
     $entry_id = $conn->insert_id;
 
-    // journal lines
+    // Journal entry lines
     $jlStmt = $conn->prepare("
         INSERT INTO journal_entry_lines
             (entry_id, account_name, debit, credit, description)
@@ -206,6 +213,7 @@ echo json_encode([
     'status'    => 'ok',
     'processed' => $processed
 ]);
+
 
 
 ?>
