@@ -31,16 +31,16 @@ if ($patient_id <= 0) {
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Select Patient</title>
+        <meta charset="UTF-8">
+        <title>Select Patient for Billing</title>
         <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     </head>
     <body class="p-4 bg-light">
     <div class="main-sidebar">
         <?php include 'billing_sidebar.php'; ?>
     </div>
-
     <div class="container bg-white p-4 rounded shadow">
-        <h3>Select Patient for Billing</h3>
+        <h2>Select Patient for Billing</h2>
         <table class="table table-bordered">
             <thead class="table-dark">
                 <tr>
@@ -52,17 +52,14 @@ if ($patient_id <= 0) {
             <?php if ($patients && $patients->num_rows > 0): ?>
                 <?php while ($row = $patients->fetch_assoc()): ?>
                     <tr>
-                        <td><?= htmlspecialchars($row['full_name']) ?></td>
+                        <td><?= htmlspecialchars($row['full_name']); ?></td>
                         <td class="text-end">
-                            <a href="billing_items.php?patient_id=<?= $row['patient_id'] ?>"
-                               class="btn btn-primary btn-sm">Manage Billing</a>
+                            <a href="billing_items.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-primary btn-sm">Manage Billing</a>
                         </td>
                     </tr>
                 <?php endwhile; ?>
             <?php else: ?>
-                <tr>
-                    <td colspan="2" class="text-center">No patients available for billing.</td>
-                </tr>
+                <tr><td colspan="2" class="text-center">No patients with unbilled completed services.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
@@ -210,17 +207,49 @@ $grand_total = $subtotal - $discount;
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Billing Items</title>
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<meta charset="UTF-8">
+<title>Billing Items</title>
+<link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+<link rel="stylesheet" href="assets/CSS/billing_items.css">
+<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+function togglePWD(checkbox){
+    let val = checkbox.checked ? 1 : 0;
+    window.location.href = "billing_items.php?patient_id=<?= $patient_id ?>&toggle_pwd=" + val;
+}
+
+function finalizeBilling(){
+    fetch('finalize_billing.php?patient_id=<?= $patient_id ?>')
+    .then(response => response.text())
+    .then(data => {
+        Swal.fire({
+            icon: 'success',
+            title: 'Billing Finalized!',
+            html: 'Billing has been finalized successfully.<br>Grand Total: ₱ <?= number_format($grand_total,2) ?>',
+            confirmButtonColor: '#198754',
+            confirmButtonText: 'OK'
+        }).then(() => {
+            window.location.href = 'billing_items.php';
+        });
+    })
+    .catch(error => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'An error occurred while finalizing billing.'
+        });
+    });
+}
+</script>
 </head>
 <body class="p-4 bg-light">
 <div class="main-sidebar">
-    <?php include 'billing_sidebar.php'; ?>
+<?php include 'billing_sidebar.php'; ?>
 </div>
 
 <div class="container bg-white p-4 rounded shadow">
-    <h3>Billing for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h3>
+    <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
 
     <label class="mb-3">
         <input type="checkbox"
@@ -271,28 +300,22 @@ $grand_total = $subtotal - $discount;
                 <td><?= htmlspecialchars($srv['description']) ?></td>
                 <td class="text-end">₱<?= number_format($srv['price'],2) ?></td>
                 <td class="text-center">
-                    <a href="?patient_id=<?= $patient_id ?>&delete=<?= $i ?>"
-                       class="btn btn-danger btn-sm">Delete</a>
+                    <a href="billing_items.php?patient_id=<?= $patient_id ?>&delete=<?= $i ?>" class="btn btn-danger btn-sm">Delete</a>
                 </td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
 
-    <div class="text-end">
+    <div class="text-end mt-3">
         <p>Subtotal: ₱<?= number_format($subtotal,2) ?></p>
         <p>Discount: -₱<?= number_format($discount,2) ?></p>
-        <h5>Grand Total: ₱<?= number_format($grand_total,2) ?></h5>
+        <h5><strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong></h5>
     </div>
 
     <div class="mt-3 d-flex justify-content-between">
         <a href="billing_items.php" class="btn btn-secondary">Back</a>
-        <button class="btn btn-success"
-            onclick="fetch('finalize_billing.php?patient_id=<?= $patient_id ?>')
-            .then(()=>Swal.fire('Success','Billing finalized','success')
-            .then(()=>location.href='billing_items.php'))">
-            Finalize Billing
-        </button>
+        <button type="button" class="btn btn-success" onclick="finalizeBilling()">Finalize Billing</button>
     </div>
 </div>
 </body>
