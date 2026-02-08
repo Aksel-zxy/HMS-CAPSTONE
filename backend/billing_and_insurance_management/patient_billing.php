@@ -9,17 +9,56 @@ use GuzzleHttp\Client;
    PAYMONGO CONFIG
 ===================================================== */
 define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
-define('PAYMONGO_PAYMENT_API', 'https://api.paymongo.com/v1/payments');
 
 
-$client = new Client([
-    'headers' => [
-        'Accept'        => 'application/json',
-        'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
-    ],
-    'timeout' => 5
-]);
+/* =====================================================
+   SYNC PAID PAYMENTS FROM paymongo_payments TABLE
+===================================================== */
+$paidPmts = $conn->query("
+    SELECT id, payment_id, payment_intent_id, amount, status
+    FROM paymongo_payments
+    WHERE status = 'paid'
+    ORDER BY paid_at DESC
+");
 
+while ($pm = $paidPmts->fetch_assoc()) {
+    // Find matching receipt by paymongo_reference or transaction_id
+    $rStmt = $conn->prepare("
+        SELECT receipt_id, patient_id, billing_id, status
+        FROM patient_receipt
+        WHERE paymongo_reference = ? OR transaction_id = ?
+        LIMIT 1
+    ");
+    $rStmt->bind_param("ss", $pm['payment_id'], $pm['payment_intent_id']);
+    $rStmt->execute();
+    $receipt = $rStmt->get_result()->fetch_assoc();
+
+    if ($receipt && $receipt['status'] !== 'Paid') {
+        $billing_id = (int)$receipt['billing_id'];
+
+        // Update billing_records
+        $bStmt = $conn->prepare("
+            UPDATE billing_records
+            SET status = 'Paid'
+            WHERE billing_id = ?
+        ");
+        $bStmt->bind_param("i", $billing_id);
+        $bStmt->execute();
+
+        // Update patient_receipt
+        $uStmt = $conn->prepare("
+            UPDATE patient_receipt
+            SET status = 'Paid', paymongo_reference = ?
+            WHERE receipt_id = ?
+        ");
+        $uStmt->bind_param("si", $pm['payment_id'], $receipt['receipt_id']);
+        $uStmt->execute();
+    }
+}
+
+/* =====================================================
+   LEGACY: Check pending billings with paymongo_payment_id
+===================================================== */
 $pending = $conn->query("
     SELECT billing_id, paymongo_payment_id
     FROM billing_records
