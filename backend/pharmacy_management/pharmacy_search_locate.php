@@ -118,23 +118,26 @@ if ($expiry_res && $expiry_res->num_rows > 0) {
 $notif = new Notification($conn);
 $latestNotifications = $notif->load();
 $notifCount = $notif->notifCount;
-// ---------------- INIT ----------------
+// ---------------- Recent Searches ----------------
 $_SESSION['recent_searches'] ??= [];
 $searchResultHTML = "";
 $openResultModal = false;
 
-// ---------------- SEARCH & LOCATE ----------------
-if (isset($_POST['search_medicine'])) {
+// ---------------- Recent Searches ----------------
+$_SESSION['recent_searches'] ??= [];
+$searchResultHTML = "";
+$openResultModal = false;
 
+// ---------------- Search & Locate ----------------
+if (isset($_POST['search_medicine'])) {
     $generic = $_POST['generic_name'] ?? '';
     $brand   = $_POST['brand_name'] ?? '';
     $dosage  = $_POST['dosage'] ?? '';
 
     $stmt = $conn->prepare("
-        SELECT med_name, generic_name, brand_name, dosage,
-               `Shelf No`, `Rack No`, `Bin No`, stock_quantity
+        SELECT med_id, med_name, generic_name, brand_name, dosage, shelf_no, rack_no, bin_no, stock_quantity
         FROM pharmacy_inventory
-        WHERE generic_name = ? AND brand_name = ? AND dosage = ?
+        WHERE generic_name=? AND brand_name=? AND dosage=?
         LIMIT 1
     ");
     $stmt->bind_param("sss", $generic, $brand, $dosage);
@@ -142,56 +145,139 @@ if (isset($_POST['search_medicine'])) {
     $result = $stmt->get_result();
 
     if ($row = $result->fetch_assoc()) {
-        $location = "Shelf {$row['Shelf No']} → Rack {$row['Rack No']} → Bin {$row['Bin No']}";
+
+        $medId = (int)$row['med_id'];
+        $location = "Shelf {$row['shelf_no']} → Rack {$row['rack_no']} → Bin {$row['bin_no']}";
+        $stock = (int)$row['stock_quantity'];
+
+        // ---------------- Step 2: Stock Status ----------------
+        $reorder = 100; // reorder threshold
+        $stockStatus = ($stock <= $reorder * 0.5) ? "Critical" : (($stock <= $reorder) ? "Low" : "Normal");
+
+        // ---------------- Step 4: Real Movement Analysis ----------------
+        // Count how many times this medicine was dispensed in last 30 days
+        $dispenseStmt = $conn->prepare("
+            SELECT SUM(quantity_dispensed) AS total_dispensed
+            FROM pharmacy_prescription_items AS ppi
+            JOIN pharmacy_prescription AS pp 
+              ON pp.prescription_id = ppi.prescription_id
+            WHERE ppi.med_id = ? 
+              AND pp.status = 'Dispensed' 
+              AND pp.prescription_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        ");
+        $dispenseStmt->bind_param("i", $medId);
+        $dispenseStmt->execute();
+        $dispenseResult = $dispenseStmt->get_result();
+        $dispensed = 0;
+        if ($dispenseRow = $dispenseResult->fetch_assoc()) {
+            $dispensed = (int)$dispenseRow['total_dispensed'];
+        }
+
+        // Determine movement based on actual dispense rate
+        if ($dispensed >= 20) {
+            $movement = "Fast-moving";
+        } elseif ($dispensed >= 5) {
+            $movement = "Moderate-moving";
+        } else {
+            $movement = "Slow-moving";
+        }
+
+        // ---------------- Step 4b: Average Daily Usage ----------------
+        $avgUseStmt = $conn->prepare("
+            SELECT IFNULL(SUM(quantity_dispensed)/30, 0) AS avg_daily
+            FROM pharmacy_prescription_items AS ppi
+            JOIN pharmacy_prescription AS pp
+              ON pp.prescription_id = ppi.prescription_id
+            WHERE ppi.med_id = ?
+              AND pp.status = 'Dispensed'
+              AND pp.prescription_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+        ");
+        $avgUseStmt->bind_param("i", $medId);
+        $avgUseStmt->execute();
+        $avgUseResult = $avgUseStmt->get_result();
+        $avgUse = 0;
+        if ($avgRow = $avgUseResult->fetch_assoc()) {
+            $avgUse = (float)$avgRow['avg_daily'];
+        }
+
+        // ---------------- Step 5: AI Analysis ----------------
+        require_once 'pharmacy_ai.php'; // <-- your AI function file
+        $aiAdvice = analyzeStockAI([
+            'med_name' => $row['med_name'],
+            'dosage'   => $row['dosage'],
+            'stock'    => $stock,
+            'reorder'  => $reorder,
+            'avg_use'  => $avgUse,
+            'status'   => $stockStatus,
+            'movement' => $movement
+        ]);
+
+        // ---------------- Save to recent searches ----------------
         array_unshift($_SESSION['recent_searches'], [
             'generic_name' => $row['generic_name'],
             'brand_name'   => $row['brand_name'],
             'med_name'     => $row['med_name'],
             'dosage'       => $row['dosage'],
             'location'     => $location,
-            'stock'        => $row['stock_quantity']
+            'stock'        => $stock,
+            'stock_status' => $stockStatus,
+            'movement'     => $movement,
+            'ai_advice'    => $aiAdvice
         ]);
         $_SESSION['recent_searches'] = array_slice($_SESSION['recent_searches'], 0, 10);
 
+        // ---------------- Display Result ----------------
+        // Format AI advice as bullet list
+        $aiLines = preg_split('/\d\.\s*/', $aiAdvice, -1, PREG_SPLIT_NO_EMPTY);
+        $aiList = "<ul>";
+        foreach ($aiLines as $line) {
+            $aiList .= "<li>" . trim($line) . "</li>";
+        }
+        $aiList .= "</ul>";
+
         $searchResultHTML = "
-        <div class='alert alert-success'>
-            <b>Generic:</b> {$row['generic_name']}<br>
-            <b>Medicine:</b> {$row['med_name']}<br>
-            <b>Brand:</b> {$row['brand_name']}<br>
-            <b>Dosage:</b> {$row['dosage']}<br><br>
-            <b>Location:</b> {$location}<br>
-            <b>Stock:</b>
-            <span class='badge " . ($row['stock_quantity'] <= 10 ? 'bg-danger' : 'bg-success') . "'>
-                {$row['stock_quantity']}
-            </span>
-        </div>
-        ";
+<div class='alert alert-success'>
+    <b>Generic:</b> {$row['generic_name']}<br>
+    <b>Medicine:</b> {$row['med_name']}<br>
+    <b>Brand:</b> {$row['brand_name']}<br>
+    <b>Dosage:</b> {$row['dosage']}<br><br>
+    <b>Location:</b> {$location}<br>
+    <b>Stock:</b>
+    <span class='badge " . ($stockStatus !== 'Normal' ? 'bg-danger' : 'bg-success') . "'>
+        {$stock} ({$stockStatus})
+    </span><br>
+    <b>Movement (last 30 days):</b>
+    <span class='badge bg-warning text-dark'>{$movement}</span><br><br>
+    <b>AI Recommendation:</b>
+    <div class='p-2 bg-light border rounded'>{$aiList}</div>
+</div>
+";
     } else {
         $searchResultHTML = "<div class='alert alert-danger text-center'>Medicine not found.</div>";
     }
 
     $_SESSION['search_result_html'] = $searchResultHTML;
     $_SESSION['show_search_modal'] = true;
-
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
 
-// ---------------- MODAL DISPLAY AFTER REDIRECT ----------------
+
+// ---------------- Modal Display ----------------
 if (!empty($_SESSION['show_search_modal'])) {
     $openResultModal = true;
     $searchResultHTML = $_SESSION['search_result_html'];
-
     unset($_SESSION['show_search_modal']);
     unset($_SESSION['search_result_html']);
 }
 
-// ---------------- CLEAR RECENT ----------------
+// ---------------- Clear Recent ----------------
 if (isset($_POST['clear_recent'])) {
     unset($_SESSION['recent_searches']);
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
+
 
 ?>
 
@@ -496,23 +582,49 @@ if (isset($_POST['clear_recent'])) {
                                         <th>Dosage</th>
                                         <th>Location</th>
                                         <th>Stock</th>
+                                        <th>Status</th>
+                                        <th>Movement</th>
+                                        <th>AI Advice</th> <!-- NEW -->
                                     </tr>
                                 </thead>
+
                                 <tbody>
                                     <?php foreach ($_SESSION['recent_searches'] as $search): ?>
                                         <tr>
-                                            <td><?= htmlspecialchars($search['med_name'] ?? '-') ?></td>
-                                            <td><?= htmlspecialchars($search['generic_name'] ?? '-') ?></td>
-                                            <td><?= htmlspecialchars($search['brand_name'] ?? '-') ?></td>
-                                            <td><?= htmlspecialchars($search['dosage'] ?? '-') ?></td>
-                                            <td><?= htmlspecialchars($search['location'] ?? '-') ?></td>
-                                            <td>
-                                                <span class="badge <?= ($search['stock'] ?? 0) <= 10 ? 'bg-danger' : 'bg-success' ?>">
+                                            <td style="vertical-align: top;"><?= htmlspecialchars($search['med_name'] ?? '-') ?></td>
+                                            <td style="vertical-align: top;"><?= htmlspecialchars($search['generic_name'] ?? '-') ?></td>
+                                            <td style="vertical-align: top;"><?= htmlspecialchars($search['brand_name'] ?? '-') ?></td>
+                                            <td style="vertical-align: top;"><?= htmlspecialchars($search['dosage'] ?? '-') ?></td>
+                                            <td style="white-space: nowrap; vertical-align: top;"><?= htmlspecialchars($search['location'] ?? '-') ?></td>
+                                            <td style="vertical-align: top;">
+                                                <span class="badge <?= ($search['stock_status'] ?? 'Normal') !== 'Normal' ? 'bg-danger' : 'bg-success' ?>">
                                                     <?= htmlspecialchars($search['stock'] ?? 0) ?>
                                                 </span>
                                             </td>
+                                            <td style="vertical-align: top;">
+                                                <span class="badge <?= ($search['stock_status'] ?? 'Normal') === 'Critical' ? 'bg-danger' : ($search['stock_status'] === 'Low' ? 'bg-warning text-dark' : 'bg-success') ?>">
+                                                    <?= htmlspecialchars($search['stock_status'] ?? '-') ?>
+                                                </span>
+                                            </td>
+                                            <td style="vertical-align: top;">
+                                                <span class="badge bg-info text-dark"><?= htmlspecialchars($search['movement'] ?? '-') ?></span>
+                                            </td>
+                                            <td style="vertical-align: top;">
+                                                <div class="small p-1 bg-light border rounded">
+                                                    <?php
+                                                    if (isset($search['ai_advice'])) {
+                                                        $plainAI = str_replace('**', '', $search['ai_advice']);
+                                                        echo nl2br(htmlspecialchars($plainAI));
+                                                    } else {
+                                                        echo '-';
+                                                    }
+                                                    ?>
+                                                </div>
+                                            </td>
                                         </tr>
+
                                     <?php endforeach; ?>
+
                                 </tbody>
                             </table>
                         <?php else: ?>

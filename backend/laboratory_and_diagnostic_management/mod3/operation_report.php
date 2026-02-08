@@ -113,6 +113,9 @@ if (!$user) {
                     <li class="sidebar-item">
                         <a href="result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
+                    <li class="sidebar-item">
+                        <a href="operation_report.php" class="sidebar-link">Laboratory Report</a>
+                    </li>
                 </ul>
             </li>
             <li class="sidebar-item">
@@ -125,13 +128,10 @@ if (!$user) {
                 </a>
                 <ul id="equipment" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
+                        <a href="../mod4/lab_equip.php" class="sidebar-link">Laboratory Equipment </a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="maintenance.php" class="sidebar-link">Maintenance Schedule</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="operation_report.php" class="sidebar-link">Operation Equipment</a>
+                        <a href="../mod4/maintenance.php" class="sidebar-link">Maintenance Schedule</a>
                     </li>
                 </ul>
             </li>
@@ -143,7 +143,7 @@ if (!$user) {
                     </svg>
                     <span style="font-size: 18px;">Configuration</span>
                 </a>
-               <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                <ul id="configuration" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
                         <a href="../configuration_page/price.php" class="sidebar-link">Laboratory Price Configuration</a>
                     </li>

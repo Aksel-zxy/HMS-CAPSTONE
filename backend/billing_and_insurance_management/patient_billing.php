@@ -2,56 +2,137 @@
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-/*
-|--------------------------------------------------------------------------
-| FETCH PATIENTS WITH UNPAID / PARTIALLY PAID BILLINGS
-|--------------------------------------------------------------------------
-| - billing_items is the source of services
-| - billing_id is the source of truth
-| - patient_receipt defines payment status
-*/
+require_once __DIR__ . '/vendor/autoload.php';
+use GuzzleHttp\Client;
 
+/* =====================================================
+   PAYMONGO CONFIG
+===================================================== */
+define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
+
+
+/* =====================================================
+   SYNC PAID PAYMENTS FROM paymongo_payments TABLE
+===================================================== */
+$paidPmts = $conn->query("
+    SELECT id, payment_id, payment_intent_id, amount, status
+    FROM paymongo_payments
+    WHERE status = 'paid'
+    ORDER BY paid_at DESC
+");
+
+while ($pm = $paidPmts->fetch_assoc()) {
+    // Find matching receipt by paymongo_reference or transaction_id
+    $rStmt = $conn->prepare("
+        SELECT receipt_id, patient_id, billing_id, status
+        FROM patient_receipt
+        WHERE paymongo_reference = ? OR transaction_id = ?
+        LIMIT 1
+    ");
+    $rStmt->bind_param("ss", $pm['payment_id'], $pm['payment_intent_id']);
+    $rStmt->execute();
+    $receipt = $rStmt->get_result()->fetch_assoc();
+
+    if ($receipt && $receipt['status'] !== 'Paid') {
+        $billing_id = (int)$receipt['billing_id'];
+
+        // Update billing_records
+        $bStmt = $conn->prepare("
+            UPDATE billing_records
+            SET status = 'Paid'
+            WHERE billing_id = ?
+        ");
+        $bStmt->bind_param("i", $billing_id);
+        $bStmt->execute();
+
+        // Update patient_receipt
+        $uStmt = $conn->prepare("
+            UPDATE patient_receipt
+            SET status = 'Paid', paymongo_reference = ?
+            WHERE receipt_id = ?
+        ");
+        $uStmt->bind_param("si", $pm['payment_id'], $receipt['receipt_id']);
+        $uStmt->execute();
+    }
+}
+
+/* =====================================================
+   LEGACY: Check pending billings with paymongo_payment_id
+===================================================== */
+$pending = $conn->query("
+    SELECT billing_id, paymongo_payment_id
+    FROM billing_records
+    WHERE status = 'Pending'
+      AND paymongo_payment_id IS NOT NULL
+");
+
+while ($row = $pending->fetch_assoc()) {
+    try {
+        $response = $client->get(PAYMONGO_PAYMENT_API . '/' . $row['paymongo_payment_id']);
+        $payment  = json_decode($response->getBody(), true);
+
+        if (
+            isset($payment['data']['attributes']['status']) &&
+            $payment['data']['attributes']['status'] === 'paid'
+        ) {
+            $billing_id = (int)$row['billing_id'];
+
+            // billing_records
+            $stmt = $conn->prepare("
+                UPDATE billing_records
+                SET status='Paid'
+                WHERE billing_id=?
+            ");
+            $stmt->bind_param("i", $billing_id);
+            $stmt->execute();
+
+            // patient_receipt
+            $stmt = $conn->prepare("
+                UPDATE patient_receipt
+                SET status='Paid'
+                WHERE billing_id=?
+            ");
+            $stmt->bind_param("i", $billing_id);
+            $stmt->execute();
+        }
+    } catch (Exception $e) {
+        // Silent fail (do NOT break UI)
+    }
+}
+
+/* =====================================================
+   FETCH PENDING BILLINGS
+===================================================== */
 $sql = "
 SELECT
     p.patient_id,
     CONCAT(p.fname,' ',IFNULL(p.mname,''),' ',p.lname) AS full_name,
-    p.address,
-    p.phone_number,
-
     bi.billing_id,
-
-    -- Billing totals
     SUM(bi.total_price) AS total_charges,
-
-    -- Latest receipt (if any)
-    pr.receipt_id,
-    pr.status AS payment_status,
-    pr.insurance_covered,
-    pr.payment_method
+    MAX(pr.receipt_id) AS receipt_id,
+    MAX(pr.status) AS payment_status,
+    MAX(pr.insurance_covered) AS insurance_covered,
+    MAX(pr.payment_method) AS payment_method,
+    MAX(pr.paymongo_reference) AS paymongo_reference
 
 FROM patientinfo p
-
 INNER JOIN billing_items bi
     ON bi.patient_id = p.patient_id
     AND bi.finalized = 1
 
 LEFT JOIN patient_receipt pr
     ON pr.billing_id = bi.billing_id
-    AND pr.receipt_id = (
-        SELECT MAX(r2.receipt_id)
-        FROM patient_receipt r2
-        WHERE r2.billing_id = bi.billing_id
-    )
 
 GROUP BY p.patient_id, bi.billing_id
-
-HAVING 
-    pr.status IS NULL OR pr.status != 'Paid'
-
-ORDER BY p.lname ASC, p.fname ASC
+HAVING MAX(pr.status) IS NULL OR MAX(pr.status) != 'Paid'
+ORDER BY p.lname, p.fname
 ";
 
 $result = $conn->query($sql);
+if (!$result) {
+    error_log("SQL Error: " . $conn->error);
+    $result = null;
+}
 ?>
 
 <!DOCTYPE html>
@@ -63,89 +144,135 @@ $result = $conn->query($sql);
 
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-<link rel="stylesheet" href="assets/CSS/patient_billing.css">
-<link rel="stylesheet" href="assets/css/billing_sidebar.css">
+<link rel="stylesheet" href="assets/css/patient_billing.css">
+
+<script>
+async function refreshAndSync(btn) {
+    btn.disabled = true;
+    const original = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking...';
+
+    try {
+        // call the updated endpoint
+        const res = await fetch('fetch_paid_payments.php', { method: 'GET', headers: { 'Accept': 'application/json' } });
+        const json = await res.json().catch(() => null);
+        if (json) console.log('Sync result', json);
+    } catch (err) {
+        console.error('Sync request failed', err);
+    } finally {
+        // reload page to reflect updated statuses
+        window.location.reload();
+    }
+}
+</script>
 </head>
 
 <body>
 <div class="dashboard-wrapper">
 
+
+
 <div class="main-content-wrapper">
-<div class="container-fluid bg-white p-4 rounded shadow">
+<div class="bg-white p-4 shadow rounded">
 
-<h1 class="mb-4">Patient Billing</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>Patient Billing</h3>
+    <div class="gap-2">
+        <!-- Refresh now triggers server-side fetch_paymongo_payments.php then reloads -->
+        <button class="btn btn-outline-primary btn-sm" onclick="refreshAndSync(this)">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
+</div>
 
-<table class="table table-bordered table-striped align-middle">
+<div class="table-responsive">
+<table class="table table-bordered align-middle">
 <thead class="table-dark">
 <tr>
-    <th>Patient Name</th>
+    <th>Patient</th>
     <th>Insurance</th>
-    <th>Payment Status</th>
-    <th>Total Charges</th>
+    <th>Status</th>
+    <th>Total</th>
     <th class="text-end">Actions</th>
 </tr>
 </thead>
-
 <tbody>
 
 <?php if ($result && $result->num_rows > 0): ?>
 <?php while ($row = $result->fetch_assoc()): ?>
 
 <?php
-$billing_id   = (int)$row['billing_id'];
-$receipt_id   = $row['receipt_id'];
-$totalCharges = (float)$row['total_charges'];
-$status       = $row['payment_status'] ?? 'Pending';
+// Safe variable extraction with null checks
+$patient_id       = (int)($row['patient_id'] ?? 0);
+$full_name        = $row['full_name'] ?? 'Unknown Patient';
+$billing_id       = (int)($row['billing_id'] ?? 0);
+$total            = (float)($row['total_charges'] ?? 0);
+$receipt_id       = $row['receipt_id'] ?? null;
+$status           = $row['payment_status'] ?? 'Pending';
+$insurance_covered = (float)($row['insurance_covered'] ?? 0);
+$payment_method   = $row['payment_method'] ?? null;
+$insuranceApplied = ($insurance_covered > 0);
+$insuranceLabel   = $insuranceApplied ? $payment_method : 'N/A';
 
-$insuranceApplied = ((float)$row['insurance_covered'] > 0);
-$insuranceLabel   = $insuranceApplied ? htmlspecialchars($row['payment_method']) : 'N/A';
+// Validate required fields
+if (!$patient_id || !$billing_id) {
+    continue; // Skip row if essential data missing
+}
+
+/* Ensure receipt exists */
+if (!$receipt_id) {
+    $stmt = $conn->prepare("
+        INSERT INTO patient_receipt (patient_id, billing_id, status)
+        VALUES (?, ?, 'Pending')
+    ");
+    if ($stmt) {
+        $stmt->bind_param("ii", $patient_id, $billing_id);
+        if ($stmt->execute()) {
+            $receipt_id = $conn->insert_id;
+        } else {
+            error_log("Failed to insert receipt for billing_id=$billing_id: " . $stmt->error);
+            continue;
+        }
+        $stmt->close();
+    }
+}
 ?>
 
 <tr>
-<td><?= htmlspecialchars($row['full_name']); ?></td>
+<td><?= htmlspecialchars($full_name) ?></td>
 
 <td>
-<?php if ($insuranceApplied): ?>
-    <span class="badge bg-success"><?= $insuranceLabel ?></span>
-<?php else: ?>
-    <span class="badge bg-secondary">N/A</span>
-<?php endif; ?>
+<?= $insuranceApplied
+    ? '<span class="badge bg-success">' . htmlspecialchars($insuranceLabel) . '</span>'
+    : '<span class="badge bg-secondary">N/A</span>' ?>
 </td>
 
 <td>
-<?php if ($status === 'Paid'): ?>
-    <span class="badge bg-success">Paid</span>
-<?php else: ?>
-    <span class="badge bg-warning text-dark">Pending</span>
-<?php endif; ?>
+<span class="badge <?= $status === 'Paid' ? 'bg-success' : 'bg-warning text-dark' ?>">
+<?= htmlspecialchars($status) ?>
+</span>
 </td>
 
-<td>₱ <?= number_format($totalCharges, 2); ?></td>
+<td>₱ <?= number_format($total, 2) ?></td>
 
 <td class="text-end">
-<div class="d-flex justify-content-end gap-2 flex-wrap">
+<div class="d-flex gap-2 justify-content-end flex-wrap">
 
-<?php if ($receipt_id): ?>
-    <a href="print_receipt.php?receipt_id=<?= $receipt_id ?>" 
-       class="btn btn-secondary btn-sm" target="_blank">
-       View Receipt
-    </a>
-<?php else: ?>
-    <a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" 
-       class="btn btn-secondary btn-sm">
-       View Bill
-    </a>
-<?php endif; ?>
+<a href="print_receipt.php?receipt_id=<?= urlencode($receipt_id) ?>"
+   target="_blank"
+   class="btn btn-secondary btn-sm">
+   <i class="bi bi-receipt"></i> View Bill
+</a>
 
-<a href="billing_summary.php?patient_id=<?= $row['patient_id']; ?>" 
+<a href="billing_summary.php?patient_id=<?= urlencode($patient_id) ?>"
    class="btn btn-success btn-sm">
-   Process Payment
+   <i class="bi bi-cash-stack"></i> Process Payment
 </a>
 
 <?php if (!$insuranceApplied): ?>
 <button class="btn btn-info btn-sm"
         data-bs-toggle="modal"
-        data-bs-target="#insuranceModal<?= $row['patient_id'] ?>">
+        data-bs-target="#insuranceModal<?= $patient_id ?>">
     Enter Insurance
 </button>
 <?php endif; ?>
@@ -153,28 +280,26 @@ $insuranceLabel   = $insuranceApplied ? htmlspecialchars($row['payment_method'])
 </div>
 
 <?php if (!$insuranceApplied): ?>
-<div class="modal fade" id="insuranceModal<?= $row['patient_id'] ?>" tabindex="-1">
+<div class="modal fade" id="insuranceModal<?= $patient_id ?>" tabindex="-1">
 <div class="modal-dialog">
 <form method="POST" action="apply_insurance.php" class="modal-content">
 
 <div class="modal-header">
-<h5 class="modal-title">Enter Insurance Number</h5>
+<h5 class="modal-title">Apply Insurance</h5>
 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
 
 <div class="modal-body">
-<input type="hidden" name="patient_id" value="<?= $row['patient_id'] ?>">
+<input type="hidden" name="patient_id" value="<?= $patient_id ?>">
 <input type="hidden" name="billing_id" value="<?= $billing_id ?>">
 
-<div class="mb-3">
 <label class="form-label">Insurance Number</label>
 <input type="text" name="insurance_number" class="form-control" required>
 </div>
-</div>
 
 <div class="modal-footer">
-<button type="submit" class="btn btn-primary">Apply Insurance</button>
-<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+<button class="btn btn-primary">Apply</button>
+<button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
 </div>
 
 </form>
@@ -187,15 +312,11 @@ $insuranceLabel   = $insuranceApplied ? htmlspecialchars($row['payment_method'])
 
 <?php endwhile; ?>
 <?php else: ?>
-<tr>
-<td colspan="5" class="text-center">No patients ready for billing.</td>
-</tr>
+<tr><td colspan="5" class="text-center">No pending billings 🎉</td></tr>
 <?php endif; ?>
 
 </tbody>
 </table>
-
-</div>
 </div>
 
 <div class="main-sidebar">
@@ -203,6 +324,8 @@ $insuranceLabel   = $insuranceApplied ? htmlspecialchars($row['payment_method'])
 </div>
 
 </div>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

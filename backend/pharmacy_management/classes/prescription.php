@@ -16,10 +16,10 @@ class Prescription
         try {
             $this->conn->begin_transaction();
 
-            // Set billing_status to pending initially for all prescriptions
+
             $billing_status = 'pending';
 
-            // Insert into pharmacy_prescription
+
             $stmt = $this->conn->prepare("
             INSERT INTO pharmacy_prescription 
             (doctor_id, patient_id, prescription_date, note, status, payment_type, billing_status) 
@@ -29,7 +29,7 @@ class Prescription
             $stmt->execute();
             $prescription_id = $this->conn->insert_id;
 
-            // Insert each medicine into items table
+
             foreach ($items as $item) {
                 $stmtItem = $this->conn->prepare("
                 INSERT INTO pharmacy_prescription_items 
@@ -64,7 +64,7 @@ class Prescription
         return $this->conn->query($query);
     }
 
-    // Fetch patients
+
     public function getPatients()
     {
         return $this->conn->query("
@@ -73,7 +73,7 @@ class Prescription
         ");
     }
 
-    // Fetch medicines
+
     public function getMedicines()
     {
         return $this->conn->query("

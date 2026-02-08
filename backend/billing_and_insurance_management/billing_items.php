@@ -4,21 +4,32 @@ include '../../SQL/config.php';
 
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 
-// Fetch patient info
+/* =========================================================
+   PATIENT SELECTION PAGE
+========================================================= */
 if ($patient_id <= 0) {
+
     $sql = "
         SELECT DISTINCT p.patient_id,
                CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name
         FROM patientinfo p
-        INNER JOIN dl_results dr ON p.patient_id = dr.patientID
-        WHERE dr.status='Completed'
-          AND p.patient_id NOT IN (SELECT DISTINCT patient_id FROM billing_items WHERE finalized=1)
+        LEFT JOIN dl_results dr 
+            ON p.patient_id = dr.patientID AND dr.status='Completed'
+        LEFT JOIN dnm_records dnr
+            ON p.patient_id = dnr.duty_id
+        WHERE (dr.patientID IS NOT NULL OR dnr.record_id IS NOT NULL)
+          AND p.patient_id NOT IN (
+                SELECT DISTINCT patient_id 
+                FROM billing_items 
+                WHERE finalized = 1
+          )
         ORDER BY p.lname ASC, p.fname ASC
     ";
+
     $patients = $conn->query($sql);
     ?>
     <!DOCTYPE html>
-    <html lang="en">
+    <html>
     <head>
         <meta charset="UTF-8">
         <title>Select Patient for Billing</title>
@@ -59,52 +70,96 @@ if ($patient_id <= 0) {
     exit;
 }
 
-// Load patient
+/* =========================================================
+   LOAD PATIENT INFO
+========================================================= */
 $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
-if (!$patient) die("Patient not found.");
+if (!$patient) die("Patient not found");
 
-// Compute age
-$dob = $patient['dob'];
+/* =========================================================
+   AGE COMPUTATION
+========================================================= */
 $age = 0;
-if (!empty($dob) && $dob != '0000-00-00') {
-    $birth = new DateTime($dob);
+if (!empty($patient['dob']) && $patient['dob'] != '0000-00-00') {
+    $birth = new DateTime($patient['dob']);
     $today = new DateTime();
     $age = $today->diff($birth)->y;
 }
 
-// Initialize cart
+/* =========================================================
+   INITIALIZE BILLING CART
+========================================================= */
 if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $_SESSION['billing_cart'][$patient_id] = [];
 
-    $sql = "SELECT result FROM dl_results WHERE patientID=? AND status='Completed'";
-    $stmt = $conn->prepare($sql);
+    /* ---- Load Lab Services ---- */
+    $stmt = $conn->prepare("
+        SELECT result FROM dl_results 
+        WHERE patientID=? AND status='Completed'
+    ");
     $stmt->bind_param("i", $patient_id);
     $stmt->execute();
     $res = $stmt->get_result();
+
     while ($r = $res->fetch_assoc()) {
         $services = explode(",", $r['result']);
         foreach ($services as $srvName) {
             $srvName = trim($srvName);
-            if ($srvName == "") continue;
-            $stmt2 = $conn->prepare("SELECT serviceID, serviceName, description, price FROM dl_services WHERE serviceName=? LIMIT 1");
+            if ($srvName == '') continue;
+
+            $stmt2 = $conn->prepare("
+                SELECT serviceID, serviceName, description, price
+                FROM dl_services
+                WHERE serviceName=? LIMIT 1
+            ");
             $stmt2->bind_param("s", $srvName);
             $stmt2->execute();
             $srv = $stmt2->get_result()->fetch_assoc();
+
             if ($srv) {
                 $_SESSION['billing_cart'][$patient_id][] = $srv;
             }
         }
     }
+
+    /* ---- Load DNM Procedures ---- */
+    $stmt = $conn->prepare("
+        SELECT procedure_name, amount
+        FROM dnm_records
+        WHERE duty_id = ?
+    ");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+
+    $existingNames = array_column($_SESSION['billing_cart'][$patient_id], 'serviceName');
+
+    while ($row = $res->fetch_assoc()) {
+        if (in_array($row['procedure_name'], $existingNames)) continue;
+
+        $_SESSION['billing_cart'][$patient_id][] = [
+            'serviceID'   => 'DNM-' . md5($row['procedure_name']),
+            'serviceName' => $row['procedure_name'],
+            'description' => 'Doctor / Nurse Management Procedure',
+            'price'       => $row['amount']
+        ];
+    }
 }
 
-// Add service
+/* =========================================================
+   ADD SERVICE MANUALLY
+========================================================= */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
     $service_id = intval($_POST['service_id']);
     if ($service_id > 0) {
-        $stmt = $conn->prepare("SELECT serviceID, serviceName, description, price FROM dl_services WHERE serviceID=? LIMIT 1");
+        $stmt = $conn->prepare("
+            SELECT serviceID, serviceName, description, price 
+            FROM dl_services 
+            WHERE serviceID=? LIMIT 1
+        ");
         $stmt->bind_param("i", $service_id);
         $stmt->execute();
         $srv = $stmt->get_result()->fetch_assoc();
@@ -116,7 +171,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_service'])) {
     exit;
 }
 
-// Delete service
+/* =========================================================
+   DELETE SERVICE
+========================================================= */
 if (isset($_GET['delete'])) {
     $index = intval($_GET['delete']);
     if (isset($_SESSION['billing_cart'][$patient_id][$index])) {
@@ -127,23 +184,28 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
-// PWD toggle
+/* =========================================================
+   PWD TOGGLE
+========================================================= */
 if (isset($_GET['toggle_pwd'])) {
-    $_SESSION['is_pwd'][$patient_id] = ($_GET['toggle_pwd'] == 1) ? 1 : 0;
+    $_SESSION['is_pwd'][$patient_id] = $_GET['toggle_pwd'] == 1 ? 1 : 0;
     header("Location: billing_items.php?patient_id=$patient_id");
     exit;
 }
 
+/* =========================================================
+   COMPUTATIONS
+========================================================= */
 $cart = $_SESSION['billing_cart'][$patient_id];
 $subtotal = array_sum(array_column($cart, 'price'));
 $is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
-$is_senior = $age >= 60 ? 1 : 0;
+$is_senior = $age >= 60;
 $discount = ($is_pwd || $is_senior) ? $subtotal * 0.20 : 0;
 $grand_total = $subtotal - $discount;
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>Billing Items</title>
@@ -189,35 +251,29 @@ function finalizeBilling(){
 <div class="container bg-white p-4 rounded shadow">
     <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
 
-    <div class="mb-3">
-        <label>
-            <input type="checkbox" <?= ($age >= 60) ? 'disabled' : '' ?> <?= $is_pwd ? 'checked' : '' ?> onchange="togglePWD(this)">
-            Patient is PWD
-        </label>
-        <?php if ($age >= 60): ?>
-            <small class="text-muted">(Senior discount applied automatically)</small>
-        <?php endif; ?>
-    </div>
+    <label class="mb-3">
+        <input type="checkbox"
+            <?= $is_senior ? 'disabled' : '' ?>
+            <?= $is_pwd ? 'checked' : '' ?>
+            onchange="location.href='billing_items.php?patient_id=<?= $patient_id ?>&toggle_pwd='+(this.checked?1:0)">
+        Patient is PWD
+    </label>
 
-    <!-- Add Service -->
-    <form method="POST" class="mb-3 d-flex gap-2">
-        <select name="service_id" class="form-select" required>
+    <form method="POST" class="d-flex gap-2 mb-3">
+        <select name="service_id" class="form-select">
             <option value="">-- Select Service --</option>
             <?php
-            // Exclude services already in the cart
             $cart_ids = array_column($cart, 'serviceID');
-            if (count($cart_ids) > 0) {
-                $placeholders = implode(',', array_fill(0, count($cart_ids), '?'));
-                $sql = "SELECT * FROM dl_services WHERE serviceID NOT IN ($placeholders) ORDER BY serviceName ASC";
+            if ($cart_ids) {
+                $ph = implode(',', array_fill(0, count($cart_ids), '?'));
+                $sql = "SELECT * FROM dl_services WHERE serviceID NOT IN ($ph)";
                 $stmt = $conn->prepare($sql);
-                $types = str_repeat('i', count($cart_ids));
-                $stmt->bind_param($types, ...$cart_ids);
+                $stmt->bind_param(str_repeat('i', count($cart_ids)), ...$cart_ids);
                 $stmt->execute();
                 $res = $stmt->get_result();
             } else {
-                $res = $conn->query("SELECT * FROM dl_services ORDER BY serviceName ASC");
+                $res = $conn->query("SELECT * FROM dl_services");
             }
-
             while ($srv = $res->fetch_assoc()):
             ?>
                 <option value="<?= $srv['serviceID'] ?>">
@@ -225,7 +281,7 @@ function finalizeBilling(){
                 </option>
             <?php endwhile; ?>
         </select>
-        <button type="submit" name="add_service" class="btn btn-primary">Add</button>
+        <button name="add_service" class="btn btn-primary">Add</button>
     </form>
 
     <table class="table table-bordered">
@@ -257,7 +313,7 @@ function finalizeBilling(){
         <h5><strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong></h5>
     </div>
 
-    <div class="mt-4 d-flex justify-content-between">
+    <div class="mt-3 d-flex justify-content-between">
         <a href="billing_items.php" class="btn btn-secondary">Back</a>
         <button type="button" class="btn btn-success" onclick="finalizeBilling()">Finalize Billing</button>
     </div>

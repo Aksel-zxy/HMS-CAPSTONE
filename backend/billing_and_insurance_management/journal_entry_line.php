@@ -34,73 +34,103 @@ $total_credit = array_sum(array_column($lines, 'credit'));
 <head>
     <meta charset="UTF-8">
     <title>Journal Entry Lines - Entry #<?= $entry['entry_id'] ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
-    <link rel="stylesheet" href="assets/CSS/journalentryline.css">
+    <link rel="stylesheet" type="text/css" href="assets/CSS/journal_entry_lines_container.css">
     <style>
-        .modal { display: none; }
-        .action-links { display: none; } /* hide Edit/Delete column */
-        .main-sidebar { float: left; width: 250px; }
-        .container { margin-left: 260px; padding: 20px; }
-
-        /* ✅ Hide sidebar and buttons when printing */
-        @media print {
-            .main-sidebar, .actions, .btn, .btn-primary, .btn-secondary, .btn-success {
-                display: none !important;
-            }
-            body {
-                margin: 0;
-                padding: 0;
-                background: white;
-            }
-            .container {
-                margin: 0;
-                width: 100%;
-                padding: 0;
-            }
+        body { background-color: #f8f9fa; }
+        .container-wrapper { 
+            background-color: white; 
+            border-radius: 30px; 
+            padding: 30px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+            margin-top: 80px; 
+            margin-left: 100px;
         }
-
+        
         .entry-info {
             display: flex;
             gap: 20px;
             margin-bottom: 15px;
+            flex-wrap: wrap;
         }
         .info-item .label { font-weight: bold; }
-        .badge.posted { color: green; font-weight: bold; }
-        .badge.draft { color: orange; font-weight: bold; }
+        .badge.posted { background-color: #28a745; }
+        .badge.draft { background-color: #ffc107; color: #000; }
+        
+        .table-responsive { margin-bottom: 20px; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-        th.amount-col, td.amount { text-align: right; }
-        .total { font-weight: bold; }
+        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        th.amount-col, td.amount-col { text-align: right; }
+        tr.total { font-weight: bold; background-color: #f8f9fa; }
+        
+        .actions { 
+            margin-top: 20px; 
+            display: flex; 
+            gap: 10px; 
+            flex-wrap: wrap;
+        }
+        .actions a, .actions button { 
+            padding: 8px 16px; 
+            border-radius: 5px; 
+            border: none; 
+            cursor: pointer; 
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        .btn-success:hover { background-color: #218838; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        
+        .entry-details { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; }
+        .details-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .detail-item { padding: 10px; }
+        .detail-item .label { font-weight: 600; display: block; margin-bottom: 5px; }
+        .detail-item .value { color: #555; }
+
+        /* ✅ Hide sidebar and buttons when printing */
+        @media print {
+            .main-sidebar, .actions, body { display: none !important; }
+            .container-wrapper { 
+                margin: 0; 
+                padding: 0; 
+                box-shadow: none; 
+                border-radius: 0;
+            }
+        }
     </style>
 </head>
-<body>
-
-<div class="main-sidebar">
-<?php include 'billing_sidebar.php'; ?>
-</div>
+<body class="p-4 bg-light">
 
 <div class="container">
-    <header>
-        <h1>Journal Entry Lines - Entry #<?= $entry['entry_id'] ?></h1>
-        <div class="entry-info">
-            <div class="info-item">
-                <span class="label">Date:</span>
-                <span class="value"><?= htmlspecialchars($entry['entry_date']) ?></span>
-            </div>
-            <div class="info-item">
-                <span class="label">Status:</span>
-                <span class="badge <?= strtolower($entry['status']) ?>"><?= $entry['status'] ?></span>
-            </div>
-            <div class="info-item">
-                <span class="label">Reference:</span>
-                <span class="value"><?= htmlspecialchars($entry['reference']) ?></span>
-            </div>
+<div class="container-wrapper">
+    <h1 class="mb-4">Journal Entry Lines - Entry #<?= $entry['entry_id'] ?></h1>
+    
+    <div class="entry-info">
+        <div class="info-item">
+            <span class="label">Date:</span>
+            <span class="value"><?= htmlspecialchars($entry['entry_date']) ?></span>
         </div>
-    </header>
+        <div class="info-item">
+            <span class="label">Status:</span>
+            <span class="badge <?= strtolower($entry['status']) ?>"><?= $entry['status'] ?></span>
+        </div>
+        <div class="info-item">
+            <span class="label">Reference:</span>
+            <span class="value"><?= htmlspecialchars($entry['reference']) ?></span>
+        </div>
+    </div>
 
-    <div class="table-container">
-        <table id="entry-table">
-            <thead>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped align-middle">
+            <thead class="table-white">
                 <tr>
                     <th>Account</th>
                     <th class="amount-col">Debit</th>
@@ -113,8 +143,8 @@ $total_credit = array_sum(array_column($lines, 'credit'));
                 <?php foreach ($lines as $line): ?>
                     <tr>
                         <td><?= htmlspecialchars($line['account_name']) ?></td>
-                        <td class="amount"><?= $line['debit'] > 0 ? number_format($line['debit'], 2) : '' ?></td>
-                        <td class="amount"><?= $line['credit'] > 0 ? number_format($line['credit'], 2) : '' ?></td>
+                        <td class="amount-col"><?= $line['debit'] > 0 ? number_format($line['debit'], 2) : '' ?></td>
+                        <td class="amount-col"><?= $line['credit'] > 0 ? number_format($line['credit'], 2) : '' ?></td>
                         <td><?= htmlspecialchars($line['description']) ?></td>
                     </tr>
                 <?php endforeach; ?>
@@ -123,10 +153,10 @@ $total_credit = array_sum(array_column($lines, 'credit'));
             <?php endif; ?>
             </tbody>
             <tfoot>
-                <tr>
+                <tr class="total">
                     <th>TOTAL</th>
-                    <th class="amount"><?= number_format($total_debit, 2) ?></th>
-                    <th class="amount"><?= number_format($total_credit, 2) ?></th>
+                    <th class="amount-col"><?= number_format($total_debit, 2) ?></th>
+                    <th class="amount-col"><?= number_format($total_credit, 2) ?></th>
                     <th></th>
                 </tr>
             </tfoot>
@@ -163,6 +193,11 @@ $total_credit = array_sum(array_column($lines, 'credit'));
             </div>
         </div>
     </div>
+</div>
+
+<div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
+</div>
 </div>
 
 <script>

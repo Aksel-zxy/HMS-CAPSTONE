@@ -417,21 +417,10 @@ $notifCount = $notif->notifCount;
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h2></h2>
 
-                        <div class="d-flex align-items-center w-100" style="max-width: 700px;">
+                        <div class="d-flex align-items-center w-100" style="max-width: 500px;">
                             <!-- Search bar -->
                             <input type="text" id="searchInput" class="form-control me-2"
                                 placeholder="Search medicine...">
-                            <!-- Display Unit Dropdown -->
-                            <form method="GET" class="d-flex gap-2">
-                                <select name="display_unit" class="form-select" onchange="this.form.submit()">
-                                    <option value="piece">Piece</option>
-                                    <option value="blister">Blister</option>
-                                    <option value="box">Box</option>
-                                    <option value="bottle">Bottle</option>
-                                    <option value="vial">Vial</option>
-                                    <option value="bag">Bag</option>
-                                </select>
-                            </form>
                             <!-- Add Medicine button -->
                             <button type="button" class="btn btn-primary text-nowrap" data-bs-toggle="modal"
                                 data-bs-target="#medicineModal">
