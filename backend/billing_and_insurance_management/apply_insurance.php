@@ -2,141 +2,123 @@
 include '../../SQL/config.php';
 session_start();
 
-/* ===============================
-   REQUEST CHECK
-================================ */
+header('Content-Type: application/json');
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    die("<script>alert('Invalid request'); window.history.back();</script>");
+    echo json_encode(['status'=>'error','message'=>'Invalid request']);
+    exit;
 }
 
-/* ===============================
-   INPUT VALIDATION
-================================ */
-$patient_id       = isset($_POST['patient_id']) ? (int)$_POST['patient_id'] : 0;
-$billing_id       = isset($_POST['billing_id']) ? (int)$_POST['billing_id'] : 0;
+$action           = $_POST['action'] ?? '';
+$patient_id       = (int)($_POST['patient_id'] ?? 0);
+$billing_id       = (int)($_POST['billing_id'] ?? 0);
 $insurance_number = trim($_POST['insurance_number'] ?? '');
 
 if ($patient_id <= 0 || $billing_id <= 0 || $insurance_number === '') {
-    die("<script>alert('All fields are required'); window.history.back();</script>");
+    echo json_encode(['status'=>'error','message'=>'Missing required fields']);
+    exit;
 }
 
-/* ===============================
-   GET PATIENT NAME (SOURCE OF TRUTH)
-================================ */
+/* ================= GET PATIENT ================= */
 $stmt = $conn->prepare("
     SELECT CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name
-    FROM patientinfo
-    WHERE patient_id = ?
+    FROM patientinfo WHERE patient_id=?
 ");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 if (!$patient) {
-    die("<script>alert('Patient not found'); window.history.back();</script>");
+    echo json_encode(['status'=>'error','message'=>'Patient not found']);
+    exit;
 }
 
 $full_name = trim($patient['full_name']);
 
-/* ===============================
-   VERIFY INSURANCE
-================================ */
+/* ================= VERIFY INSURANCE ================= */
 $stmt = $conn->prepare("
     SELECT insurance_company, promo_name, discount_type, discount_value
     FROM patient_insurance
-    WHERE insurance_number = ?
-      AND full_name = ?
-      AND status = 'Active'
+    WHERE insurance_number=? AND full_name=? AND status='Active'
     LIMIT 1
 ");
 $stmt->bind_param("ss", $insurance_number, $full_name);
 $stmt->execute();
 $insurance = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 if (!$insurance) {
-    die("<script>alert('Invalid insurance or name mismatch'); window.history.back();</script>");
+    echo json_encode(['status'=>'error','message'=>'Invalid or inactive insurance']);
+    exit;
 }
 
-/* ===============================
-   GET BILLING RECORD
-================================ */
+/* ================= GET BILLING ================= */
 $stmt = $conn->prepare("
-    SELECT billing_id, total_amount
+    SELECT total_amount
     FROM billing_records
-    WHERE billing_id = ?
-      AND patient_id = ?
-      AND status = 'Pending'
-    LIMIT 1
+    WHERE billing_id=? AND patient_id=? AND status='Pending'
 ");
 $stmt->bind_param("ii", $billing_id, $patient_id);
 $stmt->execute();
 $billing = $stmt->get_result()->fetch_assoc();
+$stmt->close();
 
 if (!$billing) {
-    die("<script>alert('No pending billing found'); window.history.back();</script>");
+    echo json_encode(['status'=>'error','message'=>'No pending billing found']);
+    exit;
 }
 
-$total_amount = (float)$billing['total_amount'];
+$total = (float)$billing['total_amount'];
 
-/* ===============================
-   CALCULATE INSURANCE
-================================ */
+/* ================= CALCULATE ================= */
 if ($insurance['discount_type'] === 'Percentage') {
-    $insurance_covered = round(($insurance['discount_value'] / 100) * $total_amount, 2);
+    $covered = round(($insurance['discount_value'] / 100) * $total, 2);
+    $discountLabel = $insurance['discount_value'] . '%';
 } else {
-    $insurance_covered = round(min($insurance['discount_value'], $total_amount), 2);
+    $covered = round(min($insurance['discount_value'], $total), 2);
+    $discountLabel = '₱' . number_format($insurance['discount_value'], 2);
 }
 
-$out_of_pocket = round($total_amount - $insurance_covered, 2);
-if ($out_of_pocket < 0) {
-    $out_of_pocket = 0;
+$out_of_pocket = max(0, round($total - $covered, 2));
+
+/* ================= PREVIEW MODE ================= */
+if ($action === 'preview') {
+    echo json_encode([
+        'status' => 'preview',
+        'insurance_company' => $insurance['insurance_company'],
+        'promo_name' => $insurance['promo_name'],
+        'discount_label' => $discountLabel,
+        'insurance_covered' => number_format($covered,2),
+        'out_of_pocket' => number_format($out_of_pocket,2)
+    ]);
+    exit;
 }
 
-/* ===============================
-   APPLY INSURANCE (TRANSACTION)
-================================ */
+/* ================= APPLY MODE ================= */
 $conn->begin_transaction();
 
 try {
-
-    /* ---- UPDATE billing_records ---- */
     $stmt = $conn->prepare("
         UPDATE billing_records
-        SET insurance_covered = ?,
-            out_of_pocket = ?,
-            grand_total = ?
-        WHERE billing_id = ?
-          AND patient_id = ?
+        SET insurance_covered=?, out_of_pocket=?, grand_total=?
+        WHERE billing_id=? AND patient_id=?
     ");
-    $stmt->bind_param(
-        "dddii",
-        $insurance_covered,
-        $out_of_pocket,
-        $out_of_pocket,
-        $billing_id,
-        $patient_id
-    );
+    $stmt->bind_param("dddii", $covered, $out_of_pocket, $out_of_pocket, $billing_id, $patient_id);
     $stmt->execute();
-
-    /* ---- UPDATE patient_receipt ---- */
-    $payment_method = $insurance['promo_name'];
 
     $stmt = $conn->prepare("
         UPDATE patient_receipt
-        SET insurance_covered = ?,
-            total_out_of_pocket = ?,
-            grand_total = ?,
-            payment_method = ?,
-            status = 'Pending'
-        WHERE billing_id = ?
-          AND patient_id = ?
+        SET insurance_covered=?, total_out_of_pocket=?, grand_total=?,
+            payment_method=?, status='Pending'
+        WHERE billing_id=? AND patient_id=?
     ");
     $stmt->bind_param(
         "dddsii",
-        $insurance_covered,
+        $covered,
         $out_of_pocket,
         $out_of_pocket,
-        $payment_method,
+        $insurance['promo_name'],
         $billing_id,
         $patient_id
     );
@@ -144,13 +126,11 @@ try {
 
     $conn->commit();
 
-    echo "<script>
-        alert('Insurance applied successfully!');
-        window.location='../billing_records/billing_summary.php?patient_id={$patient_id}';
-    </script>";
-    exit;
-
+    echo json_encode([
+        'status'=>'success',
+        'message'=>'Insurance applied successfully'
+    ]);
 } catch (Exception $e) {
     $conn->rollback();
-    die("<script>alert('Insurance application failed'); window.history.back();</script>");
+    echo json_encode(['status'=>'error','message'=>'Failed to apply insurance']);
 }
