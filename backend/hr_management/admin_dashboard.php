@@ -59,17 +59,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 <body>
 
-    <!----- Full-page Loader ----->
-    <div id="loading-screen">
-        <div class="loader">
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-            <div></div>
-        </div>
-    </div>
-
     <div class="d-flex">
         <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
@@ -310,27 +299,60 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 <!-- ----- Attendance Summary Per Employee ----- -->
                 <div class="dashboard-attendance-card">
                     <div class="dashboard-attendance-body">
-                        <h5 class="dashboard-attendance-title">Employee Attendance Summary per Month</h5>
+                        <h5 class="dashboard-attendance-title">Employee Attendance Summary</h5>
+                        <div class="filters-row">
 
-                        <!-- Employee Filter Dropdown -->
-                        <div class="employee-filter-container">
-                            <label for="employee_id">Employee</label>
-                            <select name="employee_id" id="employee_id" required>
-                                <option value="">----- Select Employee -----</option>
-                                <?php foreach ($employees as $emp): ?>
-                                    <option value="<?php echo $emp['employee_id']; ?>">
-                                        <?php echo htmlspecialchars($emp['full_name'] ?? ''); ?>
-                                        (ID: <?php echo $emp['employee_id']; ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                            <!-- Employee -->
+                            <div class="filter-container">
+                                <label for="employee_id">Employee</label>
+                                <select name="employee_id" id="employee_id" required>
+                                    <option value="">----- Select Employee -----</option>
+                                    <?php foreach ($employees as $emp): ?>
+                                        <option value="<?= $emp['employee_id']; ?>">
+                                            <?= htmlspecialchars($emp['full_name'] ?? ''); ?> (ID: <?= $emp['employee_id']; ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <!-- Month -->
+                            <div class="filter-container">
+                                <label for="month">Month</label>
+                                <select id="month">
+                                    <?php
+                                    $months = [
+                                        1=>'January',2=>'February',3=>'March',
+                                        4=>'April',5=>'May',6=>'June',
+                                        7=>'July',8=>'August',9=>'September',
+                                        10=>'October',11=>'November',12=>'December'
+                                    ];
+                                    $currentMonth = date('n');
+                                    foreach ($months as $num => $name):
+                                    ?>
+                                        <option value="<?= $num ?>" <?= $num == $currentMonth ? 'selected' : '' ?>>
+                                            <?= $name ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <!-- Year -->
+                            <div class="filter-container">
+                                <label for="year">Year</label>
+                                <select id="year">
+                                    <?php
+                                    $currentYear = date('Y');
+                                    for ($y = $currentYear; $y >= $currentYear - 5; $y--):
+                                    ?>
+                                        <option value="<?= $y ?>"><?= $y ?></option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
                         </div>
-
                         <canvas id="dashboardAttendanceChart"></canvas>
                     </div>
                 </div>
             </div>
-
 
             <!-- ---------- Pending Leave Card ---------- -->
             <div class="dashboard-leave-card">
@@ -537,7 +559,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 const totalEmployees = chart.data.labels.reduce((sum, label, idx) => {
                     let value = chart.data.datasets[0].data[idx];
                     if(label === 'Half Day' || label === 'On Leave (Half Day)' || label === 'Absent (Half Day)') {
-                        value = value * 0.5;
+                        value = value * 1;
                     }
                     return sum + value;
                 }, 0);
@@ -630,21 +652,24 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
         // ---------------- Employee Bar Chart ----------------
         let empChart;
 
-        function fetchEmployeeAttendance(employeeId) {
+        function fetchEmployeeAttendance() {
+            const employeeId = document.getElementById('employee_id').value;
+            const month      = document.getElementById('month').value;
+            const year       = document.getElementById('year').value;
+
+            if (!employeeId) return;
+
             const canvas = document.getElementById('dashboardAttendanceChart');
             forceCanvasReady(canvas);
             const ctx = canvas.getContext('2d');
 
-            fetch(`get_attendance_summary.php?employee_id=${employeeId || ''}`)
+            fetch(`get_attendance_summary.php?employee_id=${employeeId}&month=${month}&year=${year}`)
                 .then(res => res.json())
                 .then(data => {
-                    // Map all statuses to data, default 0
                     const values = allStatuses.map(s => data[s] || 0);
 
                     if (empChart) {
-                        empChart.data.labels = allStatuses;
                         empChart.data.datasets[0].data = values;
-                        empChart.data.datasets[0].backgroundColor = statusColors;
                         empChart.update({ duration: 800, easing: 'easeOutQuart' });
                     } else {
                         empChart = new Chart(ctx, {
@@ -660,9 +685,15 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                             },
                             options: {
                                 responsive: true,
-                                animation: { duration: 800, easing: 'easeOutQuart' },
-                                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                                plugins: { legend: { display: false }, tooltip: { enabled: true } }
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: { stepSize: 1 }
+                                    }
+                                },
+                                plugins: {
+                                    legend: { display: false }
+                                }
                             }
                         });
                     }
@@ -672,13 +703,9 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
         // ---------------- Event Listeners ----------------
         document.addEventListener("DOMContentLoaded", function () {
-            const dateInput = document.getElementById("attendanceDate");
-            loadAttendanceChart(dateInput.value);
-            dateInput.addEventListener("change", function () { loadAttendanceChart(this.value); });
-
-            const employeeSelect = document.getElementById('employee_id');
-            fetchEmployeeAttendance(employeeSelect.value);
-            employeeSelect.addEventListener('change', function () { fetchEmployeeAttendance(this.value); });
+            ['employee_id', 'month', 'year'].forEach(id => {
+                document.getElementById(id).addEventListener('change', fetchEmployeeAttendance);
+            });
         });
 
         // ---------- Dashboard Payroll Per Month, 1st Half and 2nd Half ---------- 

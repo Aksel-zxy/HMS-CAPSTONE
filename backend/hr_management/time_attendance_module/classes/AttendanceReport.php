@@ -26,6 +26,7 @@ class AttendanceReport {
                     SUM(CASE 
                             WHEN a.status='On Leave' THEN 1
                             WHEN a.status='On Leave (Half Day)' THEN 0.5
+                            WHEN a.status='Half Day' THEN 0.5
                             ELSE 0
                         END) AS days_on_leave,
 
