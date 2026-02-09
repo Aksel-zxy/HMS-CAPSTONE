@@ -1,0 +1,52 @@
+.insurance-card{
+    width:100%;
+    max-width:360px;
+    height:220px;
+    border-radius:18px;
+    padding:18px;
+    color:#fff;
+    position:relative;
+    box-shadow:0 10px 25px rgba(0,0,0,.3);
+    overflow:hidden;
+    margin:auto;
+}
+.insurance-card::after{
+    content:"";
+    position:absolute;
+    right:-40px;
+    top:-40px;
+    width:140px;
+    height:140px;
+    background:rgba(255,255,255,.15);
+    border-radius:50%;
+}
+.insurance-card .card-header{
+    font-size:14px;
+    font-weight:bold;
+    letter-spacing:1px;
+}
+.insurance-card .chip{
+    width:45px;
+    height:35px;
+    background:linear-gradient(135deg,#ffd700,#ffec8b);
+    border-radius:6px;
+    margin:10px 0;
+}
+.insurance-card .insurance-number{
+    font-size:15px;
+    letter-spacing:1px;
+    font-weight:bold;
+}
+.insurance-card .patient-name{
+    font-size:18px;
+    font-weight:bold;
+    text-transform:uppercase;
+}
+.insurance-card .card-footer{
+    position:absolute;
+    bottom:15px;
+    width:calc(100% - 36px);
+    display:flex;
+    justify-content:space-between;
+    font-size:13px;
+}

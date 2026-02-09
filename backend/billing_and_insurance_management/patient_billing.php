@@ -105,6 +105,7 @@ if (!$result) {
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 <link rel="stylesheet" href="assets/css/patient_billing.css">
+<link rel="stylesheet" href="assets/css/insurance.css">
 
 <script>
 async function refreshAndSync(btn) {
@@ -218,42 +219,119 @@ if (!$receipt_id) {
 </a>
 
 <?php if (!$insuranceApplied): ?>
+<!-- Modal Trigger Button -->
 <button class="btn btn-info btn-sm"
         data-bs-toggle="modal"
-        data-bs-target="#insuranceModal<?= $patient_id ?>">
+        data-bs-target="#insuranceModal<?= $billing_id ?>">
     Enter Insurance
 </button>
-<?php endif; ?>
 
-</div>
-
-<?php if (!$insuranceApplied): ?>
-<div class="modal fade" id="insuranceModal<?= $patient_id ?>" tabindex="-1">
-<div class="modal-dialog">
-<form method="POST" action="apply_insurance.php" class="modal-content">
+<!-- Insurance Modal -->
+<div class="modal fade" id="insuranceModal<?= $billing_id ?>" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content">
 
 <div class="modal-header">
-<h5 class="modal-title">Apply Insurance</h5>
-<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <h5 class="modal-title">Apply Insurance</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
 
 <div class="modal-body">
-<input type="hidden" name="patient_id" value="<?= $patient_id ?>">
-<input type="hidden" name="billing_id" value="<?= $billing_id ?>">
+    <input type="hidden" id="patient_id_<?= $billing_id ?>" value="<?= $patient_id ?>">
+    <input type="hidden" id="billing_id_<?= $billing_id ?>" value="<?= $billing_id ?>">
 
-<label class="form-label">Insurance Number</label>
-<input type="text" name="insurance_number" class="form-control" required>
+    <label class="form-label">Insurance Number</label>
+    <div class="input-group mb-2">
+        <input type="text"
+               id="insurance_number_<?= $billing_id ?>"
+               class="form-control"
+               placeholder="Enter insurance number">
+        <button class="btn btn-primary"
+                onclick="previewInsurance(<?= $billing_id ?>)">
+            Search
+        </button>
+    </div>
+
+    <div id="insurance_preview_<?= $billing_id ?>" class="mt-3"></div>
+    <div id="billing_info_<?= $billing_id ?>" class="mt-2"></div>
 </div>
 
 <div class="modal-footer">
-<button class="btn btn-primary">Apply</button>
-<button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="button"
+            class="btn btn-success"
+            id="applyBtn_<?= $billing_id ?>"
+            style="display:none;"
+            onclick="applyInsurance(<?= $billing_id ?>)">
+        Apply Insurance
+    </button>
+    <button type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal">
+        Cancel
+    </button>
 </div>
 
-</form>
 </div>
 </div>
+</div>
+
+<script>
+function previewInsurance(id){
+    let insurance_number = $('#insurance_number_'+id).val().trim();
+    let patient_id = $('#patient_id_'+id).val();
+    let billing_id = $('#billing_id_'+id).val();
+
+    if(!insurance_number){
+        alert('Enter insurance number');
+        return;
+    }
+
+    $.post('apply_insurance.php',{
+        action:'preview',
+        patient_id: patient_id,
+        billing_id: billing_id,
+        insurance_number: insurance_number
+    }, function(res){
+
+        if(res.status === 'preview'){
+            $('#insurance_preview_'+id).html(res.insurance_card_html);
+            $('#billing_info_'+id).html(`
+                <p><strong>Insurance Covered:</strong> ₱${res.insurance_covered}</p>
+                <p><strong>Out of Pocket:</strong> ₱${res.out_of_pocket}</p>
+            `);
+            $('#applyBtn_'+id).show();
+        } else {
+            alert(res.message);
+            $('#applyBtn_'+id).hide();
+            $('#insurance_preview_'+id).html('');
+            $('#billing_info_'+id).html('');
+        }
+    }, 'json');
+}
+
+function applyInsurance(id){
+    let insurance_number = $('#insurance_number_'+id).val().trim();
+    let patient_id = $('#patient_id_'+id).val();
+    let billing_id = $('#billing_id_'+id).val();
+
+    $.post('apply_insurance.php',{
+        action:'apply',
+        patient_id: patient_id,
+        billing_id: billing_id,
+        insurance_number: insurance_number
+    }, function(res){
+        if(res.status === 'success'){
+            alert(res.message);
+            location.reload();
+        } else {
+            alert(res.message);
+        }
+    }, 'json');
+}
+</script>
 <?php endif; ?>
+
+
 
 </td>
 </tr>
@@ -273,6 +351,7 @@ if (!$receipt_id) {
 
 </div>
 </div>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
