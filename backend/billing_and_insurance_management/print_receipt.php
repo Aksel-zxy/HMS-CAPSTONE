@@ -19,7 +19,8 @@ $stmt = $conn->prepare("
            pi.phone_number, pi.address, pi.attending_doctor,
            br.total_amount, br.insurance_covered AS billing_insurance,
            br.out_of_pocket AS billing_out_of_pocket, br.grand_total AS billing_grand_total,
-           br.status AS billing_status
+           br.status AS billing_status,
+           br.billing_date
     FROM patient_receipt pr
     INNER JOIN patientinfo pi ON pr.patient_id = pi.patient_id
     LEFT JOIN billing_records br ON pr.billing_id = br.billing_id
@@ -38,7 +39,7 @@ $patient_id = (int)$billing['patient_id'];
 
 $full_name = trim(
     $billing['fname'].' '.
-    (!empty($billing['mname']) ? $billing['mname'].' ' : '').
+    (!empty($billing['mname']) ? $billing['mname'].' ' : ''). 
     $billing['lname']
 );
 
@@ -93,16 +94,13 @@ while ($row = $res->fetch_assoc()) {
 
 /* ===============================
    TOTALS
-   Compute out-of-pocket if receipt is empty or zero
+   Compute correctly: subtotal, insurance, total due
 ================================ */
-$total_discount = floatval($billing['total_discount'] ?? 0);
 $insurance_covered = floatval($billing['insurance_covered'] ?? $billing['billing_insurance'] ?? 0);
 
-// If receipt out-of-pocket exists and >0, use it; else compute from billing
-$total_out_of_pocket = floatval($billing['total_out_of_pocket']);
-if ($total_out_of_pocket <= 0) {
-    $total_out_of_pocket = floatval($billing['billing_out_of_pocket'] ?? ($total_charges - $insurance_covered));
-}
+// Total due = subtotal - insurance
+$total_out_of_pocket = $total_charges - $insurance_covered;
+if ($total_out_of_pocket < 0) $total_out_of_pocket = 0;
 ?>
 
 <!DOCTYPE html>
@@ -228,7 +226,6 @@ if ($doctor) {
 <td width="70%"></td>
 <td width="30%">
 SUB TOTAL: ₱ <?= number_format($total_charges,2) ?><br>
-DISCOUNT: ₱ <?= number_format($total_discount,2) ?><br>
 INSURANCE: ₱ <?= number_format($insurance_covered,2) ?><br>
 <div class="total-box">TOTAL DUE: ₱ <?= number_format($total_out_of_pocket,2) ?></div>
 </td>

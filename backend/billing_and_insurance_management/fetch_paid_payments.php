@@ -2,21 +2,27 @@
 include '../../SQL/config.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
-/* ====================== AJAX FETCH ====================== */
+require __DIR__ . '/vendor/autoload.php';
+use GuzzleHttp\Client;
+
+define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
+
+// ================= AJAX FETCH =================
 if (isset($_GET['json'])) {
+    $client = new Client([
+        'base_uri' => 'https://api.paymongo.com/v1/',
+        'headers' => [
+            'Accept'        => 'application/json',
+            'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
+        ],
+        'timeout' => 10
+    ]);
 
     header('Content-Type: application/json');
 
     function createJournalEntry($conn, $billing_id, $patient_name, $amount, $method) {
         $created_by = $_SESSION['user_name'] ?? 'System';
         $desc = "Payment received from $patient_name via $method";
-
-        $stmt = $conn->prepare("SELECT entry_id FROM journal_entries WHERE reference_id=? LIMIT 1");
-        $stmt->bind_param("i", $billing_id);
-        $stmt->execute();
-        $existing = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-        if ($existing) return;
 
         $stmt = $conn->prepare("
             INSERT INTO journal_entries 
@@ -45,116 +51,144 @@ if (isset($_GET['json'])) {
         $stmt->close();
     }
 
-    // ===================== Fetch Paid Payments =====================
-    $paidPaymentsResult = $conn->query("
-        SELECT pp.*, br.billing_id, br.patient_id, br.status AS billing_status,
-               CONCAT(pi.fname,' ',IFNULL(pi.mname,''),' ',pi.lname) AS patient_name
-        FROM paymongo_payments pp
-        LEFT JOIN billing_records br ON br.paymongo_payment_id = pp.payment_id
-        LEFT JOIN patientinfo pi ON pi.patient_id = br.patient_id
-        WHERE pp.status='paid'
-        ORDER BY pp.paid_at DESC
-    ");
+    try {
+        $response = $client->get('payments?limit=50');
+        $body = json_decode($response->getBody(), true);
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        exit;
+    }
 
-    $updatedRows = [];
+    $payments = $body['data'] ?? [];
     $processedPayments = 0;
     $processedPatients = 0;
     $patientsPaid = [];
+    $updatedRows = [];
 
-    while ($row = $paidPaymentsResult->fetch_assoc()) {
-        $billing_id = (int)($row['billing_id'] ?? 0);
-        $patient_id = (int)($row['patient_id'] ?? 0);
-        $method = $row['payment_method'] ?? 'PAYMONGO';
-        $amount = (float)($row['amount'] ?? 0);
-        $paid_at = $row['paid_at'] ?? date('Y-m-d H:i:s');
-        $patient_name = $row['patient_name'] ?? null;
+    foreach ($payments as $p) {
+        $attr = $p['attributes'] ?? [];
+        if (($attr['status'] ?? '') !== 'paid') continue;
 
-        // Fallback: extract billing_id from remarks if missing
-        if (!$billing_id && !empty($row['remarks'])) {
-            if (preg_match('/Billing\s?#?(\d+)/i', $row['remarks'], $m)) {
-                $billing_id = (int)$m[1];
+        $payment_id = $p['id'];
+        $intent_id  = $attr['payment_intent_id'] ?? null;
+        $amount     = ($attr['amount'] ?? 0)/100;
+        $remarks    = $attr['remarks'] ?? $attr['description'] ?? '';
+        $method     = strtoupper($attr['source']['type'] ?? 'PAYMONGO');
 
-                // Get patient_id and name from billing_records & patientinfo
-                $stmt = $conn->prepare("SELECT patient_id FROM billing_records WHERE billing_id=? LIMIT 1");
-                $stmt->bind_param("i", $billing_id);
+        try {
+            $dt = new DateTime($attr['paid_at'] ?? $attr['created_at'] ?? 'now');
+            $paid_at = $dt->format('Y-m-d H:i:s');
+        } catch (Exception $e) {
+            $paid_at = date('Y-m-d H:i:s');
+        }
+
+        $stmt = $conn->prepare("
+            INSERT INTO paymongo_payments
+                (payment_id, payment_intent_id, amount, remarks, payment_method, status, paid_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+                amount=VALUES(amount),
+                status=VALUES(status),
+                paid_at=VALUES(paid_at),
+                payment_method=VALUES(payment_method)
+        ");
+        if ($stmt) {
+            $stmt->bind_param("ssdssss", $payment_id, $intent_id, $amount, $remarks, $method, $attr['status'], $paid_at);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        preg_match('/TXN[A-Z0-9]+/i', $remarks, $m);
+        $txn = $m[0] ?? null;
+        $billing = null;
+
+        if ($txn) {
+            $stmt = $conn->prepare("SELECT billing_id, patient_id, status FROM billing_records WHERE transaction_id=? LIMIT 1");
+            $stmt->bind_param("s", $txn);
+            $stmt->execute();
+            $billing = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+        }
+
+        if (empty($billing)) {
+            preg_match('/Patient\s#?(\d+)/i', $remarks, $m);
+            $patient_id = $m[1] ?? null;
+            if ($patient_id) {
+                $stmt = $conn->prepare("SELECT billing_id, patient_id, status FROM billing_records WHERE patient_id=? AND status!='Paid' ORDER BY billing_id DESC LIMIT 1");
+                $stmt->bind_param("i", $patient_id);
                 $stmt->execute();
-                $billingInfo = $stmt->get_result()->fetch_assoc();
+                $billing = $stmt->get_result()->fetch_assoc();
                 $stmt->close();
-
-                $patient_id = (int)($billingInfo['patient_id'] ?? 0);
-
-                if ($patient_id) {
-                    $stmt = $conn->prepare("SELECT CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id=? LIMIT 1");
-                    $stmt->bind_param("i", $patient_id);
-                    $stmt->execute();
-                    $patientInfo = $stmt->get_result()->fetch_assoc();
-                    $stmt->close();
-                    $patient_name = $patientInfo['full_name'] ?? "Patient #$patient_id";
-                }
             }
         }
 
-        // Only mark billing as Paid if not already Paid
-        if ($billing_id && $row['billing_status'] !== 'Paid') {
-            $stmt = $conn->prepare("
-                UPDATE billing_records
-                SET status='Paid', payment_status='Paid', payment_method=?, payment_date=?, paid_amount=?, balance=0, paymongo_payment_id=?
-                WHERE billing_id=?
-            ");
-            $stmt->bind_param("ssdii", $method, $paid_at, $amount, $row['payment_id'], $billing_id);
+        if (!$billing || $billing['status'] === 'Paid') continue;
+
+        $billing_id = (int)$billing['billing_id'];
+        $patient_id = (int)$billing['patient_id'];
+
+        $stmt = $conn->prepare("SELECT CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id=? LIMIT 1");
+        $stmt->bind_param("i", $patient_id);
+        $stmt->execute();
+        $patient = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $patient_name = $patient['full_name'] ?? "Patient #$patient_id";
+
+        $stmt = $conn->prepare("
+            UPDATE billing_records
+            SET status='Paid', payment_status='Paid', payment_method=?, payment_date=?, paid_amount=?, balance=0, paymongo_payment_id=?, paymongo_payment_intent_id=?
+            WHERE billing_id=?
+        ");
+        if ($stmt) {
+            $stmt->bind_param("ssdssi", $method, $paid_at, $amount, $payment_id, $intent_id, $billing_id);
             $stmt->execute();
             $stmt->close();
-
-            $stmt = $conn->prepare("
-                UPDATE patient_receipt
-                SET status='Paid', payment_method=?, payment_reference=?, paymongo_reference=?
-                WHERE billing_id=?
-            ");
-            $stmt->bind_param("sssi", $method, $row['payment_id'], $row['payment_id'], $billing_id);
-            $stmt->execute();
-            $stmt->close();
-
-            createJournalEntry($conn, $billing_id, $patient_name, $amount, $method);
-
-            if (!in_array($patient_id, $patientsPaid)) {
-                $patientsPaid[] = $patient_id;
-                $processedPatients++;
-            }
         }
 
+        $stmt = $conn->prepare("
+            UPDATE patient_receipt
+            SET status='Paid', payment_method=?, payment_reference=?, paymongo_reference=?
+            WHERE billing_id=?
+        ");
+        if ($stmt) {
+            $stmt->bind_param("sssi", $method, $payment_id, $payment_id, $billing_id);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        createJournalEntry($conn, $billing_id, $patient_name, $amount, $method);
+
+        if (!in_array($patient_id, $patientsPaid)) {
+            $patientsPaid[] = $patient_id;
+            $processedPatients++;
+        }
+
+        $processedPayments++;
         $updatedRows[] = [
-            'billing_id' => $billing_id ?: '-',
-            'patient_name' => $patient_name ?: $row['remarks'] ?? '-',
+            'billing_id' => $billing_id,
+            'patient_name' => $patient_name,
             'amount' => $amount,
             'method' => $method,
             'paid_at' => $paid_at
         ];
-        $processedPayments++;
     }
 
-    echo json_encode([
-        'status' => $processedPayments > 0 ? 'success' : 'no_update',
-        'message' => $processedPayments > 0
-                     ? "Payments processed: $processedPayments. Patients marked as paid: $processedPatients."
-                     : "No new payments to update.",
-        'updated_rows' => $updatedRows,
-        'payments_processed' => $processedPayments,
-        'patients_paid' => $processedPatients
-    ]);
+    if ($processedPayments === 0) {
+        echo json_encode(['status'=>'no_update','message'=>'No updated payments.','updated_rows'=>[]]);
+    } else {
+        echo json_encode([
+            'status'=>'success',
+            'message'=>"Payments processed: $processedPayments. Patients marked as paid: $processedPatients.",
+            'payments_processed'=>$processedPayments,
+            'patients_paid'=>$processedPatients,
+            'updated_rows'=>$updatedRows
+        ]);
+    }
     exit;
 }
 
 // ================= PAGE LOAD =================
-$paidPayments = $conn->query("
-    SELECT pp.*, br.billing_id, CONCAT(pi.fname,' ',IFNULL(pi.mname,''),' ',pi.lname) AS patient_name
-    FROM paymongo_payments pp
-    LEFT JOIN billing_records br ON br.paymongo_payment_id = pp.payment_id
-    LEFT JOIN patientinfo pi ON pi.patient_id = br.patient_id
-    WHERE pp.status='paid'
-    ORDER BY pp.paid_at DESC
-    LIMIT 50
-")->fetch_all(MYSQLI_ASSOC);
-
+$paidPayments = $conn->query("SELECT * FROM paymongo_payments ORDER BY paid_at DESC")->fetch_all(MYSQLI_ASSOC);
 $processedPayments = count($paidPayments);
 $processedPatients = $conn->query("SELECT COUNT(DISTINCT patient_id) FROM billing_records WHERE status='Paid'")->fetch_row()[0];
 ?>
@@ -192,7 +226,7 @@ async function refreshAndSync(btn) {
         }
     } catch (err) {
         console.error('Sync error', err);
-        alert('The payment table is updated.');
+        alert('The payment is updated.');
     } finally {
         btn.disabled = false;
         btn.innerHTML = original;
@@ -200,15 +234,19 @@ async function refreshAndSync(btn) {
 }
 </script>
 </head>
+
 <body class="p-4 bg-light">
 <div class="container">
 <div class="card shadow p-4">
 
 <h4>PayMongo Sync Complete</h4>
+
 <p><strong>Total payments processed:</strong> <?= $processedPayments ?></p>
 <p><strong>Total patients successfully marked as paid:</strong> <?= $processedPatients ?></p>
 
-<button class="btn btn-outline-primary mb-3" onclick="refreshAndSync(this)">Refresh Now</button>
+<button class="btn btn-outline-primary mb-3" onclick="refreshAndSync(this)">
+    Refresh Now
+</button>
 
 <table class="table table-bordered table-striped" id="paymentsTable">
 <thead class="table-dark">
@@ -224,7 +262,7 @@ async function refreshAndSync(btn) {
 <?php foreach ($paidPayments as $p): ?>
 <tr>
     <td><?= htmlspecialchars($p['billing_id'] ?? '-') ?></td>
-    <td><?= htmlspecialchars($p['patient_name'] ?? $p['remarks']) ?></td>
+    <td><?= htmlspecialchars($p['remarks'] ?? '-') ?></td>
     <td>₱<?= number_format($p['amount'] ?? 0, 2) ?></td>
     <td><?= htmlspecialchars($p['payment_method'] ?? '-') ?></td>
     <td><?= htmlspecialchars($p['paid_at'] ?? '-') ?></td>
