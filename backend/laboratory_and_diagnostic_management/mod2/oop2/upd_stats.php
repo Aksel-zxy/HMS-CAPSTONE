@@ -11,7 +11,6 @@ class PatientSchedule
         $this->conn = $db;
     }
 
-    // Fetch schedules
     public function getSchedules($patient_id = null, $status = null)
     {
         if ($patient_id !== null && $status !== null) {
@@ -35,7 +34,6 @@ class PatientSchedule
         return $data;
     }
 
-    // Update by scheduleID (and insert dl_results on Completed)
     public function updateSchedule($scheduleID, $new_status = null, $scheduleDate = null, $scheduleTime = null, $cancelReason = null)
     {
         if (empty($scheduleID)) {
