@@ -1,265 +1,206 @@
 <?php
 include '../../SQL/config.php';
-require __DIR__ . '/vendor/autoload.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
 
+require __DIR__ . '/vendor/autoload.php';
 use GuzzleHttp\Client;
 
-header('Content-Type: application/json');
-
-/* =====================================================
-   PAYMONGO CONFIG
-===================================================== */
 define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
 
-$client = new Client([
-    'base_uri' => 'https://api.paymongo.com/v1/',
-    'headers' => [
-        'Accept'        => 'application/json',
-        'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
-    ],
-    'timeout' => 10
-]);
+// ================= AJAX FETCH =================
+if (isset($_GET['json'])) {
+    header('Content-Type: application/json');
 
-/* =====================================================
-   FETCH PAYMENTS
-===================================================== */
-try {
-    $response = $client->get('payments?limit=50');
-    $body = json_decode($response->getBody(), true);
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'PayMongo API error']);
+    $client = new Client([
+        'base_uri' => 'https://api.paymongo.com/v1/',
+        'headers' => [
+            'Accept'        => 'application/json',
+            'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
+        ],
+        'timeout' => 10
+    ]);
+
+    try {
+        $response = $client->get('payments?limit=50');
+        $body = json_decode($response->getBody(), true);
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        exit;
+    }
+
+    $payments = $body['data'] ?? [];
+    $processedPayments = 0;
+    $processedPatients = 0;
+    $updatedRows = [];
+
+    foreach ($payments as $p) {
+        $attr = $p['attributes'] ?? [];
+        if (($attr['status'] ?? '') !== 'paid') continue;
+
+        $payment_id = $p['id'];
+        $intent_id  = $attr['payment_intent_id'] ?? null;
+        $amount     = ($attr['amount'] ?? 0)/100;
+        $remarks    = $attr['remarks'] ?? $attr['description'] ?? '';
+        $method     = strtoupper($attr['source']['type'] ?? 'PAYMONGO');
+
+        try {
+            $paid_at = (new DateTime($attr['paid_at'] ?? $attr['created_at']))->format('Y-m-d H:i:s');
+        } catch (Exception $e) {
+            $paid_at = date('Y-m-d H:i:s');
+        }
+
+        // Extract billing ID from remarks
+        preg_match('/Billing\s?#?(\d+)/i', $remarks, $m);
+        $billing_id = $m[1] ?? null;
+        $patient_id = null;
+        $patient_name = null;
+
+        if ($billing_id) {
+            // Get patient info from billing_records
+            $stmt = $conn->prepare("SELECT patient_id, status FROM billing_records WHERE billing_id=? LIMIT 1");
+            $stmt->bind_param("i", $billing_id);
+            $stmt->execute();
+            $billing = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+
+            if ($billing) {
+                $patient_id = (int)$billing['patient_id'];
+                $stmt = $conn->prepare("SELECT CONCAT(fname,' ',IFNULL(mname,''),' ',lname) AS full_name FROM patientinfo WHERE patient_id=? LIMIT 1");
+                $stmt->bind_param("i", $patient_id);
+                $stmt->execute();
+                $patient = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+
+                $patient_name = $patient['full_name'] ?? "Patient #$patient_id";
+
+                // Update billing_records if not Paid
+                if ($billing['status'] !== 'Paid') {
+                    $stmt = $conn->prepare("UPDATE billing_records
+                        SET status='Paid', payment_status='Paid', payment_method=?, payment_date=?, paid_amount=?, balance=0, paymongo_payment_id=?, paymongo_payment_intent_id=?
+                        WHERE billing_id=?");
+                    $stmt->bind_param("ssdssi", $method, $paid_at, $amount, $payment_id, $intent_id, $billing_id);
+                    $stmt->execute();
+                    $stmt->close();
+
+                    $stmt = $conn->prepare("UPDATE patient_receipt
+                        SET status='Paid', payment_method=?, payment_reference=?, paymongo_reference=?
+                        WHERE billing_id=?");
+                    $stmt->bind_param("sssi", $method, $payment_id, $payment_id, $billing_id);
+                    $stmt->execute();
+                    $stmt->close();
+
+                    $processedPatients++;
+                }
+            }
+        }
+
+        $processedPayments++;
+        $updatedRows[] = [
+            'payment_id' => $payment_id,
+            'billing_id' => $billing_id,
+            'patient_id' => $patient_id,
+            'patient_name' => $patient_name,
+            'amount' => $amount,
+            'method' => $method,
+            'status' => $attr['status'],
+            'paid_at' => $paid_at,
+            'remarks' => $remarks
+        ];
+    }
+
+    echo json_encode([
+        'status'=>'success',
+        'message'=>"Payments processed: $processedPayments | Patients updated: $processedPatients",
+        'payments_processed'=>$processedPayments,
+        'patients_paid'=>$processedPatients,
+        'updated_rows'=>$updatedRows
+    ]);
     exit;
 }
 
-$payments = $body['data'] ?? [];
-
-/* =====================================================
-   FILTER PAID PAYMENTS
-===================================================== */
-$paidPayments = array_filter($payments, function ($p) {
-    return ($p['attributes']['status'] ?? '') === 'paid';
-});
-
-/* =====================================================
-   UPSERT PAYMONGO PAYMENTS
-===================================================== */
-$pmStmt = $conn->prepare("
-    INSERT INTO paymongo_payments
-        (payment_id, payment_intent_id, amount, remarks, payment_method, status, paid_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-        payment_intent_id = VALUES(payment_intent_id),
-        amount = VALUES(amount),
-        remarks = VALUES(remarks),
-        payment_method = VALUES(payment_method),
-        status = VALUES(status),
-        paid_at = VALUES(paid_at)
-");
-
-/* =====================================================
-   LOOP PAYMENTS
-===================================================== */
-$processed = 0;
-
-foreach ($paidPayments as $p) {
-
-    $attr = $p['attributes'];
-
-    $payment_id = $p['id'];
-    $intent_id  = $attr['payment_intent_id'] ?? null;
-    $amount     = ($attr['amount'] ?? 0) / 100;
-    $remarks    = $attr['remarks'] ?? $attr['description'] ?? null;
-    $method     = strtoupper($attr['source']['type'] ?? 'PAYMONGO');
-    $status     = $attr['status'];
-    $paid_at    = date(
-        'Y-m-d H:i:s',
-        strtotime($attr['paid_at'] ?? $attr['created_at'])
-    );
-
-    // Save PayMongo payment
-    $pmStmt->bind_param(
-        "ssdssss",
-        $payment_id,
-        $intent_id,
-        $amount,
-        $remarks,
-        $method,
-        $status,
-        $paid_at
-    );
-    $pmStmt->execute();
-
-    /* =====================================================
-       FIND MATCHING RECEIPT
-       Match by transaction_id OR paymongo_reference
-    ===================================================== */
-    $rStmt = $conn->prepare("
-        SELECT
-            pr.receipt_id,
-            pr.patient_id,
-            pr.billing_id,
-            pr.grand_total,
-            pr.transaction_id,
-            pr.status
-        FROM patient_receipt pr
-        WHERE pr.transaction_id = ? OR pr.paymongo_reference = ?
-        LIMIT 1
-    ");
-    $rStmt->bind_param("ss", $intent_id, $payment_id);
-    $rStmt->execute();
-    $receipt = $rStmt->get_result()->fetch_assoc();
-
-    if (!$receipt) {
-        continue; // no matching receipt
-    }
-
-    /* =====================================================
-       MARK RECEIPT + BILLING AS PAID
-    ===================================================== */
-    if ($receipt['status'] !== 'Paid') {
-        $billing_id = (int)$receipt['billing_id'];
-
-        // Update billing_records
-        $bStmt = $conn->prepare("
-            UPDATE billing_records
-            SET status='Paid', payment_method=?
-            WHERE billing_id=?
-        ");
-        $bStmt->bind_param("si", $method, $billing_id);
-        $bStmt->execute();
-
-        // Update patient_receipt
-        $uStmt = $conn->prepare("
-            UPDATE patient_receipt
-            SET status='Paid',
-                payment_method=?,
-                payment_reference=?,
-                paymongo_reference=?
-            WHERE receipt_id=?
-        ");
-        $uStmt->bind_param("sssi", $method, $payment_id, $payment_id, $receipt['receipt_id']);
-        $uStmt->execute();
-    }
-
-    /* =====================================================
-       CREATE JOURNAL ENTRY (ONCE PER TRANSACTION)
-    ===================================================== */
-    $txnRef = $receipt['transaction_id'];
-    $total  = (float)$receipt['grand_total'];
-
-    if (!$txnRef || $total <= 0) {
-        continue;
-    }
-
-    // Prevent duplicate journal entries
-    $chk = $conn->prepare("
-        SELECT entry_id
-        FROM journal_entries
-        WHERE reference = ?
-        LIMIT 1
-    ");
-    $chk->bind_param("s", $txnRef);
-    $chk->execute();
-    if ($chk->get_result()->fetch_assoc()) {
-        continue;
-    }
-
-    $desc = "Payment received for Patient ID {$receipt['patient_id']}. Receipt TXN: {$txnRef}";
-
-    // Insert journal entry
-    $jeStmt = $conn->prepare("
-        INSERT INTO journal_entries
-            (entry_date, description, reference_type, reference_id, reference, status, module, created_by)
-        VALUES
-            (CURDATE(), ?, 'Patient Billing', ?, ?, 'Posted', 'billing', 'System')
-    ");
-    $jeStmt->bind_param(
-        "sis",
-        $desc,
-        $receipt['receipt_id'],
-        $txnRef
-    );
-    $jeStmt->execute();
-
-    $entry_id = $conn->insert_id;
-
-    // Journal entry lines
-    $jlStmt = $conn->prepare("
-        INSERT INTO journal_entry_lines
-            (entry_id, account_name, debit, credit, description)
-        VALUES (?, ?, ?, ?, ?)
-    ");
-
-    $zero = 0.00;
-
-    // Debit Cash
-    $acct = 'Cash';
-    $jlStmt->bind_param("isdds", $entry_id, $acct, $total, $zero, $desc);
-    $jlStmt->execute();
-
-    // Credit Accounts Receivable
-    $acct = 'Accounts Receivable';
-    $jlStmt->bind_param("isdds", $entry_id, $acct, $zero, $total, $desc);
-    $jlStmt->execute();
-
-    $processed++;
-}
-
-echo json_encode([
-    'status'    => 'ok',
-    'processed' => $processed
-]);
-
+// ================= PAGE LOAD =================
+$paidPayments = $conn->query("SELECT * FROM paymongo_payments ORDER BY paid_at DESC")->fetch_all(MYSQLI_ASSOC);
+$processedPayments = count($paidPayments);
+$processedPatients = $conn->query("SELECT COUNT(DISTINCT patient_id) FROM billing_records WHERE status='Paid'")->fetch_row()[0];
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Paid PayMongo Payments</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+<title>PayMongo Payments</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script>
+async function refreshPayments(btn) {
+    btn.disabled = true;
+    const original = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Fetching...';
+
+    try {
+        const res = await fetch('fetch_paid_payments.php?json=1');
+        const data = await res.json();
+        alert(data.message);
+
+        if (data.updated_rows.length) {
+            const tbody = document.querySelector('#paymentsTable tbody');
+            tbody.innerHTML = ''; // clear previous rows
+            data.updated_rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.billing_id ?? '-'}</td>
+                    <td>${row.patient_name ?? '-'}</td>
+                    <td>₱${parseFloat(row.amount).toFixed(2)}</td>
+                    <td>${row.method}</td>
+                    <td>${row.status}</td>
+                    <td>${row.paid_at}</td>
+                    <td>${row.remarks}</td>
+                    <td>${row.payment_id}</td>
+                    <td>${row.payment_intent_id}</td>
+                `;
+                tbody.prepend(tr);
+            });
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Failed to fetch payments.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+    }
+}
+</script>
 </head>
+<body class="p-4 bg-light">
+<div class="container">
+<div class="card shadow p-4">
 
-<body class="p-4">
+<h4>PayMongo Payments</h4>
 
-<h3>Paid Payments (PayMongo)</h3>
+<p><strong>Total payments processed:</strong> <?= $processedPayments ?></p>
+<p><strong>Total patients marked as paid:</strong> <?= $processedPatients ?></p>
 
-<table class="table table-bordered table-striped">
+<button class="btn btn-outline-primary mb-3" onclick="refreshPayments(this)">Refresh Payments</button>
+
+<table class="table table-bordered table-striped" id="paymentsTable">
 <thead class="table-dark">
 <tr>
-    <th>Payment ID</th>
-    <th>Intent ID</th>
+    <th>Billing ID</th>
+    <th>Patient Name</th>
     <th>Amount</th>
-    <th>Reference / Remarks</th>
+    <th>Method</th>
+    <th>Status</th>
     <th>Date Paid</th>
+    <th>Remarks</th>
+    <th>Payment ID</th>
+    <th>Payment Intent ID</th>
 </tr>
 </thead>
 <tbody>
-
-<?php if ($paidPayments): ?>
-<?php foreach ($paidPayments as $p): ?>
-<?php
-    $attr = $p['attributes'];
-    $amount = ($attr['amount'] ?? 0) / 100;
-    $remarks = $attr['remarks'] ?? $attr['description'] ?? '—';
-?>
-<tr>
-    <td><?= htmlspecialchars($p['id']) ?></td>
-    <td><?= htmlspecialchars($attr['payment_intent_id'] ?? '—') ?></td>
-    <td>₱ <?= number_format($amount, 2) ?></td>
-    <td><?= htmlspecialchars($remarks) ?></td>
-    <td><?= htmlspecialchars($attr['paid_at'] ?? $attr['created_at']) ?></td>
-</tr>
-<?php endforeach; ?>
-<?php else: ?>
-<tr>
-    <td colspan="5" class="text-center">No paid payments found</td>
-</tr>
-<?php endif; ?>
-
+<tr><td colspan="9" class="text-center">Click "Refresh Payments" to load data</td></tr>
 </tbody>
 </table>
 
+</div>
+</div>
 </body>
 </html>

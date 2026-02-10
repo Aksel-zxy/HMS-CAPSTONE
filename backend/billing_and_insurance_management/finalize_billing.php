@@ -27,34 +27,35 @@ if (empty($_SESSION['billing_cart'][$patient_id])) {
 $cart = $_SESSION['billing_cart'][$patient_id];
 
 /* ===============================
-   COMPUTE AGE / DISCOUNTS
+   AGE / DISCOUNT
 ================================ */
 $age = 0;
 if (!empty($patient['dob']) && $patient['dob'] !== '0000-00-00') {
     $age = (new DateTime())->diff(new DateTime($patient['dob']))->y;
 }
 
-$is_pwd = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
+$is_pwd    = $_SESSION['is_pwd'][$patient_id] ?? ($patient['is_pwd'] ?? 0);
 $is_senior = $age >= 60;
 $discount_rate = ($is_pwd || $is_senior) ? 0.20 : 0;
 
 /* ===============================
-   COMPUTE TOTALS
+   TOTAL COMPUTATION
 ================================ */
-$subtotal = 0;
-foreach ($cart as $srv) {
-    $subtotal += floatval($srv['price']);
-}
-
+$subtotal = array_sum(array_column($cart, 'price'));
 $total_discount = round($subtotal * $discount_rate, 2);
 $vat_amount = round(($subtotal - $total_discount) * 0.12, 2);
 $grand_total = round(($subtotal - $total_discount) + $vat_amount, 2);
 
 $total_out_of_pocket = $grand_total;
-$txn = "TXN" . uniqid();
 
 /* ===============================
-   START TRANSACTION
+   STRONG TRANSACTION ID
+   (PAYMONGO FRIENDLY)
+================================ */
+$txn = 'TXN' . strtoupper(bin2hex(random_bytes(6))); // ex: TXN9F3A2B7C91
+
+/* ===============================
+   DB TRANSACTION
 ================================ */
 $conn->begin_transaction();
 
@@ -65,16 +66,32 @@ try {
     ================================ */
     $stmt = $conn->prepare("
         INSERT INTO billing_records
-        (patient_id, billing_date, total_amount, insurance_covered, out_of_pocket, grand_total, status, payment_method, transaction_id)
-        VALUES (?, NOW(), ?, 0, ?, ?, 'Pending', 'Unpaid', ?)
+        (
+            patient_id,
+            billing_date,
+            total_amount,
+            insurance_covered,
+            out_of_pocket,
+            grand_total,
+            status,
+            payment_method,
+            transaction_id,
+            payment_status,
+            paid_amount,
+            balance
+        )
+        VALUES
+        (?, NOW(), ?, 0, ?, ?, 'Pending', 'Unpaid', ?, 'Pending', 0.00, ?)
     ");
+
     $stmt->bind_param(
-        "iddds",
+        "idddsd",
         $patient_id,
-        $grand_total,
+        $subtotal,
         $total_out_of_pocket,
         $grand_total,
-        $txn
+        $txn,
+        $grand_total
     );
     $stmt->execute();
     $billing_id = $conn->insert_id;
@@ -95,21 +112,35 @@ try {
             $patient_id,
             $srv['serviceID'],
             $srv['price'],
-            $srv['price'] // FULL PRICE — discount handled globally
+            $srv['price']
         );
         $stmt_item->execute();
     }
 
     /* ===============================
        INSERT patient_receipt
-       (NO receipt_id column!)
     ================================ */
     $stmt_receipt = $conn->prepare("
         INSERT INTO patient_receipt
-        (patient_id, billing_id, total_charges, total_vat, total_discount,
-         total_out_of_pocket, grand_total, billing_date,
-         insurance_covered, payment_method, status, transaction_id, is_pwd)
-        VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), 0, 'Unpaid', 'Pending', ?, ?)
+        (
+            patient_id,
+            billing_id,
+            total_charges,
+            total_vat,
+            total_discount,
+            total_out_of_pocket,
+            grand_total,
+            billing_date,
+            insurance_covered,
+            payment_method,
+            status,
+            transaction_id,
+            payment_reference,
+            paymongo_reference,
+            is_pwd
+        )
+        VALUES
+        (?, ?, ?, ?, ?, ?, ?, CURDATE(), 0, 'Unpaid', 'Pending', ?, NULL, NULL, ?)
     ");
 
     $stmt_receipt->bind_param(

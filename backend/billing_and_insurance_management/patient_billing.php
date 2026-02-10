@@ -9,56 +9,16 @@ use GuzzleHttp\Client;
    PAYMONGO CONFIG
 ===================================================== */
 define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
+define('PAYMONGO_PAYMENT_API', 'https://api.paymongo.com/v1/payments');
 
+$client = new Client([
+    'headers' => [
+        'Accept'        => 'application/json',
+        'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
+    ],
+    'timeout' => 5
+]);
 
-/* =====================================================
-   SYNC PAID PAYMENTS FROM paymongo_payments TABLE
-===================================================== */
-$paidPmts = $conn->query("
-    SELECT id, payment_id, payment_intent_id, amount, status
-    FROM paymongo_payments
-    WHERE status = 'paid'
-    ORDER BY paid_at DESC
-");
-
-while ($pm = $paidPmts->fetch_assoc()) {
-    // Find matching receipt by paymongo_reference or transaction_id
-    $rStmt = $conn->prepare("
-        SELECT receipt_id, patient_id, billing_id, status
-        FROM patient_receipt
-        WHERE paymongo_reference = ? OR transaction_id = ?
-        LIMIT 1
-    ");
-    $rStmt->bind_param("ss", $pm['payment_id'], $pm['payment_intent_id']);
-    $rStmt->execute();
-    $receipt = $rStmt->get_result()->fetch_assoc();
-
-    if ($receipt && $receipt['status'] !== 'Paid') {
-        $billing_id = (int)$receipt['billing_id'];
-
-        // Update billing_records
-        $bStmt = $conn->prepare("
-            UPDATE billing_records
-            SET status = 'Paid'
-            WHERE billing_id = ?
-        ");
-        $bStmt->bind_param("i", $billing_id);
-        $bStmt->execute();
-
-        // Update patient_receipt
-        $uStmt = $conn->prepare("
-            UPDATE patient_receipt
-            SET status = 'Paid', paymongo_reference = ?
-            WHERE receipt_id = ?
-        ");
-        $uStmt->bind_param("si", $pm['payment_id'], $receipt['receipt_id']);
-        $uStmt->execute();
-    }
-}
-
-/* =====================================================
-   LEGACY: Check pending billings with paymongo_payment_id
-===================================================== */
 $pending = $conn->query("
     SELECT billing_id, paymongo_payment_id
     FROM billing_records
@@ -96,7 +56,7 @@ while ($row = $pending->fetch_assoc()) {
             $stmt->execute();
         }
     } catch (Exception $e) {
-        // Silent fail (do NOT break UI)
+        // Silent fail
     }
 }
 
@@ -150,27 +110,25 @@ if (!$result) {
 async function refreshAndSync(btn) {
     btn.disabled = true;
     const original = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Checking...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Syncing...';
 
     try {
-        // call the updated endpoint
-        const res = await fetch('fetch_paid_payments.php', { method: 'GET', headers: { 'Accept': 'application/json' } });
-        const json = await res.json().catch(() => null);
-        if (json) console.log('Sync result', json);
+        await fetch('fetch_paid_payments.php?json=1', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
     } catch (err) {
         console.error('Sync request failed', err);
     } finally {
-        // reload page to reflect updated statuses
         window.location.reload();
     }
 }
 </script>
+
 </head>
 
 <body>
 <div class="dashboard-wrapper">
-
-
 
 <div class="main-content-wrapper">
 <div class="bg-white p-4 shadow rounded">
@@ -178,7 +136,6 @@ async function refreshAndSync(btn) {
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>Patient Billing</h3>
     <div class="gap-2">
-        <!-- Refresh now triggers server-side fetch_paymongo_payments.php then reloads -->
         <button class="btn btn-outline-primary btn-sm" onclick="refreshAndSync(this)">
             <i class="bi bi-arrow-clockwise"></i> Refresh
         </button>
@@ -189,7 +146,7 @@ async function refreshAndSync(btn) {
 <table class="table table-bordered align-middle">
 <thead class="table-dark">
 <tr>
-    <th>Patient</th>
+    <th>Billing ID / Patient</th>
     <th>Insurance</th>
     <th>Status</th>
     <th>Total</th>
@@ -202,7 +159,6 @@ async function refreshAndSync(btn) {
 <?php while ($row = $result->fetch_assoc()): ?>
 
 <?php
-// Safe variable extraction with null checks
 $patient_id       = (int)($row['patient_id'] ?? 0);
 $full_name        = $row['full_name'] ?? 'Unknown Patient';
 $billing_id       = (int)($row['billing_id'] ?? 0);
@@ -214,12 +170,8 @@ $payment_method   = $row['payment_method'] ?? null;
 $insuranceApplied = ($insurance_covered > 0);
 $insuranceLabel   = $insuranceApplied ? $payment_method : 'N/A';
 
-// Validate required fields
-if (!$patient_id || !$billing_id) {
-    continue; // Skip row if essential data missing
-}
+if (!$patient_id || !$billing_id) continue;
 
-/* Ensure receipt exists */
 if (!$receipt_id) {
     $stmt = $conn->prepare("
         INSERT INTO patient_receipt (patient_id, billing_id, status)
@@ -229,9 +181,6 @@ if (!$receipt_id) {
         $stmt->bind_param("ii", $patient_id, $billing_id);
         if ($stmt->execute()) {
             $receipt_id = $conn->insert_id;
-        } else {
-            error_log("Failed to insert receipt for billing_id=$billing_id: " . $stmt->error);
-            continue;
         }
         $stmt->close();
     }
@@ -239,7 +188,9 @@ if (!$receipt_id) {
 ?>
 
 <tr>
-<td><?= htmlspecialchars($full_name) ?></td>
+<td>
+<strong>#<?= htmlspecialchars($billing_id) ?></strong> / <?= htmlspecialchars($full_name) ?>
+</td>
 
 <td>
 <?= $insuranceApplied
@@ -258,14 +209,11 @@ if (!$receipt_id) {
 <td class="text-end">
 <div class="d-flex gap-2 justify-content-end flex-wrap">
 
-<a href="print_receipt.php?receipt_id=<?= urlencode($receipt_id) ?>"
-   target="_blank"
-   class="btn btn-secondary btn-sm">
+<a href="print_receipt.php?receipt_id=<?= urlencode($receipt_id) ?>" target="_blank" class="btn btn-secondary btn-sm">
    <i class="bi bi-receipt"></i> View Bill
 </a>
 
-<a href="billing_summary.php?patient_id=<?= urlencode($patient_id) ?>"
-   class="btn btn-success btn-sm">
+<a href="billing_summary.php?patient_id=<?= urlencode($patient_id) ?>" class="btn btn-success btn-sm">
    <i class="bi bi-cash-stack"></i> Process Payment
 </a>
 
@@ -325,7 +273,6 @@ if (!$receipt_id) {
 
 </div>
 </div>
-
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
