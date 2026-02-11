@@ -57,7 +57,7 @@ if (isset($_GET['json'])) {
 
         if ($billing_id) {
             // Get patient info from billing_records
-            $stmt = $conn->prepare("SELECT patient_id, status FROM billing_records WHERE billing_id=? LIMIT 1");
+            $stmt = $conn->prepare("SELECT patient_id, status, grand_total, insurance_covered FROM billing_records WHERE billing_id=? LIMIT 1");
             $stmt->bind_param("i", $billing_id);
             $stmt->execute();
             $billing = $stmt->get_result()->fetch_assoc();
@@ -89,6 +89,29 @@ if (isset($_GET['json'])) {
                     $stmt->execute();
                     $stmt->close();
 
+                    // =========================
+                    // CREATE JOURNAL ENTRY
+                    // =========================
+                    $description = "Payment received from $patient_name. Receipt TXN: $payment_id";
+                    $reference   = "Payment received from $patient_name";
+                    $entry_date  = date('Y-m-d H:i:s');
+                    $module      = 'billing';
+                    $created_by  = $_SESSION['username'] ?? 'System';
+
+                    // Insert journal entry with reference as "Payment received from [Patient Name]"
+                    $stmt = $conn->prepare("INSERT INTO journal_entries (entry_date, description, reference_type, reference, billing_id, created_at, module, created_by, status) VALUES (?, ?, 'Patient Billing', ?, ?, ?, ?, ?, 'Posted')");
+                    $stmt->bind_param("ssissss", $entry_date, $description, $reference, $billing_id, $entry_date, $module, $created_by);
+                    $stmt->execute();
+                    $entry_id = $conn->insert_id;
+                    $stmt->close();
+
+                    // Insert journal entry lines
+                    // Debit: Cash / Credit: Accounts Receivable
+                    $stmt = $conn->prepare("INSERT INTO journal_entry_lines (entry_id, account_name, debit, credit, description) VALUES (?, 'Cash', ?, 0, ?), (?, 'Accounts Receivable', 0, ?, ?)");
+                    $stmt->bind_param("idssid", $entry_id, $amount, $description, $entry_id, $amount, $description);
+                    $stmt->execute();
+                    $stmt->close();
+
                     $processedPatients++;
                 }
             }
@@ -117,6 +140,7 @@ if (isset($_GET['json'])) {
     ]);
     exit;
 }
+
 
 // ================= PAGE LOAD =================
 $paidPayments = $conn->query("SELECT * FROM paymongo_payments ORDER BY paid_at DESC")->fetch_all(MYSQLI_ASSOC);
