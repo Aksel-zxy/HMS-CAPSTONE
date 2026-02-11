@@ -11,6 +11,9 @@ use GuzzleHttp\Client;
 define('PAYMONGO_SECRET_KEY', 'sk_test_akT1ZW6za7m6FC9S9VqYNiVV');
 define('PAYMONGO_API_BASE', 'https://api.paymongo.com/v1/');
 
+/* ===============================
+   PAYMONGO CLIENT
+================================ */
 $paymongoClient = new Client([
     'base_uri' => PAYMONGO_API_BASE,
     'headers' => [
@@ -38,7 +41,7 @@ $patient = $stmt->get_result()->fetch_assoc();
 if (!$patient) die("Patient not found");
 
 /* ===============================
-   GET LATEST BILLING
+   LATEST BILLING
 ================================ */
 $stmt = $conn->prepare("
     SELECT *
@@ -52,12 +55,15 @@ $stmt->execute();
 $billing = $stmt->get_result()->fetch_assoc();
 if (!$billing) die("No billing record found");
 
-$billing_id     = $billing['billing_id'];
-$status         = $billing['status'];
-$insurance      = (float)$billing['insurance_covered'];
+$billing_id    = $billing['billing_id'];
+$status        = $billing['status'];
+$out_of_pocket = (float)$billing['out_of_pocket'];
 $transaction_id = $billing['transaction_id'];
 $existing_link  = $billing['paymongo_link_id'];
 
+/* ===============================
+   🔒 LOCK IF PAID
+================================ */
 if ($status === 'Paid') {
     header("Location: patient_billing.php");
     exit;
@@ -78,125 +84,27 @@ $stmt = $conn->prepare("
 $stmt->bind_param("i", $billing_id);
 $stmt->execute();
 $res = $stmt->get_result();
-
 while ($row = $res->fetch_assoc()) {
     $items[] = $row;
     $subtotal += (float)$row['total_price'];
 }
 
 /* ===============================
-   CHECK IF RECEIPT EXISTS
-================================ */
-$stmt = $conn->prepare("
-    SELECT receipt_id, is_pwd
-    FROM patient_receipt
-    WHERE billing_id = ?
-    LIMIT 1
-");
-$stmt->bind_param("i", $billing_id);
-$stmt->execute();
-$existing_receipt = $stmt->get_result()->fetch_assoc();
-
-$is_pwd = $existing_receipt ? (int)$existing_receipt['is_pwd'] : 0;
-
-/* ===============================
-   DISCOUNT COMPUTATION (NO VAT)
-================================ */
-$discount_percentage = 0;
-$discount = 0;
-
-if ($is_pwd == 1) {
-    $discount_percentage = 20; // PWD/Senior Discount is now 20%
-    $discount = $subtotal * ($discount_percentage / 100);
-}
-
-$grand_total = $subtotal - $discount - $insurance;
-if ($grand_total < 0) $grand_total = 0;
-
-/* ===============================
-   INSERT OR UPDATE RECEIPT
-================================ */
-if (!$existing_receipt) {
-
-    $stmt = $conn->prepare("
-        INSERT INTO patient_receipt
-        (
-            patient_id,
-            billing_id,
-            total_charges,
-            total_vat,
-            total_discount,
-            total_out_of_pocket,
-            grand_total,
-            insurance_covered,
-            billing_date,
-            payment_method,
-            status,
-            transaction_id,
-            is_pwd
-        )
-        VALUES (?, ?, ?, 0, ?, ?, ?, ?, CURDATE(),
-                'GCASH', 'Pending', ?, ?)
-    ");
-
-    $stmt->bind_param(
-        "iidddddssi",
-        $patient_id,
-        $billing_id,
-        $subtotal,
-        $discount,
-        $grand_total,
-        $grand_total,
-        $insurance,
-        $transaction_id,
-        $is_pwd
-    );
-
-    $stmt->execute();
-
-} else {
-
-    $stmt = $conn->prepare("
-        UPDATE patient_receipt
-        SET total_charges = ?,
-            total_vat = 0,
-            total_discount = ?,
-            total_out_of_pocket = ?,
-            grand_total = ?,
-            insurance_covered = ?
-        WHERE billing_id = ?
-    ");
-
-    $stmt->bind_param(
-        "dddddi",
-        $subtotal,
-        $discount,
-        $grand_total,
-        $grand_total,
-        $insurance,
-        $billing_id
-    );
-
-    $stmt->execute();
-}
-
-/* ===============================
-   PAYMONGO LINK
+   🔁 CREATE PAYMONGO LINK (ONCE)
 ================================ */
 $payLinkUrl = null;
 
-if ($grand_total > 0) {
+if ($out_of_pocket > 0) {
 
+    // Reuse existing link
     if ($existing_link) {
-
         $payLinkUrl = "https://checkout.paymongo.com/links/$existing_link";
-
     } else {
 
         $payload = [
             'data' => [
                 'attributes' => [
-                    'amount'      => (int) round($grand_total * 100),
+                    'amount'      => (int) round($out_of_pocket * 100),
                     'currency'    => 'PHP',
                     'description' => "Hospital Billing #{$billing_id}",
                     'remarks'     => "TXN:{$transaction_id}"
@@ -211,16 +119,54 @@ if ($grand_total > 0) {
         $link_id    = $body['data']['id'] ?? null;
 
         if ($link_id) {
+
+            // paymongo_payments
+            $stmt = $conn->prepare("
+                INSERT IGNORE INTO paymongo_payments
+                (payment_id, amount, status, payment_method, remarks)
+                VALUES (?, ?, 'Pending', 'PAYLINK', ?)
+            ");
+            $amount_php = $out_of_pocket;
+            $desc = "Billing #$billing_id";
+            $stmt->bind_param("sds", $link_id, $amount_php, $desc);
+            $stmt->execute();
+
+            // billing_records
             $stmt = $conn->prepare("
                 UPDATE billing_records
-                SET paymongo_link_id = ?
-                WHERE billing_id = ?
+                SET paymongo_link_id=?, paymongo_reference_number=?
+                WHERE billing_id=?
             ");
-            $stmt->bind_param("si", $link_id, $billing_id);
+            $stmt->bind_param("ssi", $link_id, $transaction_id, $billing_id);
+            $stmt->execute();
+
+            // patient_receipt
+            $stmt = $conn->prepare("
+                INSERT INTO patient_receipt
+                (patient_id, billing_id, status, paymongo_reference, payment_reference)
+                VALUES (?, ?, 'Pending', ?, ?)
+                ON DUPLICATE KEY UPDATE paymongo_reference=VALUES(paymongo_reference)
+            ");
+            $stmt->bind_param("iiss", $patient_id, $billing_id, $link_id, $transaction_id);
             $stmt->execute();
         }
     }
 }
+
+/* ===============================
+   🧾 PAYMENT HISTORY
+================================ */
+$history = [];
+$stmt = $conn->prepare("
+    SELECT payment_id, amount, status, paid_at
+    FROM paymongo_payments
+    WHERE remarks LIKE ?
+    ORDER BY updated_at DESC
+");
+$like = "%$billing_id%";
+$stmt->bind_param("s", $like);
+$stmt->execute();
+$history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!doctype html>
@@ -231,11 +177,6 @@ if ($grand_total > 0) {
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light p-4">
-
-
-<div class="main-sidebar">
-<?php include 'billing_sidebar.php'; ?>
-</div>
 
 <div class="container">
 <div class="card shadow p-4">
@@ -300,9 +241,41 @@ if ($grand_total > 0) {
        Pay Now
     </a>
 </div>
+
 <?php endif; ?>
 
+<hr>
+
+<h5>Payment History</h5>
+<table class="table table-sm table-bordered">
+<thead>
+<tr>
+    <th>Reference</th>
+    <th>Amount</th>
+    <th>Status</th>
+    <th>Paid At</th>
+</tr>
+</thead>
+<tbody>
+<?php if ($history): foreach ($history as $h): ?>
+<tr>
+    <td><?= htmlspecialchars($h['payment_id']) ?></td>
+    <td>₱<?= number_format($h['amount'], 2) ?></td>
+    <td><?= htmlspecialchars($h['status']) ?></td>
+    <td><?= $h['paid_at'] ?: '-' ?></td>
+</tr>
+<?php endforeach; else: ?>
+<tr><td colspan="4" class="text-center">No payments yet</td></tr>
+<?php endif; ?>
+</tbody>
+</table>
+
 </div>
+
+<div class="main-sidebar">
+<?php include 'billing_sidebar.php'; ?>
+</div>
+
 </div>
 
 </body>

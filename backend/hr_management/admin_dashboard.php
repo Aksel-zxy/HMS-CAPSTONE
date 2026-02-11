@@ -58,6 +58,16 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 </head>
 
 <body>
+    <!----- Full-page Loader ----->
+    <div id="loading-screen">
+        <div class="loader">
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
 
     <div class="d-flex">
         <!----- Sidebar ----->
