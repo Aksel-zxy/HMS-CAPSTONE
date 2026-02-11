@@ -2,7 +2,6 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-session_start();
 include '../../../SQL/config.php';
 require_once "oop/fetchdetails.php";
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
