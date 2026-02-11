@@ -207,7 +207,7 @@ body {
                     <li>
                         <button class="dropdown-btn <?= $isAssetActive ? 'active' : '' ?>">Asset Tracking</button>
                         <div class="dropdown-container" style="<?= $isAssetActive ? 'display:block;' : 'display:none;' ?>">
-                            <a href="budget_request.php" class="<?= $currentPage=='budget_request.php'?'active-link':'' ?>">Departments Budget Request</a>
+
                             <a href="asset_mapping.php" class="<?= $currentPage=='asset_mapping.php'?'active-link':'' ?>">Department Asset Mapping</a>
                             <a href="maintenance.php" class="<?= $currentPage=='maintenance.php'?'active-link':'' ?>">Repair & Maintenance</a>
                             <a href="asset_transfer.php" class="<?= $currentPage=='asset_transfer.php'?'active-link':'' ?>">Asset Transfer & Disposal</a>
@@ -221,12 +221,7 @@ body {
 <div class="menu">
     <p class="title">Account</p>
     <ul>
-        <li><a href="#"><span class="text">View Profile</span></a></li>
-        <li>
-            <a href="vlogin.php" target="_blank">
-                <span class="text">Vendor Login</span>
-            </a>
-        </li>
+        
         <li>
             <a href="../logout.php" onclick="return confirm('Are you sure you want to log out?');">
                 <span class="text">Log Out</span>
