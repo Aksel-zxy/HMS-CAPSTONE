@@ -15,6 +15,10 @@ function cardColor($company) {
     };
 }
 
+function normalizeName($name) {
+    return preg_replace('/\s+/', ' ', strtolower(trim($name)));
+}
+
 function renderInsuranceCard($insurance_number, $full_name, $insurance) {
     $bg = cardColor($insurance['insurance_company']);
     $discount = $insurance['discount_type'] === 'Percentage'
@@ -36,7 +40,7 @@ function renderInsuranceCard($insurance_number, $full_name, $insurance) {
 }
 
 /* =====================================================
-   AJAX HANDLER ONLY
+   AJAX ONLY
 ===================================================== */
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(403);
@@ -58,7 +62,7 @@ if (!$action || !$patient_id || !$billing_id || !$insurance_number) {
 /* =====================================================
    FETCH PATIENT
 ===================================================== */
-$stmt = $conn->prepare("SELECT fname,mname,lname FROM patientinfo WHERE patient_id=?");
+$stmt = $conn->prepare("SELECT fname, mname, lname FROM patientinfo WHERE patient_id=?");
 $stmt->bind_param("i", $patient_id);
 $stmt->execute();
 $patient = $stmt->get_result()->fetch_assoc();
@@ -69,15 +73,21 @@ if (!$patient) {
     exit;
 }
 
-$full_name = trim($patient['fname'].' '.($patient['mname'] ?? '').' '.$patient['lname']);
+$patient_full_name = normalizeName(
+    $patient['fname'].' '.
+    ($patient['mname'] ?? '').' '.
+    $patient['lname']
+);
 
 /* =====================================================
-   SEARCH INSURANCE (STRICT TO PATIENT)
+   FETCH INSURANCE BY NUMBER
 ===================================================== */
 $stmt = $conn->prepare("
-    SELECT insurance_company,promo_name,discount_type,discount_value,relationship_to_insured,full_name
+    SELECT insurance_company, promo_name, discount_type, discount_value,
+           relationship_to_insured, full_name
     FROM patient_insurance
-    WHERE insurance_number=? AND status='Active'
+    WHERE insurance_number = ?
+      AND status = 'Active'
     LIMIT 1
 ");
 $stmt->bind_param("s", $insurance_number);
@@ -91,17 +101,11 @@ if (!$insurance) {
 }
 
 /* =====================================================
-   NAME VALIDATION
+   NAME VALIDATION (FIXED)
 ===================================================== */
-$patient_name = strtolower(trim(
-    $patient['fname'].' '.
-    ($patient['mname'] ?? '').' '.
-    $patient['lname']
-));
+$insurance_name = normalizeName($insurance['full_name']);
 
-$insurance_name = strtolower(trim($insurance['full_name']));
-
-if ($patient_name !== $insurance_name) {
+if ($patient_full_name !== $insurance_name) {
     echo json_encode([
         'status'  => 'error',
         'message' => 'Insurance card does not belong to this patient'
@@ -147,9 +151,13 @@ $grand_total   = $out_of_pocket;
 if ($action === 'preview') {
     echo json_encode([
         'status' => 'preview',
-        'insurance_card_html' => renderInsuranceCard($insurance_number, $full_name, $insurance),
-        'insurance_covered'   => number_format($covered, 2),
-        'out_of_pocket'       => number_format($out_of_pocket, 2)
+        'insurance_card_html' => renderInsuranceCard(
+            $insurance_number,
+            ucwords($insurance['full_name']),
+            $insurance
+        ),
+        'insurance_covered' => number_format($covered, 2),
+        'out_of_pocket'     => number_format($out_of_pocket, 2)
     ]);
     exit;
 }
@@ -160,10 +168,12 @@ if ($action === 'preview') {
 if ($action === 'apply') {
     $conn->begin_transaction();
     try {
-
         $stmt = $conn->prepare("
             UPDATE patient_receipt
-            SET insurance_covered=?, total_out_of_pocket=?, grand_total=?, payment_method=?
+            SET insurance_covered=?,
+                total_out_of_pocket=?,
+                grand_total=?,
+                payment_method=?
             WHERE billing_id=? AND patient_id=?
         ");
         $stmt->bind_param(
@@ -181,11 +191,11 @@ if ($action === 'apply') {
         $conn->commit();
 
         echo json_encode([
-            'status' => 'success',
-            'message'=> 'Insurance applied successfully',
-            'insurance_covered' => number_format($covered,2),
-            'out_of_pocket'     => number_format($out_of_pocket,2),
-            'grand_total'       => number_format($grand_total,2)
+            'status'=>'success',
+            'message'=>'Insurance applied successfully',
+            'insurance_covered'=>number_format($covered,2),
+            'out_of_pocket'=>number_format($out_of_pocket,2),
+            'grand_total'=>number_format($grand_total,2)
         ]);
     } catch (Exception $e) {
         $conn->rollback();

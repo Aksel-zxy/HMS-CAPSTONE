@@ -155,7 +155,7 @@ async function refreshPayments(btn) {
                     <td>${row.paid_at}</td>
                     <td>${row.remarks}</td>
                     <td>${row.payment_id}</td>
-            
+                    <td>${row.payment_intent_id}</td>
                 `;
                 tbody.prepend(tr);
             });
@@ -192,6 +192,7 @@ async function refreshPayments(btn) {
     <th>Date Paid</th>
     <th>Remarks</th>
     <th>Payment ID</th>
+    <th>Payment Intent ID</th>
 </tr>
 </thead>
 <tbody>

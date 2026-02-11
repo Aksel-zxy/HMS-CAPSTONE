@@ -68,7 +68,7 @@ SELECT
     p.patient_id,
     CONCAT(p.fname,' ',IFNULL(p.mname,''),' ',p.lname) AS full_name,
     bi.billing_id,
-    SUM(bi.total_price) AS total_charges,
+    SUM(bi.total_price) AS total_amount,
     MAX(pr.receipt_id) AS receipt_id,
     MAX(pr.status) AS payment_status,
     MAX(pr.insurance_covered) AS insurance_covered,
@@ -163,7 +163,7 @@ async function refreshAndSync(btn) {
 $patient_id       = (int)($row['patient_id'] ?? 0);
 $full_name        = $row['full_name'] ?? 'Unknown Patient';
 $billing_id       = (int)($row['billing_id'] ?? 0);
-$total            = (float)($row['total_charges'] ?? 0);
+$total            = (float)($row['total_amount'] ?? 0);
 $receipt_id       = $row['receipt_id'] ?? null;
 $status           = $row['payment_status'] ?? 'Pending';
 $insurance_covered = (float)($row['insurance_covered'] ?? 0);
