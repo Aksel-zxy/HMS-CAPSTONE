@@ -163,6 +163,7 @@ th, td { vertical-align: middle; text-align:center; }
                                 <th>Total Approved</th>
                                 <th>Status</th>
                                 <th>Requested At</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -171,6 +172,7 @@ th, td { vertical-align: middle; text-align:center; }
                                 $items_text = implode(", ", array_map(fn($i)=>$i['name'] ?? '', $items_array));
                                 $total_requested = $req['total_items'] ?? count($items_array);
                                 $total_approved = $req['total_approved_items'] ?? 0;
+                                $items_json = htmlspecialchars(json_encode($items_array, JSON_UNESCAPED_UNICODE));
                             ?>
                             <tr>
                                 <td><?= $req['id'] ?></td>
@@ -186,6 +188,9 @@ th, td { vertical-align: middle; text-align:center; }
                                     ?>
                                 </td>
                                 <td><?= $req['created_at'] ?></td>
+                                <td>
+                                    <button class="btn btn-sm btn-info btn-view-items" data-items='<?= $items_json ?>'>View</button>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -194,6 +199,34 @@ th, td { vertical-align: middle; text-align:center; }
             </div>
         </div>
     </div>
+</div>
+
+<!-- Modal for viewing items -->
+<div class="modal fade" id="viewItemsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Request Items</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table table-bordered">
+            <thead class="table-light text-center">
+              <tr>
+                <th>Item</th>
+                <th>Description</th>
+                <th>Unit</th>
+                <th>Qty Requested</th>
+                <th>Approved Qty</th>
+              </tr>
+            </thead>
+            <tbody id="modalItemBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -236,8 +269,29 @@ itemBody.addEventListener('input', e=>{
 
 requestForm.addEventListener('submit', e=>{
     const rows = Array.from(itemBody.querySelectorAll('tr'));
-    const hasItem = rows.some(row => row.querySelector('input[name*="[name]"]').value.trim()!=='');
+    const hasItem = rows.some(row => row.querySelector('input[name*="[name]"]').value.trim()!=='' );
     if(!hasItem){ e.preventDefault(); alert("Please add at least one item with a name before submitting."); }
+});
+
+// View button logic
+document.querySelectorAll('.btn-view-items').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+        const items = JSON.parse(btn.dataset.items);
+        const modalBody = document.getElementById('modalItemBody');
+        modalBody.innerHTML = '';
+        items.forEach(i=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${i.name ?? ''}</td>
+                <td>${i.description ?? ''}</td>
+                <td>${i.unit ?? ''}</td>
+                <td class="text-center">${i.quantity ?? 0}</td>
+                <td class="text-center">${i.approved_quantity ?? 0}</td>
+            `;
+            modalBody.appendChild(tr);
+        });
+        new bootstrap.Modal(document.getElementById('viewItemsModal')).show();
+    });
 });
 </script>
 </body>
