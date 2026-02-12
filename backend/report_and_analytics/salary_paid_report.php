@@ -1,140 +1,136 @@
-<?php include 'header.php' ?>
+<?php
+include 'header.php';
+?>
+<!DOCTYPE html>
+<html lang="en">
 
-<body class="bg-light p-4">
+<head>
+    <meta charset="UTF-8">
+    <title>Hospital Monthly Payroll Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: #f8f9fa;
+            font-family: "Poppins", sans-serif;
+        }
+
+        .report-card {
+            border-radius: 16px;
+            border: 1px solid #ddd;
+            background: #fff;
+            padding: 30px;
+            margin-top: 20px;
+        }
+
+        .stat-title {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .stat-value {
+            font-weight: 700;
+            font-size: 1.3rem;
+        }
+
+        .stat-card {
+            background: #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
     <div class="d-flex">
-        <?php include 'sidebar.php' ?>
-        <div class="container">
-            <h2 class="mb-4 text-center">Hospital Monthly Payroll Report</h2>
+        <?php include 'sidebar.php'; ?>
+        <div class="container my-5">
 
-            <!-- Selection Form -->
-            <div class="row mb-3">
+            <h3 class="fw-bold mb-4 text-center">💰 Hospital Monthly Payroll Report</h3>
+
+            <!-- Month/Year Filters -->
+            <div class="row g-3 mb-4 justify-content-center">
                 <div class="col-md-3">
-                    <label for="month" class="form-label">Month</label>
-                    <select id="month" class="form-select">
-                        <option value="1">January</option>
-                        <option value="2">February</option>
-                        <option value="3">March</option>
-                        <option value="4">April</option>
-                        <option value="5">May</option>
-                        <option value="6">June</option>
-                        <option value="7">July</option>
-                        <option value="8">August</option>
-                        <option value="9">September</option>
-                        <option value="10">October</option>
-                        <option value="11">November</option>
-                        <option value="12">December</option>
-                    </select>
+                    <label class="form-label">Month</label>
+                    <input type="number" id="month" class="form-control" value="12" min="1" max="12">
                 </div>
-
                 <div class="col-md-3">
-                    <label for="year" class="form-label">Year</label>
-                    <select id="year" class="form-select"></select>
+                    <label class="form-label">Year</label>
+                    <input type="number" id="year" class="form-control" value="2025">
                 </div>
-
-                <div class="col-md-3 d-flex align-items-end">
-                    <button onclick="loadReport()" class="btn btn-primary w-100">Load Report</button>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-dark w-100" onclick="loadPayroll()">Load Report</button>
                 </div>
             </div>
 
-            <!-- Payroll Table -->
-            <div class="table-responsive">
-                <table id="payrollTable" class="table table-bordered table-striped table-hover" style="display:none;">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Employee ID</th>
-                            <th>Full Name</th>
-                            <th>Department</th>
-                            <th>Role</th>
-                            <th>Basic Salary</th>
-                            <th>Overtime Pay</th>
-                            <th>Deductions</th>
-                            <th>Net Pay</th>
-                            <th>Total Salary Paid</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                    <tfoot class="table-secondary">
-                        <tr>
-                            <td colspan="8" class="text-end fw-bold">Grand Total Salary Paid:</td>
-                            <td id="totalSalaryCell" class="fw-bold"></td>
-                        </tr>
-                    </tfoot>
-                </table>
+            <!-- Payroll Report Card -->
+            <div id="payrollReport" class="report-card text-center">
+                <p class="text-muted">No data loaded</p>
             </div>
+
         </div>
-
-        <!-- Bootstrap JS -->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
-        <script>
-            // Populate year dropdown dynamically
-            const yearSelect = document.getElementById("year");
-            const currentYear = new Date().getFullYear();
-            for (let y = currentYear + 1; y >= currentYear - 10; y--) {
-                const opt = document.createElement("option");
-                opt.value = y;
-                opt.textContent = y;
-                if (y === currentYear) opt.selected = true;
-                yearSelect.appendChild(opt);
-            }
-
-            async function loadReport() {
-                const month = document.getElementById("month").value;
-                const year = document.getElementById("year").value;
-                const url = `https://bsis-03.keikaizen.xyz/payroll/getHospitalMonthlyPayrollReport/${month}/${year}`;
-
-                try {
-                    const response = await fetch(url, {
-                        headers: {
-                            "Accept": "application/json"
-                        }
-                    });
-                    if (!response.ok) throw new Error("Failed to fetch payroll data");
-
-                    const data = await response.json();
-                    const tbody = document.querySelector("#payrollTable tbody");
-                    tbody.innerHTML = "";
-
-                    let totalSalary = 0;
-
-                    if (!data || data.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted">No records found for ${month}/${year}</td></tr>`;
-                    } else {
-                        data.forEach(row => {
-                            const tr = document.createElement("tr");
-                            tr.innerHTML = `
-              <td>${row.employeeId}</td>
-              <td>${row.fullName}</td>
-              <td>${row.department}</td>
-              <td>${row.role}</td>
-              <td>${formatCurrency(row.basicSalary)}</td>
-              <td>${formatCurrency(row.overtimePay)}</td>
-              <td>${formatCurrency(row.deductions)}</td>
-              <td>${formatCurrency(row.netPay)}</td>
-              <td>${formatCurrency(row.totalSalaryPaid)}</td>
-            `;
-                            tbody.appendChild(tr);
-
-                            totalSalary += row.totalSalaryPaid || 0;
-                        });
-                    }
-
-                    document.getElementById("totalSalaryCell").textContent = formatCurrency(totalSalary);
-                    document.getElementById("payrollTable").style.display = "table";
-
-                } catch (err) {
-                    alert("Error: " + err.message);
-                }
-            }
-
-            function formatCurrency(value) {
-                if (value == null) return "-";
-                return "₱ " + parseFloat(value).toLocaleString("en-PH", {
-                    minimumFractionDigits: 2
-                });
-            }
-        </script>
     </div>
+
+    <script>
+        function formatCurrency(amount) {
+            return amount.toLocaleString('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            });
+        }
+
+        async function loadPayroll() {
+            const month = document.getElementById("month").value;
+            const year = document.getElementById("year").value;
+
+            const reportDiv = document.getElementById("payrollReport");
+            reportDiv.innerHTML = `<p>Loading...</p>`;
+
+            try {
+                const res = await fetch(`https://localhost:7212/payroll/getHospitalMonthlyPayrollReport?month=${month}&year=${year}`);
+                if (!res.ok) throw new Error("Failed to fetch payroll report");
+
+                const data = await res.json();
+
+                reportDiv.innerHTML = `
+                    <div class="stat-card">
+                        <h5 class="fw-bold mb-3">Month: ${data.month}, Year: ${data.year}</h5>
+                        <div class="row text-center">
+                            <div class="col-md-3 mb-3">
+                                <div class="stat-title">Total Employees</div>
+                                <div class="stat-value">${data.total_employees}</div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="stat-title">Total Gross Pay</div>
+                                <div class="stat-value">${formatCurrency(data.total_gross_pay)}</div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="stat-title">Total Deductions</div>
+                                <div class="stat-value">${formatCurrency(data.total_deductions)}</div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="stat-title">Total Net Pay</div>
+                                <div class="stat-value">${formatCurrency(data.total_net_pay)}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+            } catch (err) {
+                console.error(err);
+                reportDiv.innerHTML = `<p class="text-danger">Failed to load payroll report</p>`;
+            }
+        }
+
+        // Load default report
+        loadPayroll();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

@@ -349,7 +349,7 @@ include 'header.php'
         }
 
         async function loadReportData() {
-            const url = `https://bsis-03.keikaizen.xyz/employee/getMonthLeaveReports/${month}/${year}`;
+            const url = `https://localhost:7212/employee/getMonthLeaveReports/${month}/${year}`;
             try {
                 const res = await fetch(url);
                 const data = await res.json();

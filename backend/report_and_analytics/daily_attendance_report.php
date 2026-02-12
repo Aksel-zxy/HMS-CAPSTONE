@@ -1,5 +1,4 @@
 <?php
-
 include 'header.php'
 ?>
 
@@ -15,16 +14,13 @@ include 'header.php'
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <div class="d-flex">
-    <!----- Sidebar ----->
-    <?php
-    include 'sidebar.php'
-    ?>
+    <!-- Sidebar -->
+    <?php include 'sidebar.php' ?>
 
     <body class="bg-light">
-
         <div class="container py-5">
-
             <!-- Page Title -->
             <div class="mb-4 text-center">
                 <h2 class="fw-bold text-dark">
@@ -32,17 +28,16 @@ include 'header.php'
                 </h2>
             </div>
 
-            <div class="row g-4">
-                <!-- Date Selection + Summary Table -->
-                <div class="col-md-4">
-                    <div class="card shadow-sm border-0 mb-3">
-                        <div class="card-body">
-                            <h5 class="card-title">Select Date</h5>
-                            <select id="dateDropdown" class="form-select"></select>
-                        </div>
-                    </div>
+            <!-- Back Button -->
+            <div class="mb-4 text-start">
+                <a href="month_attendance_report.php" class="btn btn-outline-primary rounded-pill shadow-sm">
+                    <i class="bi bi-arrow-left-circle me-2"></i> Back to Monthly Report
+                </a>
+            </div>
 
-                    <!-- Summary Table -->
+            <div class="row g-4">
+                <!-- Summary Table -->
+                <div class="col-md-4">
                     <div class="card shadow border-0">
                         <div class="card-body">
                             <h5 class="card-title mb-3 text-primary fw-bold">
@@ -71,7 +66,6 @@ include 'header.php'
                             </table>
                         </div>
                     </div>
-
                 </div>
 
                 <!-- Pie Chart -->
@@ -87,7 +81,6 @@ include 'header.php'
         </div>
 
         <script>
-            const dateDropdown = document.getElementById("dateDropdown");
             const ctx = document.getElementById("attendanceChart").getContext("2d");
 
             // Summary table elements
@@ -105,31 +98,24 @@ include 'header.php'
                     datasets: [{
                         data: [0, 0, 0, 0, 0],
                         backgroundColor: [
-                            "#2ecc71", // Present
-                            "#e74c3c", // Absent
-                            "#f39c12", // Late
-                            "#9b59b6", // Leave
-                            "#e67e22" // Under Time
+                            "#2ecc71",
+                            "#e74c3c",
+                            "#f39c12",
+                            "#9b59b6",
+                            "#e67e22"
                         ]
                     }]
                 }
             });
 
-            // Fetch available dates
-            async function loadDates() {
-                const res = await fetch("https://bsis-03.keikaizen.xyz/employee/dates");
-                const dates = await res.json();
-                dates.forEach(date => {
-                    const option = document.createElement("option");
-                    option.value = date;
-                    option.textContent = new Date(date).toLocaleDateString();
-                    dateDropdown.appendChild(option);
-                });
-            }
+            // Extract the date parameter from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const selectedDate = urlParams.get('date'); // ?date=YYYY-MM-DD
 
-            // Fetch attendance data for selected date
+            // Fetch attendance data for given date
             async function loadAttendance(date) {
-                const res = await fetch(`https://bsis-03.keikaizen.xyz/employee/attendanceReport/${date}`);
+                if (!date) return;
+                const res = await fetch(`http://localhost:5288/employee/attendanceReport/${date}`);
                 const data = await res.json();
 
                 // Update chart
@@ -150,20 +136,9 @@ include 'header.php'
                 underTimeCount.textContent = data.underTime || 0;
             }
 
-            // Event listener
-            dateDropdown.addEventListener("change", () => {
-                loadAttendance(dateDropdown.value);
-            });
-
             // Init
-            loadDates().then(() => {
-                if (dateDropdown.options.length > 0) {
-                    dateDropdown.selectedIndex = 0;
-                    loadAttendance(dateDropdown.value);
-                }
-            });
+            loadAttendance(selectedDate);
         </script>
-
     </body>
 </div>
 

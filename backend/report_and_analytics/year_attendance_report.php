@@ -1,187 +1,43 @@
-<?php
-/*
-include '../../SQL/config.php';
-
-if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
-*/
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
+    <title>Hospital Management System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Report Dashboard</title>
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
+            background: #f7f7f7;
         }
 
-        .report-card {
-            transition: all 0.3s ease;
-            border-radius: 14px;
-            background: #fff;
-            border: 1px solid #e6e6e6;
-        }
-
-        .report-card:hover {
-            transform: translateY(-6px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .grid-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 25px;
-        }
-
-        .link-section {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .link-section a {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #000;
-        }
-
-        .link-section a:hover {
-            background: #000;
-            color: #fff;
-            transform: translateY(-3px);
-        }
-
-        hr {
-            border-top: 1px solid #000;
-            opacity: 0.3;
-        }
-
-        /* Available Doctors Section */
-        .doctor-card {
-            border: 1px solid #000;
+        .month-card {
             border-radius: 10px;
-            background-color: #fff;
-            transition: all 0.25s ease;
         }
 
-        .doctor-card:hover {
-            transform: translateY(-5px);
-            background-color: #f1f1f1;
+        .small-text {
+            font-size: .85rem;
+            color: #6c757d;
         }
 
-        .doctor-avatar-placeholder {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            background-color: #e9ecef;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #000;
-            font-weight: 600;
-            font-size: 1.1rem;
-            text-transform: uppercase;
-        }
-
-        .btn-view {
-            border: 1px solid #000;
-            background: #000;
-            color: #fff;
-            border-radius: 20px;
-            padding: 5px 14px;
-            font-size: 0.85rem;
-        }
-
-        .btn-view:hover {
-            background: #fff;
-            color: #000;
-        }
-
-        .btn-collapse {
-            text-decoration: none;
-            color: #000;
-            background: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s;
-            border: 1px solid #000;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-collapse:hover {
-            background: #000;
-            color: #fff;
-        }
-
-        .modal-header {
-            background: #000;
-            color: #fff;
-        }
-
-        .table thead {
-            background: #000;
-            color: #fff;
-        }
-
-        .list-group-item {
-            border-color: #ddd;
+        canvas {
+            max-height: 200px;
         }
     </style>
 </head>
 
 <body>
     <div class="d-flex">
-        <!-- SIDEBAR -->
-        <!----- Sidebar ----->
-        <aside id="sidebar" class="sidebar-toggle">
 
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
@@ -363,7 +219,7 @@ if (!$user) {
             </li>
 
             <li class="sidebar-item">
-                <a href="../report_and_analytics/report_dashboard.php" class="sidebar-link">
+                <a href="report_dashboard.php" class="sidebar-link">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="bi bi-building" viewBox="0 0 16 16" style="margin-bottom: 7px;">
                         <path
@@ -375,107 +231,201 @@ if (!$user) {
                     <span style="font-size: 18px;">Report and Analytics</span>
                 </a>
             </li>
-
-
         </aside>
 
-        <!-- MAIN CONTENT -->
-        <div class="main w-100">
-            <div class="container my-5">
-                <div class="text-center mb-4">
-                    <h4 class="fw-bold"> Reports Dashboard</h4>
-                </div>
+        <div class="container py-4">
 
-                <h5 class="text-center mb-4">Select a Report</h5>
-
-                <!-- Reports Grid -->
-                <div class="grid-container mb-5">
-                    <a href="month_attendance_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-calendar-check" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Month Attendance Report</h5>
-                        </div>
-                    </a>
-
-
-                    <a href="month_insurance_claim_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-file-earmark-medical" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Insurance Claim Report</h5>
-                        </div>
-                    </a>
-
-
-                    <a href="revenue_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-bar-chart-line" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Revenue Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="salary_paid_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-wallet2" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Monthly Payroll Summary</h5>
-                        </div>
-                    </a>
-
-                    <a href="shift_and_duty.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Shift & Duty Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="leave_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Month Leave Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="staff_information.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Staff Information Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="doctor_specialization_and_eval_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Active Doctor Report</h5>
-                        </div>
-                    </a>
-
-                    <a href="performance_and_evaluation.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-people" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Employee Performance report</h5>
-                        </div>
-                    </a>
-
-                    <a href="year_pharmacy_sales_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-capsule" style="font-size:40px;"></i></div>
-                            <h5 class="card-title"> Hospital Rx Sales Report </h5>
-                        </div>
-                    </a>
-
-
-                    <a href="department_budget_report.php" class="text-decoration-none text-dark">
-                        <div class="card report-card p-4 text-center">
-                            <div class="mb-3"><i class="bi bi-cash-coin" style="font-size:40px;"></i></div>
-                            <h5 class="card-title">Department Budget Report </h5>
-                        </div>
-                    </a>
-                </div>
-
-                <hr class="my-5">
+            <!-- HEADER + YEAR SELECT -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-semibold mb-0">Attendance Report</h4>
+                <select id="yearSelector" class="form-select w-auto"></select>
             </div>
+
+            <!-- TOP SUMMARY -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <div class="small-text">Total Present</div>
+                        <h5 id="totalPresent">0</h5>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <div class="small-text">Total Late</div>
+                        <h5 id="totalLate">0</h5>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <div class="small-text">Total Undertime</div>
+                        <h5 id="totalUndertime">0</h5>
+                    </div>
+                </div>
+            </div>
+
+            <!-- YEAR ANALYTICS -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Average Present</div>
+                        <h5 id="avgPresent">0</h5>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Average Absent</div>
+                        <h5 id="avgAbsent">0</h5>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Most Late Month</div>
+                        <h5 id="mostLate">-</h5>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Most Absent Month</div>
+                        <h5 id="mostAbsent">-</h5>
+                    </div>
+                </div>
+            </div>
+
+            <!-- YEARLY CHART -->
+            <div class="card p-4 mb-4" style="height:320px">
+                <canvas id="yearChart"></canvas>
+            </div>
+
+            <!-- MONTH CARDS -->
+            <div class="row g-3" id="monthCards"></div>
+
         </div>
     </div>
 
+    <script>
+        const baseApi = "https://localhost:7212/employee/getYearAttendanceSummary?year=";
+        const monthNames = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ];
+
+        let yearChart;
+
+        const yearSelector = document.getElementById("yearSelector");
+        const currentYear = new Date().getFullYear();
+
+        // Populate year selector (current year selected by default)
+        for (let y = currentYear; y >= currentYear - 5; y--) {
+            yearSelector.innerHTML += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
+        }
+
+        yearSelector.addEventListener("change", () => loadReport(yearSelector.value));
+        loadReport(yearSelector.value);
+
+        function loadReport(year) {
+            fetch(baseApi + year)
+                .then(res => res.json())
+                .then(data => {
+
+                    // Top totals
+                    document.getElementById("totalPresent").innerText = data.present;
+                    document.getElementById("totalLate").innerText = data.late;
+                    document.getElementById("totalUndertime").innerText = data.underTime;
+
+                    // Analytics
+                    const avgPresent = Math.round(data.present / 12);
+                    const totalAbsent = data.monthsReport.reduce((s, m) => s + m.absent, 0);
+                    const avgAbsent = Math.round(totalAbsent / 12);
+
+                    const mostLate = data.monthsReport.reduce((a, b) => a.late > b.late ? a : b);
+                    const mostAbsent = data.monthsReport.reduce((a, b) => a.absent > b.absent ? a : b);
+
+                    document.getElementById("avgPresent").innerText = avgPresent;
+                    document.getElementById("avgAbsent").innerText = avgAbsent;
+                    document.getElementById("mostLate").innerText =
+                        `${monthNames[mostLate.month - 1]} (${mostLate.late})`;
+                    document.getElementById("mostAbsent").innerText =
+                        `${monthNames[mostAbsent.month - 1]} (${mostAbsent.absent})`;
+
+                    // YEARLY BAR CHART
+                    const labels = data.monthsReport.map(m => monthNames[m.month - 1]);
+                    const presentData = data.monthsReport.map(m => m.present);
+
+                    if (yearChart) yearChart.destroy();
+
+                    yearChart = new Chart(document.getElementById("yearChart"), {
+                        type: "bar",
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: "Present",
+                                data: presentData,
+                                backgroundColor: "#0d6efd"
+                            }]
+                        },
+                        options: {
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+
+                    // MONTH DOUGHNUT CARDS
+                    const container = document.getElementById("monthCards");
+                    container.innerHTML = "";
+
+                    data.monthsReport.forEach((m, i) => {
+                        const col = document.createElement("div");
+                        col.className = "col-xl-3 col-lg-4 col-md-6";
+
+                        col.innerHTML = `
+                            <div class="card p-3 month-card">
+                                <h6 class="fw-semibold text-center">${monthNames[m.month - 1]}</h6>
+                                <canvas id="monthChart-${i}"></canvas>
+                                <div class="d-flex justify-content-end mt-3">
+                                    <a href="month_attendance_report.php?month=${m.month}&year=${data.year}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                       View
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+
+                        container.appendChild(col);
+
+                        // Create Doughnut chart for this month
+                        new Chart(document.getElementById(`monthChart-${i}`), {
+                            type: "doughnut",
+                            data: {
+                                labels: ["Present", "Absent", "Late", "Leave", "Undertime"],
+                                datasets: [{
+                                    data: [m.present, m.absent, m.late, m.leave_count, m.underTime],
+                                    backgroundColor: ["#198754", "#dc3545", "#ffc107", "#0dcaf0", "#6f42c1"]
+                                }]
+                            },
+                            options: {
+                                plugins: {
+                                    legend: {
+                                        position: "bottom",
+                                        labels: {
+                                            boxWidth: 12
+                                        }
+                                    }
+                                },
+                                maintainAspectRatio: false
+                            }
+                        });
+                    });
+                });
+        }
     </script>
 </body>
 
