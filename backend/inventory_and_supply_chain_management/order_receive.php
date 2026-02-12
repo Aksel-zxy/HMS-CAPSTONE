@@ -1,346 +1,270 @@
 <?php
-session_start();
 include '../../SQL/config.php';
 
-// ---------------- Handle Receiving ----------------
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receive'])) {
-    $purchase_request_id = $_POST['order_id'];
-    $received_qtys = $_POST['received_qty'] ?? [];
+/* =====================================================
+   HANDLE RECEIVING
+=====================================================*/
+if (isset($_POST['action']) && $_POST['action'] === 'receive') {
 
-    // Fetch vendor info
-    $stmt = $pdo->prepare("SELECT * FROM vendor_orders WHERE purchase_request_id=? LIMIT 1");
-    $stmt->execute([$purchase_request_id]);
-    $order = $stmt->fetch(PDO::FETCH_ASSOC);
+    $request_id = $_POST['id'];
 
-    if ($order) {
-        $vendor_id = $order['vendor_id'];
+    $stmt = $pdo->prepare("SELECT * FROM department_request WHERE id=? AND status IN ('Approved','Receiving') LIMIT 1");
+    $stmt->execute([$request_id]);
+    $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Get shipped items with product info
-        $stmt = $pdo->prepare("
-            SELECT vo.*, vp.item_name, vp.item_type, vp.sub_type, vp.price, vp.unit_type, vp.pcs_per_box
-            FROM vendor_orders vo
-            JOIN vendor_products vp ON vo.item_id = vp.id
-            WHERE vo.purchase_request_id=? AND vo.vendor_id=? AND vo.status='Shipped'
-        ");
-        $stmt->execute([$purchase_request_id, $vendor_id]);
-        $orders_to_receive = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if ($request) {
 
-        if ($orders_to_receive) {
-            $subtotal = 0;
+        $items = json_decode($request['items'], true) ?: [];
+        $received_quantities = $_POST['received_quantity'] ?? [];
 
-            foreach ($orders_to_receive as $o) {
-                $item_id = $o['item_id'];
-                $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
+        foreach ($items as $index => &$item) {
 
-                // ADD THIS CHECK: Only process if still 'Shipped'
-                $stmt_check = $pdo->prepare("SELECT status FROM vendor_orders WHERE id=?");
-                $stmt_check->execute([$o['id']]);
-                $current_status = $stmt_check->fetchColumn();
-                if ($current_status !== 'Shipped') {
-                    continue; // Skip if already processed
-                }
+            $approved_qty = $item['approved_quantity'] ?? 0;
+            $already_received = $item['received_quantity'] ?? 0;
+            $receive_now = isset($received_quantities[$index]) ? (int)$received_quantities[$index] : 0;
 
-                if ($received > 0) {
-                    $now = date('Y-m-d H:i:s');
+            $remaining = $approved_qty - $already_received;
+            $receive_now = max(0, min($receive_now, $remaining));
+            if ($receive_now <= 0) continue;
 
-                    // ✅ If Box → convert to total pieces for inventory, but subtotal stays per box
-                    if ($o['unit_type'] === "Box" && $o['pcs_per_box']) {
-                        $box_qty   = $received; 
-                        $total_qty = $box_qty * (int)$o['pcs_per_box']; 
-                        $lineSubtotal = $o['price'] * $box_qty; // Price per box
-                    } else {
-                        $box_qty   = 0;
-                        $total_qty = $received;
-                        $lineSubtotal = $o['price'] * $received; // Price per piece
-                    }
+            $item['received_quantity'] = $already_received + $receive_now;
 
-                    // ---------------- Inventory Update ----------------
-                    $stmt2 = $pdo->prepare("SELECT * FROM inventory WHERE item_id=?");
-                    $stmt2->execute([$item_id]);
-                    $inv = $stmt2->fetch(PDO::FETCH_ASSOC);
+            $item_name = $item['name'];
+            $unit = strtolower($item['unit'] ?? 'piece');
+            $pcs_per_box = $item['pcs_per_box'] ?? 1;
 
-                    if ($inv) {
-                        // Update existing inventory
-                        $stmt2 = $pdo->prepare("UPDATE inventory 
-                            SET quantity = quantity + ?, 
-                                total_qty = total_qty + ?, 
-                                price = ?, 
-                                unit_type = ?, 
-                                pcs_per_box = ?, 
-                                received_at = ? 
-                            WHERE item_id=?");
-                        $stmt2->execute([
-                            $received,      
-                            $total_qty,      
-                            $o['price'],
-                            $o['unit_type'],
-                            $o['pcs_per_box'],
-                            $now,
-                            $item_id
-                        ]);
-                    } else {
-                        // Insert new item into inventory
-                        $stmt2 = $pdo->prepare("INSERT INTO inventory 
-                            (item_id, item_name, item_type, category, sub_type, quantity, total_qty, price, unit_type, pcs_per_box, received_at, location, min_stock, max_stock) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Main Storage', 0, 9999)");
-                        $stmt2->execute([
-                            $item_id,
-                            $o['item_name'],
-                            $o['item_type'],
-                            null,
-                            $o['sub_type'],
-                            $received,      
-                            $total_qty,     
-                            $o['price'],
-                            $o['unit_type'],
-                            $o['pcs_per_box'],
-                            $now
-                        ]);
-                    }
+            $total_qty = ($unit === 'box') ? $receive_now * $pcs_per_box : $receive_now;
 
-                    // ---------------- Medicine Batches ----------------
-                    if (strtolower($o['item_type']) === 'medications and pharmacy supplies') {
-                        $batch_no = 'BATCH-' . uniqid();
-                        $stmt2 = $pdo->prepare("INSERT INTO medicine_batches 
-                            (item_id, batch_no, quantity, received_at) 
-                            VALUES (?, ?, ?, ?)");
-                        $stmt2->execute([$item_id, $batch_no, $total_qty, $now]);
-                    }
+            /* GET ITEM PRICE FROM department_request_prices */
+            $stmtPrice = $pdo->prepare("
+                SELECT price 
+                FROM department_request_prices 
+                WHERE request_id=? AND item_index=? 
+                ORDER BY id DESC LIMIT 1
+            ");
+            $stmtPrice->execute([$request_id, $index]);
+            $priceRow = $stmtPrice->fetch(PDO::FETCH_ASSOC);
+            $price = $priceRow['price'] ?? 0;
 
-                    // ---------------- Subtotal ----------------
-                    $subtotal += $lineSubtotal;
+            /* UPDATE INVENTORY */
+            $stmtCheck = $pdo->prepare("SELECT * FROM inventory WHERE item_name=? LIMIT 1");
+            $stmtCheck->execute([$item_name]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
-                    // Mark as completed IMMEDIATELY after processing this item
-                    $stmt = $pdo->prepare("UPDATE vendor_orders SET status='Completed' WHERE id=?");
-                    $stmt->execute([$o['id']]);
-                }
-            }
-
-            // ---------------- Receipt Handling ----------------
-            if ($subtotal > 0) {
-                $vat = $subtotal * 0.12;
-                $total = $subtotal + $vat;
-
-                $stmt = $pdo->prepare("SELECT id FROM receipts WHERE vendor_id=? AND order_id=?");
-                $stmt->execute([$vendor_id, $purchase_request_id]);
-                $existing_receipt = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                if ($existing_receipt) {
-                    $receipt_id = $existing_receipt['id'];
-                    $stmt = $pdo->prepare("UPDATE receipts 
-                        SET subtotal=subtotal+?, vat=vat+?, total=total+? 
-                        WHERE id=?");
-                    $stmt->execute([$subtotal, $vat, $total, $receipt_id]);
-                } else {
-                    $stmt = $pdo->prepare("INSERT INTO receipts 
-                        (order_id, vendor_id, subtotal, vat, total) 
-                        VALUES (?, ?, ?, ?, ?)");
-                    $stmt->execute([$purchase_request_id, $vendor_id, $subtotal, $vat, $total]);
-                    $receipt_id = $pdo->lastInsertId();
-
-                    $stmt = $pdo->prepare("INSERT INTO receipt_payments (receipt_id, status) VALUES (?, 'Pending')");
-                    $stmt->execute([$receipt_id]);
-                }
-
-                foreach ($orders_to_receive as $o) {
-                    $received = isset($received_qtys[$o['id']]) ? intval($received_qtys[$o['id']]) : 0;
-                    if ($received > 0) {
-                        if ($o['unit_type'] === "Box" && $o['pcs_per_box']) {
-                            $lineSubtotal = $o['price'] * $received; // per box
-                        } else {
-                            $lineSubtotal = $o['price'] * $received; // per piece
-                        }
-
-                        $stmt = $pdo->prepare("
-                            INSERT INTO receipt_items 
-                            (receipt_id, item_id, item_name, quantity_received, price, subtotal, unit_type, pcs_per_box)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ");
-                        $stmt->execute([
-                            $receipt_id, 
-                            $o['item_id'], 
-                            $o['item_name'], 
-                            $received, 
-                            $o['price'], 
-                            $lineSubtotal,
-                            $o['unit_type'], 
-                            $o['pcs_per_box']
-                        ]);
-                    }
-                }
-
-                header("Location: receipt.php?receipt_id=" . $receipt_id);
-                exit;
+            if ($existing) {
+                $stmtUpdate = $pdo->prepare("
+                    UPDATE inventory
+                    SET quantity = quantity + ?,
+                        total_qty = total_qty + ?,
+                        price = ?
+                    WHERE item_name = ?
+                ");
+                $stmtUpdate->execute([$receive_now, $total_qty, $price, $item_name]);
+            } else {
+                $stmtInsert = $pdo->prepare("
+                    INSERT INTO inventory
+                    (item_name, quantity, total_qty, price, unit_type, pcs_per_box,
+                     location, min_stock, max_stock)
+                    VALUES (?, ?, ?, ?, ?, ?, 'Main Storage', 0, 9999)
+                ");
+                $stmtInsert->execute([$item_name, $receive_now, $total_qty, $price, ucfirst($unit), $pcs_per_box]);
             }
         }
+        unset($item);
+
+        $all_received = true;
+        foreach ($items as $item) {
+            if (($item['received_quantity'] ?? 0) < ($item['approved_quantity'] ?? 0)) {
+                $all_received = false;
+                break;
+            }
+        }
+
+        $new_status = $all_received ? 'Completed' : 'Receiving';
+
+        $stmtUpdateReq = $pdo->prepare("
+            UPDATE department_request
+            SET items=?, status=?
+            WHERE id=?
+        ");
+        $stmtUpdateReq->execute([json_encode($items), $new_status, $request_id]);
     }
+
+    header("Location: receive_order.php");
+    exit;
 }
 
-// ---------------- Fetch Orders ----------------
-$stmt = $pdo->query("
-    SELECT vo.purchase_request_id, vo.vendor_id,
-           SUM(vo.quantity) AS total_qty,
-           SUM(vp.price * vo.quantity) AS total_price,
-           GROUP_CONCAT(vo.item_id) AS items
-    FROM vendor_orders vo
-    JOIN vendor_products vp ON vo.item_id = vp.id
-    WHERE vo.status='Shipped'
-    GROUP BY vo.purchase_request_id, vo.vendor_id
-");
+/* =====================================================
+   FETCH ORDERS
+=====================================================*/
+$query = "SELECT * FROM department_request 
+          WHERE status IN ('Approved','Receiving','Completed')
+          ORDER BY created_at DESC";
+
+$stmt = $pdo->prepare($query);
+$stmt->execute();
 $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Orders Ready to Receive</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/inventory_dashboard.css">
+<meta charset="UTF-8">
+<title>Receive Orders</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+<style>
+body { background:#f4f6f9; font-family:'Segoe UI',sans-serif; }
+.main-content { margin-left:260px; padding:30px; }
+.card { border-radius:12px; box-shadow:0 5px 18px rgba(0,0,0,0.08); }
+.receipt-header { border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:20px; }
+.signature-line { border-top:1px solid #000; margin-top:60px; text-align:center; padding-top:5px; }
+.print-area { background:white; padding:30px; }
+</style>
 </head>
-<body class="bg-light">
+<body>
 
-<div class="main-sidebar">
-    <?php include 'inventory_sidebar.php'; ?>
-</div>
+<div class="main-sidebar"><?php include 'inventory_sidebar.php'; ?></div>
 
-<div class="container py-5">
-    <h2 class="mb-4">Orders Ready to Receive</h2>
+<div class="main-content">
+<div class="card p-4 bg-white">
 
-    <?php if (count($orders) > 0): ?>
-        <table class="table table-bordered bg-white shadow">
-            <thead class="table-dark">
-                <tr>
-                    <th>Purchase Request</th>
-                    <th>Ordered Qty</th>
-                    <th>Total Price</th>
-                    <th>Items</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php foreach ($orders as $o): ?>
-                <tr>
-                    <td>Purchase Request #<?= $o['purchase_request_id'] ?></td>
-                    <td><?= $o['total_qty'] ?></td>
-                    <td>₱<?= number_format($o['total_price'], 2) ?></td>
-                    <td><?= $o['items'] ?></td>
-                    <td><span class="badge bg-info">Shipped</span></td>
-                    <td>
-                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#viewModal<?= $o['purchase_request_id'] ?>">View</button>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php else: ?>
-        <p class="alert alert-info">No shipped orders available for receiving.</p>
-    <?php endif; ?>
-</div>
+<h2 class="mb-4 text-primary">
+<i class="bi bi-truck"></i> Delivery Orders
+</h2>
 
-<!-- Modals -->
-<?php foreach ($orders as $o): ?>
-<div class="modal fade" id="viewModal<?= $o['purchase_request_id'] ?>" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <form method="post" class="order-form">
-                <div class="modal-header">
-                    <h5 class="modal-title">📦 Order #<?= $o['purchase_request_id'] ?></h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <?php
-                    $stmt2 = $pdo->prepare("
-                        SELECT vo.*, vp.item_name, vp.price, vp.unit_type, vp.pcs_per_box,
-                               IFNULL(inv.total_qty, 0) AS inventory_qty
-                        FROM vendor_orders vo
-                        JOIN vendor_products vp ON vo.item_id = vp.id
-                        LEFT JOIN inventory inv ON vp.id = inv.item_id
-                        WHERE vo.purchase_request_id=? AND vo.status='Shipped'
-                    ");
-                    $stmt2->execute([$o['purchase_request_id']]);
-                    $items = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-                    ?>
-                    <table class="table table-striped table-bordered">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Item</th>
-                                <th>Ordered Qty</th>
-                                <th>Unit</th>
-                                <th>Total Pcs</th>
-                                <th>Current Inventory</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Qty Received</th>
-                                <th>Subtotal</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($items as $it):
-                            $lineTotal = $it['price'] * $it['quantity'];
-                            $totalPcs = ($it['unit_type'] === "Box")
-                                ? $it['quantity'] * ($it['pcs_per_box'] ?? 0)
-                                : $it['quantity'];
-                        ?>
-                            <tr>
-                                <td><?= htmlspecialchars($it['item_name']) ?></td>
-                                <td><?= $it['quantity'] ?></td>
-                                <td><?= htmlspecialchars($it['unit_type']) ?><?php if($it['unit_type']==='Box'): ?> (<?= $it['pcs_per_box'] ?> pcs)<?php endif; ?></td>
-                                <td class="total-pcs"><?= $totalPcs ?></td>
-                                <td><?= $it['inventory_qty'] ?></td>
-                                <td>₱<?= number_format($it['price'], 2) ?></td>
-                                <td><span class="badge bg-info"><?= $it['status'] ?></span></td>
-                                <td>
-                                    <input type="number"
-                                           name="received_qty[<?= $it['id'] ?>]"
-                                           value="<?= $it['quantity'] ?>"
-                                           min="1" max="<?= $it['quantity'] ?>"
-                                           class="form-control qty-input"
-                                           data-price="<?= $it['price'] ?>"
-                                           data-unit="<?= $it['unit_type'] ?>"
-                                           data-pcs="<?= $it['pcs_per_box'] ?>">
-                                </td>
-                                <td class="subtotal">₱<?= number_format($lineTotal,2) ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <div class="modal-footer">
-                    <input type="hidden" name="order_id" value="<?= $o['purchase_request_id'] ?>">
-                    <button type="submit" name="receive" class="btn btn-success">Confirm Receive</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
+<div class="table-responsive">
+<table class="table table-bordered table-hover">
+<thead class="table-light">
+<tr>
+<th>ID</th>
+<th>Department</th>
+<th>Status</th>
+<th>Purchased At</th>
+<th>Receipt</th>
+<th>Receive</th>
+</tr>
+</thead>
+<tbody>
+
+<?php foreach($orders as $o): ?>
+<tr>
+<td><?= $o['id'] ?></td>
+<td><?= htmlspecialchars($o['department']) ?></td>
+<td><?= $o['status'] ?></td>
+<td><?= $o['purchased_at'] ?></td>
+
+<td>
+<button class="btn btn-secondary btn-sm receipt-btn"
+    data-id="<?= $o['id'] ?>"
+    data-department="<?= htmlspecialchars($o['department']) ?>"
+    data-date="<?= $o['purchased_at'] ?>"
+    data-items='<?= htmlspecialchars($o['items'], ENT_QUOTES) ?>'>
+    <i class="bi bi-receipt"></i> Receipt
+</button>
+</td>
+
+<td>
+<?php if($o['status'] !== 'Completed'): ?>
+<button class="btn btn-success btn-sm receive-btn"
+    data-id="<?= $o['id'] ?>"
+    data-items='<?= htmlspecialchars($o['items'], ENT_QUOTES) ?>'>
+    <i class="bi bi-box-seam"></i> Receive
+</button>
+<?php else: ?>
+<span class="badge bg-primary">Completed</span>
+<?php endif; ?>
+</td>
+
+</tr>
 <?php endforeach; ?>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</tbody>
+</table>
+</div>
+
+</div>
+</div>
+
+<!-- MODAL -->
+<div class="modal fade" id="modalBox">
+<div class="modal-dialog modal-xl modal-dialog-scrollable">
+<div class="modal-content">
+<div class="modal-body" id="modalContent"></div>
+</div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-document.querySelectorAll('.order-form').forEach(form => {
-    form.querySelectorAll('.qty-input').forEach(input => {
-        input.addEventListener('input', () => {
-            form.querySelectorAll('tbody tr').forEach(row => {
-                const qtyInput = row.querySelector('.qty-input');
-                if(!qtyInput) return;
 
-                let qty = parseInt(qtyInput.value) || 0;
-                let price = parseFloat(qtyInput.dataset.price) || 0;
-                let unit = qtyInput.dataset.unit;
-                let pcs = parseInt(qtyInput.dataset.pcs) || 0;
+/* ================= RECEIPT VIEW ================= */
+document.querySelectorAll('.receipt-btn').forEach(btn => {
+btn.addEventListener('click', async () => {
 
-                let subtotal = price * qty;
-                let totalPcs = (unit === "Box") ? qty * pcs : qty;
+const id = btn.dataset.id;
 
-                row.querySelector('.total-pcs').innerText = totalPcs;
-                row.querySelector('.subtotal').innerText = "₱" + subtotal.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-            });
-        });
-    });
+let response = await fetch('fetch_receipt_prices.php?id=' + id);
+let data = await response.json();
+
+let grandTotal = 0;
+
+let html = `
+<div class="print-area">
+
+<div class="receipt-header text-center">
+<h3><strong>YOUR COMPANY NAME</strong></h3>
+<p>Warehouse & Inventory Department</p>
+<h4 class="mt-3">DELIVERY RECEIPT</h4>
+</div>
+
+<table class="table table-bordered">
+<thead class="table-light">
+<tr>
+<th>Item</th>
+<th>Qty</th>
+<th>Unit Price</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody>
+`;
+
+data.forEach(item => {
+grandTotal += parseFloat(item.total_price);
+
+html += `
+<tr>
+<td>${item.name}</td>
+<td class="text-center">${item.quantity}</td>
+<td class="text-end">₱ ${parseFloat(item.price).toFixed(2)}</td>
+<td class="text-end">₱ ${parseFloat(item.total_price).toFixed(2)}</td>
+</tr>
+`;
 });
+
+html += `
+<tr>
+<td colspan="3" class="text-end"><strong>GRAND TOTAL</strong></td>
+<td class="text-end"><strong>₱ ${grandTotal.toFixed(2)}</strong></td>
+</tr>
+</tbody>
+</table>
+
+<div class="text-end mt-4">
+<button onclick="window.print()" class="btn btn-dark">Print</button>
+</div>
+
+</div>
+`;
+
+document.getElementById('modalContent').innerHTML = html;
+new bootstrap.Modal(document.getElementById('modalBox')).show();
+});
+});
+
 </script>
 
 </body>

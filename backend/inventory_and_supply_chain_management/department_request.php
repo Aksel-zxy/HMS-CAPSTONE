@@ -1,76 +1,103 @@
 <?php
 include '../../SQL/config.php';
 
-// Handle Approve / Reject / Purchase Actions
+/* =====================================================
+   HANDLE ACTIONS
+=====================================================*/
 if (isset($_POST['action'])) {
+
     $request_id = $_POST['id'];
 
-    $check = $pdo->prepare("SELECT * FROM department_request WHERE id=? LIMIT 1");
-    $check->execute([$request_id]);
-    $request = $check->fetch(PDO::FETCH_ASSOC);
-    $items = json_decode($request['items'], true) ?: [];
+    // Fetch the request
+    $stmt = $pdo->prepare("SELECT * FROM department_request WHERE id=? LIMIT 1");
+    $stmt->execute([$request_id]);
+    $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($_POST['action'] === 'approve' && $request['status'] === 'Pending') {
-        $approved_quantities = $_POST['approved_quantity'] ?? [];
-        foreach ($items as $index => &$item) {
-            $approved = isset($approved_quantities[$index]) ? (int)$approved_quantities[$index] : ($item['approved_quantity'] ?? 0);
-            $approved = min($approved, $item['quantity']);
-            $item['approved_quantity'] = $approved;
-        }
-        unset($item);
-        $total_approved_items = array_sum(array_map(fn($i)=>$i['approved_quantity']??0, $items));
-        $stmt = $pdo->prepare("UPDATE department_request
-            SET status='Approved',
-                items=:items_json,
-                total_approved_items=:total_approved
-            WHERE id=:id");
-        $stmt->execute([
-            ':items_json'=>json_encode($items, JSON_UNESCAPED_UNICODE),
-            ':total_approved'=>$total_approved_items,
-            ':id'=>$request_id
-        ]);
+    if (!$request) {
+        header("Location: department_request.php");
+        exit;
     }
 
-    if ($_POST['action'] === 'reject' && $request['status'] === 'Pending') {
+    // Fetch items for this request
+    $stmtItems = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
+    $stmtItems->execute([$request_id]);
+    $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+
+    /* ================= APPROVE ================= */
+    if ($_POST['action'] === 'approve' && strcasecmp(trim($request['status']), 'Pending') === 0) {
+
+        $approved_quantities = $_POST['approved_quantity'] ?? [];
+
+        foreach ($items as $item) {
+            $idx = $item['id'];
+            $approved = isset($approved_quantities[$idx]) ? (int)$approved_quantities[$idx] : 0;
+            $approved = min($approved, $item['quantity']);
+
+            $stmtUpdate = $pdo->prepare("UPDATE department_request_items
+                SET approved_quantity=?
+                WHERE id=?");
+            $stmtUpdate->execute([$approved, $idx]);
+        }
+
+        // Update total approved in request
+        $stmtTotal = $pdo->prepare("SELECT SUM(approved_quantity) AS total FROM department_request_items WHERE request_id=?");
+        $stmtTotal->execute([$request_id]);
+        $total_approved = $stmtTotal->fetchColumn() ?: 0;
+
+        $stmtUpdateRequest = $pdo->prepare("UPDATE department_request
+            SET status='Approved', total_approved_items=?
+            WHERE id=?");
+        $stmtUpdateRequest->execute([$total_approved, $request_id]);
+    }
+
+    /* ================= REJECT ================= */
+    if ($_POST['action'] === 'reject' && strcasecmp(trim($request['status']), 'Pending') === 0) {
         $stmt = $pdo->prepare("UPDATE department_request SET status='Rejected' WHERE id=?");
         $stmt->execute([$request_id]);
     }
 
-    if ($_POST['action'] === 'purchase' && $request['status'] === 'Approved' && !$request['purchased_at']) {
+    /* ================= PURCHASE ================= */
+    if ($_POST['action'] === 'purchase' && strcasecmp(trim($request['status']), 'Approved') === 0 && !$request['purchased_at']) {
+
         $prices = $_POST['price'] ?? [];
         $units = $_POST['unit'] ?? [];
         $pcs_per_box_arr = $_POST['pcs_per_box'] ?? [];
         $payment_type = $_POST['payment_type'] ?? 'Direct';
 
-        $total_request_price = 0;
-
-        foreach ($items as $index => $item) {
+        foreach ($items as $item) {
+            $item_id = $item['id'];
             $approved_qty = $item['approved_quantity'] ?? 0;
-            $unit_type = $units[$index] ?? ($item['unit'] ?? 'pcs');
-            $pcs_per_box = intval($pcs_per_box_arr[$index] ?? ($item['pcs_per_box'] ?? 1));
-            $price = floatval($prices[$index] ?? 0);
-            $total_price = ($unit_type === 'box') ? $approved_qty * $pcs_per_box * $price : $approved_qty * $price;
-            $total_request_price += $total_price;
+            if ($approved_qty <= 0) continue;
 
-            // Save price to database
-            $stmtPrice = $pdo->prepare("INSERT INTO department_request_prices 
-                (request_id, item_index, price, total_price) VALUES (?,?,?,?)");
-            $stmtPrice->execute([$request_id, $index, $price, $total_price]);
+            $unit_type = strtolower($units[$item_id] ?? $item['unit'] ?? 'pcs');
+            $pcs_per_box = intval($pcs_per_box_arr[$item_id] ?? $item['pcs_per_box'] ?? 1);
+            $price = floatval($prices[$item_id] ?? $item['price'] ?? 0);
 
-            // Create receiving row
-            $stmtRecv = $pdo->prepare("INSERT INTO receiving 
-                (request_id, item_index, received_qty, pcs_per_box) VALUES (?,?,?,?)");
-            $stmtRecv->execute([$request_id, $index, 0, $pcs_per_box]);
+            $total_price = $price * $approved_qty;
+            $total_qty = ($unit_type === 'box') ? $approved_qty * $pcs_per_box : $approved_qty;
+
+            // Update price for the item
+            $stmtUpdatePrice = $pdo->prepare("UPDATE department_request_items 
+                SET price=?, total_price=?
+                WHERE id=?");
+            $stmtUpdatePrice->execute([$price, $total_price, $item_id]);
+
+            // Insert receiving record
+            $stmtRecv = $pdo->prepare("INSERT INTO receiving
+                (request_id, item_index, received_qty, pcs_per_box)
+                VALUES (?, ?, 0, ?)");
+            $stmtRecv->execute([$request_id, $item_id, $pcs_per_box]);
 
             // Insert into inventory
-            $total_qty = ($unit_type==='box')?$approved_qty*$pcs_per_box:$approved_qty;
-            $stmtInv = $pdo->prepare("INSERT INTO inventory 
-                (item_id, item_name, item_type, category, sub_type, quantity, total_qty, price, unit_type, pcs_per_box, received_at, location)
+            $stmtInv = $pdo->prepare("INSERT INTO inventory
+                (item_id, item_name, item_type, category, sub_type,
+                 quantity, total_qty, price, unit_type,
+                 pcs_per_box, received_at, location)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
             $stmtInv->execute([
-                $item['id'] ?? 0,
-                $item['name'] ?? '',
-                $item['unit'] ?? 'pcs',
+                $item_id,
+                $item['item_name'],
+                $unit_type,
                 $item['category'] ?? '',
                 $item['sub_type'] ?? '',
                 $approved_qty,
@@ -82,23 +109,40 @@ if (isset($_POST['action'])) {
             ]);
         }
 
-        // Update request as purchased
+        // Mark request as purchased
         $stmt = $pdo->prepare("UPDATE department_request SET purchased_at=NOW(), payment_type=? WHERE id=?");
         $stmt->execute([$payment_type, $request_id]);
     }
+
+    header("Location: department_request.php");
+    exit;
 }
 
-// Filters
-$statusFilter = $_GET['status'] ?? 'Pending';
+/* =====================================================
+   FETCH REQUESTS
+=====================================================*/
+$statusFilter = $_GET['status'] ?? 'All';
 $searchDept = $_GET['search_dept'] ?? '';
+
 $query = "SELECT * FROM department_request WHERE 1=1";
 $params = [];
-if ($statusFilter && $statusFilter!=='All') { $query.=" AND status=?"; $params[]=$statusFilter; }
-if ($searchDept) { $query.=" AND department LIKE ?"; $params[]="%$searchDept%"; }
-$query.=" ORDER BY created_at DESC";
+
+if ($statusFilter && $statusFilter !== 'All') {
+    $query .= " AND LOWER(TRIM(status)) = ?";
+    $params[] = strtolower(trim($statusFilter));
+}
+
+if ($searchDept) {
+    $query .= " AND department LIKE ?";
+    $params[] = "%$searchDept%";
+}
+
+$query .= " ORDER BY created_at DESC";
+
 $stmt = $pdo->prepare($query);
 $stmt->execute($params);
 $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if (!$requests) $requests = [];
 ?>
 
 <!DOCTYPE html>
@@ -113,6 +157,8 @@ body { background:#f8fafc; font-family:'Segoe UI',sans-serif; }
 .main-content { margin-left:260px; padding:30px; }
 .card { border-radius:12px; box-shadow:0 5px 18px rgba(0,0,0,0.08);}
 .table td, .table th { text-align:center; vertical-align:middle;}
+.qty-input, .price-input { width:80px; }
+.total-price { font-weight:bold; }
 </style>
 </head>
 <body>
@@ -154,17 +200,20 @@ body { background:#f8fafc; font-family:'Segoe UI',sans-serif; }
 </thead>
 <tbody>
 <?php foreach($requests as $r):
-    $itemsArray = json_decode($r['items'], true) ?: [];
+    $stmtItems = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
+    $stmtItems->execute([$r['id']]);
+    $itemsArray = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
+    $status = ucfirst(strtolower(trim($r['status'])));
 ?>
 <tr>
 <td><?= $r['id'] ?></td>
 <td><?= htmlspecialchars($r['department']) ?></td>
 <td><?= htmlspecialchars($r['user_id']) ?></td>
-<td><?= $r['total_items'] ?></td>
+<td><?= count($itemsArray) ?></td>
 <td>
 <?php
-    if($r['status']==='Pending') echo '<span class="badge bg-warning text-dark">Pending</span>';
-    elseif($r['status']==='Approved') echo '<span class="badge bg-success">Approved</span>';
+    if(strcasecmp($status,'Pending')===0) echo '<span class="badge bg-warning text-dark">Pending</span>';
+    elseif(strcasecmp($status,'Approved')===0) echo '<span class="badge bg-success">Approved</span>';
     else echo '<span class="badge bg-danger">Rejected</span>';
 ?>
 </td>
@@ -172,9 +221,9 @@ body { background:#f8fafc; font-family:'Segoe UI',sans-serif; }
 <td>
     <button class="btn btn-info btn-sm view-items-btn"
         data-id="<?= $r['id'] ?>"
-        data-status="<?= $r['status'] ?>"
+        data-status="<?= $status ?>"
         data-purchased="<?= $r['purchased_at'] ?>"
-        data-items='<?= htmlspecialchars(json_encode($itemsArray), ENT_QUOTES) ?>'>
+        data-items='<?= htmlspecialchars(json_encode($itemsArray, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>'>
         <i class="bi bi-eye"></i> View
     </button>
 </td>
@@ -208,83 +257,76 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
         const items = JSON.parse(btn.dataset.items || '[]');
         const status = btn.dataset.status;
         const purchased = btn.dataset.purchased;
+        const showPrice = (status.toLowerCase() === 'approved' && !purchased);
 
         let html = `<form method="post">
-            <input type="hidden" name="id" value="${btn.dataset.id}">
-            <div class="table-responsive">
-            <table class="table table-bordered">
-            <thead class="table-light">
-            <tr>
-                <th>Item</th>
-                <th>Requested Qty</th>
-                <th>Approved Qty</th>
-                <th>Unit</th>
-                <th>Pcs/Box</th>
-                <th>Price/unit</th>
-                <th>Total Price</th>
-            </tr>
-            </thead><tbody>`;
+        <input type="hidden" name="id" value="${btn.dataset.id}">
+        <div class="table-responsive">
+        <table class="table table-bordered">
+        <thead class="table-light">
+        <tr>
+            <th>Item</th>
+            <th>Requested</th>
+            <th>Approved</th>
+            <th>Unit</th>
+            <th>Pcs/Box</th>`;
+        if(showPrice) html += `<th>Price</th><th>Total</th>`;
+        html += `</tr></thead><tbody>`;
 
-        items.forEach((item,idx)=>{
-            const approvedQty = item.approved_quantity ?? 0;
-            html+=`<tr>
-                <td>${item.name}</td>
+        items.forEach(item=>{
+            const idx = item.id;
+            const approved = item.approved_quantity || 0;
+            const unit = item.unit || 'pcs';
+            const pcs = item.pcs_per_box || 1;
+            html += `<tr>
+                <td>${item.item_name}</td>
                 <td>${item.quantity}</td>
-                <td><input type="number" min="0" max="${item.quantity}" name="approved_quantity[${idx}]" class="form-control" value="${approvedQty}" ${status!=='Pending'?'readonly':''}></td>
-                <td>${item.unit}</td>
-                <td>${item.pcs_per_box??1}</td>
-                <td><input type="number" step="0.01" class="form-control price-input" name="price[${idx}]" value="0" ${status==='Pending'?'readonly':''}></td>
-                <td class="total-price text-end">0.00</td>
-            </tr>`;
+                <td><input type="number" class="form-control qty-input" name="approved_quantity[${idx}]" value="${approved}" ${status.toLowerCase()!=='pending'?'readonly':''}></td>
+                <td>${unit}<input type="hidden" name="unit[${idx}]" value="${unit}"></td>
+                <td>${pcs}<input type="hidden" name="pcs_per_box[${idx}]" value="${pcs}"></td>`;
+            if(showPrice){
+                html += `<td><input type="number" step="0.01" class="form-control price-input" name="price[${idx}]" value="${item.price || 0}"></td>
+                         <td class="total-price text-end">0.00</td>`;
+            }
+            html += `</tr>`;
         });
 
-        html+=`</tbody></table></div>
-            <div class="text-end mt-2"><strong>Total Request Price: <span id="totalRequestPrice">0.00</span></strong></div>`;
+        html += `</tbody></table></div>`;
 
-        if(status==='Pending'){
-            html+=`<div class="d-flex justify-content-end gap-2 mt-3">
-                <button type="submit" name="action" value="approve" class="btn btn-success">Approve</button>
-                <button type="submit" name="action" value="reject" class="btn btn-danger">Reject</button>
-            </div>`;
-        } else if(status==='Approved' && !purchased){
-            html+=`<div class="row mt-3">
-                <div class="col-md-4">
-                    <select name="payment_type" class="form-select">
-                        <option value="Direct">Pay Directly</option>
-                        <option value="Monthly">Monthly</option>
-                    </select>
-                </div>
-                <div class="col-md-8 text-end">
-                    <button type="submit" name="action" value="purchase" class="btn btn-primary">Purchase</button>
-                </div>
-            </div>`;
-        } else {
-            html+=`<div class="text-center mt-3"><span class="text-muted">This request has been ${status}${purchased?' and purchased.':''}</span></div>`;
+        if(status.toLowerCase() === 'pending'){
+            html += `<div class="d-flex justify-content-end gap-2 mt-3">
+                        <button type="submit" name="action" value="approve" class="btn btn-success">Approve</button>
+                        <button type="submit" name="action" value="reject" class="btn btn-danger">Reject</button>
+                    </div>`;
         }
 
-        html+=`</form>`;
+        if(showPrice){
+            html += `<div class="text-end mt-2"><strong>Total Request Price: <span id="grandTotal">0.00</span></strong></div>
+                     <div class="text-end mt-3"><button type="submit" name="action" value="purchase" class="btn btn-primary">Purchase</button></div>`;
+        }
+
+        html += `</form>`;
         document.getElementById('modalBodyContent').innerHTML = html;
 
-        // Auto compute total price
-        const rows = document.querySelectorAll('#modalBodyContent tbody tr');
-        const totalSpan = document.getElementById('totalRequestPrice');
-        function computeTotal(){
-            let sum = 0;
-            rows.forEach(r=>{
-                const qty = parseInt(r.cells[2].querySelector('input')?.value||0);
-                const price = parseFloat(r.cells[5].querySelector('input')?.value||0);
-                r.cells[6].textContent = formatCurrency(qty*price);
-                sum+=qty*price;
-            });
-            totalSpan.textContent = formatCurrency(sum);
+        if(showPrice){
+            const rows = document.querySelectorAll('#modalBodyContent tbody tr');
+            const grandTotal = document.getElementById('grandTotal');
+
+            function compute(){
+                let sum = 0;
+                rows.forEach(r=>{
+                    const qty = parseFloat(r.querySelector('.qty-input')?.value || 0);
+                    const price = parseFloat(r.querySelector('.price-input')?.value || 0);
+                    let total = price * qty;
+                    r.querySelector('.total-price').textContent = formatCurrency(total);
+                    sum += total;
+                });
+                grandTotal.textContent = formatCurrency(sum);
+            }
+            document.querySelectorAll('.qty-input, .price-input').forEach(i=>i.addEventListener('input', compute));
+            compute();
         }
-        rows.forEach(r=>{
-            const input = r.cells[5].querySelector('input');
-            if(input) input.addEventListener('input',computeTotal);
-            const qtyInput = r.cells[2].querySelector('input');
-            if(qtyInput) qtyInput.addEventListener('input',computeTotal);
-        });
-        computeTotal();
+
         new bootstrap.Modal(document.getElementById('viewModal')).show();
     });
 });
