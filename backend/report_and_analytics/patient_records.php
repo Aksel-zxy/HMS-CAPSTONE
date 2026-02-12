@@ -118,9 +118,7 @@
 </head>
 
 <body>
-    <div class="sidebar-wrapper">
-        <?php include 'sidebar.php' ?>
-    </div>
+
 
     <div class="main-content">
         <!-- Back Button -->
@@ -229,6 +227,7 @@
 
         loadPatientRecord();
     </script>
+
 </body>
 
 </html>

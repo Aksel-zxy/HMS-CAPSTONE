@@ -375,7 +375,7 @@
                     }
 
                     // Construct the full API URL based on user input
-                    const API_URL = `https://bsis-03.keikaizen.xyz/employee/getMonthShiftAndDutyReport/${month}/${year}`;
+                    const API_URL = `https://localhost:7212/employee/getMonthShiftAndDutyReport/${month}/${year}`;
 
                     try {
                         const response = await fetch(API_URL);
