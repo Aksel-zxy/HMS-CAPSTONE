@@ -5,6 +5,51 @@ $today_day = intval(date('d'));
 $today_month = intval(date('m'));
 $today_year = intval(date('Y'));
 
+/* ============================= */
+/* UPDATE REPAIR REQUEST STATUS */
+/* ============================= */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'update_request') {
+    $request_id = intval($_POST['request_id']);
+    $status = trim($_POST['status']);
+    $remarks = trim($_POST['remarks']);
+
+    // Fetch the request first
+    $stmt = $pdo->prepare("SELECT * FROM repair_requests WHERE id = ?");
+    $stmt->execute([$request_id]);
+    $request = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($request) {
+        if ($status === 'Completed') {
+            // Move to maintenance_history
+            $ins = $pdo->prepare("
+                INSERT INTO maintenance_history
+                (equipment, maintenance_type, status, remarks, completed_at)
+                VALUES (?, ?, ?, ?, NOW())
+            ");
+            $ins->execute([
+                $request['equipment'],
+                ($request['issue'] === 'Preventive Maintenance' ? 'Preventive' : 'Repair'),
+                $status,
+                $remarks
+            ]);
+
+            // Delete from repair_requests
+            $pdo->prepare("DELETE FROM repair_requests WHERE id = ?")->execute([$request_id]);
+        } else {
+            // Update status and optional remarks in repair_requests
+            $upd = $pdo->prepare("UPDATE repair_requests SET status = ?, issue = ? WHERE id = ?");
+            $upd->execute([$status, $remarks ?: $request['issue'], $request_id]);
+        }
+    }
+
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+/* ============================= */
+/* HANDLE SCHEDULE CRUD */
+/* ============================= */
+
 // Handle New Schedule
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'schedule') {
     $inventory_id = intval($_POST['inventory_id']);
@@ -49,6 +94,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST['action'] === 'delete_schedu
     exit;
 }
 
+/* ============================= */
+/* FETCH DATA FOR DISPLAY */
+/* ============================= */
+
 // Fetch unique Diagnostic Equipment for dropdown, sorted alphabetically
 $stmt = $pdo->prepare("
     SELECT MIN(id) AS id, item_name 
@@ -80,8 +129,10 @@ foreach ($schedules as $due) {
         $check = $pdo->prepare("SELECT id FROM repair_requests WHERE ticket_no = ? LIMIT 1");
         $check->execute([$ticket_no]);
         if (!$check->fetch()) {
-            $ins = $pdo->prepare("INSERT INTO repair_requests (ticket_no, user_name, equipment, issue, priority, status, created_at) 
-                                   VALUES (?, ?, ?, 'Preventive Maintenance', ?, 'Open', NOW())");
+            $ins = $pdo->prepare("
+                INSERT INTO repair_requests (ticket_no, user_name, equipment, issue, priority, status, created_at) 
+                VALUES (?, ?, ?, 'Preventive Maintenance', ?, 'Open', NOW())
+            ");
             $ins->execute([
                 $ticket_no,
                 "System",
@@ -94,9 +145,9 @@ foreach ($schedules as $due) {
 
 // Fetch Repair Requests
 $stmt = $pdo->prepare("
-    SELECT rr.*, da.department AS location
+    SELECT rr.*, i.item_name AS inventory_name, da.department AS location
     FROM repair_requests rr
-    JOIN inventory i ON rr.equipment = i.item_name
+    LEFT JOIN inventory i ON rr.equipment = i.item_name
     LEFT JOIN department_assets da ON i.item_id = da.item_id
     ORDER BY rr.created_at DESC
 ");
@@ -132,6 +183,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </ul>
 
     <div class="tab-content border p-3 bg-white rounded-bottom">
+        <!-- Repair Requests -->
         <div class="tab-pane fade show active" id="requests">
             <h5>Repair Requests</h5>
             <table class="table table-bordered">
@@ -176,6 +228,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </table>
         </div>
 
+        <!-- Schedule Maintenance -->
         <div class="tab-pane fade" id="schedule">
             <ul class="nav nav-pills mb-3">
                 <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#setSchedule">Set Schedule</button></li>
@@ -303,6 +356,7 @@ $history = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
 
+        <!-- Maintenance History -->
         <div class="tab-pane fade" id="history">
             <h5>Past Maintenance</h5>
             <table class="table table-bordered">
