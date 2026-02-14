@@ -427,32 +427,94 @@ for ($i = 1; $i <= 12; $i++) {
                 <!-- KPI CARDS -->
                 <div class="row g-3 mb-4">
                     <div class="col-md-3">
-                        <div class="card shadow-sm rounded-4 p-3">
-                            <small class="text-muted">Total Sales</small>
-                            <h3 class="fw-bold">₱<?= number_format($totalSales, 2) ?></h3>
+                        <div class="card card-gradient-sales shadow-sm rounded-4 p-3">
+                            <div class="d-flex justify-content-center align-items-center gap-3">
+                                <!-- ICON -->
+                                <div class="bg-success bg-opacity-10 
+                rounded-3 d-flex align-items-center justify-content-center"
+                                    style="width:55px; height:55px;">
+                                    <i class="fa-solid fa-money-bill-1-wave fs-3"></i>
+                                </div>
+
+                                <!-- TEXT -->
+                                <div class="text-center">
+                                    <small class="text-muted d-block">Total Sales</small>
+                                    <h3 class="fw-bold">
+                                        <?= number_format($totalSales, 2) ?>
+                                    </h3>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-gradient-orders shadow-sm rounded-4 p-3">
+                            <div class="d-flex justify-content-center align-items-center gap-3">
+
+                                <!-- ICON -->
+                                <div class="bg-success bg-opacity-10 
+                        rounded-3 d-flex align-items-center justify-content-center"
+                                    style="width:55px; height:55px;">
+                                    <i class="fa-solid fa-clipboard-list fs-3"></i>
+                                </div>
+
+                                <!-- TEXT -->
+                                <div>
+                                    <small class="text-muted">Total Orders</small>
+                                    <h3 class="fw-bold"><?= $totalOrders ?></h3>
+                                </div>
+
+                            </div>
+
                         </div>
                     </div>
 
+
                     <div class="col-md-3">
-                        <div class="card shadow-sm rounded-4 p-3">
-                            <small class="text-muted">Total Orders</small>
-                            <h3 class="fw-bold"><?= $totalOrders ?></h3>
+                        <div class="card card-gradient-dispensed shadow-sm rounded-4 p-3">
+
+                            <div class="d-flex justify-content-center align-items-center gap-3">
+
+                                <!-- ICON -->
+                                <div class="bg-success bg-opacity-10 
+                        rounded-3 d-flex align-items-center justify-content-center"
+                                    style="width:55px; height:55px;">
+                                    <i class="fa-solid fa-file-prescription fs-3"></i>
+                                </div>
+
+                                <!-- TEXT -->
+                                <div>
+                                    <small class="text-muted">Dispensed Today</small>
+                                    <h3 class="fw-bold"><?= $dispensedToday ?></h3>
+                                </div>
+
+                            </div>
+
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card card-gradient-stocks shadow-sm rounded-4 p-3">
+
+                            <div class="d-flex justify-content-center align-items-center gap-3">
+
+                                <!-- ICON -->
+                                <div class="bg-success bg-opacity-10 
+                        rounded-3 d-flex align-items-center justify-content-center"
+                                    style="width:55px; height:55px;">
+                                    <i class="fa-solid fa-boxes-stacked fs-3"></i>
+                                </div>
+
+                                <!-- TEXT -->
+                                <div>
+                                    <small class="text-muted">Total Stocks</small>
+                                    <h3 class="fw-bold"><?= $totalStocks ?></h3>
+                                </div>
+
+                            </div>
+
                         </div>
                     </div>
 
-                    <div class="col-md-3">
-                        <div class="card shadow-sm rounded-4 p-3">
-                            <small class="text-muted">Dispensed Today</small>
-                            <h3 class="fw-bold"><?= $dispensedToday ?></h3>
-                        </div>
-                    </div>
-
-                    <div class="col-md-3">
-                        <div class="card shadow-sm rounded-4 p-3">
-                            <small class="text-muted">Total Stocks</small>
-                            <h3 class="fw-bold"><?= $totalStocks ?></h3>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- MAIN CHART ROW -->
