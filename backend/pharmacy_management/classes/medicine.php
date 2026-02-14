@@ -4,13 +4,6 @@ class Medicine
     private $conn;
 
 
-    private $category_locations = array(
-        'Antibiotic' => array('storage_room' => 'Main', 'shelf_no' => 1, 'rack_no' => 1),
-        'Painkiller' => array('storage_room' => 'Main', 'shelf_no' => 1, 'rack_no' => 2),
-        'Vitamins' => array('storage_room' => 'Main', 'shelf_no' => 2, 'rack_no' => 1),
-        'Cold & Flu' => array('storage_room' => 'Main', 'shelf_no' => 2, 'rack_no' => 2),
-        'Others' => array('storage_room' => 'Main', 'shelf_no' => 3, 'rack_no' => 1)
-    );
 
     public function __construct($dbConnection)
     {
@@ -18,32 +11,41 @@ class Medicine
     }
 
 
-    private function assignLocationByCategory($category)
+    private function assignLocationAutomatically()
     {
-        $base = isset($this->category_locations[$category]) ? $this->category_locations[$category] : $this->category_locations['Others'];
+        $query = "
+        SELECT storage_room, shelf_no, rack_no, bin_no
+        FROM pharmacy_inventory
+        ORDER BY shelf_no DESC, rack_no DESC, bin_no DESC
+        LIMIT 1
+    ";
 
-        $storage_room = $base['storage_room'];
-        $shelf_no = $base['shelf_no'];
-        $rack_no = $base['rack_no'];
-
-
-        $query = "SELECT `bin_no` 
-                  FROM `pharmacy_inventory`
-                  WHERE `storage_room`='$storage_room' AND `shelf_no`='$shelf_no' AND `rack_no`='$rack_no'
-                  ORDER BY `bin_no` DESC LIMIT 1";
         $result = mysqli_query($this->conn, $query);
 
         if (mysqli_num_rows($result) > 0) {
             $row = mysqli_fetch_assoc($result);
+
+            $storage_room = 'Main';
+            $shelf_no = intval($row['shelf_no']);
+            $rack_no = intval($row['rack_no']);
             $bin_no = intval($row['bin_no']) + 1;
         } else {
+            $storage_room = 'Main';
+            $shelf_no = 1;
+            $rack_no = 1;
             $bin_no = 1;
         }
 
-
+        // Max 10 bins per rack
         if ($bin_no > 10) {
             $bin_no = 1;
             $rack_no += 1;
+        }
+
+        // Max 5 racks per shelf
+        if ($rack_no > 5) {
+            $rack_no = 1;
+            $shelf_no += 1;
         }
 
         return array(
@@ -55,16 +57,17 @@ class Medicine
     }
 
 
+
     public function addMedicineWithAutoLocation($med_name, $generic_name, $brand_name, $prescription_required, $category, $dosage, $unit, $unit_price, $stock_quantity)
     {
-        $location = $this->assignLocationByCategory($category);
+        $location = $this->assignLocationAutomatically();
 
         $stmt = $this->conn->prepare("
             INSERT INTO pharmacy_inventory (med_name, generic_name, brand_name, prescription_required, category, dosage, unit, unit_price, stock_quantity, storage_room, shelf_no, rack_no, bin_no)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->bind_param(
-            "ssssssdiiiiii",
+            "sssssssdisiii",
             $med_name,
             $generic_name,
             $brand_name,

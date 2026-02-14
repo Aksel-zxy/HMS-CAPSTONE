@@ -153,3 +153,34 @@ a.sidebar-link:hover {
   margin: 0;
   color: #323a46;
 }
+.card-gradient-sales {
+  border: 2px solid transparent;
+  border-radius: 1rem;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(135deg, #00c853, #69f0ae) border-box;
+}
+
+.card-gradient-orders {
+  border: 2px solid transparent;
+  border-radius: 1rem;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(135deg, #2979ff, #82b1ff) border-box;
+}
+
+.card-gradient-dispensed {
+  border: 2px solid transparent;
+  border-radius: 1rem;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(135deg, #ff6d00, #ffab40) border-box;
+}
+
+.card-gradient-stocks {
+  border: 2px solid transparent;
+  border-radius: 1rem;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(135deg, #8e24aa, #ce93d8) border-box;
+}
