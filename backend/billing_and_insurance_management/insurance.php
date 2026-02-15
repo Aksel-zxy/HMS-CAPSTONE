@@ -17,6 +17,7 @@ function cardColor($company) {
 <head>
     <title>Patient Insurance Cards</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <style>
         body {
@@ -84,75 +85,12 @@ function cardColor($company) {
 <body>
 
 <div class="container mt-4">
-    <h2 class="mb-4">🏥 Patient Insurance Cards</h2>
+    <h2 class="mb-4">🏥 Patient Insurance List</h2>
 
-     <div class="main-sidebar">
+    <div class="main-sidebar mb-4">
         <?php include 'billing_sidebar.php'; ?>
     </div>
 
-    <div class="row g-4">
-        <?php
-        $cards = $conn->query("
-            SELECT *
-            FROM patient_insurance
-            WHERE status = 'Active'
-            ORDER BY created_at DESC
-        ");
-
-        if ($cards->num_rows > 0):
-            while ($c = $cards->fetch_assoc()):
-        ?>
-        <div class="col-md-4 d-flex justify-content-center">
-            <div class="insurance-card"
-                 style="background: <?= cardColor($c['insurance_company']); ?>">
-
-                <div class="card-header">
-                    <?= strtoupper($c['insurance_company']); ?>
-                </div>
-
-                <div class="chip"></div>
-
-                <div class="insurance-number">
-                    <?= $c['insurance_number']; ?>
-                </div>
-
-                <div class="patient-name mt-2">
-                    <?= $c['full_name']; ?>
-                </div>
-
-                <small><?= $c['promo_name']; ?></small>
-
-                <div class="card-footer d-flex justify-content-between">
-                    <div>
-                        <strong>Discount</strong><br>
-                        <?= $c['discount_type'] === 'Percentage'
-                            ? $c['discount_value'] . '%'
-                            : '₱' . number_format($c['discount_value'], 2); ?>
-                    </div>
-
-                    <div>
-                        <strong>Relation</strong><br>
-                        <?= $c['relationship_to_insured']; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php
-            endwhile;
-        else:
-        ?>
-        <div class="col-12">
-            <div class="alert alert-warning text-center">
-                No insurance cards available.
-            </div>
-        </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- TABLE VIEW -->
-    <hr class="my-5">
-
-    <h4>Patient Insurance List</h4>
     <table class="table table-striped table-bordered">
         <thead class="table-dark">
             <tr>
@@ -164,6 +102,7 @@ function cardColor($company) {
                 <th>Discount</th>
                 <th>Relation</th>
                 <th>Status</th>
+                <th>Action</th>
             </tr>
         </thead>
         <tbody>
@@ -174,20 +113,62 @@ function cardColor($company) {
         ?>
             <tr>
                 <td><?= $i++; ?></td>
-                <td><?= $row['full_name']; ?></td>
-                <td><?= $row['insurance_company']; ?></td>
-                <td><?= $row['insurance_number']; ?></td>
-                <td><?= $row['promo_name']; ?></td>
+                <td><?= htmlspecialchars($row['full_name']); ?></td>
+                <td><?= htmlspecialchars($row['insurance_company']); ?></td>
+                <td><?= htmlspecialchars($row['insurance_number']); ?></td>
+                <td><?= htmlspecialchars($row['promo_name']); ?></td>
                 <td>
                     <?= $row['discount_type'] === 'Percentage'
-                        ? $row['discount_value'] . '%'
+                        ? htmlspecialchars($row['discount_value']) . '%'
                         : '₱' . number_format($row['discount_value'], 2); ?>
                 </td>
-                <td><?= $row['relationship_to_insured']; ?></td>
+                <td><?= htmlspecialchars($row['relationship_to_insured']); ?></td>
                 <td>
-                    <span class="badge bg-success"><?= $row['status']; ?></span>
+                    <span class="badge bg-success"><?= htmlspecialchars($row['status']); ?></span>
+                </td>
+                <td>
+                    <!-- View Button triggers modal -->
+                    <button type="button" class="btn btn-primary btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#cardModal<?= intval($row['patient_insurance_id']); ?>">
+                        View
+                    </button>
                 </td>
             </tr>
+
+            <!-- Modal for viewing insurance card -->
+            <div class="modal fade" id="cardModal<?= intval($row['patient_insurance_id']); ?>" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">Insurance Card - <?= htmlspecialchars($row['full_name']); ?></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body d-flex justify-content-center">
+                    <div class="insurance-card" style="background: <?= cardColor($row['insurance_company']); ?>;">
+                        <div class="card-header"><?= strtoupper(htmlspecialchars($row['insurance_company'])); ?></div>
+                        <div class="chip"></div>
+                        <div class="insurance-number"><?= htmlspecialchars($row['insurance_number']); ?></div>
+                        <div class="patient-name mt-2"><?= htmlspecialchars($row['full_name']); ?></div>
+                        <small><?= htmlspecialchars($row['promo_name']); ?></small>
+                        <div class="card-footer d-flex justify-content-between">
+                            <div>
+                                <strong>Discount</strong><br>
+                                <?= $row['discount_type'] === 'Percentage'
+                                    ? htmlspecialchars($row['discount_value']) . '%'
+                                    : '₱' . number_format($row['discount_value'], 2); ?>
+                            </div>
+                            <div>
+                                <strong>Relation</strong><br>
+                                <?= htmlspecialchars($row['relationship_to_insured']); ?>
+                            </div>
+                        </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
         <?php endwhile; ?>
         </tbody>
     </table>
