@@ -2,91 +2,20 @@
 session_start();
 include '../../SQL/config.php';
 
-/* ===============================
-   ADD JOURNAL ENTRY
+/* ================================
+   FETCH PAYMONGO PAYMENTS AS JOURNAL
 ================================ */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_entry'])) {
+$result = $conn->query("
+    SELECT pp.*,
+           pi.fname, pi.mname, pi.lname
+    FROM paymongo_payments pp
+    LEFT JOIN patientinfo pi ON pp.patient_id = pi.patient_id
+    ORDER BY pp.paid_at DESC
+");
+$payments = $result->fetch_all(MYSQLI_ASSOC);
 
-    $module      = $_POST['module'];
-    $receipt_id  = !empty($_POST['reference']) ? $_POST['reference'] : null;
-    $description = '';
-    $status      = $_POST['status'] ?? 'Draft';
-    $created_by  = $_SESSION['username'] ?? 'Admin';
-
-    $reference_text = "Manual Journal Entry";
-
-    /* ===============================
-       IF RECEIPT SELECTED
-       - Build Reference Text
-       - Build Description from billing_items
-    ================================ */
-    if (!empty($receipt_id)) {
-
-        // Get receipt + patient info
-        $stmt = $conn->prepare("
-            SELECT pr.transaction_id, pr.payment_method, pr.grand_total, pr.status,
-                   pr.patient_id,
-                   pi.fname, pi.mname, pi.lname
-            FROM patient_receipt pr
-            LEFT JOIN patientinfo pi ON pr.patient_id = pi.patient_id
-            WHERE pr.receipt_id = ?
-        ");
-        $stmt->bind_param("i", $receipt_id);
-        $stmt->execute();
-        $patient = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        if ($patient) {
-
-            $full_name = trim($patient['fname'].' '.$patient['mname'].' '.$patient['lname']);
-            $reference_text = "Receipt #{$receipt_id} | {$full_name} | TXN {$patient['transaction_id']} | Method: {$patient['payment_method']} | ₱".number_format($patient['grand_total'],2)." | {$patient['status']}";
-
-            // Fetch billing items for this receipt/patient
-            $stmt = $conn->prepare("
-                SELECT bi.item_id, s.service_name, bi.quantity, bi.unit_price, bi.total_price
-                FROM billing_items bi
-                LEFT JOIN services s ON bi.service_id = s.service_id
-                WHERE bi.billing_id = ?
-            ");
-            $stmt->bind_param("i", $patient['patient_id']); // Use patient_id or billing_id based on your schema
-            $stmt->execute();
-            $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-            $stmt->close();
-
-            if ($items) {
-                $description .= "Billing Items:\n";
-                foreach ($items as $item) {
-                    $description .= "- {$item['service_name']} | Qty: {$item['quantity']} | Unit: ₱".number_format($item['unit_price'],2)." | Total: ₱".number_format($item['total_price'],2)."\n";
-                }
-            }
-        }
-    }
-
-    /* ===============================
-       INSERT ENTRY
-    ================================ */
-    $stmt = $conn->prepare("
-        INSERT INTO journal_entries 
-        (entry_date, module, description, reference, status, created_by)
-        VALUES (NOW(), ?, ?, ?, ?, ?)
-    ");
-    $stmt->bind_param("sssss",
-        $module,
-        $description,
-        $reference_text,
-        $status,
-        $created_by
-    );
-    $stmt->execute();
-    $new_entry_id = $stmt->insert_id;
-    $stmt->close();
-
-    header("Location: journal_entry_line.php?entry_id=".$new_entry_id);
-    exit;
-}
-
-/* ===============================
-   FETCH RECEIPTS WITH PATIENT NAME
+/* ================================
+   FETCH RECEIPTS FOR MANUAL ENTRY
 ================================ */
 $receipts = $conn->query("
     SELECT 
@@ -102,13 +31,10 @@ $receipts = $conn->query("
     ORDER BY pr.created_at DESC
 ")->fetch_all(MYSQLI_ASSOC);
 
-/* ===============================
-   FETCH JOURNAL ENTRIES
+/* ================================
+   FETCH EXISTING JOURNAL ENTRIES
 ================================ */
-$stmt = $conn->prepare("
-    SELECT * FROM journal_entries 
-    ORDER BY entry_date DESC
-");
+$stmt = $conn->prepare("SELECT * FROM journal_entries ORDER BY entry_date DESC");
 $stmt->execute();
 $entries = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 ?>
@@ -123,90 +49,78 @@ $entries = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 body { background-color: #f8f9fa; }
 .container-wrapper { 
     background-color: white; 
-    border-radius: 30px; 
+    border-radius: 20px; 
     padding: 30px; 
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
-    margin-top: 80px; 
+    margin-top: 50px; 
 }
+.table thead { background-color: #007bff; color: white; }
+.debit { color: green; font-weight: bold; }
+.credit { color: red; font-weight: bold; }
+.btn-view { background-color: #17a2b8; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; }
+.reference-info { white-space: pre-line; font-size: 0.85em; }
 .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,.6); justify-content: center; align-items: center; }
 .modal-content { background: #fff; padding: 20px; width: 600px; border-radius: 8px; }
 .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; }
-.status.posted { color: green; font-weight: bold; }
-.status.draft { color: orange; font-weight: bold; }
-.badge.billing { background-color: #007bff; }
-.badge.insurance { background-color: #28a745; }
-.badge.supply { background-color: #6c757d; }
-.badge.general { background-color: #17a2b8; }
-.btn-view { background-color: #17a2b8; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; }
-.reference-info { font-size: 0.85em; color: #555; white-space: pre-line; }
-.module-info { font-size: 0.85em; color: #333; display: block; margin-top: 3px; }
 </style>
 </head>
-
 <body class="p-4">
+
 
 <div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
 
-<div class="container">
-<div class="container-wrapper">
+<div class="container container-wrapper">
+<h2>Journal Entries - PayMongo Payments</h2>
 
-<h1 class="mb-4">Journal Management Module</h1>
-
-<table class="table table-bordered table-striped">
+<table class="table table-bordered table-striped mt-3">
 <thead>
 <tr>
-<th>ID</th>
 <th>Date</th>
+<th>Debit Account</th>
+<th>Credit Account</th>
+<th>Amount</th>
 <th>Description</th>
 <th>Reference</th>
-<th>Module</th>
-<th>Created By</th>
-<th>Status</th>
 <th>Action</th>
 </tr>
 </thead>
 <tbody>
-<?php foreach ($entries as $row): ?>
+<?php foreach ($payments as $p):
+    $full_name = trim($p['fname'].' '.$p['mname'].' '.$p['lname']);
+    $description = "Payment received from {$full_name}\nMethod: {$p['payment_method']}\nRemarks: ".($p['remarks'] ?? '');
+    $amount = number_format($p['amount'], 2);
+    $date = $p['paid_at'] ?? 'N/A';
+?>
 <tr>
-<td><?= $row['entry_id'] ?></td>
-<td><?= $row['entry_date'] ?></td>
-<td class="reference-info"><?= nl2br(htmlspecialchars($row['description'])) ?></td>
-<td class="reference-info"><?= htmlspecialchars($row['reference']) ?></td>
+<td><?= $date ?></td>
+<td class="debit">Cash / Bank</td>
+<td class="credit">Patient Receivable</td>
+<td>₱<?= $amount ?></td>
+<td class="reference-info"><?= nl2br(htmlspecialchars($description)) ?></td>
+<td><?= htmlspecialchars($p['payment_id']) ?></td>
 <td>
-<span class="badge <?= strtolower($row['module']) ?>"><?= ucfirst($row['module']) ?></span>
-<?php if(str_contains(strtolower($row['reference']), 'paid')): ?>
-    <span class="module-info">Payment Completed</span>
-<?php elseif(str_contains(strtolower($row['reference']), 'pending')): ?>
-    <span class="module-info">Payment Pending</span>
-<?php endif; ?>
-</td>
-<td><?= htmlspecialchars($row['created_by']) ?></td>
-<td><span class="status <?= strtolower($row['status']) ?>"><?= $row['status'] ?></span></td>
-<td>
-<a href="journal_entry_line.php?entry_id=<?= $row['entry_id'] ?>" class="btn-view">View</a>
+<a href="journal_entry_line.php?payment_id=<?= urlencode($p['payment_id']) ?>" class="btn-view">View</a>
 </td>
 </tr>
 <?php endforeach; ?>
 </tbody>
 </table>
 
-<button id="openModal" class="btn btn-primary mt-3">Add Journal Entry</button>
+<button id="openModal" class="btn btn-primary mt-3">Add Manual Journal Entry</button>
 
 </div>
-</div>
 
-<!-- MODAL -->
+<!-- MANUAL ENTRY MODAL -->
 <div id="addEntryModal" class="modal">
 <div class="modal-content">
 
 <div class="d-flex justify-content-between mb-3">
-<h4>Add Journal Entry</h4>
+<h4>Add Manual Journal Entry</h4>
 <button class="close-btn" id="closeModal">&times;</button>
 </div>
 
-<form method="POST">
+<form method="POST" action="manual_journal_insert.php">
 
 <input type="hidden" name="add_entry" value="1">
 
