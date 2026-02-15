@@ -107,6 +107,9 @@ if (!$result) {
 <link rel="stylesheet" href="assets/css/patient_billing.css">
 <link rel="stylesheet" href="assets/css/insurance.css">
 
+<!-- jQuery Library -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
 <script>
 async function refreshAndSync(btn) {
     btn.disabled = true;
@@ -277,56 +280,91 @@ if (!$receipt_id) {
 
 <script>
 function previewInsurance(id){
-    let insurance_number = $('#insurance_number_'+id).val().trim();
-    let patient_id = $('#patient_id_'+id).val();
-    let billing_id = $('#billing_id_'+id).val();
+    console.log('previewInsurance called with id:', id);
+    
+    let insurance_number = document.getElementById('insurance_number_'+id).value.trim();
+    let patient_id = document.getElementById('patient_id_'+id).value;
+    let billing_id = document.getElementById('billing_id_'+id).value;
+
+    console.log('Insurance Number:', insurance_number);
+    console.log('Patient ID:', patient_id);
+    console.log('Billing ID:', billing_id);
 
     if(!insurance_number){
         alert('Enter insurance number');
         return;
     }
 
-    $.post('apply_insurance.php',{
-        action:'preview',
-        patient_id: patient_id,
-        billing_id: billing_id,
-        insurance_number: insurance_number
-    }, function(res){
+    console.log('Sending POST request to apply_insurance.php');
 
+    let formData = new FormData();
+    formData.append('action', 'preview');
+    formData.append('patient_id', patient_id);
+    formData.append('billing_id', billing_id);
+    formData.append('insurance_number', insurance_number);
+
+    fetch('apply_insurance.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
+    .then(res => {
+        console.log('Response received:', res);
+        
         if(res.status === 'preview'){
-            $('#insurance_preview_'+id).html(res.insurance_card_html);
-            $('#billing_info_'+id).html(`
+            document.getElementById('insurance_preview_'+id).innerHTML = res.insurance_card_html;
+            document.getElementById('billing_info_'+id).innerHTML = `
                 <p><strong>Insurance Covered:</strong> ₱${res.insurance_covered}</p>
                 <p><strong>Out of Pocket:</strong> ₱${res.out_of_pocket}</p>
-            `);
-            $('#applyBtn_'+id).show();
+            `;
+            document.getElementById('applyBtn_'+id).style.display = 'block';
         } else {
             alert(res.message);
-            $('#applyBtn_'+id).hide();
-            $('#insurance_preview_'+id).html('');
-            $('#billing_info_'+id).html('');
+            document.getElementById('applyBtn_'+id).style.display = 'none';
+            document.getElementById('insurance_preview_'+id).innerHTML = '';
+            document.getElementById('billing_info_'+id).innerHTML = '';
         }
-    }, 'json');
+    })
+    .catch(error => {
+        console.error('Fetch Error:', error);
+        alert('Error: ' + error.message);
+    });
 }
 
 function applyInsurance(id){
-    let insurance_number = $('#insurance_number_'+id).val().trim();
-    let patient_id = $('#patient_id_'+id).val();
-    let billing_id = $('#billing_id_'+id).val();
+    console.log('applyInsurance called with id:', id);
+    
+    let insurance_number = document.getElementById('insurance_number_'+id).value.trim();
+    let patient_id = document.getElementById('patient_id_'+id).value;
+    let billing_id = document.getElementById('billing_id_'+id).value;
 
-    $.post('apply_insurance.php',{
-        action:'apply',
-        patient_id: patient_id,
-        billing_id: billing_id,
-        insurance_number: insurance_number
-    }, function(res){
+    let formData = new FormData();
+    formData.append('action', 'apply');
+    formData.append('patient_id', patient_id);
+    formData.append('billing_id', billing_id);
+    formData.append('insurance_number', insurance_number);
+
+    fetch('apply_insurance.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(res => {
+        console.log('Apply Response:', res);
         if(res.status === 'success'){
             alert(res.message);
             location.reload();
         } else {
             alert(res.message);
         }
-    }, 'json');
+    })
+    .catch(error => {
+        console.error('Apply Error:', error);
+        alert('Error: ' + error.message);
+    });
 }
 </script>
 <?php endif; ?>
