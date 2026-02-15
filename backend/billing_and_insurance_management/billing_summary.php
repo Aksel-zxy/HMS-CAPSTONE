@@ -55,9 +55,9 @@ $stmt->execute();
 $billing = $stmt->get_result()->fetch_assoc();
 if (!$billing) die("No billing record found");
 
-$billing_id    = $billing['billing_id'];
-$status        = $billing['status'];
-$out_of_pocket = (float)$billing['out_of_pocket'];
+$billing_id     = $billing['billing_id'];
+$status         = $billing['status'];
+$out_of_pocket  = (float)$billing['out_of_pocket'];
 $transaction_id = $billing['transaction_id'];
 $existing_link  = $billing['paymongo_link_id'];
 
@@ -88,6 +88,28 @@ while ($row = $res->fetch_assoc()) {
     $items[] = $row;
     $subtotal += (float)$row['total_price'];
 }
+
+/* ===============================
+   CALCULATE DISCOUNTS & GRAND TOTAL
+================================ */
+$discount = 0;
+$discount_percentage = 0;
+$insurance = 0;
+
+// Example: Apply PWD/Senior discount if present
+if (!empty($billing['discount_amount'])) {
+    $discount = (float)$billing['discount_amount'];
+    $discount_percentage = (float)($billing['discount_percentage'] ?? 0);
+}
+
+// Example: Apply insurance coverage if present
+if (!empty($billing['insurance_coverage'])) {
+    $insurance = (float)$billing['insurance_coverage'];
+}
+
+// Grand total calculation
+$grand_total = $subtotal - $discount - $insurance;
+if ($grand_total < 0) $grand_total = 0;
 
 /* ===============================
    🔁 CREATE PAYMONGO LINK (ONCE)
@@ -241,7 +263,6 @@ $history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
        Pay Now
     </a>
 </div>
-
 <?php endif; ?>
 
 <hr>
