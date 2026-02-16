@@ -57,9 +57,22 @@ if (!$billing) die("No billing record found");
 
 $billing_id     = $billing['billing_id'];
 $status         = $billing['status'];
-$out_of_pocket  = (float)$billing['out_of_pocket'];
 $transaction_id = $billing['transaction_id'];
 $existing_link  = $billing['paymongo_link_id'];
+
+/* ===============================
+   FETCH PATIENT RECEIPT (for discounts)
+================================ */
+$receipt = null;
+$stmt = $conn->prepare("
+    SELECT *
+    FROM patient_receipt
+    WHERE billing_id = ? AND patient_id = ?
+    LIMIT 1
+");
+$stmt->bind_param("ii", $billing_id, $patient_id);
+$stmt->execute();
+$receipt = $stmt->get_result()->fetch_assoc();
 
 /* ===============================
    🔒 LOCK IF PAID
@@ -90,25 +103,29 @@ while ($row = $res->fetch_assoc()) {
 }
 
 /* ===============================
-   CALCULATE DISCOUNTS & GRAND TOTAL
+   CALCULATE AMOUNTS FROM RECEIPT
 ================================ */
-$discount = 0;
-$discount_percentage = 0;
-$insurance = 0;
+$pwd_discount = 0;
+$insurance_covered = 0;
+$grand_total = $subtotal;
+$out_of_pocket = $subtotal;
 
-// Example: Apply PWD/Senior discount if present
-if (!empty($billing['discount_amount'])) {
-    $discount = (float)$billing['discount_amount'];
-    $discount_percentage = (float)($billing['discount_percentage'] ?? 0);
+if ($receipt) {
+    // Fetch from patient_receipt (where apply_insurance.php stores the data)
+    $pwd_discount = (float)($receipt['total_discount'] ?? 0);
+    $insurance_covered = (float)($receipt['insurance_covered'] ?? 0);
+    $grand_total = (float)($receipt['grand_total'] ?? $subtotal - $pwd_discount - $insurance_covered);
+    $out_of_pocket = (float)($receipt['total_out_of_pocket'] ?? $grand_total);
+} else {
+    // Fallback to billing_records if no receipt found
+    $pwd_discount = (float)($billing['total_discount'] ?? 0);
+    $insurance_covered = (float)($billing['insurance_covered'] ?? 0);
+    $grand_total = (float)($billing['grand_total'] ?? $subtotal - $pwd_discount - $insurance_covered);
+    $out_of_pocket = (float)($billing['out_of_pocket'] ?? $grand_total);
 }
 
-// Example: Apply insurance coverage if present
-if (!empty($billing['insurance_coverage'])) {
-    $insurance = (float)$billing['insurance_coverage'];
-}
-
-// Grand total calculation
-$grand_total = $subtotal - $discount - $insurance;
+// Ensure out_of_pocket doesn't go negative
+if ($out_of_pocket < 0) $out_of_pocket = 0;
 if ($grand_total < 0) $grand_total = 0;
 
 /* ===============================
@@ -116,7 +133,7 @@ if ($grand_total < 0) $grand_total = 0;
 ================================ */
 $payLinkUrl = null;
 
-if ($out_of_pocket > 0) {
+if ($grand_total > 0) {
 
     // Reuse existing link
     if ($existing_link) {
@@ -126,7 +143,7 @@ if ($out_of_pocket > 0) {
         $payload = [
             'data' => [
                 'attributes' => [
-                    'amount'      => (int) round($out_of_pocket * 100),
+                    'amount'      => (int) round($grand_total * 100),
                     'currency'    => 'PHP',
                     'description' => "Hospital Billing #{$billing_id}",
                     'remarks'     => "TXN:{$transaction_id}"
@@ -148,7 +165,7 @@ if ($out_of_pocket > 0) {
                 (payment_id, amount, status, payment_method, remarks)
                 VALUES (?, ?, 'Pending', 'PAYLINK', ?)
             ");
-            $amount_php = $out_of_pocket;
+            $amount_php = $grand_total;
             $desc = "Billing #$billing_id";
             $stmt->bind_param("sds", $link_id, $amount_php, $desc);
             $stmt->execute();
@@ -226,41 +243,41 @@ $history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 </tbody>
 </table>
 
-<table class="table">
+<table class="table table-sm">
 <tr>
     <th>Subtotal</th>
     <td class="text-end">₱<?= number_format($subtotal, 2) ?></td>
 </tr>
 
-<?php if ($discount > 0): ?>
+<?php if ($pwd_discount > 0): ?>
 <tr class="table-warning">
-    <th>PWD/Senior Discount <?= $discount_percentage ?>%</th>
-    <td class="text-end">- ₱<?= number_format($discount, 2) ?></td>
+    <th>PWD/Senior Discount (20%)</th>
+    <td class="text-end">- ₱<?= number_format($pwd_discount, 2) ?></td>
 </tr>
 <?php endif; ?>
 
-<?php if ($insurance > 0): ?>
+<?php if ($insurance_covered > 0): ?>
 <tr class="table-info">
-    <th>Insurance Discount</th>
-    <td class="text-end">- ₱<?= number_format($insurance, 2) ?></td>
+    <th>Insurance Coverage</th>
+    <td class="text-end">- ₱<?= number_format($insurance_covered, 2) ?></td>
 </tr>
 <?php endif; ?>
 
-<tr class="table-success">
+<tr class="table-success fw-bold">
     <th>Amount to Pay</th>
-    <td class="text-end fw-bold">₱<?= number_format($grand_total, 2) ?></td>
+    <td class="text-end">₱<?= number_format($grand_total, 2) ?></td>
 </tr>
 </table>
 
 <?php if ($grand_total <= 0): ?>
 <div class="alert alert-success text-center">
-    Fully Covered — No Payment Required
+    <strong>Fully Covered</strong> — No Payment Required
 </div>
 <?php elseif ($payLinkUrl): ?>
 <div class="text-center">
     <a href="<?= htmlspecialchars($payLinkUrl) ?>" target="_blank"
        class="btn btn-primary btn-lg">
-       Pay Now
+       <i class="bi bi-credit-card"></i> Pay Now ₱<?= number_format($grand_total, 2) ?>
     </a>
 </div>
 <?php endif; ?>
@@ -282,11 +299,15 @@ $history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 <tr>
     <td><?= htmlspecialchars($h['payment_id']) ?></td>
     <td>₱<?= number_format($h['amount'], 2) ?></td>
-    <td><?= htmlspecialchars($h['status']) ?></td>
+    <td>
+        <span class="badge <?= $h['status'] === 'Paid' ? 'bg-success' : 'bg-warning text-dark' ?>">
+            <?= htmlspecialchars($h['status']) ?>
+        </span>
+    </td>
     <td><?= $h['paid_at'] ?: '-' ?></td>
 </tr>
 <?php endforeach; else: ?>
-<tr><td colspan="4" class="text-center">No payments yet</td></tr>
+<tr><td colspan="4" class="text-center text-muted">No payments yet</td></tr>
 <?php endif; ?>
 </tbody>
 </table>
