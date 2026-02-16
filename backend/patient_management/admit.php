@@ -19,30 +19,36 @@ echo "Patient not found.";
 exit();
 }
 
-$comorbidity_count = getComorbidityCount($conn, $patient_id);
+
 
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-$bed_id = $_POST['bed_id'];
-$assigned_date = $_POST['assigned_date'];
-$admission_type = $_POST['admission_type'];
-$severity = $_POST['severity'] ?? 3;
-$predicted_los = $_POST['predicted_los'];
 
-$predicted_los = predictLoS(
+    $bed_id = $_POST['bed_id'];
+    $assigned_date = $_POST['assigned_date'];
+    $admission_type = $_POST['admission_type'];
+    $severity = $_POST['severity'];
+
+    $comorbidities = getComorbidities($conn, $patient_id);
+
+    $predicted_los = predictLoS(
         $patient['age'],
         $severity,
-        $comorbidity_count
+        $comorbidities,
+        $admission_type
     );
-$admission->admit($patient_id, $bed_id, $assigned_date, $admission_type, $severity, $predicted_los);
+
+    $admission->admit(
+        $patient_id,
+        $bed_id,
+        $assigned_date,
+        $admission_type,
+        $severity,
+        $predicted_los
+    );
 }
 
-$severity = $_POST['severity'] ?? 3;
-$predicted_los = predictLoS(
-    $patient['age'],
-    $severity,
-    $comorbidity_count
-);
+
 
 $user_id = $_SESSION['user_id'];
 logAction($conn, $user_id, 'Patient_Admitted', $patient_id);
@@ -62,7 +68,7 @@ logAction($conn, $user_id, 'Patient_Admitted', $patient_id);
 
     <h2>Admit Patient: <?= htmlspecialchars($patient['fname'] . " " . $patient['lname']) ?></h2>
     <p><strong>Patient ID:</strong> <?= $patient['patient_id'] ?></p>
-    <p><strong>Address:</strong> <?= $patient['address'] ?></p>
+    <p><strong>Age:</strong> <?= $patient['age'] ?></p>
     <p><strong>Gender:</strong> <?= $patient['gender'] ?></p>
 
     <form method="POST" class="mt-3">
@@ -89,32 +95,6 @@ logAction($conn, $user_id, 'Patient_Admitted', $patient_id);
             </div>
         </div>
 
-        <div class="mb-3 row">
-            <label class="col-sm-3 col-form-label">Severity Level</label>
-            <div class="col-sm-9">
-                <select name="severity" class="form-control" required>
-                    <option value="1" <?= ($severity == 1) ? 'selected' : '' ?>>Mild</option>
-                    <option value="3" <?= ($severity == 3) ? 'selected' : '' ?>>Moderate</option>
-                    <option value="5" <?= ($severity== 5) ? 'selected' : '' ?>>Severe</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Predicted Length of Stay -->
-
-        <div class="alert alert-info justify-content-center" role="alert">
-            <strong>Predicted Length of Stay:</strong>
-            <span id="predicted_los_text"><?= $predicted_los ?></span> days
-            <span id="los_badge"
-                class="badge <?= $predicted_los >= 7 ? 'bg-danger' : ($predicted_los >= 4 ? 'bg-warning' : 'bg-success') ?>">
-                <?= $predicted_los >= 7 ? 'Long Stay Risk' : ($predicted_los >= 4 ? 'Moderate Stay' : 'Short Stay') ?>
-            </span>
-        </div>
-
-        <!-- Hidden input so the value is submitted -->
-        <input type="hidden" name="predicted_los" id="predicted_los_input" value="<?= $predicted_los ?>">
-
-
         <!--  Admission Type Dropdown -->
         <div class="mb-3 row">
             <label class="col-sm-3 col-form-label">Admission Type</label>
@@ -132,43 +112,87 @@ logAction($conn, $user_id, 'Patient_Admitted', $patient_id);
             </div>
         </div>
 
+        <div class="mb-3 row">
+            <label class="col-sm-3 col-form-label">Severity Level</label>
+            <div class="col-sm-9">
+                <select name="severity" class="form-control" required>
+                    <option value="1">Mild</option>
+                    <option value="3">Moderate</option>
+                    <option value="5">Severe</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="alert alert-info justify-content-center" role="alert">
+            <strong>Predicted Length of Stay:</strong>
+            <span id="predicted_los_text">Calculating...</span>
+            <span id="los_badge" class="badge bg-secondary">Please wait...</span>
+        </div>
+
+
+
         <button type="submit" class="btn btn-success">Admit Patient</button>
         <a href="inpatient.php" class="btn btn-secondary">Cancel</a>
     </form>
 
+
     <script>
     const severitySelect = document.querySelector('select[name="severity"]');
-    const losText = document.getElementById('predicted_los_text'); // shows the days
-    const losBadge = document.getElementById('los_badge'); // badge span
-    const hiddenInput = document.getElementById('predicted_los_input');
+    const admissionSelect = document.querySelector('select[name="admission_type"]');
+    const losText = document.getElementById('predicted_los_text');
+    const losBadge = document.getElementById('los_badge');
 
-    const age = <?= $patient['age'] ?>;
-    const comorbidity = <?= $comorbidity_count ?>;
+    const patientId = <?= $patient_id ?>;
 
-    severitySelect.addEventListener('change', () => {
-        const severity = parseInt(severitySelect.value);
+    function updatePrediction() {
+        const severity = severitySelect.value;
+        const admission_type = admissionSelect.value;
 
-        // Recalculate predicted LoS
-        const predicted = Math.max(1, Math.round(0.05 * age + 1.3 * severity + 0.85 * comorbidity + 1.7));
+        if (!severity || !admission_type) return;
 
-        // Update display
-        losText.textContent = predicted;
+        // Show temporary loading
+        losText.textContent = "Calculating...";
+        losBadge.textContent = "Please wait...";
+        losBadge.className = "badge bg-secondary";
 
-        // Update badge
-        if (predicted >= 7) {
-            losBadge.textContent = 'Long Stay Risk';
-            losBadge.className = 'badge bg-danger';
-        } else if (predicted >= 4) {
-            losBadge.textContent = 'Moderate Stay';
-            losBadge.className = 'badge bg-warning';
-        } else {
-            losBadge.textContent = 'Short Stay';
-            losBadge.className = 'badge bg-success';
-        }
+        fetch("predict_los_ajax.php", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: `patient_id=${patientId}&severity=${severity}&admission_type=${admission_type}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                const predicted = parseFloat(data.los);
+                console.log("AJAX response:", data);
 
-        // Update hidden input so correct value is submitted
-        hiddenInput.value = predicted;
-    });
+                losText.textContent = predicted + " day" + (predicted > 1 ? "s" : "");
+
+                if (predicted >= 7) {
+                    losBadge.textContent = "Long Stay Risk";
+                    losBadge.className = "badge bg-danger";
+                } else if (predicted >= 4) {
+                    losBadge.textContent = "Moderate Stay";
+                    losBadge.className = "badge bg-warning";
+                } else {
+                    losBadge.textContent = "Short Stay";
+                    losBadge.className = "badge bg-success";
+                }
+            })
+            .catch(err => {
+                losText.textContent = "Prediction unavailable";
+                losBadge.textContent = "";
+                console.error(err);
+            });
+    }
+
+    // Trigger live prediction when severity or admission type changes
+    severitySelect.addEventListener("change", updatePrediction);
+    admissionSelect.addEventListener("change", updatePrediction);
+
+    // Trigger once on page load
+    updatePrediction();
     </script>
 
 </body>

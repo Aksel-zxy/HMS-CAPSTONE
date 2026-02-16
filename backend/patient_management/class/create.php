@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'height' => $_POST["height"] ?? '',
         'weight' => $_POST["weight"] ?? '',
         'color_of_eyes' => $_POST["coe"] ?? '',
+        'discount' => $_POST["discount"] ?? ''
     ];
 
     $conn->begin_transaction();
