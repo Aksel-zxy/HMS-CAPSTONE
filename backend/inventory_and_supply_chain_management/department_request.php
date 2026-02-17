@@ -2,7 +2,7 @@
 include '../../SQL/config.php';
 
 /* =====================================================
-   HANDLE ACTIONS
+   HANDLE ACTIONS (Approve / Reject / Purchase)
 =====================================================*/
 if (isset($_POST['action'])) {
 
@@ -31,7 +31,10 @@ if (isset($_POST['action'])) {
         foreach ($items as $item) {
             $idx = $item['id'];
             $approved = isset($approved_quantities[$idx]) ? (int)$approved_quantities[$idx] : 0;
-            $approved = min($approved, $item['quantity']);
+
+            // Clamp approved quantity to valid range [0, requested quantity]
+            if ($approved < 0) $approved = 0;
+            if ($approved > $item['quantity']) $approved = $item['quantity'];
 
             $stmtUpdate = $pdo->prepare("UPDATE department_request_items
                 SET approved_quantity=?
@@ -56,8 +59,8 @@ if (isset($_POST['action'])) {
         $stmt->execute([$request_id]);
     }
 
-    /* ================= PURCHASE ================= */
-    if ($_POST['action'] === 'purchase' && strcasecmp(trim($request['status']), 'Approved') === 0 && !$request['purchased_at']) {
+    /* ================= PURCHASE (NO INVENTORY HERE - ONLY UPDATE PRICES & STATUS) ================= */
+    if ($_POST['action'] === 'purchase' && strcasecmp($request['status'], 'Approved') === 0 && !$request['purchased_at']) {
 
         $prices = $_POST['price'] ?? [];
         $units = $_POST['unit'] ?? [];
@@ -74,42 +77,15 @@ if (isset($_POST['action'])) {
             $price = floatval($prices[$item_id] ?? $item['price'] ?? 0);
 
             $total_price = $price * $approved_qty;
-            $total_qty = ($unit_type === 'box') ? $approved_qty * $pcs_per_box : $approved_qty;
 
-            // Update price for the item
+            // Update price and details for the item ONLY (approved quantities are LOCKED)
             $stmtUpdatePrice = $pdo->prepare("UPDATE department_request_items 
-                SET price=?, total_price=?
+                SET price=?, total_price=?, unit=?, pcs_per_box=?
                 WHERE id=?");
-            $stmtUpdatePrice->execute([$price, $total_price, $item_id]);
-
-            // Insert receiving record
-            $stmtRecv = $pdo->prepare("INSERT INTO receiving
-                (request_id, item_index, received_qty, pcs_per_box)
-                VALUES (?, ?, 0, ?)");
-            $stmtRecv->execute([$request_id, $item_id, $pcs_per_box]);
-
-            // Insert into inventory
-            $stmtInv = $pdo->prepare("INSERT INTO inventory
-                (item_id, item_name, item_type, category, sub_type,
-                 quantity, total_qty, price, unit_type,
-                 pcs_per_box, received_at, location)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)");
-            $stmtInv->execute([
-                $item_id,
-                $item['item_name'],
-                $unit_type,
-                $item['category'] ?? '',
-                $item['sub_type'] ?? '',
-                $approved_qty,
-                $total_qty,
-                $price,
-                ucfirst($unit_type),
-                $pcs_per_box,
-                'Main Storage'
-            ]);
+            $stmtUpdatePrice->execute([$price, $total_price, ucfirst($unit_type), $pcs_per_box, $item_id]);
         }
 
-        // Mark request as purchased
+        // Mark request as purchased (Status stays 'Approved', just mark purchased_at)
         $stmt = $pdo->prepare("UPDATE department_request SET purchased_at=NOW(), payment_type=? WHERE id=?");
         $stmt->execute([$payment_type, $request_id]);
     }
@@ -159,6 +135,11 @@ body { background:#f8fafc; font-family:'Segoe UI',sans-serif; }
 .table td, .table th { text-align:center; vertical-align:middle;}
 .qty-input, .price-input { width:80px; }
 .total-price { font-weight:bold; }
+.locked-badge { font-size:0.75rem; margin-left:5px; }
+.quantity-locked { background-color: #e9ecef !important; }
+.action-section { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+.action-section.reject-selected { background-color: #ffe5e5; border: 1px solid #ff9999; }
+.action-section.approve-selected { background-color: #e5ffe5; border: 1px solid #99ff99; }
 </style>
 </head>
 <body>
@@ -167,13 +148,14 @@ body { background:#f8fafc; font-family:'Segoe UI',sans-serif; }
 
 <div class="main-content">
 <div class="card p-4 bg-white">
-<h2 class="mb-4 text-primary"><i class="bi bi-cart4"></i> Department Requests</h2>
+<h2 class="mb-4 text-primary"><i class="bi bi-cart4"></i> Department Requests - Purchase Order</h2>
 
 <form method="get" class="row g-3 mb-4">
     <div class="col-md-3">
         <select name="status" class="form-select">
             <option value="Pending" <?= $statusFilter==='Pending'?'selected':'' ?>>Pending</option>
             <option value="Approved" <?= $statusFilter==='Approved'?'selected':'' ?>>Approved</option>
+            <option value="Purchased" <?= $statusFilter==='Purchased'?'selected':'' ?>>Purchased</option>
             <option value="Rejected" <?= $statusFilter==='Rejected'?'selected':'' ?>>Rejected</option>
             <option value="All" <?= $statusFilter==='All'?'selected':'' ?>>All</option>
         </select>
@@ -195,7 +177,7 @@ body { background:#f8fafc; font-family:'Segoe UI',sans-serif; }
 <th>Total Requested</th>
 <th>Status</th>
 <th>Requested At</th>
-<th>View / Purchase</th>
+<th>View / Action</th>
 </tr>
 </thead>
 <tbody>
@@ -214,6 +196,7 @@ body { background:#f8fafc; font-family:'Segoe UI',sans-serif; }
 <?php
     if(strcasecmp($status,'Pending')===0) echo '<span class="badge bg-warning text-dark">Pending</span>';
     elseif(strcasecmp($status,'Approved')===0) echo '<span class="badge bg-success">Approved</span>';
+    elseif(strcasecmp($status,'Purchased')===0) echo '<span class="badge bg-primary">Purchased</span>';
     else echo '<span class="badge bg-danger">Rejected</span>';
 ?>
 </td>
@@ -257,17 +240,42 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
         const items = JSON.parse(btn.dataset.items || '[]');
         const status = btn.dataset.status;
         const purchased = btn.dataset.purchased;
-        const showPrice = (status.toLowerCase() === 'approved' && !purchased);
+        const isPending = (status.toLowerCase() === 'pending');
+        const isApproved = (status.toLowerCase() === 'approved');
+        const showPrice = (isApproved && !purchased);
 
-        let html = `<form method="post">
-        <input type="hidden" name="id" value="${btn.dataset.id}">
-        <div class="table-responsive">
+        let html = `<form method="post" id="requestForm">
+        <input type="hidden" name="id" value="${btn.dataset.id}">`;
+
+        // STATUS BANNER
+        if (isApproved) {
+            html += `<div class="alert alert-success" role="alert">
+                <i class="bi bi-check-circle"></i> <strong>This request is APPROVED.</strong> Approved quantities are LOCKED and cannot be changed.
+            </div>`;
+        }
+
+        // ============ PENDING REQUEST - APPROVE/REJECT DROPDOWN ============
+        if (isPending) {
+            html += `<div class="action-section" id="actionSection">
+                <div class="mb-3">
+                    <label for="pendingActionDropdown" class="form-label"><strong>Select Action:</strong></label>
+                    <select class="form-select" id="pendingActionDropdown" required>
+                        <option value="">-- Choose an action --</option>
+                        <option value="approve">✓ APPROVE - Enter approved quantities</option>
+                        <option value="reject">✗ REJECT - Deny this request</option>
+                    </select>
+                </div>
+            </div>`;
+        }
+
+        // ITEMS TABLE
+        html += `<div class="table-responsive">
         <table class="table table-bordered">
         <thead class="table-light">
         <tr>
             <th>Item</th>
             <th>Requested</th>
-            <th>Approved</th>
+            <th>Approved ${isApproved ? '<span class="badge bg-success locked-badge">LOCKED</span>' : ''}</th>
             <th>Unit</th>
             <th>Pcs/Box</th>`;
         if(showPrice) html += `<th>Price</th><th>Total</th>`;
@@ -278,14 +286,24 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
             const approved = item.approved_quantity || 0;
             const unit = item.unit || 'pcs';
             const pcs = item.pcs_per_box || 1;
+            
             html += `<tr>
                 <td>${item.item_name}</td>
                 <td>${item.quantity}</td>
-                <td><input type="number" class="form-control qty-input" name="approved_quantity[${idx}]" value="${approved}" ${status.toLowerCase()!=='pending'?'readonly':''}></td>
+                <td>
+                    <input type="number" 
+                           class="form-control qty-input" 
+                           name="approved_quantity[${idx}]" 
+                           value="${approved}" 
+                           min="0" 
+                           max="${item.quantity}" 
+                           readonly 
+                           style="background-color:#e9ecef;">
+                </td>
                 <td>${unit}<input type="hidden" name="unit[${idx}]" value="${unit}"></td>
                 <td>${pcs}<input type="hidden" name="pcs_per_box[${idx}]" value="${pcs}"></td>`;
             if(showPrice){
-                html += `<td><input type="number" step="0.01" class="form-control price-input" name="price[${idx}]" value="${item.price || 0}"></td>
+                html += `<td><input type="number" step="0.01" class="form-control price-input" name="price[${idx}]" value="${item.price || 0}" required></td>
                          <td class="total-price text-end">0.00</td>`;
             }
             html += `</tr>`;
@@ -293,29 +311,117 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
 
         html += `</tbody></table></div>`;
 
-        if(status.toLowerCase() === 'pending'){
-            html += `<div class="d-flex justify-content-end gap-2 mt-3">
-                        <button type="submit" name="action" value="approve" class="btn btn-success">Approve</button>
-                        <button type="submit" name="action" value="reject" class="btn btn-danger">Reject</button>
+        // ============ PENDING REQUEST - APPROVE/REJECT BUTTONS (HIDDEN UNTIL SELECTION) ============
+        if (isPending){
+            html += `<div class="d-flex justify-content-end gap-2 mt-3" id="pendingActionButtons" style="display:none;">
+                        <button type="button" class="btn btn-success" id="pendingApproveBtn">
+                            <i class="bi bi-check-circle"></i> APPROVE
+                        </button>
+                        <button type="button" class="btn btn-danger" id="pendingRejectBtn">
+                            <i class="bi bi-x-circle"></i> REJECT
+                        </button>
                     </div>`;
         }
 
+        // ============ APPROVED REQUEST - PURCHASE SECTION ============
         if(showPrice){
-            html += `<div class="text-end mt-2"><strong>Total Request Price: <span id="grandTotal">0.00</span></strong></div>
-                     <div class="text-end mt-3"><button type="submit" name="action" value="purchase" class="btn btn-primary">Purchase</button></div>`;
+            html += `<div class="alert alert-info mt-3">
+                <strong>Purchase Instructions:</strong> Set the unit price for each item. Total price will be calculated automatically.
+            </div>
+            <div id="priceErrorAlert" class="alert alert-danger" style="display:none;">
+                <i class="bi bi-exclamation-triangle"></i> <strong>Error:</strong> Please set a price for all items before purchasing.
+            </div>
+            <div class="text-end"><strong>Total Request Price: <span id="grandTotal">0.00</span></strong></div>
+            <div class="text-end mt-3">
+                <button type="button" class="btn btn-primary" id="purchaseBtn">
+                    <i class="bi bi-bag-check"></i> Purchase
+                </button>
+            </div>`;
         }
 
         html += `</form>`;
         document.getElementById('modalBodyContent').innerHTML = html;
 
+        // ============ PENDING REQUEST - DROPDOWN LOGIC ============
+        if (isPending) {
+            const actionDropdown = document.getElementById('pendingActionDropdown');
+            const actionButtons = document.getElementById('pendingActionButtons');
+            const approveBtn = document.getElementById('pendingApproveBtn');
+            const rejectBtn = document.getElementById('pendingRejectBtn');
+            const actionSection = document.getElementById('actionSection');
+            const qtyInputs = document.querySelectorAll('#modalBodyContent .qty-input');
+            const requestForm = document.getElementById('requestForm');
+
+            actionDropdown.addEventListener('change', function() {
+                const selectedAction = this.value;
+
+                if (selectedAction === 'approve') {
+                    // Enable quantity inputs
+                    qtyInputs.forEach(input => {
+                        input.disabled = false;
+                        input.style.backgroundColor = '#ffffff';
+                        input.style.borderColor = '#28a745';
+                    });
+                    actionSection.classList.remove('reject-selected');
+                    actionSection.classList.add('approve-selected');
+                    actionButtons.style.display = 'flex';
+                    rejectBtn.style.display = 'none';
+                    approveBtn.style.display = 'block';
+                } 
+                else if (selectedAction === 'reject') {
+                    // Disable quantity inputs
+                    qtyInputs.forEach(input => {
+                        input.disabled = true;
+                        input.value = 0;
+                        input.style.backgroundColor = '#ffcccc';
+                        input.style.borderColor = '#dc3545';
+                    });
+                    actionSection.classList.remove('approve-selected');
+                    actionSection.classList.add('reject-selected');
+                    actionButtons.style.display = 'flex';
+                    approveBtn.style.display = 'none';
+                    rejectBtn.style.display = 'block';
+                } 
+                else {
+                    qtyInputs.forEach(input => {
+                        input.disabled = true;
+                        input.style.backgroundColor = '#f0f0f0';
+                        input.style.borderColor = '';
+                    });
+                    actionSection.classList.remove('approve-selected', 'reject-selected');
+                    actionButtons.style.display = 'none';
+                }
+            });
+
+            // Approve button handler
+            approveBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                requestForm.innerHTML += '<input type="hidden" name="action" value="approve">';
+                requestForm.submit();
+            });
+
+            // Reject button handler
+            rejectBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                requestForm.innerHTML += '<input type="hidden" name="action" value="reject">';
+                requestForm.submit();
+            });
+        }
+
+        // ============ APPROVED REQUEST - PURCHASE LOGIC WITH PRICE VALIDATION ============
         if(showPrice){
+            const purchaseBtn = document.getElementById('purchaseBtn');
+            const requestForm = document.getElementById('requestForm');
+            const priceErrorAlert = document.getElementById('priceErrorAlert');
             const rows = document.querySelectorAll('#modalBodyContent tbody tr');
             const grandTotal = document.getElementById('grandTotal');
 
+            // Calculate totals
             function compute(){
                 let sum = 0;
                 rows.forEach(r=>{
-                    const qty = parseFloat(r.querySelector('.qty-input')?.value || 0);
+                    const qtyInput = r.querySelector('.qty-input');
+                    const qty = parseFloat(qtyInput?.value || 0);
                     const price = parseFloat(r.querySelector('.price-input')?.value || 0);
                     let total = price * qty;
                     r.querySelector('.total-price').textContent = formatCurrency(total);
@@ -323,8 +429,42 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
                 });
                 grandTotal.textContent = formatCurrency(sum);
             }
+
             document.querySelectorAll('.qty-input, .price-input').forEach(i=>i.addEventListener('input', compute));
             compute();
+
+            // Purchase button handler with price validation
+            purchaseBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Validate all prices are set
+                let allPricesSet = true;
+                rows.forEach(r => {
+                    const qtyInput = r.querySelector('.qty-input');
+                    const qty = parseFloat(qtyInput?.value || 0);
+                    const priceInput = r.querySelector('.price-input');
+                    const price = parseFloat(priceInput?.value || 0);
+                    
+                    if (qty > 0 && price <= 0) {
+                        allPricesSet = false;
+                        priceInput.style.borderColor = '#dc3545';
+                        priceInput.style.borderWidth = '2px';
+                    } else {
+                        priceInput.style.borderColor = '';
+                        priceInput.style.borderWidth = '';
+                    }
+                });
+
+                if (!allPricesSet) {
+                    priceErrorAlert.style.display = 'block';
+                    return;
+                }
+
+                // All prices are valid, proceed with purchase
+                priceErrorAlert.style.display = 'none';
+                requestForm.innerHTML += '<input type="hidden" name="action" value="purchase">';
+                requestForm.submit();
+            });
         }
 
         new bootstrap.Modal(document.getElementById('viewModal')).show();
