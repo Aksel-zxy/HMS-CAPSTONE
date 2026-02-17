@@ -155,6 +155,23 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             </div>
                         </div>
 
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">PWD or SENIOR CITIZEN</label>
+                            <div class="col-sm-9">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="discount" value="Yes" required>
+                                    <label class="form-check-label">Yes</label>
+                                </div>
+
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="discount" value="No">
+                                    <label class="form-check-label">No</label>
+                                </div>
+                            </div>
+                        </div>
+
+
+
                     </div>
 
                     <div class="row mb-3 d-none" id="step2">

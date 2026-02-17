@@ -1,11 +1,7 @@
 <?php
 include '../../../SQL/config.php';
-
 include_once '../class/patient.php';
 include_once '../class/caller.php';    
-
-
-
 
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'patient') {
     header('Location: ' . BASE_URL . 'backend/login.php');
@@ -262,7 +258,7 @@ try {
                                 <th style="text-align:center;">Medicines</th>
                                 <th style="text-align:center;">Note</th>
                                 <th style="text-align:center;">Status</th>
-
+                                <th style="text-align:center;">Actions</th>
 
                             </tr>
                         </thead>
@@ -287,7 +283,12 @@ try {
                                 <td style="padding:12px; text-align:center;">
                                     <?= htmlspecialchars($pres['status']) ?>
                                 </td>
-
+                                <td>
+                                    <a href="prescription_download.php?id=<?= $pres['prescription_id']; ?>"
+                                        class="btn btn-info btn-sm" target="_blank">
+                                        <i class="fa-solid fa-download"></i>
+                                    </a>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                             <?php else: ?>
