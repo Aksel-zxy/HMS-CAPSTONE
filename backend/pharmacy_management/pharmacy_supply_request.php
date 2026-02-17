@@ -32,25 +32,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $valid_items = array_filter($items, fn($i) => !empty(trim($i['name'] ?? '')));
         if (count($valid_items) === 0) throw new Exception("Please add at least one item before submitting.");
 
+        // Remove 'items' from the query
         $stmt = $pdo->prepare("
             INSERT INTO department_request
-            (user_id, department, department_id, month, items, total_items, status)
+            (user_id, department, department_id, month, total_items, status)
             VALUES
-            (:user_id, :department, :department_id, :month, :items, :total_items, 'Pending')
+            (:user_id, :department, :department_id, :month, :total_items, 'Pending')
         ");
         $stmt->execute([
             ':user_id'       => $user_id,
             ':department'    => $department,
             ':department_id' => $department_id,
             ':month'         => date('Y-m-d'),
-            ':items'         => json_encode($valid_items, JSON_UNESCAPED_UNICODE),
             ':total_items'   => count($valid_items)
         ]);
+
         $success = "Purchase request successfully submitted!";
     } catch (Exception $e) {
         $error = $e->getMessage();
     }
 }
+
 
 // 🔎 Fetch user's requests
 $request_stmt = $pdo->prepare("SELECT * FROM department_request WHERE user_id = ? ORDER BY created_at DESC");
@@ -382,32 +384,35 @@ $notifCount = $notif->notifCount;
                                     </thead>
                                     <tbody>
                                         <?php foreach ($my_requests as $req):
-                                            $items_array = json_decode($req['items'], true) ?: [];
+                                            // ✅ Safely handle missing 'items' key
+                                            $items_array = isset($req['items']) ? json_decode($req['items'], true) : [];
+                                            $items_array = is_array($items_array) ? $items_array : [];
                                             $items_text = implode(", ", array_map(fn($i) => $i['name'] ?? '', $items_array));
                                             $total_requested = $req['total_items'] ?? count($items_array);
                                             $total_approved = $req['total_approved_items'] ?? 0;
                                             $items_json = htmlspecialchars(json_encode($items_array, JSON_UNESCAPED_UNICODE));
                                         ?>
                                             <tr>
-                                                <td><?= $req['id'] ?></td>
+                                                <td><?= htmlspecialchars($req['id']) ?></td>
                                                 <td><?= htmlspecialchars($items_text) ?></td>
-                                                <td class="text-center"><?= $total_requested ?></td>
-                                                <td class="text-center"><?= $total_approved ?></td>
+                                                <td class="text-center"><?= htmlspecialchars($total_requested) ?></td>
+                                                <td class="text-center"><?= htmlspecialchars($total_approved) ?></td>
                                                 <td>
                                                     <?php
-                                                    $status = $req['status'];
+                                                    $status = $req['status'] ?? '';
                                                     if ($status === 'Pending') echo '<span class="badge bg-warning text-dark status-badge">Pending</span>';
                                                     elseif ($status === 'Approved') echo '<span class="badge bg-success status-badge">Approved</span>';
                                                     else echo '<span class="badge bg-danger status-badge">Declined</span>';
                                                     ?>
                                                 </td>
-                                                <td><?= $req['created_at'] ?></td>
+                                                <td><?= htmlspecialchars($req['created_at']) ?></td>
                                                 <td>
                                                     <button class="btn btn-sm btn-info btn-view-items" data-items='<?= $items_json ?>'>View</button>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
+
                                 </table>
                             </div>
                         </div>
