@@ -28,9 +28,12 @@ if (!$user) {
 $medicineObj = new Medicine($conn);
 $data = $medicineObj->getAllBatches();
 $grouped = [];
+
 foreach ($data as $batch) {
-    $grouped[$batch['med_name']][] = $batch;
+    $key = $batch['med_name'] . '|' . $batch['brand_name'];
+    $grouped[$key][] = $batch;
 }
+
 
 // 🔔 Pending prescriptions count
 $notif_sql = "SELECT COUNT(*) AS pending 
@@ -314,15 +317,24 @@ $notifCount = $notif->notifCount;
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($grouped as $medName => $batches): ?>
+                        <?php foreach ($grouped as $key => $batches): ?>
                             <?php
+                            $medName = $batches[0]['med_name'];
+                            $brandName = $batches[0]['brand_name'];
                             $totalStock = array_sum(array_column($batches, 'stock_quantity'));
                             $earliestExpiry = $batches[0]['expiry_date'] ?? '-';
                             $status = $batches[0]['status'] ?? 'Available';
                             ?>
                             <!-- Main Medicine Row -->
-                            <tr class="medicine-main" data-med-name="<?= htmlspecialchars($medName) ?>" style="cursor:pointer;">
-                                <td><?= htmlspecialchars($medName) ?></td>
+                            <tr class="medicine-main"
+                                data-med="<?= htmlspecialchars($key) ?>"
+                                style="cursor:pointer;">
+
+                                <td>
+                                    <?= htmlspecialchars($medName) ?><br>
+                                    <small class="text-muted"><?= htmlspecialchars($brandName) ?></small>
+                                </td>
+
                                 <td><?= $totalStock ?></td>
                                 <td><?= formatMonthYear($earliestExpiry) ?></td>
                                 <td>
@@ -335,7 +347,7 @@ $notifCount = $notif->notifCount;
 
                             <!-- Hidden Batch Rows -->
                             <?php foreach ($batches as $batch): ?>
-                                <tr class="batch-row" data-med="<?= htmlspecialchars($medName) ?>" style="display:none;">
+                                <tr class="batch-row" data-med="<?= htmlspecialchars($key) ?>" style="display:none;">
                                     <td style="padding-left:30px;">— Batch <?= $batch['batch_no'] ?? 'N/A' ?></td>
                                     <td><?= $batch['stock_quantity'] ?></td>
                                     <td><?= formatMonthYear($batch['expiry_date']) ?></td>
@@ -388,7 +400,7 @@ $notifCount = $notif->notifCount;
                         // Hide all rows
                         rows.forEach(row => {
                             row.style.display = "none";
-                            document.querySelectorAll(`.batch-row[data-med="${row.dataset.medName}"]`)
+                            document.querySelectorAll(`.batch-row[data-med="${row.dataset.med}"]`)
                                 .forEach(batch => batch.style.display = "none");
                         });
 
@@ -456,9 +468,10 @@ $notifCount = $notif->notifCount;
                     document.querySelectorAll('.medicine-main').forEach(row => {
                         row.addEventListener('click', () => {
                             const medName = row.dataset.medName;
-                            document.querySelectorAll(`.batch-row[data-med="${medName}"]`).forEach(batchRow => {
-                                batchRow.style.display = batchRow.style.display === 'none' ? '' : 'none';
-                            });
+                            document.querySelectorAll(`.batch-row[data-med="${row.dataset.med}"]`)
+                                .forEach(batchRow => {
+                                    batchRow.style.display = batchRow.style.display === 'none' ? '' : 'none';
+                                });
                         });
                     });
                 </script>
