@@ -14,7 +14,6 @@ $total_debit = 0;
 $total_credit = 0;
 
 if ($entry_id > 0) {
-    // Load manual journal entry
     $stmt = $conn->prepare("SELECT * FROM journal_entries WHERE entry_id = ?");
     $stmt->bind_param("i", $entry_id);
     $stmt->execute();
@@ -26,7 +25,6 @@ if ($entry_id > 0) {
         exit;
     }
 
-    // Load journal lines
     $stmt = $conn->prepare("SELECT * FROM journal_entry_lines WHERE entry_id = ?");
     $stmt->bind_param("i", $entry_id);
     $stmt->execute();
@@ -37,8 +35,9 @@ if ($entry_id > 0) {
         $total_debit += floatval($line['debit'] ?? 0);
         $total_credit += floatval($line['credit'] ?? 0);
     }
+
 } elseif ($payment_id) {
-    // Load PayMongo payment as a journal-style entry
+
     $stmt = $conn->prepare("
         SELECT pp.*, pi.fname, pi.mname, pi.lname
         FROM paymongo_payments pp
@@ -60,7 +59,6 @@ if ($entry_id > 0) {
     $amount = floatval($payment['amount']);
     $paid_at = $payment['paid_at'] ?? 'N/A';
 
-    // Create a single "line" for display
     $lines[] = [
         'account_name' => 'Cash / Bank',
         'debit' => $amount,
@@ -76,6 +74,7 @@ if ($entry_id > 0) {
 
     $total_debit = $amount;
     $total_credit = $amount;
+
 } else {
     header("Location: journal_entry.php");
     exit;
@@ -88,24 +87,100 @@ if ($entry_id > 0) {
 <meta charset="UTF-8">
 <title>Journal Entry Details</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
 <style>
-body { background-color: #f8f9fa; }
-.container-wrapper { background-color: white; padding: 30px; margin: 50px auto; border-radius: 15px; max-width: 800px; }
-.debit { color: green; font-weight: bold; }
-.credit { color: red; font-weight: bold; }
-.reference-info { white-space: pre-line; font-size: 0.9em; }
-.actions { margin-top: 20px; display: flex; gap: 10px; }
-.btn-secondary { background-color: #6c757d; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; }
-.btn-secondary:hover { background-color: #5a6268; }
+body { 
+    background-color: #f8f9fa; 
+}
+
+.container-wrapper { 
+    background-color: white; 
+    padding: 30px; 
+    margin: 50px auto; 
+    border-radius: 15px; 
+    max-width: 900px; 
+}
+
+.debit { 
+    color: green; 
+    font-weight: bold; 
+}
+
+.credit { 
+    color: red; 
+    font-weight: bold; 
+}
+
+.reference-info { 
+    white-space: pre-line; 
+    font-size: 0.9em; 
+}
+
+.actions { 
+    margin-top: 20px; 
+    display: flex; 
+    gap: 10px; 
+}
+
+.btn-secondary { 
+    background-color: #6c757d; 
+    color: white; 
+    padding: 8px 16px; 
+    border-radius: 5px; 
+    text-decoration: none; 
+    border: none;
+}
+
+.btn-secondary:hover { 
+    background-color: #5a6268; 
+}
+
+/* ================= PRINT SETTINGS ================= */
+@media print {
+
+    /* Hide sidebar */
+    .main-sidebar {
+        display: none !important;
+    }
+
+    /* Hide action buttons */
+    .actions {
+        display: none !important;
+    }
+
+    body {
+        background: white !important;
+    }
+
+    .container-wrapper {
+        margin: 0 !important;
+        max-width: 100% !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+    }
+
+    table {
+        font-size: 12px;
+    }
+
+    h2 {
+        margin-top: 0;
+    }
+}
 </style>
+
 </head>
 <body>
 
+<!-- SIDEBAR -->
 <div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
 
+<!-- CONTENT -->
 <div class="container container-wrapper">
+
 <h2>Journal Entry Details</h2>
 
 <div class="mb-3">
@@ -127,6 +202,7 @@ body { background-color: #f8f9fa; }
 </tr>
 </thead>
 <tbody>
+
 <?php foreach ($lines as $line): ?>
 <tr>
 <td><?= htmlspecialchars($line['account_name'] ?? '') ?></td>
@@ -135,6 +211,7 @@ body { background-color: #f8f9fa; }
 <td class="reference-info"><?= nl2br(htmlspecialchars($line['description'] ?? '')) ?></td>
 </tr>
 <?php endforeach; ?>
+
 </tbody>
 <tfoot>
 <tr class="fw-bold">
@@ -147,6 +224,7 @@ body { background-color: #f8f9fa; }
 </table>
 </div>
 
+<!-- ACTION BUTTONS -->
 <div class="actions">
 <a href="journal_entry.php" class="btn-secondary">Back to Journal</a>
 <button onclick="window.print()" class="btn-secondary">Print</button>
