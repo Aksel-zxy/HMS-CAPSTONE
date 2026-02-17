@@ -85,6 +85,7 @@ if ($entry_id > 0) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Journal Entry Details</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
@@ -93,6 +94,18 @@ body {
     background-color: #f8f9fa; 
 }
 
+/* Sidebar push layout */
+.content-wrapper {
+    margin-left: 250px; /* same as sidebar width */
+    padding: 20px;
+    transition: margin-left 0.3s ease;
+}
+
+.sidebar.closed ~ .content-wrapper {
+    margin-left: 0;
+}
+
+/* Main container */
 .container-wrapper { 
     background-color: white; 
     padding: 30px; 
@@ -101,72 +114,36 @@ body {
     max-width: 900px; 
 }
 
-.debit { 
-    color: green; 
-    font-weight: bold; 
-}
+/* Debit / Credit styling */
+.debit { color: green; font-weight: bold; }
+.credit { color: red; font-weight: bold; }
 
-.credit { 
-    color: red; 
-    font-weight: bold; 
-}
+/* Reference / description */
+.reference-info { white-space: pre-line; font-size: 0.9em; }
 
-.reference-info { 
-    white-space: pre-line; 
-    font-size: 0.9em; 
-}
+/* Action buttons */
+.actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-secondary { background-color: #6c757d; color: white; padding: 8px 16px; border-radius: 5px; text-decoration: none; border: none; }
+.btn-secondary:hover { background-color: #5a6268; }
 
-.actions { 
-    margin-top: 20px; 
-    display: flex; 
-    gap: 10px; 
-}
-
-.btn-secondary { 
-    background-color: #6c757d; 
-    color: white; 
-    padding: 8px 16px; 
-    border-radius: 5px; 
-    text-decoration: none; 
-    border: none;
-}
-
-.btn-secondary:hover { 
-    background-color: #5a6268; 
-}
+/* Table responsiveness */
+.table-responsive { overflow-x: auto; }
 
 /* ================= PRINT SETTINGS ================= */
 @media print {
+    .main-sidebar { display: none !important; }
+    .actions { display: none !important; }
+    body { background: white !important; }
+    .container-wrapper { margin: 0 !important; max-width: 100% !important; border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; }
+    table { font-size: 12px; }
+    h2 { margin-top: 0; }
+}
 
-    /* Hide sidebar */
-    .main-sidebar {
-        display: none !important;
-    }
-
-    /* Hide action buttons */
-    .actions {
-        display: none !important;
-    }
-
-    body {
-        background: white !important;
-    }
-
-    .container-wrapper {
-        margin: 0 !important;
-        max-width: 100% !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-    }
-
-    table {
-        font-size: 12px;
-    }
-
-    h2 {
-        margin-top: 0;
-    }
+/* ================= RESPONSIVE ================= */
+@media (max-width: 768px) {
+    .content-wrapper { margin-left: 0; padding: 15px; }
+    .container-wrapper { padding: 20px; margin: 20px auto; }
+    .actions { flex-direction: column; gap: 8px; }
 }
 </style>
 
@@ -179,6 +156,7 @@ body {
 </div>
 
 <!-- CONTENT -->
+<div class="content-wrapper">
 <div class="container container-wrapper">
 
 <h2>Journal Entry Details</h2>
@@ -202,7 +180,6 @@ body {
 </tr>
 </thead>
 <tbody>
-
 <?php foreach ($lines as $line): ?>
 <tr>
 <td><?= htmlspecialchars($line['account_name'] ?? '') ?></td>
@@ -211,7 +188,6 @@ body {
 <td class="reference-info"><?= nl2br(htmlspecialchars($line['description'] ?? '')) ?></td>
 </tr>
 <?php endforeach; ?>
-
 </tbody>
 <tfoot>
 <tr class="fw-bold">
@@ -230,6 +206,7 @@ body {
 <button onclick="window.print()" class="btn-secondary">Print</button>
 </div>
 
+</div>
 </div>
 </body>
 </html>

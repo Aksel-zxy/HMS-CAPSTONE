@@ -11,7 +11,7 @@ $offset = ($page - 1) * $limit;
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 /* ================================
-   FETCH PAYMONGO PAYMENTS
+   FETCH PAYMENTS
 ================================ */
 $payments_sql = "
 SELECT
@@ -100,50 +100,112 @@ function getPatientName($fname, $mname, $lname, $patient_id = null) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Journal Management Module</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
 <style>
-body { background-color: #f8f9fa; }
-.container-wrapper { background-color: white; border-radius: 20px; padding: 30px; margin-top: 50px; }
-.table thead { background-color: #007bff; color: white; }
+/* =========================
+   LAYOUT FIX FOR SIDEBAR
+========================= */
+
+.content-wrapper {
+    margin-left: 250px; /* Same as sidebar width */
+    padding: 30px;
+    transition: margin-left 0.3s ease;
+}
+
+/* When sidebar is closed */
+.sidebar.closed ~ .content-wrapper {
+    margin-left: 0;
+}
+
+/* Responsive behavior */
+@media (max-width: 768px) {
+    .content-wrapper {
+        margin-left: 0;
+        padding: 15px;
+    }
+}
+
+/* =========================
+   UI STYLING
+========================= */
+
+.container-box {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+}
+
+.table thead {
+    background-color: #007bff;
+    color: white;
+}
+
 .debit { color: green; font-weight: bold; }
 .credit { color: red; font-weight: bold; }
-.btn-view { background-color: #17a2b8; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 12px; }
-.btn-view:hover { background-color: #138496; }
-.reference-info { white-space: pre-line; font-size: 0.85em; }
-.unknown-patient { background-color: #fff3cd; color: #856404; padding: 8px; border-radius: 4px; font-weight: 500; }
 .entry-amount { text-align: right; font-weight: 500; }
-.pagination .page-link { border-radius: 6px; }
+.reference-info { white-space: pre-line; font-size: 0.85rem; }
+.unknown-patient {
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 5px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.btn-view {
+    background-color: #17a2b8;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.btn-view:hover {
+    background-color: #138496;
+    color: white;
+}
+
+/* Prevent overflow */
+.table-responsive {
+    overflow-x: auto;
+}
 </style>
 </head>
-<body class="p-4">
 
-<div class="main-sidebar">
+<body>
+
 <?php include 'billing_sidebar.php'; ?>
-</div>
 
-<div class="container container-wrapper">
+<div class="content-wrapper">
+<div class="container-fluid">
+<div class="container-box">
+
 <h2>Journal Entries - Payments</h2>
 <p class="text-muted">All payment transactions recorded in the billing system</p>
 
-<!-- SEARCH BAR -->
-<form method="GET" class="row mb-3">
-    <div class="col-md-4">
+<!-- SEARCH -->
+<form method="GET" class="row g-2 mb-3">
+    <div class="col-12 col-md-4">
         <input type="text" name="search" class="form-control"
                placeholder="Search patient, method, reference..."
                value="<?= htmlspecialchars($search) ?>">
     </div>
-    <div class="col-md-2">
-        <button type="submit" class="btn btn-primary">Search</button>
+    <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-primary w-100">Search</button>
     </div>
 </form>
 
-<table class="table table-bordered table-striped">
+<div class="table-responsive">
+<table class="table table-bordered table-striped align-middle">
 <thead>
 <tr>
 <th>Date</th>
-<th>Debit Account</th>
-<th>Credit Account</th>
+<th>Debit</th>
+<th>Credit</th>
 <th>Amount</th>
 <th>Description</th>
 <th>Reference</th>
@@ -153,98 +215,51 @@ body { background-color: #f8f9fa; }
 <tbody>
 
 <?php foreach ($payments as $p): 
-$full_name = getPatientName($p['fname'] ?? '', $p['mname'] ?? '', $p['lname'] ?? '', $p['patient_id'] ?? null);
-$is_unknown = strpos($full_name, 'Unknown') === 0;
-$method = $p['payment_method'] ?: 'CASH';
-$remarks = $p['remarks'] ?: "Billing #" . ($p['billing_id'] ?? 'N/A');
-$description = "Payment received from {$full_name}\nMethod: {$method}\nRemarks: {$remarks}";
+$full_name = getPatientName($p['fname'], $p['mname'], $p['lname'], $p['patient_id']);
 ?>
-<tr <?= $is_unknown ? 'style="background-color:#fff3cd;"' : '' ?>>
+<tr>
 <td><?= date('Y-m-d H:i:s', strtotime($p['paid_at'])) ?></td>
 <td class="debit">Cash / Bank</td>
 <td class="credit">Patient Receivable</td>
 <td class="entry-amount">₱<?= number_format($p['amount'],2) ?></td>
 <td class="reference-info">
-<?php if ($is_unknown): ?>
-<span class="unknown-patient">⚠️ <?= htmlspecialchars($full_name) ?></span><br>
-<?php endif; ?>
-<?= nl2br(htmlspecialchars($description)) ?>
+<?= nl2br(htmlspecialchars("Payment received from $full_name\nMethod: {$p['payment_method']}")) ?>
 </td>
-<td><?= htmlspecialchars($p['payment_id']) ?></td>
+<td><?= $p['payment_id'] ?></td>
 <td>
-<a href="journal_entry_line.php?payment_id=<?= urlencode($p['payment_id']) ?>" class="btn-view">View</a>
+<a href="journal_entry_line.php?payment_id=<?= $p['payment_id'] ?>" class="btn-view">View</a>
 </td>
 </tr>
 <?php endforeach; ?>
 
 <?php foreach ($receipts as $r): 
-$full_name = getPatientName($r['fname'] ?? '', $r['mname'] ?? '', $r['lname'] ?? '', $r['patient_id'] ?? null);
-$is_unknown = strpos($full_name, 'Unknown') === 0;
-$method = $r['payment_method'] ?: 'CASH';
+$full_name = getPatientName($r['fname'], $r['mname'], $r['lname'], $r['patient_id']);
 $status_badge = $r['status'] == 'Posted'
     ? '<span class="badge bg-success">Posted</span>'
     : '<span class="badge bg-warning text-dark">Draft</span>';
-$description = "Payment received from {$full_name}\nMethod: {$method}\nBilling #" . ($r['billing_id'] ?? 'N/A');
 ?>
-<tr <?= $is_unknown ? 'style="background-color:#fff3cd;"' : '' ?>>
+<tr>
 <td><?= date('Y-m-d H:i:s', strtotime($r['receipt_created'])) ?></td>
 <td class="debit">Cash / Bank</td>
 <td class="credit">Patient Receivable</td>
 <td class="entry-amount">₱<?= number_format($r['grand_total'],2) ?></td>
 <td class="reference-info">
 <?= $status_badge ?><br>
-<?php if ($is_unknown): ?>
-<span class="unknown-patient">⚠️ <?= htmlspecialchars($full_name) ?></span><br>
-<?php endif; ?>
-<?= nl2br(htmlspecialchars($description)) ?>
+<?= nl2br(htmlspecialchars("Payment received from $full_name\nMethod: {$r['payment_method']}")) ?>
 </td>
-<td><?= htmlspecialchars($r['receipt_id']) ?></td>
+<td><?= $r['receipt_id'] ?></td>
 <td>
-<a href="journal_entry_line.php?receipt_id=<?= urlencode($r['receipt_id']) ?>" class="btn-view">View</a>
+<a href="journal_entry_line.php?receipt_id=<?= $r['receipt_id'] ?>" class="btn-view">View</a>
 </td>
 </tr>
 <?php endforeach; ?>
 
-<?php if (empty($payments) && empty($receipts)): ?>
-<tr>
-<td colspan="7" class="text-center text-muted py-4">
-No payment entries found.
-</td>
-</tr>
-<?php endif; ?>
-
 </tbody>
 </table>
+</div>
 
-<!-- PAGINATION -->
-<?php if ($total_pages > 1): ?>
-<nav>
-<ul class="pagination justify-content-center mt-4">
-
-<?php if ($page > 1): ?>
-<li class="page-item">
-<a class="page-link" href="?page=<?= $page-1 ?>&search=<?= urlencode($search) ?>">Previous</a>
-</li>
-<?php endif; ?>
-
-<?php for ($i=1; $i<=$total_pages; $i++): ?>
-<li class="page-item <?= $i==$page ? 'active':'' ?>">
-<a class="page-link" href="?page=<?= $i ?>&search=<?= urlencode($search) ?>">
-<?= $i ?>
-</a>
-</li>
-<?php endfor; ?>
-
-<?php if ($page < $total_pages): ?>
-<li class="page-item">
-<a class="page-link" href="?page=<?= $page+1 ?>&search=<?= urlencode($search) ?>">Next</a>
-</li>
-<?php endif; ?>
-
-</ul>
-</nav>
-<?php endif; ?>
-
+</div>
+</div>
 </div>
 
 </body>

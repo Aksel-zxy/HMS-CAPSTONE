@@ -34,35 +34,45 @@ if ($patient_id <= 0) {
         <meta charset="UTF-8">
         <title>Select Patient for Billing</title>
         <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+        <link rel="stylesheet" href="assets/css/billing_sidebar.css">
+        <style>
+            .content-wrapper { margin-left: 250px; transition: margin-left 0.3s ease; padding: 20px; }
+            .sidebar.closed ~ .content-wrapper { margin-left: 0; }
+            @media (max-width: 768px) { .content-wrapper { margin-left: 0; padding: 15px; } }
+        </style>
     </head>
     <body class="p-4 bg-light">
+
     <div class="main-sidebar">
         <?php include 'billing_sidebar.php'; ?>
     </div>
-    <div class="container bg-white p-4 rounded shadow">
-        <h2>Select Patient for Billing</h2>
-        <table class="table table-bordered">
-            <thead class="table-dark">
-                <tr>
-                    <th>Patient Name</th>
-                    <th class="text-end">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php if ($patients && $patients->num_rows > 0): ?>
-                <?php while ($row = $patients->fetch_assoc()): ?>
+
+    <div class="content-wrapper">
+        <div class="container bg-white p-4 rounded shadow">
+            <h2>Select Patient for Billing</h2>
+            <table class="table table-bordered table-striped table-responsive">
+                <thead class="table-dark">
                     <tr>
-                        <td><?= htmlspecialchars($row['full_name']); ?></td>
-                        <td class="text-end">
-                            <a href="billing_items.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-primary btn-sm">Manage Billing</a>
-                        </td>
+                        <th>Patient Name</th>
+                        <th class="text-end">Action</th>
                     </tr>
-                <?php endwhile; ?>
-            <?php else: ?>
-                <tr><td colspan="2" class="text-center">No patients with unbilled completed services.</td></tr>
-            <?php endif; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                <?php if ($patients && $patients->num_rows > 0): ?>
+                    <?php while ($row = $patients->fetch_assoc()): ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['full_name']); ?></td>
+                            <td class="text-end">
+                                <a href="billing_items.php?patient_id=<?= $row['patient_id']; ?>" class="btn btn-primary btn-sm">Manage Billing</a>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr><td colspan="2" class="text-center">No patients with unbilled completed services.</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
     </body>
     </html>
@@ -211,8 +221,9 @@ $grand_total = $subtotal - $discount;
 <title>Billing Items</title>
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="assets/CSS/billing_items.css">
-<link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
+<link rel="stylesheet" href="assets/css/billing_sidebar.css">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
 function togglePWD(checkbox){
     let val = checkbox.checked ? 1 : 0;
@@ -242,81 +253,109 @@ function finalizeBilling(){
     });
 }
 </script>
+
+<style>
+/* =========================
+   RESPONSIVE CONTENT WRAPPER
+========================= */
+.content-wrapper {
+    margin-left: 250px; /* width of sidebar */
+    transition: margin-left 0.3s ease;
+    padding: 20px;
+}
+.sidebar.closed ~ .content-wrapper {
+    margin-left: 0;
+}
+@media (max-width: 768px) {
+    .content-wrapper {
+        margin-left: 0;
+        padding: 15px;
+    }
+}
+.table-responsive { overflow-x: auto; }
+</style>
+
 </head>
 <body class="p-4 bg-light">
+
 <div class="main-sidebar">
 <?php include 'billing_sidebar.php'; ?>
 </div>
 
-<div class="container bg-white p-4 rounded shadow">
-    <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
+<div class="content-wrapper">
+    <div class="container bg-white p-4 rounded shadow">
+        <h2>Services for <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></h2>
 
-    <label class="mb-3">
-        <input type="checkbox"
-            <?= $is_senior ? 'disabled' : '' ?>
-            <?= $is_pwd ? 'checked' : '' ?>
-            onchange="location.href='billing_items.php?patient_id=<?= $patient_id ?>&toggle_pwd='+(this.checked?1:0)">
-        Patient is PWD
-    </label>
+        <label class="mb-3">
+            <input type="checkbox"
+                <?= $is_senior ? 'disabled' : '' ?>
+                <?= $is_pwd ? 'checked' : '' ?>
+                onchange="togglePWD(this)">
+            Patient is PWD
+        </label>
 
-    <form method="POST" class="d-flex gap-2 mb-3">
-        <select name="service_id" class="form-select">
-            <option value="">-- Select Service --</option>
-            <?php
-            $cart_ids = array_column($cart, 'serviceID');
-            if ($cart_ids) {
-                $ph = implode(',', array_fill(0, count($cart_ids), '?'));
-                $sql = "SELECT * FROM dl_services WHERE serviceID NOT IN ($ph)";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param(str_repeat('i', count($cart_ids)), ...$cart_ids);
-                $stmt->execute();
-                $res = $stmt->get_result();
-            } else {
-                $res = $conn->query("SELECT * FROM dl_services");
-            }
-            while ($srv = $res->fetch_assoc()):
-            ?>
-                <option value="<?= $srv['serviceID'] ?>">
-                    <?= htmlspecialchars($srv['serviceName']) ?> - ₱<?= number_format($srv['price'],2) ?>
-                </option>
-            <?php endwhile; ?>
-        </select>
-        <button name="add_service" class="btn btn-primary">Add</button>
-    </form>
+        <form method="POST" class="d-flex gap-2 mb-3 flex-wrap">
+            <select name="service_id" class="form-select flex-grow-1">
+                <option value="">-- Select Service --</option>
+                <?php
+                $cart_ids = array_column($cart, 'serviceID');
+                if ($cart_ids) {
+                    $ph = implode(',', array_fill(0, count($cart_ids), '?'));
+                    $sql = "SELECT * FROM dl_services WHERE serviceID NOT IN ($ph)";
+                    $stmt = $conn->prepare($sql);
+                    $stmt->bind_param(str_repeat('i', count($cart_ids)), ...$cart_ids);
+                    $stmt->execute();
+                    $res = $stmt->get_result();
+                } else {
+                    $res = $conn->query("SELECT * FROM dl_services");
+                }
+                while ($srv = $res->fetch_assoc()):
+                ?>
+                    <option value="<?= $srv['serviceID'] ?>">
+                        <?= htmlspecialchars($srv['serviceName']) ?> - ₱<?= number_format($srv['price'],2) ?>
+                    </option>
+                <?php endwhile; ?>
+            </select>
+            <button name="add_service" class="btn btn-primary">Add</button>
+        </form>
 
-    <table class="table table-bordered">
-        <thead class="table-dark">
-            <tr>
-                <th>Service</th>
-                <th>Description</th>
-                <th class="text-end">Price</th>
-                <th class="text-center">Action</th>
-            </tr>
-        </thead>
-        <tbody>
-        <?php foreach ($cart as $i => $srv): ?>
-            <tr>
-                <td><?= htmlspecialchars($srv['serviceName']) ?></td>
-                <td><?= htmlspecialchars($srv['description']) ?></td>
-                <td class="text-end">₱<?= number_format($srv['price'],2) ?></td>
-                <td class="text-center">
-                    <a href="billing_items.php?patient_id=<?= $patient_id ?>&delete=<?= $i ?>" class="btn btn-danger btn-sm">Delete</a>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Service</th>
+                        <th>Description</th>
+                        <th class="text-end">Price</th>
+                        <th class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($cart as $i => $srv): ?>
+                    <tr>
+                        <td><?= htmlspecialchars($srv['serviceName']) ?></td>
+                        <td><?= htmlspecialchars($srv['description']) ?></td>
+                        <td class="text-end">₱<?= number_format($srv['price'],2) ?></td>
+                        <td class="text-center">
+                            <a href="billing_items.php?patient_id=<?= $patient_id ?>&delete=<?= $i ?>" class="btn btn-danger btn-sm">Delete</a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
 
-    <div class="text-end mt-3">
-        <p>Subtotal: ₱<?= number_format($subtotal,2) ?></p>
-        <p>Discount: -₱<?= number_format($discount,2) ?></p>
-        <h5><strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong></h5>
-    </div>
+        <div class="text-end mt-3">
+            <p>Subtotal: ₱<?= number_format($subtotal,2) ?></p>
+            <p>Discount: -₱<?= number_format($discount,2) ?></p>
+            <h5><strong>Grand Total: ₱<?= number_format($grand_total,2) ?></strong></h5>
+        </div>
 
-    <div class="mt-3 d-flex justify-content-between">
-        <a href="billing_items.php" class="btn btn-secondary">Back</a>
-        <button type="button" class="btn btn-success" onclick="finalizeBilling()">Finalize Billing</button>
+        <div class="mt-3 d-flex justify-content-between flex-wrap gap-2">
+            <a href="billing_items.php" class="btn btn-secondary">Back</a>
+            <button type="button" class="btn btn-success" onclick="finalizeBilling()">Finalize Billing</button>
+        </div>
     </div>
 </div>
+
 </body>
 </html>
