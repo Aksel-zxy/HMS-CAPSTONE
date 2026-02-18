@@ -60,7 +60,7 @@ if (isset($_POST['action'])) {
     }
 
     /* ================= PURCHASE (NO INVENTORY HERE - ONLY UPDATE PRICES & STATUS) ================= */
-    if ($_POST['action'] === 'purchase' && strcasecmp($request['status'], 'Approved') === 0 && !$request['purchased_at']) {
+    if ($_POST['action'] === 'purchase' && strcasecmp(trim($request['status']), 'Approved') === 0 && !$request['purchased_at']) {
 
         $prices = $_POST['price'] ?? [];
         $units = $_POST['unit'] ?? [];
@@ -85,8 +85,8 @@ if (isset($_POST['action'])) {
             $stmtUpdatePrice->execute([$price, $total_price, ucfirst($unit_type), $pcs_per_box, $item_id]);
         }
 
-        // Mark request as purchased (Status stays 'Approved', just mark purchased_at)
-        $stmt = $pdo->prepare("UPDATE department_request SET purchased_at=NOW(), payment_type=? WHERE id=?");
+        // Mark request as purchased (NO inventory insertion)
+        $stmt = $pdo->prepare("UPDATE department_request SET status='Purchased', purchased_at=NOW(), payment_type=? WHERE id=?");
         $stmt->execute([$payment_type, $request_id]);
     }
 
@@ -240,26 +240,26 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
         const items = JSON.parse(btn.dataset.items || '[]');
         const status = btn.dataset.status;
         const purchased = btn.dataset.purchased;
+        const showPrice = (status.toLowerCase() === 'approved' && !purchased);
         const isPending = (status.toLowerCase() === 'pending');
         const isApproved = (status.toLowerCase() === 'approved');
-        const showPrice = (isApproved && !purchased);
 
-        let html = `<form method="post" id="requestForm">
+        let html = `<form method="post">
         <input type="hidden" name="id" value="${btn.dataset.id}">`;
 
-        // STATUS BANNER
+        // Show status banner for Approved or Purchased
         if (isApproved) {
             html += `<div class="alert alert-success" role="alert">
                 <i class="bi bi-check-circle"></i> <strong>This request is APPROVED.</strong> Approved quantities are LOCKED and cannot be changed.
             </div>`;
         }
 
-        // ============ PENDING REQUEST - APPROVE/REJECT DROPDOWN ============
+        // PENDING STATUS - Show Approve/Reject Dropdown
         if (isPending) {
             html += `<div class="action-section" id="actionSection">
                 <div class="mb-3">
-                    <label for="pendingActionDropdown" class="form-label"><strong>Select Action:</strong></label>
-                    <select class="form-select" id="pendingActionDropdown" required>
+                    <label for="actionDropdown" class="form-label"><strong>Select Action:</strong></label>
+                    <select class="form-select" id="actionDropdown" name="actionDropdown" required>
                         <option value="">-- Choose an action --</option>
                         <option value="approve">✓ APPROVE - Enter approved quantities</option>
                         <option value="reject">✗ REJECT - Deny this request</option>
@@ -268,7 +268,7 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
             </div>`;
         }
 
-        // ITEMS TABLE
+        // Items table
         html += `<div class="table-responsive">
         <table class="table table-bordered">
         <thead class="table-light">
@@ -297,13 +297,13 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
                            value="${approved}" 
                            min="0" 
                            max="${item.quantity}" 
-                           readonly 
-                           style="background-color:#e9ecef;">
+                           ${!isPending ? 'readonly disabled' : 'disabled'}
+                           style="${!isPending ? 'background-color:#e9ecef;' : 'background-color:#f0f0f0;'}">
                 </td>
                 <td>${unit}<input type="hidden" name="unit[${idx}]" value="${unit}"></td>
                 <td>${pcs}<input type="hidden" name="pcs_per_box[${idx}]" value="${pcs}"></td>`;
             if(showPrice){
-                html += `<td><input type="number" step="0.01" class="form-control price-input" name="price[${idx}]" value="${item.price || 0}" required></td>
+                html += `<td><input type="number" step="0.01" class="form-control price-input" name="price[${idx}]" value="${item.price || 0}"></td>
                          <td class="total-price text-end">0.00</td>`;
             }
             html += `</tr>`;
@@ -311,52 +311,45 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
 
         html += `</tbody></table></div>`;
 
-        // ============ PENDING REQUEST - APPROVE/REJECT BUTTONS (HIDDEN UNTIL SELECTION) ============
-        if (isPending){
-            html += `<div class="d-flex justify-content-end gap-2 mt-3" id="pendingActionButtons" style="display:none;">
-                        <button type="button" class="btn btn-success" id="pendingApproveBtn">
+        // Action buttons
+        if(isPending){
+            html += `<div class="d-flex justify-content-end gap-2 mt-3" id="actionButtons" style="display:none;">
+                        <button type="submit" name="action" value="approve" class="btn btn-success" id="submitApprove">
                             <i class="bi bi-check-circle"></i> APPROVE
                         </button>
-                        <button type="button" class="btn btn-danger" id="pendingRejectBtn">
+                        <button type="submit" name="action" value="reject" class="btn btn-danger" id="submitReject">
                             <i class="bi bi-x-circle"></i> REJECT
                         </button>
                     </div>`;
         }
 
-        // ============ APPROVED REQUEST - PURCHASE SECTION ============
         if(showPrice){
             html += `<div class="alert alert-info mt-3">
                 <strong>Purchase Instructions:</strong> Set the unit price for each item. Total price will be calculated automatically.
             </div>
-            <div id="priceErrorAlert" class="alert alert-danger" style="display:none;">
-                <i class="bi bi-exclamation-triangle"></i> <strong>Error:</strong> Please set a price for all items before purchasing.
-            </div>
             <div class="text-end"><strong>Total Request Price: <span id="grandTotal">0.00</span></strong></div>
-            <div class="text-end mt-3">
-                <button type="button" class="btn btn-primary" id="purchaseBtn">
-                    <i class="bi bi-bag-check"></i> Purchase
-                </button>
-            </div>`;
+            <div class="text-end mt-3"><button type="submit" name="action" value="purchase" class="btn btn-primary">
+                <i class="bi bi-bag-check"></i> Purchase
+            </button></div>`;
         }
 
         html += `</form>`;
         document.getElementById('modalBodyContent').innerHTML = html;
 
-        // ============ PENDING REQUEST - DROPDOWN LOGIC ============
+        // PENDING STATUS - Add dropdown change event
         if (isPending) {
-            const actionDropdown = document.getElementById('pendingActionDropdown');
-            const actionButtons = document.getElementById('pendingActionButtons');
-            const approveBtn = document.getElementById('pendingApproveBtn');
-            const rejectBtn = document.getElementById('pendingRejectBtn');
+            const actionDropdown = document.getElementById('actionDropdown');
+            const actionButtons = document.getElementById('actionButtons');
+            const submitApprove = document.getElementById('submitApprove');
+            const submitReject = document.getElementById('submitReject');
             const actionSection = document.getElementById('actionSection');
             const qtyInputs = document.querySelectorAll('#modalBodyContent .qty-input');
-            const requestForm = document.getElementById('requestForm');
 
             actionDropdown.addEventListener('change', function() {
                 const selectedAction = this.value;
 
                 if (selectedAction === 'approve') {
-                    // Enable quantity inputs
+                    // Enable quantity inputs for approval
                     qtyInputs.forEach(input => {
                         input.disabled = false;
                         input.style.backgroundColor = '#ffffff';
@@ -365,11 +358,11 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
                     actionSection.classList.remove('reject-selected');
                     actionSection.classList.add('approve-selected');
                     actionButtons.style.display = 'flex';
-                    rejectBtn.style.display = 'none';
-                    approveBtn.style.display = 'block';
+                    submitReject.style.display = 'none';
+                    submitApprove.style.display = 'block';
                 } 
                 else if (selectedAction === 'reject') {
-                    // Disable quantity inputs
+                    // Disable quantity inputs for rejection
                     qtyInputs.forEach(input => {
                         input.disabled = true;
                         input.value = 0;
@@ -379,10 +372,11 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
                     actionSection.classList.remove('approve-selected');
                     actionSection.classList.add('reject-selected');
                     actionButtons.style.display = 'flex';
-                    approveBtn.style.display = 'none';
-                    rejectBtn.style.display = 'block';
+                    submitApprove.style.display = 'none';
+                    submitReject.style.display = 'block';
                 } 
                 else {
+                    // Reset
                     qtyInputs.forEach(input => {
                         input.disabled = true;
                         input.style.backgroundColor = '#f0f0f0';
@@ -392,31 +386,13 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
                     actionButtons.style.display = 'none';
                 }
             });
-
-            // Approve button handler
-            approveBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                requestForm.innerHTML += '<input type="hidden" name="action" value="approve">';
-                requestForm.submit();
-            });
-
-            // Reject button handler
-            rejectBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                requestForm.innerHTML += '<input type="hidden" name="action" value="reject">';
-                requestForm.submit();
-            });
         }
 
-        // ============ APPROVED REQUEST - PURCHASE LOGIC WITH PRICE VALIDATION ============
+        // Price calculation (for Approved status)
         if(showPrice){
-            const purchaseBtn = document.getElementById('purchaseBtn');
-            const requestForm = document.getElementById('requestForm');
-            const priceErrorAlert = document.getElementById('priceErrorAlert');
             const rows = document.querySelectorAll('#modalBodyContent tbody tr');
             const grandTotal = document.getElementById('grandTotal');
 
-            // Calculate totals
             function compute(){
                 let sum = 0;
                 rows.forEach(r=>{
@@ -432,39 +408,6 @@ document.querySelectorAll('.view-items-btn').forEach(btn=>{
 
             document.querySelectorAll('.qty-input, .price-input').forEach(i=>i.addEventListener('input', compute));
             compute();
-
-            // Purchase button handler with price validation
-            purchaseBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                
-                // Validate all prices are set
-                let allPricesSet = true;
-                rows.forEach(r => {
-                    const qtyInput = r.querySelector('.qty-input');
-                    const qty = parseFloat(qtyInput?.value || 0);
-                    const priceInput = r.querySelector('.price-input');
-                    const price = parseFloat(priceInput?.value || 0);
-                    
-                    if (qty > 0 && price <= 0) {
-                        allPricesSet = false;
-                        priceInput.style.borderColor = '#dc3545';
-                        priceInput.style.borderWidth = '2px';
-                    } else {
-                        priceInput.style.borderColor = '';
-                        priceInput.style.borderWidth = '';
-                    }
-                });
-
-                if (!allPricesSet) {
-                    priceErrorAlert.style.display = 'block';
-                    return;
-                }
-
-                // All prices are valid, proceed with purchase
-                priceErrorAlert.style.display = 'none';
-                requestForm.innerHTML += '<input type="hidden" name="action" value="purchase">';
-                requestForm.submit();
-            });
         }
 
         new bootstrap.Modal(document.getElementById('viewModal')).show();
