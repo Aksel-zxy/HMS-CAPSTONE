@@ -52,7 +52,11 @@ if (!$data) {
 // ----------------------
 function analyzeResumeAI($data) {
     $apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-    $apiKey = "AIzaSyAeia2rGWN_doG_n5OMR_JcYgM3qhVDC8I";
+    $apiKey = getenv('MARWIN_KEY');
+
+    if (!$apiKey) {
+        return ['error' => 'API key not configured'];
+    }
 
     $payload = [
         "contents" => [
