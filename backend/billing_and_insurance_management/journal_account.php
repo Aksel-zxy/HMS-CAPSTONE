@@ -89,7 +89,7 @@ usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
 /* =====================================
    PAGINATION SETTINGS
 ===================================== */
-$limit = 10; // records per page
+$limit = 15; // records per page
 $totalRecords = count($records);
 $totalPages = ceil($totalRecords / $limit);
 
