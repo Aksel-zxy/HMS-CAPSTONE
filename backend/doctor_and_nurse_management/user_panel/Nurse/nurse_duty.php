@@ -201,7 +201,7 @@ $dutyStmt->close();
                             <?php if (!empty($duties)): ?>
                                 <?php foreach ($duties as $duty): ?>
                                     <tr id="row-<?= $duty['duty_id'] ?>">
-                                        <td><?= htmlspecialchars($duty['doctor_name']) ?></td>
+                                        <td><?= htmlspecialchars($duty['doctor_name']?? '') ?></td>
                                         <td><?= htmlspecialchars($duty['bed_id']) ?></td>
                                         <td><?= htmlspecialchars($duty['procedure']) ?></td>
                                         <td>

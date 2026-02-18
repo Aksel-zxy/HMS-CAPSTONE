@@ -38,14 +38,14 @@ function getComorbidities($conn, $patient_id) {
 
 function predictLoS($age, $severity, $comorbidities, $admission_type) {
 
-    $apiKey = "AIzaSyD1ydBto2H39tVDxw_4FJq4kCFAK39f2yA";
+    $apiKey = "ROBERT_KEY";
 
     $prompt = "
     You are a hospital AI specialized in predicting Length of Stay (LoS).
 
     Patient Information:
     - Age: $age
-    - Severity Level (1=Mild, 2=Moderate, 3=Severe): $severity
+    - Severity Level (1=Mild, 3=Moderate, 5=Severe): $severity
     - Comorbidities: $comorbidities
     - Admission Type: $admission_type
 
