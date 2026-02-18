@@ -68,7 +68,7 @@ SELECT
     p.patient_id,
     CONCAT(p.fname,' ',IFNULL(p.mname,''),' ',p.lname) AS full_name,
     bi.billing_id,
-    SUM(bi.total_price) AS total_charges,
+    SUM(bi.total_price) AS total_amount,
     MAX(pr.receipt_id) AS receipt_id,
     MAX(pr.status) AS payment_status,
     MAX(pr.insurance_covered) AS insurance_covered,
@@ -105,6 +105,10 @@ if (!$result) {
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 <link rel="stylesheet" href="assets/css/patient_billing.css">
+<link rel="stylesheet" href="assets/css/insurance.css">
+
+<!-- jQuery Library -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <script>
 async function refreshAndSync(btn) {
@@ -162,7 +166,7 @@ async function refreshAndSync(btn) {
 $patient_id       = (int)($row['patient_id'] ?? 0);
 $full_name        = $row['full_name'] ?? 'Unknown Patient';
 $billing_id       = (int)($row['billing_id'] ?? 0);
-$total            = (float)($row['total_charges'] ?? 0);
+$total            = (float)($row['total_amount'] ?? 0);
 $receipt_id       = $row['receipt_id'] ?? null;
 $status           = $row['payment_status'] ?? 'Pending';
 $insurance_covered = (float)($row['insurance_covered'] ?? 0);
@@ -218,42 +222,154 @@ if (!$receipt_id) {
 </a>
 
 <?php if (!$insuranceApplied): ?>
+<!-- Modal Trigger Button -->
 <button class="btn btn-info btn-sm"
         data-bs-toggle="modal"
-        data-bs-target="#insuranceModal<?= $patient_id ?>">
+        data-bs-target="#insuranceModal<?= $billing_id ?>">
     Enter Insurance
 </button>
-<?php endif; ?>
 
-</div>
-
-<?php if (!$insuranceApplied): ?>
-<div class="modal fade" id="insuranceModal<?= $patient_id ?>" tabindex="-1">
-<div class="modal-dialog">
-<form method="POST" action="apply_insurance.php" class="modal-content">
+<!-- Insurance Modal -->
+<div class="modal fade" id="insuranceModal<?= $billing_id ?>" tabindex="-1">
+<div class="modal-dialog modal-dialog-centered">
+<div class="modal-content">
 
 <div class="modal-header">
-<h5 class="modal-title">Apply Insurance</h5>
-<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <h5 class="modal-title">Apply Insurance</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 </div>
 
 <div class="modal-body">
-<input type="hidden" name="patient_id" value="<?= $patient_id ?>">
-<input type="hidden" name="billing_id" value="<?= $billing_id ?>">
+    <input type="hidden" id="patient_id_<?= $billing_id ?>" value="<?= $patient_id ?>">
+    <input type="hidden" id="billing_id_<?= $billing_id ?>" value="<?= $billing_id ?>">
 
-<label class="form-label">Insurance Number</label>
-<input type="text" name="insurance_number" class="form-control" required>
+    <label class="form-label">Insurance Number</label>
+    <div class="input-group mb-2">
+        <input type="text"
+               id="insurance_number_<?= $billing_id ?>"
+               class="form-control"
+               placeholder="Enter insurance number">
+        <button class="btn btn-primary"
+                onclick="previewInsurance(<?= $billing_id ?>)">
+            Search
+        </button>
+    </div>
+
+    <div id="insurance_preview_<?= $billing_id ?>" class="mt-3"></div>
+    <div id="billing_info_<?= $billing_id ?>" class="mt-2"></div>
 </div>
 
 <div class="modal-footer">
-<button class="btn btn-primary">Apply</button>
-<button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+    <button type="button"
+            class="btn btn-success"
+            id="applyBtn_<?= $billing_id ?>"
+            style="display:none;"
+            onclick="applyInsurance(<?= $billing_id ?>)">
+        Apply Insurance
+    </button>
+    <button type="button"
+            class="btn btn-secondary"
+            data-bs-dismiss="modal">
+        Cancel
+    </button>
 </div>
 
-</form>
 </div>
 </div>
+</div>
+
+<script>
+function previewInsurance(id){
+    console.log('previewInsurance called with id:', id);
+    
+    let insurance_number = document.getElementById('insurance_number_'+id).value.trim();
+    let patient_id = document.getElementById('patient_id_'+id).value;
+    let billing_id = document.getElementById('billing_id_'+id).value;
+
+    console.log('Insurance Number:', insurance_number);
+    console.log('Patient ID:', patient_id);
+    console.log('Billing ID:', billing_id);
+
+    if(!insurance_number){
+        alert('Enter insurance number');
+        return;
+    }
+
+    console.log('Sending POST request to apply_insurance.php');
+
+    let formData = new FormData();
+    formData.append('action', 'preview');
+    formData.append('patient_id', patient_id);
+    formData.append('billing_id', billing_id);
+    formData.append('insurance_number', insurance_number);
+
+    fetch('apply_insurance.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
+    .then(res => {
+        console.log('Response received:', res);
+        
+        if(res.status === 'preview'){
+            document.getElementById('insurance_preview_'+id).innerHTML = res.insurance_card_html;
+            document.getElementById('billing_info_'+id).innerHTML = `
+                <p><strong>Insurance Covered:</strong> ₱${res.insurance_covered}</p>
+                <p><strong>Out of Pocket:</strong> ₱${res.out_of_pocket}</p>
+            `;
+            document.getElementById('applyBtn_'+id).style.display = 'block';
+        } else {
+            alert(res.message);
+            document.getElementById('applyBtn_'+id).style.display = 'none';
+            document.getElementById('insurance_preview_'+id).innerHTML = '';
+            document.getElementById('billing_info_'+id).innerHTML = '';
+        }
+    })
+    .catch(error => {
+        console.error('Fetch Error:', error);
+        alert('Error: ' + error.message);
+    });
+}
+
+function applyInsurance(id){
+    console.log('applyInsurance called with id:', id);
+    
+    let insurance_number = document.getElementById('insurance_number_'+id).value.trim();
+    let patient_id = document.getElementById('patient_id_'+id).value;
+    let billing_id = document.getElementById('billing_id_'+id).value;
+
+    let formData = new FormData();
+    formData.append('action', 'apply');
+    formData.append('patient_id', patient_id);
+    formData.append('billing_id', billing_id);
+    formData.append('insurance_number', insurance_number);
+
+    fetch('apply_insurance.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(res => {
+        console.log('Apply Response:', res);
+        if(res.status === 'success'){
+            alert(res.message);
+            location.reload();
+        } else {
+            alert(res.message);
+        }
+    })
+    .catch(error => {
+        console.error('Apply Error:', error);
+        alert('Error: ' + error.message);
+    });
+}
+</script>
 <?php endif; ?>
+
+
 
 </td>
 </tr>

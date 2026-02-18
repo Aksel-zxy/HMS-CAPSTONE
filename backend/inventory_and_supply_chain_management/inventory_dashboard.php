@@ -5,67 +5,54 @@ include '../../SQL/config.php';
 // --- AUTH ---
 if (!isset($_SESSION['user_id'])) die("Login required.");
 
-// --- Fetch Total Order Requests ---
-$order_stmt = $pdo->query("SELECT COUNT(*) FROM purchase_requests");
-$total_orders = $order_stmt->fetchColumn();
-
-// --- Fetch Total Approved Budget (All Departments) ---
-$budget_stmt = $pdo->query("SELECT COALESCE(SUM(approved_amount),0) FROM department_budgets WHERE status='Approved'");
-$total_approved_budget = $budget_stmt->fetchColumn();
-
-// --- Fetch Total Spent (All Departments) ---
-$spent_stmt = $pdo->query("SELECT COALESCE(SUM(total_price),0) FROM purchase_requests WHERE status IN ('Approved','Completed')");
-$total_spent = $spent_stmt->fetchColumn();
-
-// --- Remaining Budget ---
-$remaining_budget = max($total_approved_budget - $total_spent, 0);
-
-// --- Fetch Budget Per Department ---
-$dept_stmt = $pdo->query("
+// --- Fetch Inventory Totals ---
+$inventory_stmt = $pdo->query("
     SELECT 
-        u.department,
-        COALESCE(SUM(b.approved_amount),0) AS approved_budget,
-        (
-            SELECT COALESCE(SUM(pr.total_price),0)
-            FROM purchase_requests pr
-            WHERE pr.user_id = u.user_id AND pr.status IN ('Approved','Completed')
-        ) AS spent_amount
-    FROM users u
-    LEFT JOIN department_budgets b ON b.user_id = u.user_id AND b.status='Approved'
-    WHERE u.department IS NOT NULL AND u.department != ''
-    GROUP BY u.department
+        COUNT(*) AS total_items,
+        COALESCE(SUM(quantity),0) AS total_quantity,
+        COALESCE(SUM(quantity * price),0) AS total_value
+    FROM inventory
 ");
-$dept_data = $dept_stmt->fetchAll(PDO::FETCH_ASSOC);
+$inventory_data = $inventory_stmt->fetch(PDO::FETCH_ASSOC);
+
+// --- Fetch Inventory by Item Type for Graph ---
+$item_type_stmt = $pdo->query("
+    SELECT 
+        COALESCE(item_type,'Uncategorized') AS item_type,
+        COUNT(*) AS item_count,
+        COALESCE(SUM(quantity),0) AS total_quantity,
+        COALESCE(SUM(quantity * price),0) AS total_value
+    FROM inventory
+    GROUP BY item_type
+    ORDER BY total_value DESC
+");
+$item_type_data = $item_type_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Prepare data for charts
-$departments = [];
-$approved_budgets = [];
-$spent_budgets = [];
-foreach ($dept_data as $d) {
-    $departments[] = $d['department'];
-    $approved_budgets[] = (float)$d['approved_budget'];
-    $spent_budgets[] = (float)$d['spent_amount'];
+$item_types = [];
+$total_values = [];
+$total_quantities = [];
+foreach ($item_type_data as $i) {
+    $item_types[] = $i['item_type'];
+    $total_values[] = (float)$i['total_value'];
+    $total_quantities[] = (float)$i['total_quantity'];
 }
 
 // Convert to JSON for Chart.js
-$departments_json = json_encode($departments);
-$approved_json = json_encode($approved_budgets);
-$spent_json = json_encode($spent_budgets);
+$item_types_json = json_encode($item_types);
+$values_json = json_encode($total_values);
+$quantities_json = json_encode($total_quantities);
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Inventory Dashboard</title>
+<title>Hospital Assets Dashboard</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link rel="stylesheet" href="assets/CSS/inventory_dashboard.css">
 <link rel="stylesheet" href="assets/CSS/dashboard.css">
-
-<style>
-
-</style>
 </head>
 <body>
 
@@ -75,53 +62,45 @@ $spent_json = json_encode($spent_budgets);
 
 <div class="main-content">
   <div class="container-fluid py-4">
-    <h2 class="text-center mb-4">📊 Inventory & Budget Dashboard</h2>
+    <h2 class="text-center mb-4">🏥 Hospital Assets Dashboard</h2>
 
     <!-- Summary Row -->
     <div class="row g-4 mb-4">
       <div class="col-md-3">
         <div class="card text-center bg-primary text-white">
           <div class="card-body">
-            <h5>Total Order Requests</h5>
-            <h3><?= number_format($total_orders) ?></h3>
+            <h5>Total Inventory Items</h5>
+            <h3><?= number_format($inventory_data['total_items']) ?></h3>
           </div>
         </div>
       </div>
       <div class="col-md-3">
         <div class="card text-center bg-success text-white">
           <div class="card-body">
-            <h5>Total Approved Budget</h5>
-            <h3>₱<?= number_format($total_approved_budget,2) ?></h3>
+            <h5>Total Quantity</h5>
+            <h3><?= number_format($inventory_data['total_quantity']) ?></h3>
           </div>
         </div>
       </div>
       <div class="col-md-3">
         <div class="card text-center bg-warning text-dark">
           <div class="card-body">
-            <h5>Total Spent</h5>
-            <h3>₱<?= number_format($total_spent,2) ?></h3>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card text-center bg-info text-white">
-          <div class="card-body">
-            <h5>Remaining Budget</h5>
-            <h3>₱<?= number_format($remaining_budget,2) ?></h3>
+            <h5>Total Asset Value</h5>
+            <h3>₱<?= number_format($inventory_data['total_value'],2) ?></h3>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Charts Row -->
-    <div class="row g-4">
+    <div class="row g-4 mb-5">
       <div class="col-md-6">
         <div class="card">
           <div class="card-header bg-light">
-            <h5 class="mb-0 text-center">Budget Distribution by Department</h5>
+            <h5 class="mb-0 text-center">Asset Value by Item Type</h5>
           </div>
           <div class="card-body">
-            <canvas id="budgetPieChart" height="250"></canvas>
+            <canvas id="assetValueChart" height="250"></canvas>
           </div>
         </div>
       </div>
@@ -129,41 +108,39 @@ $spent_json = json_encode($spent_budgets);
       <div class="col-md-6">
         <div class="card">
           <div class="card-header bg-light">
-            <h5 class="mb-0 text-center">Allocated vs Spent (per Department)</h5>
+            <h5 class="mb-0 text-center">Inventory Quantity by Item Type</h5>
           </div>
           <div class="card-body">
-            <canvas id="budgetBarChart" height="250"></canvas>
+            <canvas id="assetQuantityChart" height="250"></canvas>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Table Section -->
-    <div class="row mt-5">
+    <div class="row">
       <div class="col-12">
         <div class="card">
           <div class="card-header bg-dark text-white">
-            <h5 class="mb-0">Department Budget Overview</h5>
+            <h5 class="mb-0">Inventory Assets Overview by Item Type</h5>
           </div>
           <div class="card-body p-0">
             <table class="table table-striped table-bordered mb-0 text-center">
               <thead class="table-light">
                 <tr>
-                  <th>Department</th>
-                  <th>Approved Budget</th>
-                  <th>Total Spent</th>
-                  <th>Remaining</th>
+                  <th>Item Type</th>
+                  <th>Number of Items</th>
+                  <th>Total Quantity</th>
+                  <th>Total Value</th>
                 </tr>
               </thead>
               <tbody>
-                <?php foreach ($dept_data as $d): 
-                  $remaining = max($d['approved_budget'] - $d['spent_amount'], 0);
-                ?>
+                <?php foreach ($item_type_data as $i): ?>
                   <tr>
-                    <td><?= htmlspecialchars($d['department']) ?></td>
-                    <td>₱<?= number_format($d['approved_budget'],2) ?></td>
-                    <td>₱<?= number_format($d['spent_amount'],2) ?></td>
-                    <td class="fw-bold text-success">₱<?= number_format($remaining,2) ?></td>
+                    <td><?= htmlspecialchars($i['item_type']) ?></td>
+                    <td><?= number_format($i['item_count']) ?></td>
+                    <td><?= number_format($i['total_quantity']) ?></td>
+                    <td class="fw-bold text-success">₱<?= number_format($i['total_value'],2) ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -172,58 +149,60 @@ $spent_json = json_encode($spent_budgets);
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
 <script>
-const departments = <?= $departments_json ?>;
-const approvedBudgets = <?= $approved_json ?>;
-const spentBudgets = <?= $spent_json ?>;
+const itemTypes = <?= $item_types_json ?>;
+const values = <?= $values_json ?>;
+const quantities = <?= $quantities_json ?>;
 
-// PIE CHART — Budget per Department
-new Chart(document.getElementById('budgetPieChart'), {
-  type: 'pie',
-  data: {
-    labels: departments,
-    datasets: [{
-      data: approvedBudgets,
-      backgroundColor: [
-        '#007bff','#28a745','#ffc107','#dc3545','#17a2b8','#6f42c1','#20c997'
-      ],
-    }]
-  },
-  options: {
-    plugins: {
-      legend: { position: 'bottom' }
-    }
-  }
-});
-
-// BAR CHART — Allocated vs Spent
-new Chart(document.getElementById('budgetBarChart'), {
+// BAR CHART — Asset Value by Item Type
+new Chart(document.getElementById('assetValueChart'), {
   type: 'bar',
   data: {
-    labels: departments,
-    datasets: [
-      {
-        label: 'Approved Budget',
-        data: approvedBudgets,
-        backgroundColor: 'rgba(54, 162, 235, 0.7)',
-      },
-      {
-        label: 'Spent',
-        data: spentBudgets,
-        backgroundColor: 'rgba(255, 99, 132, 0.7)',
-      }
-    ]
+    labels: itemTypes,
+    datasets: [{
+      label: 'Asset Value (₱)',
+      data: values,
+      backgroundColor: 'rgba(54, 162, 235, 0.7)'
+    }]
   },
   options: {
     responsive: true,
     plugins: {
-      legend: { position: 'top' },
+      legend: { display: false },
     },
     scales: {
-      y: { beginAtZero: true, ticks: { callback: value => '₱' + value.toLocaleString() } }
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: value => '₱' + value.toLocaleString()
+        }
+      }
+    }
+  }
+});
+
+// BAR CHART — Quantity by Item Type
+new Chart(document.getElementById('assetQuantityChart'), {
+  type: 'bar',
+  data: {
+    labels: itemTypes,
+    datasets: [{
+      label: 'Quantity',
+      data: quantities,
+      backgroundColor: 'rgba(255, 159, 64, 0.7)'
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      y: { beginAtZero: true }
     }
   }
 });

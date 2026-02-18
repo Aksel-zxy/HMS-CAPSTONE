@@ -19,9 +19,22 @@ $categories = [
     "Diagnostic Equipment"
 ];
 
-// Inventory query
-$invQuery = "SELECT * FROM inventory WHERE 1";
+// Inventory query (combined by item_name, case-insensitive)
+$invQuery = "
+    SELECT 
+        LOWER(item_name) AS item_name_lower,
+        MAX(id) AS id,
+        item_name,
+        item_type,
+        sub_type,
+        category,
+        pcs_per_box,
+        SUM(total_qty) AS total_quantity
+    FROM inventory
+    WHERE 1
+";
 $invParams = [];
+
 if (!empty($invSearch)) {
     $invQuery .= " AND (item_name LIKE :search OR item_type LIKE :search OR sub_type LIKE :search)";
     $invParams[':search'] = "%$invSearch%";
@@ -30,12 +43,14 @@ if (!empty($invCategory)) {
     $invQuery .= " AND category = :category";
     $invParams[':category'] = $invCategory;
 }
-$invQuery .= " ORDER BY received_at DESC";
+
+$invQuery .= " GROUP BY LOWER(item_name) ORDER BY item_name ASC";
+
 $inventoryStmt = $pdo->prepare($invQuery);
 $inventoryStmt->execute($invParams);
 $inventory = $inventoryStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Stock adjustments query
+// Stock adjustments query (unchanged)
 $histQuery = "
     SELECT sa.id, i.item_name, i.category, sa.old_quantity, sa.new_quantity, sa.reason, sa.adjusted_at
     FROM stock_adjustments sa
@@ -66,8 +81,6 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
 <link rel="stylesheet" href="assets/css/inventory_dashboard.css">
 </head>
 <body class="bg-light">
-    
-
 <div class="main-sidebar">
     <?php include 'inventory_sidebar.php'; ?>
 </div>
@@ -121,23 +134,21 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
                         <th>Type</th>
                         <th>Sub-Type</th>
                         <th>Total Quantity (pcs)</th>
-                        <th>Price</th>
-                        <th>Received At</th>
-                        <th>Location</th>
+                        <th>Total Boxes</th>
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach($inventory as $item): ?>
+                    <?php foreach($inventory as $item): 
+                        $totalBoxes = $item['pcs_per_box'] > 0 ? floor($item['total_quantity'] / $item['pcs_per_box']) : 0;
+                    ?>
                         <tr>
                             <td><?= $item['id'] ?></td>
                             <td><?= htmlspecialchars($item['item_name']) ?></td>
                             <td><?= htmlspecialchars($item['item_type']) ?></td>
                             <td><?= htmlspecialchars($item['sub_type']) ?></td>
-                            <td><span class="badge bg-primary"><?= (int)$item['total_qty'] ?></span></td>
-                            <td>₱<?= number_format($item['price'],2) ?></td>
-                            <td><?= htmlspecialchars($item['received_at']) ?></td>
-                            <td><?= htmlspecialchars($item['location']) ?></td>
+                            <td><span class="badge bg-primary"><?= (int)$item['total_quantity'] ?></span></td>
+                            <td><span class="badge bg-info"><?= $totalBoxes ?></span></td>
                             <td>
                                 <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#adjustModal<?= $item['id'] ?>">Adjust</button>
                             </td>
@@ -154,11 +165,11 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
                                         </div>
                                         <div class="modal-body">
                                             <input type="hidden" name="inventory_id" value="<?= $item['id'] ?>">
-                                            <input type="hidden" name="old_quantity" value="<?= $item['total_qty'] ?>">
+                                            <input type="hidden" name="old_quantity" value="<?= $item['total_quantity'] ?>">
 
                                             <div class="mb-3">
                                                 <label class="form-label">Current Quantity (pcs)</label>
-                                                <input type="text" class="form-control" value="<?= $item['total_qty'] ?>" disabled>
+                                                <input type="text" class="form-control" value="<?= $item['total_quantity'] ?>" disabled>
                                             </div>
                                             <div class="mb-3">
                                                 <label class="form-label">New Quantity (pcs)</label>
@@ -184,7 +195,6 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
 
         <!-- History Tab -->
         <div class="tab-pane fade" id="history" role="tabpanel">
-
             <!-- Filters for History -->
             <form method="get" class="row g-2 mb-4">
                 <div class="col-md-4">
@@ -242,7 +252,6 @@ $adjustments = $adjStmt->fetchAll(PDO::FETCH_ASSOC);
 <div class="main-chatbox">
     <?php include 'chatbox.php'; ?>
 </div>
-
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

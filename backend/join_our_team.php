@@ -109,7 +109,7 @@ $posts = $jobPost->getAllPosts();
                         <br />
 
                         <label for="resume">Upload Resume</label>
-                        <input type="file" id="resume" name="resume" required>
+                        <input type="file" id="resume" name="resume" required accept=".pdf">
 
                         <label for="application_letter">Upload Application Letter</label>
                         <input type="file" id="application_letter" name="application_letter" required>

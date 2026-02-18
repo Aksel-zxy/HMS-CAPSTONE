@@ -226,14 +226,8 @@ if (isset($_POST['search_medicine'])) {
         ]);
         $_SESSION['recent_searches'] = array_slice($_SESSION['recent_searches'], 0, 10);
 
-        // ---------------- Display Result ----------------
-        // Format AI advice as bullet list
-        $aiLines = preg_split('/\d\.\s*/', $aiAdvice, -1, PREG_SPLIT_NO_EMPTY);
-        $aiList = "<ul>";
-        foreach ($aiLines as $line) {
-            $aiList .= "<li>" . trim($line) . "</li>";
-        }
-        $aiList .= "</ul>";
+        $aiFormatted = nl2br(htmlspecialchars($aiAdvice));
+
 
         $searchResultHTML = "
 <div class='alert alert-success'>
@@ -249,7 +243,7 @@ if (isset($_POST['search_medicine'])) {
     <b>Movement (last 30 days):</b>
     <span class='badge bg-warning text-dark'>{$movement}</span><br><br>
     <b>AI Recommendation:</b>
-    <div class='p-2 bg-light border rounded'>{$aiList}</div>
+    <div class='p-2 bg-light border rounded'>{$aiFormatted}</div>
 </div>
 ";
     } else {
@@ -577,7 +571,7 @@ if (isset($_POST['clear_recent'])) {
                                 <thead class="table-light">
                                     <tr>
                                         <th>Medicine</th>
-                                        <th>Generic Name</th>
+                                        <th style="white-space: nowrap" ;>Generic Name</th>
                                         <th>Brand</th>
                                         <th>Dosage</th>
                                         <th>Location</th>
@@ -591,12 +585,12 @@ if (isset($_POST['clear_recent'])) {
                                 <tbody>
                                     <?php foreach ($_SESSION['recent_searches'] as $search): ?>
                                         <tr>
-                                            <td style="vertical-align: top;"><?= htmlspecialchars($search['med_name'] ?? '-') ?></td>
-                                            <td style="vertical-align: top;"><?= htmlspecialchars($search['generic_name'] ?? '-') ?></td>
-                                            <td style="vertical-align: top;"><?= htmlspecialchars($search['brand_name'] ?? '-') ?></td>
-                                            <td style="vertical-align: top;"><?= htmlspecialchars($search['dosage'] ?? '-') ?></td>
+                                            <td style=" white-space: nowrap; vertical-align: top;"><?= htmlspecialchars($search['med_name'] ?? '-') ?></td>
+                                            <td style="white-space: nowrap; vertical-align: top;"><?= htmlspecialchars($search['generic_name'] ?? '-') ?></td>
+                                            <td style="white-space: nowrap; vertical-align: top;"><?= htmlspecialchars($search['brand_name'] ?? '-') ?></td>
+                                            <td style="white-space: nowrap; vertical-align: top;"><?= htmlspecialchars($search['dosage'] ?? '-') ?></td>
                                             <td style="white-space: nowrap; vertical-align: top;"><?= htmlspecialchars($search['location'] ?? '-') ?></td>
-                                            <td style="vertical-align: top;">
+                                            <td style="white-space: nowrap; vertical-align: top;">
                                                 <span class="badge <?= ($search['stock_status'] ?? 'Normal') !== 'Normal' ? 'bg-danger' : 'bg-success' ?>">
                                                     <?= htmlspecialchars($search['stock'] ?? 0) ?>
                                                 </span>

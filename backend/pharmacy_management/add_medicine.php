@@ -40,8 +40,24 @@ try {
     $expiry_date = date("Y-m-d", strtotime("+$years year"));
 
     // 2️⃣ Check if medicine already exists
-    $stmt = $conn->prepare("SELECT med_id FROM pharmacy_inventory WHERE med_name = ? AND dosage = ?");
-    $stmt->bind_param("ss", $med_name, $dosage);
+    $stmt = $conn->prepare("
+    SELECT med_id 
+    FROM pharmacy_inventory 
+    WHERE med_name = ?
+    AND generic_name = ?
+    AND brand_name = ?
+    AND dosage = ?
+    AND unit_price = ?
+");
+    $stmt->bind_param(
+        "ssssd",
+        $med_name,
+        $generic_name,
+        $brand_name,
+        $dosage,
+        $unit_price
+    );
+
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -62,7 +78,7 @@ try {
         $stmt2->bind_param("dssssi", $unit_price, $unit, $generic_name, $brand_name, $prescription_required, $med_id);
         $stmt2->execute();
     } else {
-        // Insert new medicine with auto-location
+        // Insert new medicine with auto-location and initial batch
         $medicineObj->addMedicineWithAutoLocation(
             $med_name,
             $generic_name,
@@ -72,7 +88,8 @@ try {
             $dosage,
             $unit,
             $unit_price,
-            $stock_quantity
+            $stock_quantity,
+            $expiry_date // ✅ Pass expiry date here
         );
     }
 

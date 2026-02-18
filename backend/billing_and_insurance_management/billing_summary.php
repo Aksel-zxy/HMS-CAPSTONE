@@ -25,7 +25,7 @@ $paymongoClient = new Client([
 ]);
 
 /* ===============================
-   PATIENT
+   GET PATIENT
 ================================ */
 $patient_id = (int)($_GET['patient_id'] ?? 0);
 
@@ -55,11 +55,24 @@ $stmt->execute();
 $billing = $stmt->get_result()->fetch_assoc();
 if (!$billing) die("No billing record found");
 
-$billing_id    = $billing['billing_id'];
-$status        = $billing['status'];
-$out_of_pocket = (float)$billing['out_of_pocket'];
+$billing_id     = $billing['billing_id'];
+$status         = $billing['status'];
 $transaction_id = $billing['transaction_id'];
 $existing_link  = $billing['paymongo_link_id'];
+
+/* ===============================
+   FETCH PATIENT RECEIPT (for discounts)
+================================ */
+$receipt = null;
+$stmt = $conn->prepare("
+    SELECT *
+    FROM patient_receipt
+    WHERE billing_id = ? AND patient_id = ?
+    LIMIT 1
+");
+$stmt->bind_param("ii", $billing_id, $patient_id);
+$stmt->execute();
+$receipt = $stmt->get_result()->fetch_assoc();
 
 /* ===============================
    🔒 LOCK IF PAID
@@ -70,7 +83,7 @@ if ($status === 'Paid') {
 }
 
 /* ===============================
-   BILLING ITEMS
+   GET BILLING ITEMS
 ================================ */
 $items = [];
 $subtotal = 0;
@@ -90,11 +103,97 @@ while ($row = $res->fetch_assoc()) {
 }
 
 /* ===============================
+   CALCULATE AMOUNTS FROM RECEIPT
+================================ */
+$pwd_discount = 0;
+$insurance_covered = 0;
+$grand_total = $subtotal;
+$out_of_pocket = $subtotal;
+
+if ($receipt) {
+    // Fetch from patient_receipt (where apply_insurance.php stores the data)
+    $pwd_discount = (float)($receipt['total_discount'] ?? 0);
+    $insurance_covered = (float)($receipt['insurance_covered'] ?? 0);
+    $grand_total = (float)($receipt['grand_total'] ?? $subtotal - $pwd_discount - $insurance_covered);
+    $out_of_pocket = (float)($receipt['total_out_of_pocket'] ?? $grand_total);
+} else {
+    // Fallback to billing_records if no receipt found
+    $pwd_discount = (float)($billing['total_discount'] ?? 0);
+    $insurance_covered = (float)($billing['insurance_covered'] ?? 0);
+    $grand_total = (float)($billing['grand_total'] ?? $subtotal - $pwd_discount - $insurance_covered);
+    $out_of_pocket = (float)($billing['out_of_pocket'] ?? $grand_total);
+}
+
+// Ensure out_of_pocket doesn't go negative
+if ($out_of_pocket < 0) $out_of_pocket = 0;
+if ($grand_total < 0) $grand_total = 0;
+
+/* ===============================
+   🔒 AUTO-MARK AS PAID IF FULLY COVERED
+================================ */
+if ($grand_total <= 0 && $status !== 'Paid') {
+    $stmt = $conn->prepare("
+        UPDATE billing_records
+        SET status = 'Paid'
+        WHERE billing_id = ?
+    ");
+    $stmt->bind_param("i", $billing_id);
+    $stmt->execute();
+    
+    // Also update patient_receipt
+    $stmt = $conn->prepare("
+        UPDATE patient_receipt
+        SET status = 'Paid'
+        WHERE billing_id = ? AND patient_id = ?
+    ");
+    $stmt->bind_param("ii", $billing_id, $patient_id);
+    $stmt->execute();
+    
+    $status = 'Paid';
+}
+
+/* ===============================
+   HANDLE CASH PAYMENT
+================================ */
+if (isset($_POST['payment_method']) && $_POST['payment_method'] === 'cash' && $grand_total > 0) {
+    $stmt = $conn->prepare("
+        INSERT INTO paymongo_payments
+        (payment_id, amount, status, payment_method, remarks)
+        VALUES (?, ?, 'Paid', 'CASH', ?)
+    ");
+    $cash_reference = 'CASH-' . time();
+    $desc = "Billing #$billing_id - Cash Payment";
+    $stmt->bind_param("sds", $cash_reference, $grand_total, $desc);
+    $stmt->execute();
+    
+    // Update billing_records
+    $stmt = $conn->prepare("
+        UPDATE billing_records
+        SET status = 'Paid', payment_method = 'Cash'
+        WHERE billing_id = ?
+    ");
+    $stmt->bind_param("i", $billing_id);
+    $stmt->execute();
+    
+    // Update patient_receipt
+    $stmt = $conn->prepare("
+        UPDATE patient_receipt
+        SET status = 'Paid', payment_reference = ?
+        WHERE billing_id = ? AND patient_id = ?
+    ");
+    $stmt->bind_param("sii", $cash_reference, $billing_id, $patient_id);
+    $stmt->execute();
+    
+    header("Location: patient_billing.php?success=cash_payment");
+    exit;
+}
+
+/* ===============================
    🔁 CREATE PAYMONGO LINK (ONCE)
 ================================ */
 $payLinkUrl = null;
 
-if ($out_of_pocket > 0) {
+if ($grand_total > 0) {
 
     // Reuse existing link
     if ($existing_link) {
@@ -104,7 +203,7 @@ if ($out_of_pocket > 0) {
         $payload = [
             'data' => [
                 'attributes' => [
-                    'amount'      => (int) round($out_of_pocket * 100),
+                    'amount'      => (int) round($grand_total * 100),
                     'currency'    => 'PHP',
                     'description' => "Hospital Billing #{$billing_id}",
                     'remarks'     => "TXN:{$transaction_id}"
@@ -126,7 +225,7 @@ if ($out_of_pocket > 0) {
                 (payment_id, amount, status, payment_method, remarks)
                 VALUES (?, ?, 'Pending', 'PAYLINK', ?)
             ");
-            $amount_php = $out_of_pocket;
+            $amount_php = $grand_total;
             $desc = "Billing #$billing_id";
             $stmt->bind_param("sds", $link_id, $amount_php, $desc);
             $stmt->execute();
@@ -170,11 +269,21 @@ $history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 ?>
 
 <!doctype html>
-<html lang="en">
+<html>
 <head>
 <meta charset="utf-8">
 <title>Billing Summary</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+    .payment-method-btn {
+        transition: all 0.3s ease;
+    }
+    .payment-method-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+</style>
 </head>
 <body class="bg-light p-4">
 
@@ -204,30 +313,73 @@ $history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 </tbody>
 </table>
 
-<table class="table">
+<table class="table table-sm">
 <tr>
     <th>Subtotal</th>
     <td class="text-end">₱<?= number_format($subtotal, 2) ?></td>
 </tr>
-<tr class="table-success">
+
+<?php if ($pwd_discount > 0): ?>
+<tr class="table-warning">
+    <th>PWD/Senior Discount (20%)</th>
+    <td class="text-end">- ₱<?= number_format($pwd_discount, 2) ?></td>
+</tr>
+<?php endif; ?>
+
+<?php if ($insurance_covered > 0): ?>
+<tr class="table-info">
+    <th>Insurance Coverage</th>
+    <td class="text-end">- ₱<?= number_format($insurance_covered, 2) ?></td>
+</tr>
+<?php endif; ?>
+
+<tr class="table-success fw-bold">
     <th>Amount to Pay</th>
-    <td class="text-end fw-bold">₱<?= number_format($out_of_pocket, 2) ?></td>
+    <td class="text-end">₱<?= number_format($grand_total, 2) ?></td>
 </tr>
 </table>
 
-<?php if ($out_of_pocket <= 0): ?>
+<?php if ($grand_total <= 0): ?>
 <div class="alert alert-success text-center">
-    ✅ Fully covered — no payment required
+    <i class="bi bi-check-circle-fill"></i>
+    <strong>Fully Covered</strong> — No Payment Required
+    <br><small class="text-muted">Status: <span class="badge bg-success">PAID</span></small>
 </div>
-
 <?php elseif ($payLinkUrl): ?>
-<div class="text-center">
-    <a href="<?= htmlspecialchars($payLinkUrl) ?>" target="_blank"
-       class="btn btn-primary btn-lg">
-       Pay Now
-    </a>
+<div class="card border-primary mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Select Payment Method</h5>
+        <div class="row g-3">
+            <!-- Online Payment -->
+            <div class="col-md-6">
+                <a href="<?= htmlspecialchars($payLinkUrl) ?>" target="_blank"
+                   class="btn btn-primary btn-lg w-100 payment-method-btn">
+                   <i class="bi bi-credit-card"></i> 
+                   <br>Pay Online
+                   <br><small>₱<?= number_format($grand_total, 2) ?></small>
+                </a>
+                <small class="text-muted d-block text-center mt-2">
+                    Card, GCash, GrabPay, Bank Transfer
+                </small>
+            </div>
+            
+            <!-- Cash Payment -->
+            <div class="col-md-6">
+                <form method="POST" onsubmit="return confirm('Confirm cash payment of ₱<?= number_format($grand_total, 2) ?>?');">
+                    <input type="hidden" name="payment_method" value="cash">
+                    <button type="submit" class="btn btn-success btn-lg w-100 payment-method-btn">
+                        <i class="bi bi-cash-coin"></i> 
+                        <br>Pay with Cash
+                        <br><small>₱<?= number_format($grand_total, 2) ?></small>
+                    </button>
+                </form>
+                <small class="text-muted d-block text-center mt-2">
+                    Pay at cashier/office
+                </small>
+            </div>
+        </div>
+    </div>
 </div>
-
 <?php endif; ?>
 
 <hr>
@@ -238,6 +390,7 @@ $history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 <tr>
     <th>Reference</th>
     <th>Amount</th>
+    <th>Method</th>
     <th>Status</th>
     <th>Paid At</th>
 </tr>
@@ -247,11 +400,22 @@ $history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 <tr>
     <td><?= htmlspecialchars($h['payment_id']) ?></td>
     <td>₱<?= number_format($h['amount'], 2) ?></td>
-    <td><?= htmlspecialchars($h['status']) ?></td>
+    <td>
+        <?php if (strpos($h['payment_id'], 'CASH-') === 0): ?>
+            <span class="badge bg-secondary">Cash</span>
+        <?php else: ?>
+            <span class="badge bg-info">Online</span>
+        <?php endif; ?>
+    </td>
+    <td>
+        <span class="badge <?= $h['status'] === 'Paid' ? 'bg-success' : 'bg-warning text-dark' ?>">
+            <?= htmlspecialchars($h['status']) ?>
+        </span>
+    </td>
     <td><?= $h['paid_at'] ?: '-' ?></td>
 </tr>
 <?php endforeach; else: ?>
-<tr><td colspan="4" class="text-center">No payments yet</td></tr>
+<tr><td colspan="5" class="text-center text-muted">No payments yet</td></tr>
 <?php endif; ?>
 </tbody>
 </table>
@@ -263,6 +427,8 @@ $history = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 </div>
 
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>
 </html>

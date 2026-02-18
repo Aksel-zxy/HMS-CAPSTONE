@@ -433,7 +433,7 @@ $notifCount = $notif->notifCount;
                     <!-- Medicine Inventory Table -->
                     <table id="medicineInventoryTable" class="table table-bordered table-hover">
                         <thead>
-                            <tr>
+                            <tr class="text-nowrap">
                                 <th onclick="sortTable(0)">Medicine ID</th>
                                 <th onclick="sortTable(1)">Medicine Name</th>
                                 <th>Generic Name</th>
@@ -489,14 +489,24 @@ $notifCount = $notif->notifCount;
                                         </td>
                                         <td>
                                             <!-- Edit Button -->
-                                            <button class="btn btn-warning btn-sm edit-btn" data-bs-toggle="modal"
-                                                data-bs-target="#editMedicineModal" data-id="<?= $row['med_id'] ?>"
+                                            <button class="btn btn-warning btn-sm edit-btn"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editMedicineModal"
+
+                                                data-id="<?= $row['med_id'] ?>"
                                                 data-name="<?= htmlspecialchars($row['med_name']) ?>"
+                                                data-generic="<?= htmlspecialchars($row['generic_name']) ?>"
+                                                data-brand="<?= htmlspecialchars($row['brand_name']) ?>"
                                                 data-category="<?= htmlspecialchars($row['category']) ?>"
                                                 data-dosage="<?= htmlspecialchars($row['dosage']) ?>"
                                                 data-stock="<?= $row['stock_quantity'] ?>"
                                                 data-unit="<?= htmlspecialchars($row['unit']) ?>"
-                                                data-price="<?= $row['unit_price'] ?>">Update</button>
+                                                data-price="<?= $row['unit_price'] ?>"
+                                                data-prescription="<?= htmlspecialchars($row['prescription_required']) ?>">
+
+                                                Update
+                                            </button>
+
 
                                             <!-- Delete Button Form -->
                                             <!-- <form action="update_medicine.php" method="POST" style="display:inline;">
@@ -621,32 +631,66 @@ $notifCount = $notif->notifCount;
 
                             <div class="modal-body">
                                 <input type="hidden" name="med_id" id="edit_med_id">
+
+                                <!-- Medicine Name -->
                                 <div class="mb-3">
                                     <label class="form-label">Medicine Name</label>
                                     <input type="text" class="form-control" name="med_name" id="edit_med_name" required>
                                 </div>
+
+                                <!-- Generic Name -->
+                                <div class="mb-3">
+                                    <label class="form-label">Generic Name</label>
+                                    <input type="text" class="form-control" name="generic_name" id="edit_generic_name" required>
+                                </div>
+
+                                <!-- Brand Name -->
+                                <div class="mb-3">
+                                    <label class="form-label">Brand Name</label>
+                                    <input type="text" class="form-control" name="brand_name" id="edit_brand_name" required>
+                                </div>
+
+                                <!-- Category -->
                                 <div class="mb-3">
                                     <label class="form-label">Category</label>
                                     <input type="text" class="form-control" name="category" id="edit_category" required>
                                 </div>
+
+                                <!-- Dosage -->
                                 <div class="mb-3">
                                     <label class="form-label">Dosage</label>
                                     <input type="text" class="form-control" name="dosage" id="edit_dosage" required>
                                 </div>
+
+                                <!-- Stock Quantity (Read-only) -->
                                 <div class="mb-3">
                                     <label class="form-label">Stock Quantity</label>
                                     <input type="number" class="form-control" name="stock_quantity"
                                         id="edit_stock_quantity" readonly>
                                 </div>
+
+                                <!-- Unit Price -->
                                 <div class="mb-3">
                                     <label class="form-label">Unit Price (₱)</label>
                                     <input type="number" step="0.01" class="form-control" name="unit_price"
                                         id="edit_unit_price" required>
                                 </div>
+
+                                <!-- Unit -->
                                 <div class="mb-3">
                                     <label class="form-label">Unit</label>
                                     <input type="text" class="form-control" name="unit" id="edit_unit" required>
                                 </div>
+
+                                <!-- Prescription Required -->
+                                <div class="mb-3">
+                                    <label class="form-label">Prescription Required</label>
+                                    <select class="form-select" name="prescription_required" id="edit_prescription_required" required>
+                                        <option value="Yes">Yes</option>
+                                        <option value="No">No</option>
+                                    </select>
+                                </div>
+
                             </div>
 
                             <div class="modal-footer">
@@ -657,6 +701,7 @@ $notifCount = $notif->notifCount;
                     </div>
                 </div>
             </div>
+
 
 
             <!-- END CODING HERE -->
@@ -707,16 +752,22 @@ $notifCount = $notif->notifCount;
     <script>
         document.querySelectorAll('.edit-btn').forEach(button => {
             button.addEventListener('click', function() {
+
                 document.getElementById('edit_med_id').value = this.dataset.id;
                 document.getElementById('edit_med_name').value = this.dataset.name;
+                document.getElementById('edit_generic_name').value = this.dataset.generic;
+                document.getElementById('edit_brand_name').value = this.dataset.brand;
                 document.getElementById('edit_category').value = this.dataset.category;
                 document.getElementById('edit_dosage').value = this.dataset.dosage;
                 document.getElementById('edit_stock_quantity').value = this.dataset.stock;
                 document.getElementById('edit_unit').value = this.dataset.unit;
-                document.getElementById('edit_unit_price').value = this.dataset.price; // NEW
+                document.getElementById('edit_unit_price').value = this.dataset.price;
+                document.getElementById('edit_prescription_required').value = this.dataset.prescription;
+
             });
         });
     </script>
+
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {

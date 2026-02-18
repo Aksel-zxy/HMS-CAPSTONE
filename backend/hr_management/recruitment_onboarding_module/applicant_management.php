@@ -290,70 +290,108 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                             <th>Notes</th>
                             <th>Submitted Documents</th>
                             <th>Actions</th>
+                            <th>AI Analysis</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (!empty($actionableApplicants)): ?>
-                            <?php foreach ($actionableApplicants as $row): ?>
-                                <?php 
-                                    $tracking = $applicantObj->getLatestTracking($row['applicant_id']); 
-                                    $documents = $applicantObj->getApplicantDocuments($row['applicant_id']); 
-                                    $currentStatus = $tracking['status'] ?? 'Pending';
-                                ?>
-                                <tr>
-                                    <td><?= htmlspecialchars(trim($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name'] . ' ' . $row['suffix_name'])); ?></td>
-                                    <td><?= htmlspecialchars($row['specialization']); ?></td>
-                                    <td><?= htmlspecialchars($row['email']); ?></td>
-                                    <td><?= htmlspecialchars($row['phone']); ?></td>
-                                    <td><?= $currentStatus; ?></td>
-                                    <td><?= isset($tracking['interview_date']) && $tracking['interview_date'] ? date("Y-m-d", strtotime($tracking['interview_date'])) : '-'; ?></td>
-                                    <td><?= $tracking['notes'] ?? '-'; ?></td>
-                                    <td>
-                                        <?php if (!empty($documents)): ?>
-                                            <?php foreach ($documents as $docType => $files): ?>
-                                                <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $docType))); ?>:</strong><br>
-                                                <?php foreach ($files as $file): ?>
-                                                    <a href="download_document.php?id=<?= $file['document_id'] ?>" target="_blank">
-                                                        <?= htmlspecialchars($file['document_type']); ?>
-                                                    </a>
-                                                    <br />
-                                                <?php endforeach; ?>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            No documents
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <form method="POST" class="d-flex flex-column align-items-center gap-2">
-                                            <input type="hidden" name="applicant_id" value="<?= $row['applicant_id']; ?>">
-
-                                            <?php if ($currentStatus !== 'Done Interview'): ?>
-                                                <input type="date" name="interview_date" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
-                                                <input type="text" name="notes" placeholder="Notes (Optional)" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
-                                                <button type="submit" name="action" value="schedule_interview" class="btn btn-primary btn-sm" style="max-width:120px;">Schedule</button>
-                                            <?php endif; ?>
-
-                                            <?php if (isset($tracking['interview_date']) && in_array($currentStatus, ['Pending Interview', 'Scheduled'])): ?>
-                                                <button type="submit" name="action" value="done_interview" class="btn btn-warning btn-sm mt-1" style="max-width:120px;">Done Interview</button>
-                                            <?php endif; ?>
-
-                                            <?php if ($currentStatus === 'Done Interview'): ?>
-                                                <div class="d-flex gap-2 justify-content-center mt-1">
-                                                    <button type="submit" name="action" value="update_status" class="btn btn-success btn-sm" title="Hired" onclick="this.form.status.value='Hired';"><i class="fas fa-check"></i></button>
-                                                    <button type="submit" name="action" value="update_status" class="btn btn-danger btn-sm" title="Rejected" onclick="this.form.status.value='Rejected';"><i class="fas fa-times"></i></button>
-                                                    <input type="hidden" name="status" value="">
-                                                </div>
-                                            <?php endif; ?>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
+                    <?php if (!empty($actionableApplicants)): ?>
+                        <?php foreach ($actionableApplicants as $row): ?>
+                            <?php 
+                                $tracking = $applicantObj->getLatestTracking($row['applicant_id']); 
+                                $documents = $applicantObj->getApplicantDocuments($row['applicant_id']); 
+                                $currentStatus = $tracking['status'] ?? 'Pending';
+                            ?>
                             <tr>
-                                <td colspan="9" style="text-align:center;">No applicants found.</td>
+                                <!-- Applicant Info -->
+                                <td><?= htmlspecialchars(trim($row['first_name'] . ' ' . $row['middle_name'] . ' ' . $row['last_name'] . ' ' . $row['suffix_name'])); ?></td>
+                                <td><?= htmlspecialchars($row['specialization']); ?></td>
+                                <td><?= htmlspecialchars($row['email']); ?></td>
+                                <td><?= htmlspecialchars($row['phone']); ?></td>
+                                <td><?= $currentStatus; ?></td>
+                                <td><?= isset($tracking['interview_date']) && $tracking['interview_date'] ? date("Y-m-d", strtotime($tracking['interview_date'])) : '-'; ?></td>
+                                <td><?= $tracking['notes'] ?? '-'; ?></td>
+
+                                <!-- Submitted Documents -->
+                                <td>
+                                    <?php if (!empty($documents)): ?>
+                                        <?php foreach ($documents as $docType => $files): ?>
+                                            <strong><?= htmlspecialchars(ucfirst(str_replace('_', ' ', $docType))); ?>:</strong><br>
+                                            <?php foreach ($files as $file): ?>
+                                                <a href="download_document.php?id=<?= $file['document_id'] ?>" target="_blank">
+                                                    <?= htmlspecialchars($file['document_type']); ?>
+                                                </a><br>
+                                            <?php endforeach; ?>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        No documents
+                                    <?php endif; ?>
+                                </td>
+
+                                <!-- Actions -->
+                                <td>
+                                    <!-- AI Evaluate Button -->
+                                    <a href="javascript:void(0);" 
+                                    class="btn btn-info btn-sm mb-1 ai-evaluate-btn" 
+                                    data-id="<?= $row['applicant_id'] ?>" 
+                                    style="max-width:160px;">
+                                    🤖 AI Evaluate
+                                    </a>
+
+                                    <!-- Interview / Status Form -->
+                                    <form method="POST" class="d-flex flex-column align-items-center gap-2">
+                                        <input type="hidden" name="applicant_id" value="<?= $row['applicant_id']; ?>">
+
+                                        <?php if ($currentStatus !== 'Done Interview'): ?>
+                                            <input type="date" name="interview_date" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
+                                            <input type="text" name="notes" placeholder="Notes (Optional)" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
+                                            <button type="submit" name="action" value="schedule_interview" class="btn btn-primary btn-sm" style="max-width:120px;">Schedule</button>
+                                        <?php endif; ?>
+
+                                        <?php if (isset($tracking['interview_date']) && in_array($currentStatus, ['Pending Interview', 'Scheduled'])): ?>
+                                            <button type="submit" name="action" value="done_interview" class="btn btn-warning btn-sm mt-1" style="max-width:120px;">Done Interview</button>
+                                        <?php endif; ?>
+
+                                        <?php if ($currentStatus === 'Done Interview'): ?>
+                                            <div class="d-flex gap-2 justify-content-center mt-1">
+                                                <button type="submit" name="action" value="update_status" class="btn btn-success btn-sm" title="Hired" onclick="this.form.status.value='Hired';"><i class="fas fa-check"></i></button>
+                                                <button type="submit" name="action" value="update_status" class="btn btn-danger btn-sm" title="Rejected" onclick="this.form.status.value='Rejected';"><i class="fas fa-times"></i></button>
+                                                <input type="hidden" name="status" value="">
+                                            </div>
+                                        <?php endif; ?>
+                                    </form>
+                                </td>
+
+                                <!-- AI Analysis Column -->
+                                <td>
+                                    <?php 
+                                        // Show saved AI analysis from DB
+                                        $aiText = !empty($row['ai_remarks']) ? $row['ai_remarks'] : '';
+
+                                        // Simple formatting: bold headings, bullets
+                                        if ($aiText) {
+                                            // Convert **bold** markdown to <strong>
+                                            $aiText = preg_replace('/\*\*(.*?)\*\*/', '<strong>$1</strong>', $aiText);
+                                            // Convert bullet points starting with '*' to •
+                                            $aiText = preg_replace('/^\* (.*)$/m', '• $1', $aiText);
+                                            // Convert newlines to <br>
+                                            $aiText = nl2br($aiText);
+                                        } else {
+                                            $aiText = 'No AI analysis yet.';
+                                        }
+                                    ?>
+                                    <div id="aiResult-<?= $row['applicant_id'] ?>" class="ai-result" style="max-width:350px;">
+                                        <?= $aiText; ?>
+                                    </div>
+                                </td>
                             </tr>
-                        <?php endif; ?>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr>
+                            <td colspan="10" style="text-align:center;">No applicants found.</td>
+                        </tr>
+                    <?php endif; ?>
                     </tbody>
+
                 </table>
             </div>
             <!-- END CODING HERE -->
@@ -377,6 +415,42 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+
+        document.querySelectorAll('.ai-evaluate-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const applicantId = this.dataset.id;
+                const resultDiv = document.getElementById(`aiResult-${applicantId}`);
+                resultDiv.textContent = "Analyzing... 🤖";
+
+                fetch('analyze_applicant.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ applicant_id: applicantId })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    // If AI returned 'ai_analysis', use it, else fallback to raw_response
+                    const text = data.ai_analysis 
+                                || (data.raw_response?.candidates?.[0]?.content?.parts?.[0]?.text)
+                                || "No analysis available";
+
+                    resultDiv.textContent = text;
+
+                    // Optional: save AI remarks back to DB
+                    fetch('save_ai_remarks.php', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ 
+                            applicant_id: applicantId, 
+                            ai_remarks: text 
+                        })
+                    });
+                })
+                .catch(err => {
+                    resultDiv.textContent = "AJAX Error: " + err;
+                });
+            });
         });
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
