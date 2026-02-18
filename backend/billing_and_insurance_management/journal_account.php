@@ -85,6 +85,26 @@ if ($lines && $lines->num_rows>0) {
 
 // Sort records by date (newest first)
 usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
+
+/* =====================================
+   PAGINATION SETTINGS
+===================================== */
+$limit = 10; // records per page
+$totalRecords = count($records);
+$totalPages = ceil($totalRecords / $limit);
+
+// Get current page
+$page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int)$_GET['page'] : 1;
+
+// Validate page number
+if ($page < 1) $page = 1;
+if ($page > $totalPages && $totalPages > 0) $page = $totalPages;
+
+// Calculate starting index
+$start = ($page - 1) * $limit;
+
+// Slice records for current page only
+$records = array_slice($records, $start, $limit);
 ?>
 
 <!DOCTYPE html>
@@ -97,20 +117,14 @@ usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
 <link rel="stylesheet" type="text/css" href="assets/css/billing_sidebar.css">
 
 <style>
-/* ==============================
-   Layout for sidebar push + content
-============================== */
 .content-wrapper {
-    margin-left: 250px; /* sidebar width */
+    margin-left: 250px;
     padding: 20px;
     transition: margin-left 0.3s ease;
 }
-
 .sidebar.closed ~ .content-wrapper {
     margin-left: 0;
 }
-
-/* Container styling */
 .container-wrapper {
     background-color: white; 
     border-radius: 30px; 
@@ -118,8 +132,6 @@ usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
     box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
     margin-top: 80px;
 }
-
-/* Stats cards */
 .stats-card { 
     background-color: white; 
     border-radius: 12px; 
@@ -131,18 +143,15 @@ usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
 .stats-card h5 { font-size: 14px; color: #666; margin-bottom: 10px; font-weight: 600; }
 .stats-card .amount { font-size: 24px; font-weight: bold; color: #333; }
 
-/* Badges */
 .badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; }
 .badge.asset { background-color: #d4edda; color: #155724; }
 .badge.liability { background-color: #f8d7da; color: #721c24; }
 .badge.revenue { background-color: #d1ecf1; color: #0c5460; }
 .badge.expense { background-color: #fff3cd; color: #856404; }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
     .content-wrapper { margin-left: 0; padding: 15px; }
     .container-wrapper { margin: 20px auto; padding: 20px; }
-    .stats-card { margin-bottom: 15px; }
 }
 </style>
 </head>
@@ -173,7 +182,11 @@ usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
                         <tr>
                             <td><?= $rec['id'] ?></td>
                             <td><?= htmlspecialchars($rec['name']) ?></td>
-                            <td><span class="badge <?= strtolower($rec['type']) ?>"><?= $rec['type'] ?></span></td>
+                            <td>
+                                <span class="badge <?= strtolower($rec['type']) ?>">
+                                    <?= $rec['type'] ?>
+                                </span>
+                            </td>
                             <td>₱<?= number_format($rec['amount'],2) ?></td>
                             <td><?= date("M d, Y h:i A", strtotime($rec['date'])) ?></td>
                         </tr>
@@ -185,6 +198,30 @@ usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
             </table>
         </div>
 
+        <!-- Pagination -->
+        <?php if($totalPages > 1): ?>
+        <nav>
+            <ul class="pagination justify-content-center mt-4">
+
+                <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                    <a class="page-link" href="?page=<?= $page-1 ?>">Previous</a>
+                </li>
+
+                <?php for($i = 1; $i <= $totalPages; $i++): ?>
+                    <li class="page-item <?= ($page == $i) ? 'active' : '' ?>">
+                        <a class="page-link" href="?page=<?= $i ?>"><?= $i ?></a>
+                    </li>
+                <?php endfor; ?>
+
+                <li class="page-item <?= ($page >= $totalPages) ? 'disabled' : '' ?>">
+                    <a class="page-link" href="?page=<?= $page+1 ?>">Next</a>
+                </li>
+
+            </ul>
+        </nav>
+        <?php endif; ?>
+
+        <!-- Totals -->
         <div class="row mt-4 g-3">
             <div class="col-6 col-md-3">
                 <div class="stats-card">
@@ -211,6 +248,7 @@ usort($records, fn($a,$b)=> strtotime($b['date']) - strtotime($a['date']));
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
