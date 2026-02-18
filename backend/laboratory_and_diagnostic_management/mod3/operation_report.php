@@ -1,6 +1,7 @@
 <?php
 session_start();
 include '../../../SQL/config.php';
+
 if (!isset($_SESSION['labtech']) || $_SESSION['labtech'] !== true) {
     header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
@@ -9,6 +10,7 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     echo "User ID is not set in session.";
     exit();
 }
+
 $query = "SELECT * FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
@@ -19,6 +21,87 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+$total_patients = 0;
+$sql_patients = "SELECT COUNT(DISTINCT patientID) as count FROM dl_schedule";
+$res_p = $conn->query($sql_patients);
+if ($res_p && $row = $res_p->fetch_assoc()) {
+    $total_patients = $row['count'];
+}
+
+$chart_dates = [];
+$chart_counts = [];
+
+$sql_line = "SELECT scheduleDate as log_date, COUNT(*) as total 
+             FROM dl_schedule 
+             WHERE scheduleDate >= CURDATE() - INTERVAL 7 DAY 
+             GROUP BY scheduleDate 
+             ORDER BY log_date ASC";
+
+$res_line = $conn->query($sql_line);
+if ($res_line) {
+    while ($row = $res_line->fetch_assoc()) {
+        $chart_dates[] = date('M d', strtotime($row['log_date']));
+        $chart_counts[] = $row['total'];
+    }
+}
+
+$donut_labels = [];
+$donut_data = [];
+
+$sql_donut = "SELECT serviceName, COUNT(*) as total 
+              FROM dl_schedule 
+              GROUP BY serviceName 
+              ORDER BY total DESC 
+              LIMIT 5";
+
+$res_donut = $conn->query($sql_donut);
+if ($res_donut) {
+    while ($row = $res_donut->fetch_assoc()) {
+        $donut_labels[] = $row['serviceName'];
+        $donut_data[] = $row['total'];
+    }
+}
+
+$avg_turnaround = "0";
+$sql_turnaround = "SELECT AVG(TIMESTAMPDIFF(MINUTE, CONCAT(scheduleDate, ' ', scheduleTime), completed_at)) as avg_min 
+                   FROM dl_schedule 
+                   WHERE completed_at IS NOT NULL AND completed_at != '0000-00-00 00:00:00'";
+
+$res_turn = $conn->query($sql_turnaround);
+if ($res_turn && $row = $res_turn->fetch_assoc()) {
+    $minutes = $row['avg_min'];
+    if ($minutes > 0) {
+        $avg_turnaround = round($minutes / 60, 1);
+    }
+}
+
+$equipment_health = 0;
+
+$total_machines = 0;
+$sql_total_eq = "SELECT COUNT(*) as total FROM machine_equipments";
+$res_total_eq = $conn->query($sql_total_eq);
+if ($res_total_eq && $row = $res_total_eq->fetch_assoc()) {
+    $total_machines = $row['total'];
+}
+
+$working_machines = 0;
+$sql_working_eq = "SELECT COUNT(*) as working FROM machine_equipments WHERE status = 'Available'";
+$res_working_eq = $conn->query($sql_working_eq);
+if ($res_working_eq && $row = $res_working_eq->fetch_assoc()) {
+    $working_machines = $row['working'];
+}
+
+if ($total_machines > 0) {
+    $equipment_health = round(($working_machines / $total_machines) * 100, 1);
+} else {
+    $equipment_health = 100;
+}
+
+$json_dates = json_encode($chart_dates);
+$json_counts = json_encode($chart_counts);
+$json_donut_labels = json_encode($donut_labels);
+$json_donut_data = json_encode($donut_data);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -184,18 +267,105 @@ if (!$user) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <h1>LABORATORY REPORT</h1>
-            <!----- End of Main Content ----->
-            <script>
-                const toggler = document.querySelector(".toggler-btn");
-                toggler.addEventListener("click", function() {
-                    document.querySelector("#sidebar").classList.toggle("collapsed");
-                });
-            </script>
-            <script src="../assets/Bootstrap/all.min.js"></script>
-            <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
-            <script src="../assets/Bootstrap/fontawesome.min.js"></script>
-            <script src="../assets/Bootstrap/jq.js"></script>
+            <div class="container-fluid p-4">
+
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;"
+                     class="mb-0 text-secondary">Monthly Laboratory Report</h3>
+                    <button class="btn btn-primary px-4 py-2 shadow-sm" onclick="window.print()">
+                        <i class="fas fa-print me-2"></i> Print Report
+                    </button>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-7">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-muted mb-4">Total Tests Performed</h5>
+                                <canvas id="lineChart" style="max-height: 250px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-5">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-muted mb-4">Test Breakdown</h5>
+                                <div style="position: relative; height: 200px; display: flex; justify-content: center;">
+                                    <canvas id="donutChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body d-flex align-items-center">
+                                <div class="me-3 rounded" style="width: 8px; height: 40px; background-color: #0d6efd;"></div>
+                                <div>
+                                    <h6 class="text-muted mb-0">Total Patients</h6>
+                                    <h4 class="mb-0 fw-bold"><?php echo number_format($total_patients); ?></h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body d-flex align-items-center">
+                                <div class="me-3 rounded" style="width: 8px; height: 40px; background-color: #6ea8fe;"></div>
+                                <div>
+                                    <h6 class="text-muted mb-0">Avg Turnaround Time</h6>
+                                    <h4 class="mb-0 fw-bold"><?php echo $avg_turnaround; ?> hrs</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm">
+                            <div class="card-body d-flex align-items-center">
+
+                                <div class="me-3 rounded" style="width: 8px; height: 40px; 
+                background-color: <?php echo ($equipment_health < 50) ? '#dc3545' : (($equipment_health < 80) ? '#ffc107' : '#adb5bd'); ?>;">
+                                </div>
+
+                                <div>
+                                    <h6 class="text-muted mb-0">Equipment Health</h6>
+                                    <h4 class="mb-0 fw-bold"><?php echo $equipment_health; ?>%</h4>
+
+                                    <?php if ($equipment_health < 100): ?>
+                                        <small class="text-danger" style="font-size: 12px;">Issues Detected</small>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        <!----- End of Main Content ----->
+        <script>
+            window.dashboardData = {
+                lineLabels: <?php echo $json_dates; ?>,
+                lineData: <?php echo $json_counts; ?>,
+                donutLabels: <?php echo $json_donut_labels; ?>,
+                donutData: <?php echo $json_donut_data; ?>
+            };
+            const toggler = document.querySelector(".toggler-btn");
+            toggler.addEventListener("click", function() {
+                document.querySelector("#sidebar").classList.toggle("collapsed");
+            });
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="../assets/javascript/lab_report.js"></script>
+        <script src="../assets/Bootstrap/all.min.js"></script>
+        <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+        <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+        <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
