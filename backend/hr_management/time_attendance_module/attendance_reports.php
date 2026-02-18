@@ -123,12 +123,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <li class="sidebar-item">
                         <a href="attendance_reports.php" class="sidebar-link">Attendance Reports</a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="enroll_fingerprint.php" class="sidebar-link">Fingerprint Enrollment</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="scan_fingerprint.php" class="sidebar-link">Fingerprint Scan</a>
-                    </li>
                 </ul>
             </li>
             
@@ -145,9 +139,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </a>
 
                 <ul id="geralddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../leave_management_module/leave_application.php" class="sidebar-link">Leave Application</a>
-                    </li>
                     <li class="sidebar-item">
                         <a href="../leave_management_module/leave_approval.php" class="sidebar-link d-flex justify-content-between align-items-center">
                             Leave Approval

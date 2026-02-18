@@ -166,9 +166,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                 <ul id="geralddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../leave_management_module/leave_application.php" class="sidebar-link">Leave Application</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="../leave_management_module/leave_approval.php" class="sidebar-link d-flex justify-content-between align-items-center">
                             Leave Approval
                             <?php if ($pendingCount > 0): ?>

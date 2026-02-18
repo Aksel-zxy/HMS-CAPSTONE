@@ -36,12 +36,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['budget_id'])) {
     $update->bind_param('ddsi', $allocated_budget, $allocated_budget, $status, $budget_id);
 
     if ($update->execute()) {
-        $msg = "Budget request updated successfully.";
+        $_SESSION['success'] = "Budget request updated successfully.";
     } else {
-        $msg = "Error updating budget: " . $update->error;
+        $_SESSION['error'] = "Error updating budget: " . $update->error;
     }
 
     $update->close();
+
+    header("Location: department_budget_approval.php");
+    exit();
 }
 
 $pendingCount = $leaveNotif->getPendingLeaveCount();
@@ -166,9 +169,6 @@ $requests = $result->fetch_all(MYSQLI_ASSOC);
 
                 <ul id="geralddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../leave_management_module/leave_application.php" class="sidebar-link">Leave Application</a>
-                    </li>
-                    <li class="sidebar-item">
                         <a href="../leave_management_module/leave_approval.php" class="sidebar-link d-flex justify-content-between align-items-center">
                             Leave Approval
                             <?php if ($pendingCount > 0): ?>
@@ -258,10 +258,6 @@ $requests = $result->fetch_all(MYSQLI_ASSOC);
             <div class="budget">
                 <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Pending Budget Requests</p>
 
-                <?php if(isset($msg)): ?>
-                    <div class="success-message"><?= htmlspecialchars($msg) ?></div>
-                <?php endif; ?>
-
                 <table>
                     <thead>
                         <tr>
@@ -304,7 +300,7 @@ $requests = $result->fetch_all(MYSQLI_ASSOC);
                     <br />
                     <br />
                     
-                    <form method="POST">
+                    <form method="POST" action="department_budget_approval.php">
                         <input type="hidden" name="budget_id" id="budget_id">
                         <div>
                             <label>Department</label>
