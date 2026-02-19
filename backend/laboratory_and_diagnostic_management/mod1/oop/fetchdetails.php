@@ -259,29 +259,20 @@ class SmartScheduler
 
         $laboratorists = $this->conn->query("SELECT employee_id FROM hr_employees WHERE profession = 'Laboratorist'")->fetch_all(MYSQLI_ASSOC);
 
-        // --- NEW TIME-AWARE LOGIC START ---
         $currentDate = date('Y-m-d');
         $currentHour = (int)date('H');
-        $endHour = 17;
 
-        // Default start hour is 8 AM
-        $startHour = 8;
-
-        // If the user selected today, start searching from the next available hour
+        // Logic for 24-Hour Operation
         if ($target_date === $currentDate) {
+            // Start from the next hour
             $startHour = $currentHour + 1;
+        } else {
+            // If it's a future date, start from the beginning of that day (Midnight)
+            $startHour = 0;
         }
 
-        // If the start hour is already past closing time, stop immediately
-        if ($startHour >= $endHour) {
-            return [
-                'success' => false,
-                'message' => 'No slots available. Business hours for today have ended.'
-            ];
-        }
-        // --- NEW TIME-AWARE LOGIC END ---
-
-        for ($hour = $startHour; $hour < $endHour; $hour++) {
+        // Loop through the 24-hour cycle (0 to 23)
+        for ($hour = $startHour; $hour < 24; $hour++) {
             $timeString = sprintf("%02d:00:00", $hour);
 
             $availableStaff = [];
@@ -297,6 +288,7 @@ class SmartScheduler
             }
 
             if (!empty($availableStaff)) {
+                // Sort by least workload to balance the team
                 usort($availableStaff, function ($a, $b) {
                     return $a['load'] <=> $b['load'];
                 });
@@ -309,23 +301,53 @@ class SmartScheduler
                         'recommended_staff_id' => $bestStaff['id'],
                         'recommended_time' => $timeString,
                         'recommended_date' => $target_date,
-                        'message' => 'Optimal slot found based on lowest staff workload.'
+                        'message' => 'Optimal 24-hour slot found.'
                     ];
                 }
             }
         }
 
-        return ['success' => false, 'message' => 'No slots available for this date.'];
+        return [
+            'success' => false,
+            'message' => 'No slots available for the remainder of this date.'
+        ];
     }
 
-    // ... (rest of your private functions remain the same)
     private function isStaffFree($emp_id, $date, $time)
-    { /* ... */
+    {
+        $stmt = $this->conn->prepare("SELECT COUNT(*) as count FROM dl_schedule WHERE employee_id = ? AND scheduleDate = ? AND scheduleTime = ?");
+        $stmt->bind_param("iss", $emp_id, $date, $time);
+        $stmt->execute();
+        $res = $stmt->get_result()->fetch_assoc();
+        return $res['count'] == 0;
     }
+
     private function getStaffDailyLoad($emp_id, $date)
-    { /* ... */
+    {
+        $stmt = $this->conn->prepare("SELECT COUNT(*) as count FROM dl_schedule WHERE employee_id = ? AND scheduleDate = ?");
+        $stmt->bind_param("is", $emp_id, $date);
+        $stmt->execute();
+        $res = $stmt->get_result()->fetch_assoc();
+        return $res['count'];
     }
+
     private function isRoomAvailable($room_type, $date, $time)
-    { /* ... */
+    {
+        $stmtTotal = $this->conn->prepare("SELECT COUNT(*) as total FROM rooms WHERE room_type = ?");
+        $stmtTotal->bind_param("s", $room_type);
+        $stmtTotal->execute();
+        $totalRooms = $stmtTotal->get_result()->fetch_assoc()['total'];
+
+        $stmtBooked = $this->conn->prepare("
+            SELECT COUNT(*) as booked 
+            FROM dl_schedule s
+            JOIN rooms r ON s.room_id = r.roomID
+            WHERE r.room_type = ? AND s.scheduleDate = ? AND s.scheduleTime = ?
+        ");
+        $stmtBooked->bind_param("sss", $room_type, $date, $time);
+        $stmtBooked->execute();
+        $bookedRooms = $stmtBooked->get_result()->fetch_assoc()['booked'];
+
+        return $bookedRooms < $totalRooms;
     }
 }
