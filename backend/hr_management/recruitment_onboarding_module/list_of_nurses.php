@@ -421,7 +421,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <label for="license_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>License Type:</label>
                 <select id="license_type" name="license_type" required>
-                    <option value="Regsitered Nurse">Regsitered Nurse</option>
+                    <option value="Registered Nurse">Registered Nurse</option>
                 <select>
                 <br />
 
@@ -599,7 +599,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         });
 
-        const nurseSpecializations = {
+        const nurseSpecialization = {
             "Anesthesiology & Pain Management": ["Anesthesia Nurse", "Pain Management Nurse"],
             "Cardiology (Heart & Vascular System)": ["Cardiac Nurse", "CCU Nurse"],
             "Dermatology (Skin, Hair, & Nails)": ["Dermatology Nurse", "Aesthetic Nurse"],

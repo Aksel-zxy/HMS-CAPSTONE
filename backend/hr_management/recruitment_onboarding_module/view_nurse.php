@@ -455,7 +455,7 @@ if (isset($uploadedDocs[$docType])) {
 
                     <label>License Type:</label>
                     <select id="license_type" name="license_type">
-                        <option value="General Physician" <?= ($employee['license_type'] ?? '') == 'General Physician' ? 'selected' : '' ?>>General Physician</option>
+                        <option value="Registered Nurse" <?= ($employee['license_type'] ?? '') == 'Registered Nurse' ? 'selected' : '' ?>>Registered Nurse</option>
                     </select>
 
                     <label>License Number:</label>
