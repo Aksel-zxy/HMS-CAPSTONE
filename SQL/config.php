@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Manila');
 if (!defined("BASE_URL")) {
     define("BASE_URL", "/hms-capstone/");
 }
