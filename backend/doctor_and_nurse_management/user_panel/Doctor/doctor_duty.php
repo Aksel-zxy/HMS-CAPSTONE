@@ -126,7 +126,8 @@ class Duty
             r.result AS lab_result,
             r.status AS lab_status,
             r.remarks AS lab_remarks,
-            r.received_by AS lab_received_by
+            r.received_by AS lab_received_by,
+            r.scheduleID
         FROM duty_assignments d
         INNER JOIN p_appointments a ON d.appointment_id = a.appointment_id
         INNER JOIN patientinfo pat ON a.patient_id = pat.patient_id
@@ -1017,7 +1018,8 @@ if (class_exists('Prescription')) {
                                                         </form>
                                                     <?php else: ?>
                                                         <button class="btn btn-success btn-sm view-result-btn"
-                                                            data-appointmentid="<?= htmlspecialchars($duty['appointment_id']) ?>">
+                                                            data-scheduleid="<?= htmlspecialchars($duty['scheduleID'] ?? '') ?>"
+                                                            data-testtype="<?= htmlspecialchars($duty['lab_result'] ?? '') ?>">
                                                             View Result
                                                         </button>
 
@@ -1318,17 +1320,19 @@ if (class_exists('Prescription')) {
         });
         document.querySelectorAll(".view-result-btn").forEach(button => {
             button.addEventListener("click", function() {
-                const appointmentID = this.dataset.appointmentid;
-                if (!appointmentID) return alert("❌ Missing appointment ID.");
+                const scheduleID = this.dataset.scheduleid;
+                const testType = this.dataset.testtype;
+
+                if (!scheduleID || !testType) return alert("❌ Missing Schedule ID or Test Type.");
 
                 const modalEl = document.getElementById("resultModal");
                 const modal = new bootstrap.Modal(modalEl);
-                document.getElementById("modalTitle").innerText = `Appointment Results #${appointmentID}`;
+                document.getElementById("modalTitle").innerText = `Laboratory Result #${scheduleID}`;
                 document.getElementById("resultContent").innerHTML =
                     "<p class='text-center text-muted'>Loading results...</p>";
                 modal.show();
 
-                fetch(`get_result.php?appointmentID=${appointmentID}`)
+                fetch(`get_result.php?scheduleID=${scheduleID}&testType=${encodeURIComponent(testType)}`)
                     .then(res => res.text())
                     .then(data => {
                         document.getElementById("resultContent").innerHTML = data;
