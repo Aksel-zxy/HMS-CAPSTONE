@@ -364,7 +364,7 @@ if (isset($uploadedDocs[$docType])) {
                     <select id="role" name="role" required>
                         <?php 
                         $roles = [
-                            'Resident Doctor','Chief Resident','Attending Physician/Consultant',
+                            'Non-Resident Doctor','Resident Doctor','Chief Resident','Attending Physician/Consultant',
                             'Department Chairperson/Head of Department','Hospital Director/Chief Medical Officer'
                         ];
                         foreach ($roles as $role) : ?>
