@@ -7,7 +7,9 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 if (isset($_POST['action']) && $_POST['action'] === 'ai_suggest') {
-    ob_clean();
+    if (ob_get_length() > 0) {
+        ob_clean();
+    }
     header('Content-Type: application/json');
 
     try {
@@ -69,7 +71,7 @@ if (isset($_POST['action']) && $_POST['action'] === 'ai_suggest') {
                         'recommended_time' => $time,
                         'message' => 'Optimal slot found.'
                     ];
-                    break 2; 
+                    break 2;
                 }
             }
         }

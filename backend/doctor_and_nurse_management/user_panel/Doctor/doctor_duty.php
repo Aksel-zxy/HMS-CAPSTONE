@@ -848,7 +848,7 @@ if (class_exists('Prescription')) {
                                             <label class="form-label">Purpose</label>
                                             <select name="procedure" class="form-select form-select-sm" required>
                                                 <?php
-                                                $purposes = ["Consultation", "Ob-gyn", "Pediatric", "Psychiatric", "Cardiology", "Laboratory"];
+                                                $purposes = ["Consultation", "Ob-gyn", "Pediatric", "Psychiatric", "Cardiology", "Laboratory", "General Checkup"];
                                                 foreach ($purposes as $purpose):
                                                     $selected = (strcasecmp($purpose, $appointment['purpose']) == 0) ? 'selected' : '';
                                                 ?>
