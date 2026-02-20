@@ -23,26 +23,23 @@ public function callEmr($patient_id) {
 
 public function callBalance($patient_id) {
     $stmt = $this->conn->prepare("
-                SELECT 
-                p.patient_id,
-                CONCAT(p.fname, ' ', IFNULL(p.mname, ''), ' ', p.lname) AS full_name,
-                ds.serviceID,
-                ds.serviceName,
-                ds.price
-            FROM patientinfo p
-            INNER JOIN dl_results dr 
-                ON p.patient_id = dr.patientID
-            CROSS JOIN dl_services ds
-            WHERE dr.status = 'Completed'
-            AND p.patient_id = ?   -- 👈 change this to any patientID you want
-            AND p.patient_id NOT IN (
-                SELECT DISTINCT patient_id 
-                FROM billing_items 
-                WHERE finalized = 1
-            )
-            ORDER BY ds.serviceName ASC;
-
-    ");
+               SELECT 
+    bi.quantity,
+    bi.unit_price,
+    bi.total_price,
+    br.payment_status,
+    ds.serviceName,
+    ds.description,
+    pi.patient_id
+FROM billing_items bi
+LEFT JOIN billing_records br 
+    ON bi.billing_id = br.billing_id
+LEFT JOIN patientinfo pi
+    ON br.patient_id = pi.patient_id
+LEFT JOIN dl_services ds 
+    ON bi.service_id = ds.serviceID
+WHERE pi.patient_id = ?
+  AND br.payment_status = 'Pending';");
     
     // ✅ Keep bind_param now
     $stmt->bind_param("i", $patient_id);
