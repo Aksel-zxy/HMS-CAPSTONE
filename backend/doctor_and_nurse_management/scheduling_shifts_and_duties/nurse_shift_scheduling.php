@@ -414,13 +414,13 @@ if (isset($_GET['view_sched_id'])) {
                             <tbody>
                                 <?php foreach ($nurses as $nurse): ?>
                                     <tr>
-                                        <td><?= htmlspecialchars($nurse['employee_id']) ?></td>
-                                        <td><?= htmlspecialchars($nurse['first_name']) ?></td>
-                                        <td><?= htmlspecialchars($nurse['middle_name']) ?></td>
-                                        <td><?= htmlspecialchars($nurse['last_name']) ?></td>
-                                        <td><?= htmlspecialchars($nurse['role']) ?></td>
-                                        <td><?= htmlspecialchars($nurse['profession']) ?></td>
-                                        <td><?= htmlspecialchars($nurse['department']) ?></td>
+                                        <td><?= htmlspecialchars($doc['employee_id']?? '') ?></td>
+                                        <td><?= htmlspecialchars($doc['first_name']?? '') ?></td>
+                                        <td><?= htmlspecialchars($doc['middle_name']?? '') ?></td>
+                                        <td><?= htmlspecialchars($doc['last_name']?? '') ?></td>
+                                        <td><?= htmlspecialchars($doc['role']?? '') ?></td>
+                                        <td><?= htmlspecialchars($doc['profession']?? '') ?></td>
+                                        <td><?= htmlspecialchars($doc['department']?? '') ?></td>
                                         <td>
                                             <form method="get" style="display:inline;">
                                                 <input type="hidden" name="view_sched_id" value="<?= htmlspecialchars($nurse['employee_id']) ?>">
