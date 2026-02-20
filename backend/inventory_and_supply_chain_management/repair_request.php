@@ -1,8 +1,32 @@
 <?php
+session_start();
 include '../../SQL/config.php';
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// 🔐 Ensure login
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../../login.php");
+    exit();
 }
+
+$user_id = $_SESSION['user_id'];
+
+// 👤 Fetch logged-in user info
+$user_stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ? LIMIT 1");
+$user_stmt->execute([$user_id]);
+$user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+// Build display name (adjust field names to match your users table)
+$logged_user_name = trim(
+    ($user['first_name'] ?? '') . ' ' .
+    ($user['last_name']  ?? '')
+);
+if (empty($logged_user_name)) {
+    $logged_user_name = $user['username'] ?? $user['name'] ?? 'Unknown User';
+}
+$logged_user_dept = $user['department'] ?? '';
 
 // ===============================
 // Auto-generate ticket number
@@ -24,8 +48,8 @@ $active_tab  = 'tickets'; // default tab
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
     $active_tab = 'new'; // stay on form tab on error, switch to tickets on success
-    $user_id   = intval($_POST['user_id']   ?? 0);
-    $user_name = trim($_POST['user_name']   ?? '');
+    // Use logged-in user data from session (not editable by user)
+    $user_name = $logged_user_name;
     $equipment = trim($_POST['equipment']   ?? '');
     $issue     = trim($_POST['issue']       ?? '');
     $location  = trim($_POST['location']    ?? '');
@@ -657,6 +681,70 @@ $departments = [
             font-weight: 500;
         }
 
+        /* ── REQUESTOR DISPLAY CARD ── */
+        .requestor-display {
+            display: flex;
+            align-items: center;
+            gap: .9rem;
+            background: linear-gradient(135deg, #f0f6ff, #e8f0ff);
+            border: 1.5px solid #c5d8ff;
+            border-radius: 12px;
+            padding: .75rem 1.1rem;
+        }
+        .requestor-avatar {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--accent), #1a6fd4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #fff;
+            flex-shrink: 0;
+            box-shadow: 0 3px 10px rgba(45,139,255,.35);
+        }
+        .requestor-name {
+            font-size: .95rem;
+            font-weight: 700;
+            color: var(--navy);
+            line-height: 1.2;
+        }
+        .requestor-meta {
+            font-size: .75rem;
+            color: var(--muted);
+            margin-top: 3px;
+            font-weight: 500;
+        }
+
+        /* ── LOGGED-IN USER BANNER (hero) ── */
+        .user-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.2);
+            border-radius: 999px;
+            padding: 5px 14px 5px 6px;
+            font-size: .8rem;
+            color: rgba(255,255,255,.9);
+            font-weight: 600;
+        }
+        .user-pill-avatar {
+            width: 26px;
+            height: 26px;
+            background: linear-gradient(135deg, var(--accent), #1a6fd4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .72rem;
+            font-weight: 800;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
         @media (max-width: 768px) {
             .page-wrap { padding: 0 1rem 2rem; }
             .stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -683,6 +771,15 @@ $departments = [
             </div>
             <div class="d-flex flex-column align-items-end gap-2">
                 <span class="hero-badge"><i class="bi bi-circle-fill text-success" style="font-size:.5rem"></i>&nbsp;System Online</span>
+                <span class="hero-badge" style="background:rgba(255,255,255,.15); border-color:rgba(255,255,255,.25); gap:.6rem; padding:6px 14px 6px 8px;">
+                    <span style="width:28px;height:28px;background:linear-gradient(135deg,#2d8bff,#1a6fd4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#fff;flex-shrink:0;">
+                        <?= strtoupper(substr($logged_user_name, 0, 1)) ?>
+                    </span>
+                    <span style="display:flex;flex-direction:column;line-height:1.25;">
+                        <span style="font-size:.7rem;opacity:.65;font-weight:500;letter-spacing:.3px;">Logged in as</span>
+                        <span style="font-size:.82rem;font-weight:700;color:#fff;"><?= htmlspecialchars($logged_user_name) ?></span>
+                    </span>
+                </span>
                 <span class="hero-badge"><i class="bi bi-calendar3"></i>&nbsp;<?= date('F d, Y') ?></span>
             </div>
         </div>
@@ -769,26 +866,42 @@ $departments = [
             <div class="tab-body">
                 <form method="POST" action="" id="repairForm" novalidate>
                     <input type="hidden" name="submit_request" value="1">
-                    <input type="hidden" name="user_id" value="<?= $_SESSION['user_id'] ?? 0 ?>">
-
                     <!-- Section: Requestor Info -->
                     <div class="form-section-title">
                         <i class="bi bi-person-badge"></i> Requestor Information
                     </div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label"><i class="bi bi-person me-1"></i>Requestor Name <span class="text-danger">*</span></label>
-                            <input type="text" name="user_name" class="form-control"
-                                   placeholder="e.g. Juan dela Cruz" required
-                                   value="<?= htmlspecialchars($_POST['user_name'] ?? '') ?>">
+                            <label class="form-label"><i class="bi bi-person me-1"></i>Requestor Name</label>
+                            <div class="requestor-display">
+                                <div class="requestor-avatar">
+                                    <?= strtoupper(substr($logged_user_name, 0, 1)) ?>
+                                </div>
+                                <div>
+                                    <div class="requestor-name"><?= htmlspecialchars($logged_user_name) ?></div>
+                                    <div class="requestor-meta">
+                                        <i class="bi bi-person-badge me-1"></i>User ID: <?= $user_id ?>
+                                        <?php if (!empty($user['role'])): ?>
+                                            &nbsp;·&nbsp;<i class="bi bi-shield me-1"></i><?= htmlspecialchars($user['role']) ?>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Hidden — submitted as the logged-in user -->
+                            <input type="hidden" name="user_id"   value="<?= $user_id ?>">
+                            <input type="hidden" name="user_name" value="<?= htmlspecialchars($logged_user_name) ?>">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label"><i class="bi bi-building me-1"></i>Department / Location <span class="text-danger">*</span></label>
                             <select name="location" class="form-select" required>
-                                <option value="" disabled selected>— Select Department —</option>
+                                <option value="" disabled <?= empty($_POST['location']) && empty($logged_user_dept) ? 'selected' : '' ?>>— Select Department —</option>
                                 <?php foreach ($departments as $dept): ?>
-                                    <option value="<?= htmlspecialchars($dept) ?>"
-                                        <?= (($_POST['location'] ?? '') === $dept) ? 'selected' : '' ?>>
+                                    <?php
+                                        $sel = '';
+                                        if (!empty($_POST['location']) && $_POST['location'] === $dept) $sel = 'selected';
+                                        elseif (empty($_POST['location']) && $logged_user_dept === $dept) $sel = 'selected';
+                                    ?>
+                                    <option value="<?= htmlspecialchars($dept) ?>" <?= $sel ?>>
                                         <?= htmlspecialchars($dept) ?>
                                     </option>
                                 <?php endforeach; ?>
