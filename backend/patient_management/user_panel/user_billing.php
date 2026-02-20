@@ -29,7 +29,7 @@ $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 
 if (!$user) {
-    echo "No user found.";
+    echo "No user found."; 
     exit();
 }
 
@@ -177,34 +177,44 @@ try {
 
 
                 <!-- Appointment Table -->
-                <table class="table table-hover align-middle overflow-x-auto">
-                    <thead>
+                <!-- Dynamic Balance Section -->
+                <?php if (!empty($balance) && is_array($balance)): ?>
+
+                <h5 class="text-primary mt-3">Services</h5>
+
+                <table class="table table-sm">
+                    <thead class="table-light">
                         <tr>
-                            <th class="text-center">Service Name</th>
-                            <th class="text-center">Price (₱)</th>
-                            <th class="text-center">Status</th>
+                            <th>Service Name</th>
+                            <th>Qty</th>
+                            <th>Unit Price (₱)</th>
+                            <th>Total (₱)</th>
                         </tr>
                     </thead>
-
                     <tbody>
                         <?php 
-                        if (!empty($balance) && is_array($balance)) {
-                            foreach ($balance as $row) {
-                                echo "<tr>
-                                    <td class='text-center'>" . htmlspecialchars($row['serviceName']) . "</td>
-                                    <td class='text-center'>₱" . number_format($row['price'], 2) . "</td>
-                                    <td class='text-center'>Completed</td>
-                                </tr>";
-                            }
-                        } else {
-                            echo "<tr><td colspan='3' class='text-center'>No services found.</td></tr>";
-                        }
-                        ?>
+            $grandTotal = 0;
+            foreach ($balance as $row): 
+                $grandTotal += $row['total_price'];
+        ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['serviceName']) ?></td>
+                            <td><?= htmlspecialchars($row['quantity']) ?></td>
+                            <td><?= number_format($row['unit_price'], 2) ?></td>
+                            <td><?= number_format($row['total_price'], 2) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
                     </tbody>
-
-
-
                 </table>
+
+                <hr>
+                <h5 class="text-end">
+                    <strong>Total Balance: ₱<?= number_format($grandTotal, 2) ?></strong>
+                </h5>
+
+                <?php else: ?>
+                <p><strong>Balance:</strong> There's no outstanding balance.</p>
+                <?php endif; ?>
             </div>
             <!-- END CODING HERE -->
         </div>

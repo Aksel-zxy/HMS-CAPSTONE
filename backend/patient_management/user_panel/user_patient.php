@@ -173,21 +173,104 @@ try {
                 <div class="border-bottom border-2 pb-3">
                     <h3>Records</h3>
                 </div>
-                <div class="mt-4 border-3 border-bottom">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p class="fs-6"><strong>Patient ID:</strong>
-                                <?= htmlspecialchars($patient['patient_id']) ?>
-                            </p>
-                            <p class="fs-6"><strong>Name:</strong>
-                                <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
-                            </p>
-                            <p class="fs-6"><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
+                <div class="mt-4 border-3 border-bottom mb-4">
+                    <div class="card  mb-3" style="width: 100%;">
+                        <div class="card-body w-100">
+                            <h5 class="card-title text-primary mb-3">Patient Information</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="fs-6"><strong>Patient ID:</strong>
+                                        <?= htmlspecialchars($patient['patient_id']) ?></p>
+                                    <p class="fs-6"><strong>Name:</strong>
+                                        <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
+                                    </p>
+                                    <p class="fs-6"><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
+                                </div>
+                                <div class="col-md-6 text-md-start text-end">
+                                    <p class="fs-6"><strong>Contact:</strong>
+                                        <?= htmlspecialchars($patient['phone_number']) ?></p>
+                                    <p class="fs-6"><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?>
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6 text-md-start text-end">
-                            <p class="fs-6"><strong>Contact:</strong> <?= htmlspecialchars($patient['phone_number']) ?>
-                            </p>
-                            <p class="fs-6"><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?></p>
+                    </div>
+
+                    <div class="row g-3">
+                        <!-- CBC Card -->
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card shadow h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title text-primary">CBC</h5>
+                                    <p><strong>Test Type:</strong> <?= htmlspecialchars($wtf['cbc_test'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>WBC:</strong> <?= htmlspecialchars($wtf['wbc'] ?? 'N/A') ?></p>
+                                    <p><strong>RBC:</strong> <?= htmlspecialchars($wtf['rbc'] ?? 'N/A') ?></p>
+                                    <p><strong>Hemoglobin:</strong> <?= htmlspecialchars($wtf['hemoglobin'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Platelets:</strong> <?= htmlspecialchars($wtf['platelets'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['cbc_remarks'] ?? 'N/A') ?>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CT Scan Card -->
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card shadow h-100">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title text-primary">CT Scan</h5>
+                                    <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['ct_findings'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Impression:</strong>
+                                        <?= htmlspecialchars($wtf['ct_impression'] ?? 'N/A') ?></p>
+                                    <?php if (!empty($wtf['ct_image'])): ?>
+                                    <img src="data:image/jpeg;base64,<?= base64_encode($wtf['ct_image']); ?>"
+                                        class="img-fluid mt-2" />
+                                    <?php else: ?>
+                                    <p class="text-muted"><em>No CT image</em></p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- MRI Card -->
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card shadow h-100">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title text-primary">MRI</h5>
+                                    <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['mri_findings'] ?? 'N/A') ?>
+                                    </p>
+                                    <p><strong>Impression:</strong>
+                                        <?= htmlspecialchars($wtf['mri_impression'] ?? 'N/A') ?></p>
+                                    <?php if (!empty($wtf['mri_image'])): ?>
+                                    <img src="data:image/jpeg;base64,<?= base64_encode($wtf['mri_image']); ?>"
+                                        class="img-fluid mt-2" />
+                                    <?php else: ?>
+                                    <p class="text-muted"><em>No MRI image</em></p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- X-Ray Card -->
+                        <div class="col-md-3 col-sm-6">
+                            <div class="card shadow h-100">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title text-primary">X-Ray</h5>
+                                    <p><strong>Findings:</strong>
+                                        <?= htmlspecialchars($wtf['xray_findings'] ?? 'N/A') ?></p>
+                                    <p><strong>Impression:</strong>
+                                        <?= htmlspecialchars($wtf['xray_impression'] ?? 'N/A') ?></p>
+                                    <?php if (!empty($wtf['xray_image'])): ?>
+                                    <a href="view_image.php?type=xray&patient_id=<?= $wtf['patient_id'] ?>"
+                                        class="btn btn-secondary btn-sm mt-2" target="_blank">View X-Ray Image</a>
+                                    <?php else: ?>
+                                    <p class="text-muted"><em>No X-Ray image</em></p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -203,7 +286,6 @@ try {
                             <tr style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left;">
                                 <th style="padding:12px; text-align:center;">Date</th>
                                 <th style="padding:12px; text-align:center;">Diagnosis</th>
-
                                 <th style="padding:12px; text-align:center;">Notes</th>
                                 <th style="padding:12px; text-align:center;"></th>
 
