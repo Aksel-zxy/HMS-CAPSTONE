@@ -168,8 +168,6 @@ $departments = $dept_stmt->fetchAll(PDO::FETCH_COLUMN);
             color: var(--text);
             min-height: 100vh;
         }
-        .main-sidebar { z-index: 100; }
-
         /* ── PAGE WRAPPER ── */
         .page-wrap {
             padding: 0 2rem 3rem 2rem;
@@ -738,10 +736,6 @@ $departments = $dept_stmt->fetchAll(PDO::FETCH_COLUMN);
     </style>
 </head>
 <body>
-
-<div class="main-sidebar">
-    <?php include 'inventory_sidebar.php'; ?>
-</div>
 
 <div class="page-wrap">
 

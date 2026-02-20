@@ -168,8 +168,6 @@ $departments = $dept_stmt->fetchAll(PDO::FETCH_COLUMN);
             color: var(--text);
             min-height: 100vh;
         }
-        .main-sidebar { z-index: 100; }
-
         /* ── PAGE WRAPPER ── */
         .page-wrap {
             padding: 0 2rem 3rem 2rem;
@@ -739,12 +737,14 @@ $departments = $dept_stmt->fetchAll(PDO::FETCH_COLUMN);
 </head>
 <body>
 
-<div class="main-sidebar">
-    <?php include 'inventory_sidebar.php'; ?>
-</div>
-
 <div class="page-wrap">
-
+<div class="container">
+    <div class="d-flex align-items-center mb-3 mt-4">
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+</div>
+</div>
     <!-- ── HERO ── -->
     <div class="page-hero">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
@@ -825,7 +825,6 @@ $departments = $dept_stmt->fetchAll(PDO::FETCH_COLUMN);
          TAB CONTAINER
     ══════════════════════════ -->
     <div class="tab-container">
-
         <!-- Tab Navigation -->
         <div class="tab-nav">
             <button class="tab-btn <?= $active_tab === 'new' ? 'active' : '' ?>"

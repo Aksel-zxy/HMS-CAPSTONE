@@ -60,7 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_schedule'])) {
         $end   = ($status === 'On Duty') ? ($_POST[$d . '_end'] ?: null) : null;
         $room  = ($status === 'On Duty' && !empty($_POST[$d . '_room_id'])) ? (int)$_POST[$d . '_room_id'] : null;
 
-        // ... (Your Resident Validation logic here) ...
+        // ... (Resident Validation logic here) ...
 
         array_push($bind_values, $start, $end, $status, $room);
     }
