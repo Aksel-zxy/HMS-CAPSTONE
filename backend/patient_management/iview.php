@@ -117,10 +117,10 @@ logAction($conn, $user_id, 'VIEW_PATIENT', $patient_id);
                         <p><strong>Impression:</strong> <?= htmlspecialchars($wtf['ct_impression'] ?? 'N/A') ?></p>
                         <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['ct_remarks'] ?? 'N/A') ?></p>
                         <?php if (!empty($wtf['ct_image'])): ?>
-                        <img src="data:image/jpeg;base64,<?= base64_encode($wtf['ct_image']); ?>"
-                            class="img-fluid mt-2" />
+                        <a href="../view_image.php?type=ct&patient_id=<?= $wtf['patient_id'] ?>"
+                            class="btn btn-secondary btn-sm mt-2" target="_blank">View CT Scan Image</a>
                         <?php else: ?>
-                        <p class="text-muted"><em>No CT image available</em></p>
+                        <p class="text-muted"><em>No CT Scan image</em></p>
                         <?php endif; ?>
 
                         <hr>
@@ -129,10 +129,10 @@ logAction($conn, $user_id, 'VIEW_PATIENT', $patient_id);
                         <p><strong>Impression:</strong> <?= htmlspecialchars($wtf['mri_impression'] ?? 'N/A') ?></p>
                         <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['mri_remarks'] ?? 'N/A') ?></p>
                         <?php if (!empty($wtf['mri_image'])): ?>
-                        <img src="data:image/jpeg;base64,<?= base64_encode($wtf['mri_image']); ?>"
-                            class="img-fluid mt-2" />
+                        <a href="../view_image.php?type=mri&patient_id=<?= $wtf['patient_id'] ?>"
+                            class="btn btn-secondary btn-sm mt-2" target="_blank">View MRI Image</a>
                         <?php else: ?>
-                        <p class="text-muted"><em>No MRI image available</em></p>
+                        <p class="text-muted"><em>No MRI image</em></p>
                         <?php endif; ?>
 
                         <hr>

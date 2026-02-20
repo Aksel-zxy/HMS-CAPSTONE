@@ -44,7 +44,7 @@ try {
     $patients = $patientObj->getPatientsById($patient_id);
 
     $history = $callerObj->callHistory($patient_id);
-    
+    $wtf = $callerObj->getResults($patient_id);
 
 
     $prescriptions = $callerObj->callPrescription($patient_id);
@@ -223,13 +223,11 @@ try {
                                     <h5 class="card-title text-primary">CT Scan</h5>
                                     <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['ct_findings'] ?? 'N/A') ?>
                                     </p>
-                                    <p><strong>Impression:</strong>
-                                        <?= htmlspecialchars($wtf['ct_impression'] ?? 'N/A') ?></p>
                                     <?php if (!empty($wtf['ct_image'])): ?>
-                                    <img src="data:image/jpeg;base64,<?= base64_encode($wtf['ct_image']); ?>"
-                                        class="img-fluid mt-2" />
+                                    <a href="../view_image.php?type=ct&patient_id=<?= $wtf['patient_id'] ?>"
+                                        class="btn btn-secondary btn-sm mt-2" target="_blank">View CT Scan Image</a>
                                     <?php else: ?>
-                                    <p class="text-muted"><em>No CT image</em></p>
+                                    <p class="text-muted"><em>No CT Scan image</em></p>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -245,8 +243,8 @@ try {
                                     <p><strong>Impression:</strong>
                                         <?= htmlspecialchars($wtf['mri_impression'] ?? 'N/A') ?></p>
                                     <?php if (!empty($wtf['mri_image'])): ?>
-                                    <img src="data:image/jpeg;base64,<?= base64_encode($wtf['mri_image']); ?>"
-                                        class="img-fluid mt-2" />
+                                    <a href="../view_image.php?type=mri&patient_id=<?= $wtf['patient_id'] ?>"
+                                        class="btn btn-secondary btn-sm mt-2" target="_blank">View MRI Image</a>
                                     <?php else: ?>
                                     <p class="text-muted"><em>No MRI image</em></p>
                                     <?php endif; ?>
@@ -264,7 +262,7 @@ try {
                                     <p><strong>Impression:</strong>
                                         <?= htmlspecialchars($wtf['xray_impression'] ?? 'N/A') ?></p>
                                     <?php if (!empty($wtf['xray_image'])): ?>
-                                    <a href="view_image.php?type=xray&patient_id=<?= $wtf['patient_id'] ?>"
+                                    <a href="../view_image.php?type=xray&patient_id=<?= $wtf['patient_id'] ?>"
                                         class="btn btn-secondary btn-sm mt-2" target="_blank">View X-Ray Image</a>
                                     <?php else: ?>
                                     <p class="text-muted"><em>No X-Ray image</em></p>
