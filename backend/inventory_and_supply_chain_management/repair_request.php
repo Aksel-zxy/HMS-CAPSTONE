@@ -740,7 +740,7 @@ $departments = $dept_stmt->fetchAll(PDO::FETCH_COLUMN);
 <body>
 
 <div class="main-sidebar">
-    <?php include 'billing_sidebar.php'; ?>
+    <?php include 'inventory_sidebar.php'; ?>
 </div>
 
 <div class="page-wrap">
