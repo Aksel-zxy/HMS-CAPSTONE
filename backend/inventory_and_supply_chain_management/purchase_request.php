@@ -7,7 +7,6 @@ ini_set('display_errors', 1);
 
 // 🔐 Ensure login
 if (!isset($_SESSION['user_id'])) {
-    // For AJAX requests return JSON, for normal requests redirect
     if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
         header('Content-Type: application/json');
         http_response_code(401);
@@ -21,14 +20,12 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = (int)$_SESSION['user_id'];
 
 /* =====================================================
-   🔁 AJAX — Fetch Request Items (replaces fetch_request_items.php)
-   Called by JS: fetch('purchase_request.php?ajax=items&id=X')
+   🔁 AJAX — Fetch Request Items
 =====================================================*/
 if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
     header('Content-Type: application/json');
 
     $request_id = (int)($_GET['id'] ?? 0);
-
     if ($request_id <= 0) {
         http_response_code(400);
         echo json_encode(['error' => 'Invalid request ID']);
@@ -36,21 +33,13 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
     }
 
     try {
-        // Security: confirm the request belongs to this user
-        $check = $pdo->prepare("
-            SELECT id FROM department_request
-            WHERE id = ? AND user_id = ?
-            LIMIT 1
-        ");
+        $check = $pdo->prepare("SELECT id FROM department_request WHERE id = ? AND user_id = ? LIMIT 1");
         $check->execute([$request_id, $user_id]);
-
         if (!$check->fetch()) {
             http_response_code(403);
             echo json_encode(['error' => 'Access denied — this request does not belong to you.']);
             exit();
         }
-
-        // Fetch items
         $stmt = $pdo->prepare("
             SELECT item_name, description, unit, quantity, pcs_per_box, total_pcs
             FROM department_request_items
@@ -58,24 +47,20 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
             ORDER BY id ASC
         ");
         $stmt->execute([$request_id]);
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-        echo json_encode($items);
-
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
     }
-    exit(); // ← stop here; do NOT render HTML
+    exit();
 }
 
 /* =====================================================
-   👤 Fetch user info (only needed for normal page load)
+   👤 Fetch user info
 =====================================================*/
 $user_stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ? LIMIT 1");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
-
 if (!$user) die("User not found.");
 
 $full_name     = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
@@ -89,54 +74,27 @@ $request_date  = date('F d, Y');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
-
         $items       = $_POST['items'] ?? [];
         $valid_items = array_filter($items, fn($i) => !empty(trim($i['name'] ?? '')));
-
-        if (count($valid_items) === 0) {
-            throw new Exception("Please add at least one item before submitting.");
-        }
-
+        if (count($valid_items) === 0) throw new Exception("Please add at least one item before submitting.");
         $stmt = $pdo->prepare("
-            INSERT INTO department_request
-            (user_id, department, department_id, month, total_items, status)
+            INSERT INTO department_request (user_id, department, department_id, month, total_items, status)
             VALUES (?, ?, ?, ?, ?, 'Pending')
         ");
-        $stmt->execute([
-            $user_id,
-            $department,
-            $department_id,
-            date('Y-m-d'),
-            count($valid_items)
-        ]);
-
+        $stmt->execute([$user_id, $department, $department_id, date('Y-m-d'), count($valid_items)]);
         $request_id = $pdo->lastInsertId();
-
         $item_stmt = $pdo->prepare("
-            INSERT INTO department_request_items
-            (request_id, item_name, description, unit, quantity, pcs_per_box, total_pcs)
+            INSERT INTO department_request_items (request_id, item_name, description, unit, quantity, pcs_per_box, total_pcs)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
-
         foreach ($valid_items as $item) {
             $quantity  = (int)($item['quantity']    ?? 0);
             $pcs_box   = (int)($item['pcs_per_box'] ?? 1);
             $total_pcs = (int)($item['total_pcs']   ?? 0);
-
-            $item_stmt->execute([
-                $request_id,
-                $item['name'],
-                $item['description'] ?? '',
-                $item['unit']        ?? '',
-                $quantity,
-                $pcs_box,
-                $total_pcs
-            ]);
+            $item_stmt->execute([$request_id, $item['name'], $item['description'] ?? '', $item['unit'] ?? '', $quantity, $pcs_box, $total_pcs]);
         }
-
         $pdo->commit();
         $success = "Purchase request successfully submitted!";
-
     } catch (Exception $e) {
         $pdo->rollBack();
         $error = $e->getMessage();
@@ -146,11 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 /* =====================================================
    🔎 FETCH USER REQUESTS
 =====================================================*/
-$request_stmt = $pdo->prepare("
-    SELECT * FROM department_request
-    WHERE user_id = ?
-    ORDER BY created_at DESC
-");
+$request_stmt = $pdo->prepare("SELECT * FROM department_request WHERE user_id = ? ORDER BY created_at DESC");
 $request_stmt->execute([$user_id]);
 $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -159,32 +113,31 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Purchase Request — HMS Capstone</title>
+    <title>Purchase Request — HMS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         /* ═══════════════════════════════════════════
-           DESIGN TOKENS
+           DESIGN TOKENS — aligned with inventory_sidebar.php
         ═══════════════════════════════════════════ */
         :root {
-            --sidebar-w:     250px;   /* billing_sidebar.php default */
-            --sidebar-w-sm:  200px;   /* billing_sidebar.php ≤768px  */
-            --topbar-h:      56px;    /* billing_sidebar.php toggle  */
-            --accent:        #00acc1;
-            --navy:          #0b1d3a;
-            --surface:       #F5F6F7; /* matches billing_sidebar body */
-            --card:          #ffffff;
-            --border:        #e0e6f0;
-            --text:          #374151;
-            --muted:         #6e768e;
-            --radius:        12px;
-            --shadow:        0 2px 16px rgba(11,29,58,.08);
-            --shadow-md:     0 4px 24px rgba(11,29,58,.12);
+            /* Sidebar widths matching inventory_sidebar.php exactly */
+            --sidebar-w:    250px;  /* default */
+            --sidebar-w-md: 200px;  /* ≤ 768px */
+            --sidebar-w-xs: 0px;    /* ≤ 480px (overlay / hidden) */
+
+            --accent:    #00acc1;
+            --navy:      #0b1d3a;
+            --surface:   #F5F6F7;
+            --card:      #ffffff;
+            --border:    #e0e6f0;
+            --text:      #374151;
+            --muted:     #6e768e;
+            --radius:    12px;
+            --shadow:    0 2px 16px rgba(11,29,58,.08);
+            --shadow-md: 0 4px 24px rgba(11,29,58,.12);
         }
 
-        /* ═══════════════════════════════════════════
-           BASE
-        ═══════════════════════════════════════════ */
         *, *::before, *::after { box-sizing: border-box; }
         html { scroll-behavior: smooth; }
 
@@ -193,7 +146,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             background: var(--surface);
             color: var(--text);
             margin: 0;
-            /* Push right to clear the fixed sidebar from billing_sidebar.php */
+            /* Default: push right of 250px sidebar */
             margin-left: var(--sidebar-w);
             transition: margin-left 0.3s ease-in-out;
             min-height: 100vh;
@@ -202,10 +155,10 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
 
         /* ═══════════════════════════════════════════
            PAGE WRAPPER
+           top padding clears inventory_sidebar's top-navbar (≈ 60px)
         ═══════════════════════════════════════════ */
         .page-wrap {
-            /* Clear fixed toggle button (~56px) + breathing room */
-            padding: calc(var(--topbar-h) + 16px) 1.75rem 3rem 1.75rem;
+            padding: 70px 1.75rem 3rem 1.75rem;
             max-width: 1400px;
             margin: 0 auto;
         }
@@ -231,7 +184,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             box-shadow: 0 4px 12px rgba(0,172,193,.35);
         }
         .page-header h2 {
-            font-size: clamp(1.2rem, 3vw, 1.6rem);
+            font-size: clamp(1.15rem, 3vw, 1.55rem);
             font-weight: 800;
             color: var(--navy);
             margin: 0;
@@ -260,7 +213,6 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         .alert-success { background: #e6faf5; color: #0d6e52; border-left: 4px solid #00c9a7; }
         .alert-danger  { background: #fff0f3; color: #7a0020; border-left: 4px solid #ff4d6d; }
-        .alert-info    { background: #eef6ff; color: #1a4d8c; border-left: 4px solid var(--accent); }
 
         /* ═══════════════════════════════════════════
            TABS
@@ -274,7 +226,6 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             scrollbar-width: none;
         }
         .nav-tabs::-webkit-scrollbar { display: none; }
-
         .nav-tabs .nav-link {
             border: none;
             border-bottom: 3px solid transparent;
@@ -321,11 +272,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             color: #1a4d8c;
             margin-bottom: 1.5rem;
         }
-        .info-box-item {
-            display: flex;
-            align-items: center;
-            gap: .4rem;
-        }
+        .info-box-item { display: flex; align-items: center; gap: .4rem; }
         .info-box-item strong { font-weight: 700; }
 
         /* ═══════════════════════════════════════════
@@ -366,7 +313,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         .items-table thead th {
             background: var(--navy);
             color: rgba(255,255,255,.8);
-            font-size: .72rem;
+            font-size: .7rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .6px;
@@ -397,9 +344,11 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             transition: all .2s;
             cursor: pointer;
             min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
         }
         .btn-add:hover { background: #d8eeff; }
-
         .btn-submit-pr {
             background: linear-gradient(135deg, var(--accent), #0088a3);
             color: #fff;
@@ -412,13 +361,15 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             transition: transform .2s, box-shadow .2s;
             min-height: 44px;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
         }
         .btn-submit-pr:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 22px rgba(0,172,193,.45);
             color: #fff;
         }
-
         .btn-remove-row {
             background: #fff0f3;
             border: 1.5px solid #ffb3c1;
@@ -452,7 +403,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         .req-table thead th {
             background: var(--navy);
             color: rgba(255,255,255,.8);
-            font-size: .72rem;
+            font-size: .7rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .6px;
@@ -467,7 +418,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         .req-table tbody tr:last-child { border-bottom: none; }
         .req-table tbody td { padding: .8rem 1rem; vertical-align: middle; text-align: center; }
 
-        /* Mobile request card */
+        /* Mobile request cards */
         .req-mobile-list { display: none; }
         .req-mobile-card {
             background: var(--card);
@@ -495,20 +446,14 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             padding: 2px 8px;
             color: var(--navy);
         }
-        .rmc-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: .82rem;
-            margin-bottom: .3rem;
-            gap: .5rem;
-        }
-        .rmc-label { color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; }
-        .rmc-val { font-weight: 600; color: var(--text); }
+        .rmc-row { display: flex; justify-content: space-between; font-size: .82rem; margin-bottom: .3rem; gap: .5rem; }
+        .rmc-label { color: var(--muted); font-weight: 600; font-size: .7rem; text-transform: uppercase; }
+        .rmc-val   { font-weight: 600; color: var(--text); }
 
         /* Status badges */
-        .badge-pending  { background: #fff8e6; color: #a05a00; border: 1.5px solid #ffd700;  border-radius: 999px; padding: 3px 10px; font-size: .73rem; font-weight: 700; }
-        .badge-approved { background: #e6faf5; color: #0d6e52; border: 1.5px solid #5cd6b0;  border-radius: 999px; padding: 3px 10px; font-size: .73rem; font-weight: 700; }
-        .badge-rejected { background: #fff0f3; color: #8b0020; border: 1.5px solid #ff4d6d;  border-radius: 999px; padding: 3px 10px; font-size: .73rem; font-weight: 700; }
+        .badge-pending  { background:#fff8e6; color:#a05a00; border:1.5px solid #ffd700;  border-radius:999px; padding:3px 10px; font-size:.73rem; font-weight:700; white-space:nowrap; }
+        .badge-approved { background:#e6faf5; color:#0d6e52; border:1.5px solid #5cd6b0;  border-radius:999px; padding:3px 10px; font-size:.73rem; font-weight:700; white-space:nowrap; }
+        .badge-rejected { background:#fff0f3; color:#8b0020; border:1.5px solid #ff4d6d;  border-radius:999px; padding:3px 10px; font-size:.73rem; font-weight:700; white-space:nowrap; }
 
         .btn-view {
             background: #eef6ff;
@@ -524,12 +469,8 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         .btn-view:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
         /* Empty state */
-        .empty-state {
-            text-align: center;
-            padding: 3rem 1rem;
-            color: var(--muted);
-        }
-        .empty-state i { font-size: 2.5rem; margin-bottom: .75rem; opacity: .4; }
+        .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+        .empty-state i { font-size: 2.5rem; margin-bottom: .75rem; opacity: .4; display: block; }
 
         /* ═══════════════════════════════════════════
            MODAL
@@ -537,79 +478,89 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
         .modal-header  { background: var(--navy); color: #fff; border-radius: var(--radius) var(--radius) 0 0; padding: 1rem 1.4rem; }
         .modal-header .modal-title { font-weight: 700; font-size: 1rem; }
-        .modal-header .btn-close { filter: invert(1); }
-        .modal-table { font-size: .86rem; }
+        .modal-header .btn-close   { filter: invert(1); }
         .modal-table thead th { background: #f4f8ff; color: var(--navy); font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; }
 
-        /* ═══════════════════════════════════════════
-           SAFE AREA (iPhone notch)
-        ═══════════════════════════════════════════ */
+        /* iPhone safe area */
         @supports (padding: env(safe-area-inset-bottom)) {
             .page-wrap { padding-bottom: calc(3rem + env(safe-area-inset-bottom)); }
         }
 
         /* ═══════════════════════════════════════════
-           RESPONSIVE — TABLET (≤ 991px)
+           RESPONSIVE — TABLET ≤ 991px
+           inventory_sidebar.php still shows at 250px
         ═══════════════════════════════════════════ */
         @media (max-width: 991px) {
-            .page-wrap { padding: calc(var(--topbar-h) + 12px) 1.25rem 2rem 1.25rem; }
+            .page-wrap { padding: 65px 1.25rem 2rem 1.25rem; }
             .pr-card { padding: 1.25rem; }
         }
 
         /* ═══════════════════════════════════════════
-           RESPONSIVE — LARGE MOBILE (≤ 768px)
-           billing_sidebar.php sidebar = 200px at this bp
+           RESPONSIVE — LARGE MOBILE ≤ 768px
+           inventory_sidebar.php sidebar shrinks to 200px
         ═══════════════════════════════════════════ */
         @media (max-width: 768px) {
-            body { margin-left: var(--sidebar-w-sm); }
+            body { margin-left: var(--sidebar-w-md); }  /* 200px */
 
-            .page-wrap { padding: calc(var(--topbar-h) + 10px) 1rem 2rem 1rem; }
+            .page-wrap { padding: 62px 1rem 2rem 1rem; }
             .pr-card { padding: 1rem; }
-            .page-header h2 { font-size: 1.2rem; }
-            .page-header .date-chip { display: none; } /* save space on small screens */
+            .page-header h2 { font-size: 1.15rem; }
+            .page-header .date-chip { display: none; }
 
-            /* Hide desktop req table, show cards */
+            /* Swap table for mobile cards */
             .req-table-desktop { display: none !important; }
             .req-mobile-list   { display: block; }
 
-            .btn-submit-pr { width: 100%; }
-            .btn-add       { width: 100%; }
+            /* Buttons full-width */
+            .btn-submit-pr { width: 100%; justify-content: center; }
+            .btn-add       { width: 100%; justify-content: center; }
 
+            /* Stack info box */
             .info-box { flex-direction: column; gap: .5rem; }
+
+            .nav-tabs .nav-link { font-size: .84rem; padding: .65rem .85rem; }
         }
 
         /* ═══════════════════════════════════════════
-           RESPONSIVE — SMALL MOBILE (≤ 479px)
-           Sidebar hidden by default — margin-left 0
+           RESPONSIVE — SMALL MOBILE ≤ 480px
+           inventory_sidebar.php becomes full-width overlay
+           body margin-left must be 0
         ═══════════════════════════════════════════ */
-        @media (max-width: 479px) {
-            body { margin-left: 0; }
-            .page-wrap { padding: 55px .75rem 2rem .75rem; }
-            .nav-tabs .nav-link { font-size: .8rem; padding: .6rem .75rem; }
+        @media (max-width: 480px) {
+            body { margin-left: 0; }  /* sidebar overlays, no margin needed */
+
+            .page-wrap { padding: 58px .75rem 2rem .75rem; }
             .pr-card { padding: .85rem; }
+            .page-header { gap: .5rem; }
+            .page-header-icon { width: 38px; height: 38px; font-size: 1.1rem; border-radius: 10px; }
+            .page-header h2 { font-size: 1.05rem; }
+
+            .nav-tabs .nav-link { font-size: .78rem; padding: .6rem .65rem; }
+
             .items-table { min-width: 580px; font-size: .8rem; }
             .items-table tbody td { padding: .5rem .6rem; }
-            .form-control, .form-select { font-size: .82rem; }
+            .form-control, .form-select { font-size: .82rem; min-height: 36px; }
+
+            .info-box { font-size: .82rem; padding: .75rem 1rem; }
+            .rmc-row { font-size: .79rem; }
         }
     </style>
 </head>
 <body>
 
-<!-- Billing Sidebar -->
-<div class="main-sidebar">
-    <?php include 'inventory_sidebar.php'; ?>
-</div>
+<!-- ── SIDEBAR (inventory_sidebar.php) ── -->
+<?php include 'inventory_sidebar.php'; ?>
 
 <div class="page-wrap">
 
-    <!-- ── PAGE HEADER ── -->
+    <!-- PAGE HEADER -->
     <div class="page-header">
         <div class="page-header-icon"><i class="bi bi-cart3"></i></div>
         <h2>Purchase Requests</h2>
         <span class="date-chip"><i class="bi bi-calendar3 me-1"></i><?= $request_date ?></span>
     </div>
 
-    <!-- ── ALERTS ── -->
+    <!-- ALERTS -->
     <?php if (isset($success)): ?>
         <div class="alert alert-success mb-3" id="successAlert">
             <i class="bi bi-check-circle-fill me-2"></i><?= htmlspecialchars($success) ?>
@@ -620,7 +571,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         </div>
     <?php endif; ?>
 
-    <!-- ── TABS ── -->
+    <!-- TABS -->
     <ul class="nav nav-tabs" role="tablist">
         <li class="nav-item">
             <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#form" role="tab">
@@ -631,7 +582,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             <button class="nav-link" data-bs-toggle="tab" data-bs-target="#my-requests" role="tab">
                 <i class="bi bi-list-check me-1"></i> My Requests
                 <?php if (!empty($my_requests)): ?>
-                    <span style="background:#00acc1;color:#fff;border-radius:999px;font-size:.65rem;padding:2px 7px;font-weight:800;margin-left:4px;">
+                    <span style="background:#00acc1;color:#fff;border-radius:999px;font-size:.63rem;padding:2px 7px;font-weight:800;margin-left:4px;">
                         <?= count($my_requests) ?>
                     </span>
                 <?php endif; ?>
@@ -641,13 +592,11 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <div class="tab-content">
 
-        <!-- ═══════════════════════════════
-             TAB 1 — REQUEST FORM
-        ════════════════════════════════ -->
+        <!-- ═══ TAB 1 — REQUEST FORM ═══ -->
         <div class="tab-pane fade show active" id="form" role="tabpanel">
             <div class="pr-card">
 
-                <!-- Info Box -->
+                <!-- Info box -->
                 <div class="info-box">
                     <div class="info-box-item">
                         <i class="bi bi-building"></i>
@@ -667,7 +616,6 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
 
                 <form method="POST" id="requestForm">
-
                     <!-- Items Table -->
                     <div class="items-table-wrap mb-3">
                         <table class="items-table">
@@ -704,30 +652,27 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Add Row -->
                     <div class="d-flex justify-content-center mb-4">
                         <button type="button" id="addRowBtn" class="btn-add">
-                            <i class="bi bi-plus-circle me-1"></i> Add Item
+                            <i class="bi bi-plus-circle"></i> Add Item
                         </button>
                     </div>
 
                     <!-- Submit -->
                     <div class="d-flex justify-content-center">
                         <button type="submit" class="btn-submit-pr">
-                            <i class="bi bi-send me-2"></i> Submit Request
+                            <i class="bi bi-send"></i> Submit Request
                         </button>
                     </div>
-
                 </form>
             </div>
         </div>
 
-        <!-- ═══════════════════════════════
-             TAB 2 — MY REQUESTS
-        ════════════════════════════════ -->
+        <!-- ═══ TAB 2 — MY REQUESTS ═══ -->
         <div class="tab-pane fade" id="my-requests" role="tabpanel">
             <div class="pr-card">
 
                 <?php if (empty($my_requests)): ?>
                     <div class="empty-state">
-                        <div><i class="bi bi-inbox"></i></div>
+                        <i class="bi bi-inbox"></i>
                         <p style="font-weight:600;">No purchase requests yet.</p>
                         <p style="font-size:.85rem;">Submit your first request using the form tab.</p>
                     </div>
@@ -792,6 +737,10 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <?= $badge ?>
                                 </div>
                                 <div class="rmc-row">
+                                    <span class="rmc-label">Department</span>
+                                    <span class="rmc-val"><?= htmlspecialchars($req['department'] ?? $department) ?></span>
+                                </div>
+                                <div class="rmc-row">
                                     <span class="rmc-label">Total Items</span>
                                     <span class="rmc-val"><?= htmlspecialchars($req['total_items']) ?></span>
                                 </div>
@@ -811,16 +760,13 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
 
                 <?php endif; ?>
-
             </div>
         </div>
 
     </div><!-- end tab-content -->
 </div><!-- end page-wrap -->
 
-<!-- ═══════════════════════════════
-     MODAL — View Items
-════════════════════════════════ -->
+<!-- ═══ MODAL — View Items ═══ -->
 <div class="modal fade" id="viewItemsModal" tabindex="-1" aria-labelledby="viewItemsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
@@ -858,25 +804,34 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
 <script>
 /* ═══════════════════════════════════════════════════════
    SIDEBAR MARGIN SYNC
-   Watches billing_sidebar.php's toggle (#mySidebar .closed)
-   and adjusts body margin-left to match.
+   inventory_sidebar.php uses class="sidebar" (not an id).
+   Watches for class changes triggered by the sidebar's own JS.
 ═══════════════════════════════════════════════════════ */
 (function syncSidebarMargin() {
-    const sidebar   = document.getElementById('mySidebar');
+    // inventory_sidebar.php wraps the nav in a <div class="sidebar">
+    const sidebar = document.querySelector('.sidebar');
     if (!sidebar) return;
 
     function getWidth() {
-        if (window.innerWidth <= 480) return 0;
-        if (window.innerWidth <= 768) return 200;
-        return 250;
+        if (window.innerWidth <= 480) return 0;   // sidebar overlays at this size
+        if (window.innerWidth <= 768) return 200;  // 200px breakpoint
+        return 250;                                 // 250px default
     }
 
     function applyMargin() {
-        document.body.style.marginLeft = sidebar.classList.contains('closed') ? '0px' : getWidth() + 'px';
+        // If inventory_sidebar.php adds a "closed" class on toggle, handle it:
+        const isClosed = sidebar.classList.contains('closed') ||
+                         sidebar.style.display === 'none';
+        document.body.style.marginLeft = (isClosed ? 0 : getWidth()) + 'px';
     }
 
     applyMargin();
-    new MutationObserver(applyMargin).observe(sidebar, { attributes: true, attributeFilter: ['class'] });
+
+    // Watch for sidebar class / style changes (toggle button)
+    new MutationObserver(applyMargin)
+        .observe(sidebar, { attributes: true, attributeFilter: ['class', 'style'] });
+
+    // Recalculate on resize (breakpoint changes)
     window.addEventListener('resize', applyMargin);
 })();
 
@@ -891,14 +846,11 @@ document.getElementById('addRowBtn').addEventListener('click', () => {
     const template = itemBody.querySelector('tr').cloneNode(true);
     template.querySelectorAll('input, select').forEach(el => {
         el.name = el.name.replace(/\[\d+\]/, `[${itemIndex}]`);
-        if (el.type === 'number')   el.value  = el.classList.contains('quantity') ? 1 : 1;
-        if (el.type === 'text')     el.value  = '';
-        if (el.readOnly)            el.value  = el.classList.contains('quantity') ? 1 : 1;
+        if (el.type === 'number') el.value = 1;
+        if (el.type === 'text')   el.value = '';
         if (el.tagName === 'SELECT') el.selectedIndex = 0;
-        // Reset pcs-per-box disabled state
         if (el.classList.contains('pcs-per-box')) el.disabled = true;
     });
-    // Reset total-pcs to 1
     template.querySelector('.total-pcs').value = 1;
     itemBody.appendChild(template);
     itemIndex++;
@@ -915,27 +867,24 @@ itemBody.addEventListener('click', e => {
     }
 });
 
-// Recalculate total pcs on input
+// Recalculate on input
 itemBody.addEventListener('input', e => {
     const row = e.target.closest('tr');
     if (!row) return;
-
-    const unit       = row.querySelector('.unit').value;
-    const qty        = parseFloat(row.querySelector('.quantity').value) || 0;
-    const pcsBox     = row.querySelector('.pcs-per-box');
-    const pcsPerBox  = parseFloat(pcsBox.value) || 1;
-
+    const unit      = row.querySelector('.unit').value;
+    const qty       = parseFloat(row.querySelector('.quantity').value) || 0;
+    const pcsBox    = row.querySelector('.pcs-per-box');
+    const pcsPerBox = parseFloat(pcsBox.value) || 1;
     pcsBox.disabled = (unit !== 'box');
     row.querySelector('.total-pcs').value = unit === 'box' ? qty * pcsPerBox : qty;
 });
 
-// Also handle unit select change specifically
+// Handle unit select change
 itemBody.addEventListener('change', e => {
     if (e.target.classList.contains('unit')) {
-        const row = e.target.closest('tr');
+        const row    = e.target.closest('tr');
         const pcsBox = row.querySelector('.pcs-per-box');
         const qty    = parseFloat(row.querySelector('.quantity').value) || 0;
-
         pcsBox.disabled = (e.target.value !== 'box');
         row.querySelector('.total-pcs').value =
             e.target.value === 'box' ? qty * (parseFloat(pcsBox.value) || 1) : qty;
@@ -945,7 +894,7 @@ itemBody.addEventListener('change', e => {
 /* ═══════════════════════════════════════════════════════
    VIEW ITEMS MODAL — AJAX
 ═══════════════════════════════════════════════════════ */
-const viewModal = new bootstrap.Modal(document.getElementById('viewItemsModal'));
+const viewModal   = new bootstrap.Modal(document.getElementById('viewItemsModal'));
 
 document.addEventListener('click', e => {
     const btn = e.target.closest('.btn-view-items');
@@ -956,65 +905,54 @@ document.addEventListener('click', e => {
     viewModal.show();
 
     fetch('purchase_request.php?ajax=items&id=' + btn.dataset.id)
-        .then(res => {
-            // Capture raw text first so we can show it if JSON parsing fails
-            return res.text().then(text => {
-                try {
-                    const data = JSON.parse(text);
-                    return { ok: res.ok, status: res.status, data };
-                } catch (e) {
-                    // PHP returned an error page / warning instead of JSON
-                    return { ok: false, status: res.status, parseError: true, raw: text };
-                }
-            });
-        })
+        .then(res => res.text().then(text => {
+            try {
+                const data = JSON.parse(text);
+                return { ok: res.ok, status: res.status, data };
+            } catch {
+                return { ok: false, status: res.status, parseError: true, raw: text };
+            }
+        }))
         .then(({ ok, status, data, parseError, raw }) => {
             if (parseError) {
-                // Strip HTML tags from PHP error output for a readable message
                 const plain = raw.replace(/<[^>]*>/g, '').trim().substring(0, 300);
                 modalBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">
-                    <strong>Server returned invalid JSON (HTTP ${status}):</strong><br>
+                    <strong>Server error (HTTP ${status}):</strong><br>
                     <code style="font-size:.78rem;white-space:pre-wrap;">${plain}</code>
                 </td></tr>`;
                 return;
             }
-            // Handle error JSON (e.g. { error: '...' })
             if (!ok || data.error) {
                 modalBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">
-                    ⚠ ${data.error ?? 'Unknown server error (HTTP ' + status + ')'}
+                    ⚠ ${data.error ?? 'Unknown error (HTTP ' + status + ')'}
                 </td></tr>`;
                 return;
             }
             if (!Array.isArray(data) || data.length === 0) {
-                modalBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No items found for this request.</td></tr>';
+                modalBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No items found.</td></tr>';
                 return;
             }
-            let html = '';
-            data.forEach((item, idx) => {
-                const esc = s => String(s ?? '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                html += `
-                    <tr>
-                        <td>${idx + 1}</td>
-                        <td>${esc(item.item_name)}</td>
-                        <td>${esc(item.description)}</td>
-                        <td>${esc(item.unit)}</td>
-                        <td class="text-center">${esc(item.quantity)}</td>
-                        <td class="text-center">${esc(item.pcs_per_box)}</td>
-                        <td class="text-center">${esc(item.total_pcs)}</td>
-                    </tr>`;
-            });
-            modalBody.innerHTML = html;
+            const esc = s => String(s ?? '—').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            modalBody.innerHTML = data.map((item, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${esc(item.item_name)}</td>
+                    <td>${esc(item.description)}</td>
+                    <td>${esc(item.unit)}</td>
+                    <td class="text-center">${esc(item.quantity)}</td>
+                    <td class="text-center">${esc(item.pcs_per_box)}</td>
+                    <td class="text-center">${esc(item.total_pcs)}</td>
+                </tr>`).join('');
         })
         .catch(err => {
             modalBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">
-                ⚠ Network error — could not reach fetch_request_items.php.<br>
-                <code style="font-size:.78rem;">${err.message}</code>
+                ⚠ Network error: <code style="font-size:.78rem;">${err.message}</code>
             </td></tr>`;
         });
 });
 
 /* ═══════════════════════════════════════════════════════
-   AUTO-DISMISS SUCCESS ALERT
+   AUTO-DISMISS SUCCESS ALERT (5 s)
 ═══════════════════════════════════════════════════════ */
 const successAlert = document.getElementById('successAlert');
 if (successAlert) {
