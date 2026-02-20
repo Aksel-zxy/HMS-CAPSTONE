@@ -346,7 +346,7 @@ body {
                 ?></span>
             </div>
             <a href="leave_request.php">Leave Request</a>
-            <a href="payslip.php">Payslip Viewing</a>
+            <a href="payslip_viewing.php">Payslip Viewing</a>
             <a href="../logout.php" class="logout-link"
                onclick="return confirm('Are you sure you want to log out?');">
                Logout
@@ -387,6 +387,7 @@ body {
                 </li>
 
                 <li><a href="repair_request.php">Repair Request</a></li>
+                <li><a href="purchase_request.php">Purchase Request</a></li>
             </ul>
         </div>
     </nav>
