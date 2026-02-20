@@ -5,7 +5,7 @@ include '../../SQL/config.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// 🔐 Ensure login
+
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../../login.php");
     exit();
@@ -13,7 +13,7 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// 👤 Fetch user info
+
 $user_stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ? LIMIT 1");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
@@ -25,7 +25,7 @@ $department = $user['department'] ?? 'Unknown Department';
 $department_id = $user['department_id'] ?? 0;
 $request_date = date('F d, Y');
 
-// 📤 Handle form submission
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $items = $_POST['items'] ?? [];
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// 🔎 Fetch user's requests
+
 $request_stmt = $pdo->prepare("SELECT * FROM department_request WHERE user_id = ? ORDER BY created_at DESC");
 $request_stmt->execute([$user_id]);
 $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -85,7 +85,7 @@ th, td { vertical-align: middle; text-align:center; }
 <div class="container py-5">
     <h2 class="mb-4 fw-bold">📋 Purchase Requests</h2>
 
-    <!-- Tabs -->
+    
     <ul class="nav nav-tabs" id="requestTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="form-tab" data-bs-toggle="tab" data-bs-target="#form" type="button" role="tab">Request Form</button>
@@ -96,7 +96,7 @@ th, td { vertical-align: middle; text-align:center; }
     </ul>
 
     <div class="tab-content mt-3">
-        <!-- Request Form Tab -->
+        
         <div class="tab-pane fade show active" id="form" role="tabpanel">
             <div class="card p-4">
                 <?php if(isset($success)) echo '<div class="alert alert-success">'.$success.'</div>'; ?>
@@ -150,7 +150,7 @@ th, td { vertical-align: middle; text-align:center; }
             </div>
         </div>
 
-        <!-- My Requests Tab -->
+        
         <div class="tab-pane fade" id="my-requests" role="tabpanel">
             <div class="card p-4">
                 <div class="table-responsive">

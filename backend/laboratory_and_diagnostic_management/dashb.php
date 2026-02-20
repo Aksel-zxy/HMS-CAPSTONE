@@ -8,7 +8,7 @@ class Schedule {
         $this->conn = $conn;
     }
 
-    // ✅ Fetch today's schedule list (not completed)
+    
     public function getTodaysSchedules() {
         $today = date('Y-m-d');
         $query = "
@@ -37,7 +37,7 @@ class Schedule {
         return $schedules;
     }
 
-    // ✅ Fetch summary counts for dashboard cards
+    
     public function getDashboardStats() {
         $today = date('Y-m-d');
         $stats = [
@@ -73,7 +73,7 @@ class Schedule {
     }
 }
 
-// for chart
+
 $startOfWeek = date('Y-m-d', strtotime('monday this week'));
 
 $testTypes = [];
@@ -83,7 +83,7 @@ while ($row = $result->fetch_assoc()) {
     $testTypes[] = $row['serviceName'];
 }
 
-// Define fixed colors for each service
+
 $colorMap = [
     'CBC' => '#2a5adf',
     'MRI' => '#198754',
@@ -116,19 +116,19 @@ foreach ($testTypes as $test) {
     $result = $stmt->get_result();
 
     while ($row = $result->fetch_assoc()) {
-        $dayIndex = (int)date('N', strtotime($row['day'])) - 1; // Monday=0
+        $dayIndex = (int)date('N', strtotime($row['day'])) - 1; 
         $counts[$dayIndex] = (int)$row['total'];
     }
     $stmt->close();
 
-    // Use fixed color, or default blue if not in map
+    
     $color = $colorMap[$test] ?? '#0d6efd';
 
     $datasets[] = [
         'label' => $test,
         'data' => array_values($counts),
         'borderColor' => $color,
-        'backgroundColor' => $color . '33', // transparent fill
+        'backgroundColor' => $color . '33', 
         'fill' => true,
         'tension' => 0.4,
         'pointRadius' => 4

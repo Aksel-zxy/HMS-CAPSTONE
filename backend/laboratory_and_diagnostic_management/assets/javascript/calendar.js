@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
   const calendarEl = document.getElementById("scheduleCalendar");
 
-  // Hover box for Month view
+  
   const hoverBox = document.createElement("div");
   Object.assign(hoverBox.style, {
     position: "absolute",
@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   document.body.appendChild(hoverBox);
 
-  // Modal (hidden by default)
+  
   const modal = document.createElement("div");
   modal.innerHTML = `
         <div id="calendarModal" style="
@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.target === modalEl) modalEl.style.display = "none";
   };
 
-  // Date helpers
+  
   function toYMD(d) {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -92,9 +92,9 @@ document.addEventListener("DOMContentLoaded", function () {
     slotEventOverlap: false,
 
     eventContent: function (arg) {
-      // ✅ Show details in week/day view, but not in month
+      
       if (arg.view.type === "dayGridMonth") {
-        return { html: "" }; // hide text in month view
+        return { html: "" }; 
       }
 
       let patient = arg.event.extendedProps.patient || "";
@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function () {
       };
     },
 
-    // ✅ Month cell coloring
+    
     dayCellDidMount: function (info) {
       if (calendar.view.type !== "dayGridMonth") return;
 
@@ -122,7 +122,7 @@ document.addEventListener("DOMContentLoaded", function () {
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data) && data.length) {
-            // ✅ Filter out completed & cancelled (case-insensitive)
+            
             const activeAppointments = data.filter(
               (d) =>
                 d.status &&
@@ -130,16 +130,16 @@ document.addEventListener("DOMContentLoaded", function () {
             );
 
             if (activeAppointments.length > 0) {
-              info.el.style.backgroundColor = "lightgreen"; // has active
+              info.el.style.backgroundColor = "lightgreen"; 
             } else {
-              info.el.style.backgroundColor = ""; // only completed/cancelled → no color
+              info.el.style.backgroundColor = ""; 
             }
           } else {
             info.el.style.backgroundColor = "";
           }
         });
 
-      // Hover tooltip
+      
       info.el.addEventListener("mouseenter", function (e) {
         if (calendar.view.type !== "dayGridMonth") return;
 
@@ -150,7 +150,7 @@ document.addEventListener("DOMContentLoaded", function () {
           .then((data) => {
             let html = `<strong>${dateStr}</strong><br>`;
             if (Array.isArray(data) && data.length) {
-              // ✅ Only show non-completed & non-cancelled
+              
               const activeAppointments = data.filter(
                 (d) =>
                   d.status &&
@@ -181,7 +181,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     },
 
-    // ✅ Modal for week/day view
+    
     dateClick: function (info) {
       if (
         calendar.view.type === "timeGridWeek" ||

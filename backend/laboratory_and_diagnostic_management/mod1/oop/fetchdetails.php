@@ -208,16 +208,16 @@ class SmartScheduler
         $currentDate = date('Y-m-d');
         $currentHour = (int)date('H');
 
-        // Logic for 24-Hour Operation
+        
         if ($target_date === $currentDate) {
-            // Start from the next hour
+            
             $startHour = $currentHour + 1;
         } else {
-            // If it's a future date, start from the beginning of that day (Midnight)
+            
             $startHour = 0;
         }
 
-        // Loop through the 24-hour cycle (0 to 23)
+        
         for ($hour = $startHour; $hour < 24; $hour++) {
             $timeString = sprintf("%02d:00:00", $hour);
 
@@ -234,7 +234,7 @@ class SmartScheduler
             }
 
             if (!empty($availableStaff)) {
-                // Sort by least workload to balance the team
+                
                 usort($availableStaff, function ($a, $b) {
                     return $a['load'] <=> $b['load'];
                 });

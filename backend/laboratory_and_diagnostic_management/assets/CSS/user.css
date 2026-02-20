@@ -97,7 +97,7 @@ a.sidebar-link:hover {
     color: #00acc1
 }
 
-/* ---------- TopBar ---------- */
+
 .topbar {
     width: 100%;
     height: 80px;
@@ -108,7 +108,7 @@ a.sidebar-link:hover {
     margin-bottom: 20px;
 }
 
-/* ---------- Toggle ---------- */
+
 .toggle {
     position: relative;
     width: 60px;

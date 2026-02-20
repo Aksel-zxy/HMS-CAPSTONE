@@ -34,13 +34,13 @@ if (!$user) {
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
-            <!----- Sidebar Navigation ----->
+            
             <li class="sidebar-item">
                 <a href="../labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -150,8 +150,8 @@ if (!$user) {
                 </ul>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -165,7 +165,7 @@ if (!$user) {
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -183,9 +183,9 @@ if (!$user) {
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <h1>MAINTENANCE</h1>
-            <!----- End of Main Content ----->
+            
             <script>
                 const toggler = document.querySelector(".toggler-btn");
                 toggler.addEventListener("click", function() {
