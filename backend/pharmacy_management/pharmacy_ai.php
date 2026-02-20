@@ -3,7 +3,7 @@ function analyzeStockAI($data)
 {
     // ✅ Use your API key directly
 
-    $apiKey = ('AXL_KEY');
+    $apiKey = getenv('AXL_KEY') ??  ' ';
     if (!$apiKey) {
         return "AI analysis unavailable: No API key set.";
     }
