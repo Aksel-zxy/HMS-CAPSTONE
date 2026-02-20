@@ -159,14 +159,10 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
                 <a href="purchase_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                        class="fa-regular fa-folder-closed" viewBox="0 0 16 16">
-
-                        <path d=" M512 464L128 464C119.2 464 112 456.8 112 448L112 304L528 304L528 448C528 456.8 520.8
-                        464 512 464zM528 256L112 256L112 160C112 151.2 119.2 144 128 144L266.7 144C270.2 144 273.5 145.1
-                        276.3 147.2L314.7 176C328.5 186.4 345.4 192 362.7 192L512 192C520.8 192 528 199.2 528 208L528
-                        256zM128 512L512 512C547.3 512 576 483.3 576 448L576 208C576 172.7 547.3 144 512 144L362.7
-                        144C355.8 144 349 141.8 343.5 137.6L305.1 108.8C294 100.5 280.5 96 266.7 96L128 96C92.7 96 64
-                        124.7 64 160L64 448C64 483.3 92.7 512 128 512z" />
+                        class="bi bi-file-earmark-text" viewBox="0 0 16 16">
+                        <path
+                            d="M14 4.5V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h5.5L14 4.5zm-3-.5a.5.5 0 0 1-.5-.5V1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4h-3z" />
+                        <path d="M5 7h6v1H5V7zm0 2h6v1H5V9z" />
                     </svg>
                     <span style="font-size: 18px;">Purchase Request</span>
                 </a>
