@@ -11,8 +11,8 @@ class Login
 {
     private $conn;
     private $error;
-// change to false to turn off OTP
-    private $useOTP = false;  
+    // change to false to turn off OTP
+    private $useOTP = false;
 
     public function __construct($conn)
     {
@@ -84,7 +84,7 @@ class Login
         $dbPassword = $user['password'];
 
         if (password_verify($password, $dbPassword) || $password === $dbPassword) {
-            
+
             if ($password === $dbPassword) {
                 $newHash = password_hash($password, PASSWORD_DEFAULT);
                 $stmt = $this->conn->prepare("UPDATE users SET password=? WHERE user_id=?");
@@ -121,7 +121,7 @@ class Login
         $_SESSION['role']      = $user['role'];
         $_SESSION['otp_verified'] = true;
 
-        $roleMap = ['0'=>'superadmin','1'=>'hr','2'=>'doctor','3'=>'patient','4'=>'billing','5'=>'pharmacy','6'=>'labtech','7'=>'inventory','8'=>'report'];
+        $roleMap = ['0' => 'superadmin', '1' => 'hr', '2' => 'doctor', '3' => 'patient', '4' => 'billing', '5' => 'pharmacy', '6' => 'labtech', '7' => 'inventory', '8' => 'report'];
         if (isset($roleMap[$user['role']])) {
             $_SESSION[$roleMap[$user['role']]] = true;
         }
@@ -148,15 +148,18 @@ class Login
     {
         $otp = rand(100000, 999999);
         $_SESSION['otp'] = $otp;
-        $_SESSION['otp_expiry'] = time() + 300; 
+        $_SESSION['otp_expiry'] = time() + 300;
         $_SESSION['otp_verified'] = false;
 
         $mail = new PHPMailer(true);
         try {
             $mail->isSMTP();
-            $mail->Host = SMTP_HOST; $mail->SMTPAuth = true;
-            $mail->Username = SMTP_USER; $mail->Password = SMTP_PASS;
-            $mail->SMTPSecure = 'tls'; $mail->Port = SMTP_PORT;
+            $mail->Host = SMTP_HOST;
+            $mail->SMTPAuth = true;
+            $mail->Username = SMTP_USER;
+            $mail->Password = SMTP_PASS;
+            $mail->SMTPSecure = 'tls';
+            $mail->Port = SMTP_PORT;
             $mail->setFrom('no-reply@hospital.com', 'BSIS-4101 (HMS CAPSTONE)');
             $mail->addAddress($email);
             $mail->isHTML(true);
@@ -179,13 +182,13 @@ class Login
 
             $paths = [
                 'Doctor' => "doctor_and_nurse_management/user_panel/Doctor/my_doctor_schedule.php",
-                'Pharmacist' => "pharmacy_management/user_panel/user_pharmacist.php",
+                'Pharmacist' => "pharmacy_management/user_panel/pharmacy_dashboard.php",
                 'Nurse' => "doctor_and_nurse_management/user_panel/Nurse/my_nurse_schedule.php",
                 'Accountant' => "billing_and_insurance_management/user_panel/user_accountant.php",
                 'Laboratorist' => "laboratory_and_diagnostic_management/user_panel/user_lab.php"
             ];
 
-            if(isset($paths[$employee['profession']])) {
+            if (isset($paths[$employee['profession']])) {
                 header("Location: " . $paths[$employee['profession']]);
                 exit;
             }
@@ -205,7 +208,10 @@ class Login
         $this->error = "Incorrect password.";
     }
 
-    public function getError() { return $this->error; }
+    public function getError()
+    {
+        return $this->error;
+    }
 }
 
 $login = new Login($conn);

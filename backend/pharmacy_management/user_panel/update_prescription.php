@@ -5,30 +5,29 @@ ob_start();
 header('Content-Type: application/json');
 session_start();
 
-require '../../SQL/config.php';
-require_once 'classes/medicine.php';
+require '../../../SQL/config.php';
+require_once '../classes/medicine.php';
 date_default_timezone_set('Asia/Manila');
 
 $id = intval($_POST['prescription_id'] ?? 0);
 $status = $_POST['status'] ?? null;
 $payment_type = $_POST['payment_type'] ?? null;
-$user_id = $_SESSION['user_id'] ?? 0; // logged-in admin ID
+
+// ===============================
+// STAFF SIDE: logged-in employee
+// ===============================
+$employee_id = $_SESSION['employee_id'] ?? 0;
+$dispensed_role = 'pharmacist';
 
 if (!$id) {
     echo json_encode(['error' => 'Prescription ID is required.']);
     exit;
 }
 
-if (!$user_id) {
+if (!$employee_id) {
     echo json_encode(['error' => 'Unauthorized access.']);
     exit;
 }
-
-// ===============================
-// ADMIN SIDE: Set dispensed_by and role
-// ===============================
-$employee_id = $user_id;
-$dispensed_role = 'admin';
 
 $medicineObj = new Medicine($conn);
 
@@ -56,7 +55,7 @@ try {
     if ($status) {
 
         // -------------------------------
-        // Handle Cancel first
+        // Handle Cancel immediately
         // -------------------------------
         if ($status === 'Cancelled') {
             $stmt = $conn->prepare("UPDATE pharmacy_prescription SET status='Cancelled' WHERE prescription_id=?");

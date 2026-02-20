@@ -1,20 +1,21 @@
 <?php
-include '../../SQL/config.php';
-require_once "classes/notification.php";
+include '../../../SQL/config.php';
+require_once "../classes/notification.php";
 
-if (!isset($_SESSION['pharmacy']) || $_SESSION['pharmacy'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
+if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Pharmacist') {
+    header('Location: login.php');
     exit();
 }
 
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+if (!isset($_SESSION['employee_id'])) {
     echo "User ID is not set in session.";
     exit();
 }
 
-$query = "SELECT * FROM users WHERE user_id = ?";
+// Fetch user details from database
+$query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
+$stmt->bind_param("i", $_SESSION['employee_id']);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
@@ -63,11 +64,11 @@ $notifCount = $notif->notifCount;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HMS | Pharmacy Management</title>
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="assets/CSS/med_inventory.css">
-    <link rel="stylesheet" href="assets/CSS/prescription.css">
+    <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/CSS/super.css">
+    <link rel="stylesheet" href="../assets/CSS/med_inventory.css">
+    <link rel="stylesheet" href="../assets/CSS/prescription.css">
 </head>
 
 <body>
@@ -76,7 +77,7 @@ $notifCount = $notif->notifCount;
         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
-                <img src="assets/image/logo-dark.png" width="90px" height="20px">
+                <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
             <div class="menu-title">Pharmacy Management | Prescription Records</div>
@@ -148,13 +149,7 @@ $notifCount = $notif->notifCount;
                 </a>
             </li>
 
-            <li class="sidebar-item">
-                <a href="pharmacy_supply_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
-                    <i class="fa-solid fa-boxes-stacked"></i>
-                    <span style="font-size: 18px;">Supply Request</span>
-                </a>
-            </li>
+
         </aside>
         <!----- End of Sidebar ----->
         <!----- Main Content ----->
@@ -243,13 +238,13 @@ $notifCount = $notif->notifCount;
 
                         <!-- Username + Profile Dropdown -->
                         <div class="dropdown d-flex align-items-center">
-                            <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
+                            <span class="username ml-1 me-2"><?php echo $user['first_name']; ?> <?php echo $user['last_name']; ?></span>
                             <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown">
                                 <i class="bi bi-person-circle"></i>
                             </button>
                             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                                <li><span>Welcome <strong><?php echo $user['lname']; ?></strong>!</span></li>
-                                <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
+                                <li><span>Welcome <strong><?php echo $user['last_name']; ?></strong>!</span></li>
+                                <li><a class="dropdown-item" href="../../logout.php">Logout</a></li>
                             </ul>
                         </div>
                     </div>
@@ -530,6 +525,7 @@ ORDER BY MAX(i.dispensed_date) DESC
                         </nav>
                     </div>
                 </div>
+
                 <!-- 🔎 Search Script -->
                 <script>
                     document.getElementById("recordSearchInput").addEventListener("keyup", function() {
@@ -758,10 +754,10 @@ ORDER BY MAX(i.dispensed_date) DESC
         });
     </script>
 
-    <script src="assets/Bootstrap/all.min.js"></script>
-    <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-    <script src="assets/Bootstrap/fontawesome.min.js"></script>
-    <script src="assets/Bootstrap/jq.js"></script>
+    <script src="../assets/Bootstrap/all.min.js"></script>
+    <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="../assets/Bootstrap/fontawesome.min.js"></script>
+    <script src="../assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
