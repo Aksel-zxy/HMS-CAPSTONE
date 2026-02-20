@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '../../../../../SQL/config.php'; //
+require_once __DIR__ . '../../../../../SQL/config.php'; 
 
 class Calendar
 {
@@ -9,7 +9,7 @@ class Calendar
         $this->conn = $conn;
     }
 
-    // ✅ Only fetch Processing schedules for the calendar
+    
     public function getSchedules()
     {
         $sql = "
@@ -47,7 +47,7 @@ class Calendar
         return $events;
     }
 
-    // ✅ Exclude "Completed" schedules from tooltip/day details
+    
     public function getDayDetails($date)
     {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return [];

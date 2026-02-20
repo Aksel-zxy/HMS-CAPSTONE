@@ -39,13 +39,13 @@ $schedules = $schedule->getTodaysSchedules();
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
-            <!----- Sidebar Navigation ----->
+            
             <li class="sidebar-item">
                 <a href="labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -154,8 +154,8 @@ $schedules = $schedule->getTodaysSchedules();
                 </ul>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -169,7 +169,7 @@ $schedules = $schedule->getTodaysSchedules();
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -187,13 +187,13 @@ $schedules = $schedule->getTodaysSchedules();
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <div style="width:95%; margin:20px auto; padding:25px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="color:#0d6efd; font-family:Arial, sans-serif; margin-bottom:25px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
                     📊 Laboratory Dashboard
                 </h2>
 
-                <!-- Dashboard Stats -->
+                
                 <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;margin-bottom:30px;">
                     <div style="flex:1;min-width:220px;background:#ffffff;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,0.1);padding:20px;text-align:center;">
                         <h3 style="color:#0d6efd;margin:0;">Today's Tests</h3>
@@ -216,16 +216,16 @@ $schedules = $schedule->getTodaysSchedules();
                     </div>
                 </div>
 
-                <!-- Dashboard Grid -->
+                
                 <div style="display:grid;grid-template-columns:2fr 1fr;gap:25px;">
-                    <!-- Reports Overview -->
+                    
                     <div style="background:#fff;border-radius:14px;padding:25px;box-shadow:0 3px 10px rgba(0,0,0,0.06);">
                         <h2 style="font-size:18px;color:#333;margin-bottom:10px;">Reports Overview</h2>
                         <p style="color:#888;font-size:13px;margin-bottom:20px;">Weekly summary of completed reports</p>
                         <canvas id="reportsChart" style="width:100%;height:320px;"></canvas>
                     </div>
 
-                    <!-- Today's Schedule -->
+                    
                     <div style="background:#fff;border-radius:14px;padding:25px;box-shadow:0 3px 10px rgba(0,0,0,0.06);">
                         <h2 style="font-size:18px;color:#333;margin-bottom:10px;">Today's Schedule</h2>
                         <p style="color:#888;font-size:13px;margin-bottom:15px;">List of patients scheduled for today</p>
@@ -278,13 +278,13 @@ $schedules = $schedule->getTodaysSchedules();
                     </div>
                 </div>
             </div>
-            <!----- End of Main Content ----->
+            
             <script>
                 const toggler = document.querySelector(".toggler-btn");
                 toggler.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
-                //chart
+                
                 const ctx = document.getElementById('reportsChart').getContext('2d');
 
                 new Chart(ctx, {

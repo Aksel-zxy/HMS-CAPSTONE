@@ -8,7 +8,7 @@ class RoomManager
         $this->conn = $conn;
     }
 
-    // 🔹 Get ONE available room (used during scheduling)
+    
     public function getAvailableRoom($roomType)
     {
         $stmt = $this->conn->prepare("
@@ -27,7 +27,7 @@ class RoomManager
         return $room ?: null;
     }
 
-    // 🔹 Get ALL available rooms (used for front-end display)
+    
     public function getAvailableRoomsByType($roomType)
     {
         $stmt = $this->conn->prepare("

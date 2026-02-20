@@ -5,13 +5,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $patientID   = $_POST['patientID'] ?? null;
     $scheduleIDs = isset($_POST['scheduleIDs']) ? json_decode($_POST['scheduleIDs'], true) : [];
     $status      = $_POST['status'] ?? 'Processing';
-    $remarks     = $_POST['remarks'] ?? ''; // ✅ capture remarks from modal
+    $remarks     = $_POST['remarks'] ?? ''; 
 
     if (!$patientID || empty($scheduleIDs)) {
         die("Invalid data submitted.");
     }
 
-    // 1. Get all test names from dl_schedule
+    
     $placeholders = implode(',', array_fill(0, count($scheduleIDs), '?'));
     $types = str_repeat('i', count($scheduleIDs));
 

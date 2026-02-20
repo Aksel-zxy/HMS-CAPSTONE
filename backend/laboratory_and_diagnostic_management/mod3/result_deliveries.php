@@ -37,13 +37,13 @@ $allPatients = $patient->getAllPatients();
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
-            <!----- Sidebar Navigation ----->
+            
             <li class="sidebar-item">
                 <a href="../labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -153,8 +153,8 @@ $allPatients = $patient->getAllPatients();
                 </ul>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -168,7 +168,7 @@ $allPatients = $patient->getAllPatients();
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -186,7 +186,7 @@ $allPatients = $patient->getAllPatients();
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
                     📊 Results
@@ -201,7 +201,7 @@ $allPatients = $patient->getAllPatients();
                         <thead style="background:#f1f5f9; border-bottom:2px solid #dee2e6; text-align:left; position:sticky; top:0; z-index:1;">
                             <tr>
                                 <th style="padding:12px;text-align:center;">Result ID</th>
-                                <!-- <th style="padding:12px;text-align:center;">Patient ID // Removed Patient ID column</th> -->
+                                
                                 <th style="padding:12px;text-align:center;">Patient Name</th>
                                 <th style="padding:12px;text-align:center;">Test Name</th>
                                 <th style="padding:12px;text-align:center;">Status</th>
@@ -254,9 +254,7 @@ $allPatients = $patient->getAllPatients();
                                                 <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
                                                     <?= htmlspecialchars($test['resultID']) ?>
                                                 </td>
-                                                <!-- <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
-                                                        <?= htmlspecialchars($patientId) ?> // THIS IS THE PATIENT ID COLUMN
-                                                    </td> -->
+                                                
                                                 <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
                                                     <?= htmlspecialchars($pdata['name']) ?>
                                                 </td>
@@ -315,7 +313,7 @@ $allPatients = $patient->getAllPatients();
                     </table>
                 </div>
             </div>
-            <!-- MODAL AREA -->
+            
             <div class="modal fade" id="viewResultModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
@@ -333,31 +331,31 @@ $allPatients = $patient->getAllPatients();
                     </div>
                 </div>
             </div>
-            <!-- Impression Modal -->
+            
             <div class="modal fade" id="aiImpressionModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
-                        <!-- Header -->
+                        
                         <div class="modal-header" style="background: linear-gradient(90deg, #4facfe, #00f2fe); color: #fff;">
                             <h5 class="modal-title">Remarks</h5>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                         </div>
 
-                        <!-- Body -->
+                        
                         <div class="modal-body">
                             <pre id="impressionText" class="p-3 bg-light rounded border" style="font-family: 'Arial', sans-serif; font-size:14px;">
                                 Loading...
                             </pre>
                         </div>
 
-                        <!-- Footer -->
+                        
                         <div class="modal-footer d-flex justify-content-between">
                             <button class="btn btn-outline-primary" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
                 </div>
             </div>
-            <!----- End of Main Content ----->
+            
             <script>
                 document.addEventListener("DOMContentLoaded", function() {
                     const impressionButtons = document.querySelectorAll(".ai-impression-btn");
@@ -390,7 +388,7 @@ $allPatients = $patient->getAllPatients();
                                 .then(data => {
                                     if (data.success) {
                                         alert("Result copy sent successfully!");
-                                        location.reload(); // Reload to update status if necessary
+                                        location.reload(); 
                                     } else {
                                         alert("Error: " + data.message);
                                         this.disabled = false;

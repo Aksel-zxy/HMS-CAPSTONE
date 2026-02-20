@@ -203,7 +203,7 @@ class Login
                     header("Location: doctor_and_nurse_management/user_panel/Doctor/my_doctor_schedule.php");
                     break;
                 case 'Pharmacist':
-                    header("Location: pharmacy_management/user_panel/user_pharmacist.php");
+                    header("Location: pharmacy_management/user_panel/pharmacy_dashboard.php");
                     break;
                 case 'Nurse':
                     header("Location: doctor_and_nurse_management/user_panel/Nurse/my_nurse_schedule.php");

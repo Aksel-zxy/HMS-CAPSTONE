@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $resultID = $_POST['resultID'];
     $patientID = $_POST['patientID'];
 
-    // 1. Fetch Patient and Result Data
+    
     $query = "SELECT p.fname, p.email, s.serviceName, r.result 
               FROM patientinfo p
               JOIN dl_schedule s ON p.patient_id = s.patientid
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $mail = new PHPMailer(true);
 
     try {
-        // 2. SMTP Configuration
+        
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com'; 
         $mail->SMTPAuth   = true;
@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
 
-        // 3. Recipients & Content
+        
         $mail->setFrom('no-reply@hms.com', 'HMS Diagnostic and Laboratory Management');
         $mail->addAddress($data['email'], $data['fname']);
 
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $mail->send();
 
-        // 4. Update Database Status
+        
         $update = $conn->prepare("UPDATE dl_results SET status = 'Delivered' WHERE resultID = ?");
         $update->bind_param("i", $resultID);
         $update->execute();

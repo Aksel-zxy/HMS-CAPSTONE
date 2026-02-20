@@ -4,12 +4,10 @@ ini_set('display_errors', 1);
 
 require_once __DIR__ . "/../../../../SQL/config.php";
 
-/* ==============================
-   FUNCTION: Complete Schedule + Free Room
-============================== */
+
 function markScheduleCompleted($conn, $scheduleID)
 {
-    // Get room used in this schedule
+    
     $stmt = $conn->prepare("
         SELECT room_id 
         FROM dl_schedule 
@@ -23,7 +21,7 @@ function markScheduleCompleted($conn, $scheduleID)
 
     $roomID = $result['room_id'] ?? null;
 
-    // Mark schedule as completed
+    
     $updateSchedule = $conn->prepare("
         UPDATE dl_schedule 
         SET status = 'Completed', completed_at = NOW() 
@@ -33,7 +31,7 @@ function markScheduleCompleted($conn, $scheduleID)
     $updateSchedule->execute();
     $updateSchedule->close();
 
-    // Free the room
+    
     if ($roomID) {
         $freeRoom = $conn->prepare("
             UPDATE rooms 
@@ -46,9 +44,7 @@ function markScheduleCompleted($conn, $scheduleID)
     }
 }
 
-/* ==============================
-   FUNCTION: Read Image as Blob
-============================== */
+
 function getImageBlob($fileInputName)
 {
     if (!empty($_FILES[$fileInputName]['tmp_name'])) {
@@ -67,9 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Missing required data.");
     }
 
-    /* ==============================
-       CBC RESULT
-    ============================== */
+    
     if ($testType === "CBC") {
 
         $wbc        = $_POST['wbc'];
@@ -115,20 +109,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
     }
 
-    /* ==============================
-       IMAGE-BASED TESTS
-    ============================== */
+    
     elseif (in_array($testType, ['X-ray', 'MRI', 'CT'])) {
 
         $findings   = $_POST['findings'];
         $impression = $_POST['impression'];
         $remarks    = $_POST['remarks'];
 
-        // Image input name
+        
         $fileInputName = strtolower(str_replace('-', '', $testType)) . '_image';
         $imageBlob = getImageBlob($fileInputName);
 
-        // Table mapping
+        
         $tableMap = [
             'X-ray' => 'dl_lab_xray',
             'MRI'   => 'dl_lab_mri',

@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '../../../../../SQL/config.php'; // note the leading slash
+require_once __DIR__ . '../../../../../SQL/config.php'; 
 
 class Audit {
     private $conn;
@@ -34,8 +34,8 @@ class Audit {
     }
 }
 
-// --- instantiate and fetch
-$audit = new Audit($conn);           // ✅ this was missing
+
+$audit = new Audit($conn);           
 $auditLogs = [];
 $fetchError = '';
 

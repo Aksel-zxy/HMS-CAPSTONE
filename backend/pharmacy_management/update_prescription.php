@@ -1,67 +1,109 @@
 <?php
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+ob_start();
+header('Content-Type: application/json');
+session_start();
+
 require '../../SQL/config.php';
 require_once 'classes/medicine.php';
-header('Content-Type: application/json');
 date_default_timezone_set('Asia/Manila');
-
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING);
 
 $id = intval($_POST['prescription_id'] ?? 0);
 $status = $_POST['status'] ?? null;
 $payment_type = $_POST['payment_type'] ?? null;
+$user_id = $_SESSION['user_id'] ?? 0; // logged-in admin ID
 
 if (!$id) {
     echo json_encode(['error' => 'Prescription ID is required.']);
     exit;
 }
 
+if (!$user_id) {
+    echo json_encode(['error' => 'Unauthorized access.']);
+    exit;
+}
+
+// ===============================
+// ADMIN SIDE: Set dispensed_by and role
+// ===============================
+$employee_id = $user_id;
+$dispensed_role = 'admin';
+
 $medicineObj = new Medicine($conn);
 
 try {
-    // --- Update Payment Type Only ---
+    $warnings = [];
+    $total_dispensed = 0;
+    $total_cost = 0;
+
+    // ===============================
+    // UPDATE PAYMENT TYPE ONLY
+    // ===============================
     if ($payment_type !== null && !$status) {
         $stmt = $conn->prepare("UPDATE pharmacy_prescription SET payment_type=? WHERE prescription_id=?");
         $stmt->bind_param("si", $payment_type, $id);
         $stmt->execute();
 
+        ob_clean();
         echo json_encode(['success' => 'Payment type updated successfully.']);
         exit;
     }
 
-    // --- Handle Status Update ---
+    // ===============================
+    // PROCESS STATUS UPDATE
+    // ===============================
     if ($status) {
-        // Update prescription status first
-        $stmt = $conn->prepare("UPDATE pharmacy_prescription SET status=? WHERE prescription_id=?");
-        $stmt->bind_param("si", $status, $id);
-        $stmt->execute();
 
-        // ✅ Only process dispensing if status is "Dispensed"
-        if ($status === "Dispensed") {
+        // -------------------------------
+        // Handle Cancel first
+        // -------------------------------
+        if ($status === 'Cancelled') {
+            $stmt = $conn->prepare("UPDATE pharmacy_prescription SET status='Cancelled' WHERE prescription_id=?");
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+
+            ob_clean();
+            echo json_encode(['success' => 'Prescription cancelled successfully.']);
+            exit;
+        }
+
+        // Only continue if status is Dispensed
+        if ($status === 'Dispensed') {
+            // Fetch prescription items
             $items = $conn->query("
-                SELECT i.item_id, i.med_id, i.quantity_prescribed, i.quantity_dispensed, inv.stock_quantity, inv.med_name, inv.unit_price
+                SELECT i.item_id, i.med_id, i.quantity_prescribed,
+                       inv.med_name, inv.unit_price
                 FROM pharmacy_prescription_items i
                 JOIN pharmacy_inventory inv ON i.med_id = inv.med_id
                 WHERE i.prescription_id = {$id}
             ");
 
-            $warnings = [];
+            $dispense_items = [];
+
             while ($item = $items->fetch_assoc()) {
-                if ($item['stock_quantity'] == 0) {
-                    $warnings[] = "{$item['med_name']} - Stock is not available";
-                } elseif ($item['stock_quantity'] < $item['quantity_prescribed']) {
-                    $warnings[] = "{$item['med_name']} - Stock is insufficient (Available: {$item['stock_quantity']}, Needed: {$item['quantity_prescribed']})";
+                $med_id = (int)$item['med_id'];
+                $quantity_needed = (int)$item['quantity_prescribed'];
+
+                // Check NON-EXPIRED stock
+                $batchRes = $conn->query("
+                    SELECT SUM(stock_quantity) AS total_stock
+                    FROM pharmacy_stock_batches
+                    WHERE med_id={$med_id} AND expiry_date >= CURDATE()
+                ");
+                $total_stock = (int)($batchRes->fetch_assoc()['total_stock'] ?? 0);
+
+                if ($total_stock <= 0) {
+                    $warnings[] = "{$item['med_name']} - Cannot dispense (all batches expired)";
+                } elseif ($total_stock < $quantity_needed) {
+                    $warnings[] = "{$item['med_name']} - Cannot dispense (Available: {$total_stock}, Needed: {$quantity_needed})";
+                } else {
+                    $dispense_items[] = $item;
                 }
             }
 
-            if (!empty($warnings)) {
-                echo json_encode(['error' => implode("\n", $warnings)]);
-                exit;
-            }
-
-            // Reset pointer and process dispensing
-            $items->data_seek(0);
-            while ($item = $items->fetch_assoc()) {
+            // Dispense valid items
+            foreach ($dispense_items as $item) {
                 $item_id = (int)$item['item_id'];
                 $med_id = (int)$item['med_id'];
                 $quantity_dispensed = (int)$item['quantity_prescribed'];
@@ -69,44 +111,63 @@ try {
                 $total_price = $unit_price * $quantity_dispensed;
                 $dispensed_date = date("Y-m-d H:i:s");
 
-                // Update prescription item
                 $updateItem = $conn->prepare("
                     UPDATE pharmacy_prescription_items
-                    SET quantity_dispensed=?, unit_price=?, total_price=?, dispensed_date=?
+                    SET quantity_dispensed=?, unit_price=?, total_price=?, dispensed_date=?, dispensed_by=?, dispensed_role=?
                     WHERE item_id=?
                 ");
-                $updateItem->bind_param("iddsi", $quantity_dispensed, $unit_price, $total_price, $dispensed_date, $item_id);
+                $updateItem->bind_param(
+                    "iddsisi",
+                    $quantity_dispensed,
+                    $unit_price,
+                    $total_price,
+                    $dispensed_date,
+                    $employee_id,
+                    $dispensed_role,
+                    $item_id
+                );
                 $updateItem->execute();
 
-                // Deduct stock using Medicine class (FIFO batch)
                 $medicineObj->dispenseMedicine($med_id, $quantity_dispensed);
+
+                $total_dispensed += $quantity_dispensed;
+                $total_cost += $total_price;
             }
 
-            // Update billing_status
+            // Update billing status
             $ptypeRes = $conn->query("SELECT payment_type FROM pharmacy_prescription WHERE prescription_id={$id}");
             $ptype = strtolower($ptypeRes->fetch_assoc()['payment_type'] ?? '');
             $billing_status = ($ptype === 'cash') ? 'paid' : 'pending';
-            $conn->query("UPDATE pharmacy_prescription SET billing_status='{$billing_status}' WHERE prescription_id={$id}");
 
-            // Return totals
-            $res = $conn->query("SELECT SUM(quantity_dispensed) AS total_dispensed, SUM(total_price) AS total_cost
-                FROM pharmacy_prescription_items WHERE prescription_id={$id}");
-            $row = $res->fetch_assoc();
+            $stmt = $conn->prepare("UPDATE pharmacy_prescription SET billing_status=? WHERE prescription_id=?");
+            $stmt->bind_param("si", $billing_status, $id);
+            $stmt->execute();
 
+            // Update prescription status ONLY if at least one item was dispensed
+            if ($total_dispensed > 0) {
+                $stmt = $conn->prepare("UPDATE pharmacy_prescription SET status='Dispensed' WHERE prescription_id=?");
+                $stmt->bind_param("i", $id);
+                $stmt->execute();
+                $current_status = 'Dispensed';
+            } else {
+                $current_status = 'Pending';
+            }
+
+            ob_clean();
             echo json_encode([
-                'success' => 'Prescription dispensed successfully.',
-                'dispensed_quantity' => $row['total_dispensed'],
-                'total_cost' => $row['total_cost']
+                'success' => "Prescription status: {$current_status}",
+                'dispensed_quantity' => $total_dispensed,
+                'total_cost' => $total_cost,
+                'warnings' => $warnings
             ]);
-            exit;
-        } else {
-            // ✅ Cancelled or Pending — no stock change
-            echo json_encode(['success' => "Prescription status updated to {$status}."]);
             exit;
         }
     }
 
     echo json_encode(['error' => 'No action provided.']);
+    exit;
 } catch (Exception $e) {
+    ob_clean();
     echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+    exit;
 }

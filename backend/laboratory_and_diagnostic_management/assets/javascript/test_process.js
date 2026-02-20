@@ -1,4 +1,4 @@
-// Sidebar toggle
+
 document.querySelector(".toggler-btn")?.addEventListener("click", function () {
   document.querySelector("#sidebar").classList.toggle("collapsed");
 });
@@ -36,14 +36,14 @@ function showResult(index) {
     return;
   }
 
-  // Update modal title
+  
   document.getElementById("modalTitle").innerText = testType + " Result";
 
-  // Show loading
+  
   document.getElementById("resultContent").innerHTML =
     "<p class='text-center text-muted'>Loading result...</p>";
 
-  // Fetch result
+  
   fetch(
     "get_result.php?scheduleID=" +
       scheduleID +
@@ -59,7 +59,7 @@ function showResult(index) {
         "<p class='text-danger'>Error loading result.</p>";
     });
 
-  // Handle prev/next visibility
+  
   const prevBtn = document.getElementById("prevResult");
   const nextBtn = document.getElementById("nextResult");
 
@@ -73,7 +73,7 @@ function showResult(index) {
   }
 }
 
-// Prev / Next handlers
+
 document.getElementById("prevResult").addEventListener("click", function () {
   if (currentIndex > 0) {
     currentIndex--;
@@ -88,10 +88,10 @@ document.getElementById("nextResult").addEventListener("click", function () {
   }
 });
 
-// Click handler for each button
+
 document.querySelectorAll(".view-result-btn").forEach((button) => {
   button.addEventListener("click", function () {
-    // Parse JSON from button's data-results
+    
     tests = JSON.parse(this.dataset.results || "[]");
 
     currentIndex = 0;
@@ -113,12 +113,12 @@ document.addEventListener("DOMContentLoaded", function () {
   remarksModal.addEventListener("show.bs.modal", function (event) {
     const button = event.relatedTarget;
 
-    // Get data from button
+    
     const patientID = button.getAttribute("data-patientid");
     const scheduleIDs = button.getAttribute("data-scheduleids");
     const testList = button.getAttribute("data-testlist");
 
-    // Fill modal hidden inputs
+    
     document.getElementById("remarksPatientID").value = patientID;
     document.getElementById("remarksScheduleIDs").value = scheduleIDs;
     document.getElementById("remarksTestList").value = testList;
@@ -141,27 +141,27 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 });
-// Global fix for accessibility warning: prevent focus inside hidden modals
+
 document.addEventListener("DOMContentLoaded", function () {
   let lastTriggerButton = null;
 
-  // Track which element opened a modal
+  
   document.querySelectorAll("[data-bs-toggle='modal']").forEach((btn) => {
     btn.addEventListener("click", function () {
       lastTriggerButton = this;
     });
   });
 
-  // Apply fix to all modals
+  
   document.querySelectorAll(".modal").forEach((modal) => {
-    // 1️ Before the modal hides, blur any focused element inside it
+    
     modal.addEventListener("hide.bs.modal", function () {
       if (document.activeElement && modal.contains(document.activeElement)) {
         document.activeElement.blur();
       }
     });
 
-    // 2️ After fully hidden, restore focus to opener or body
+    
     modal.addEventListener("hidden.bs.modal", function () {
       if (lastTriggerButton && document.body.contains(lastTriggerButton)) {
         lastTriggerButton.focus();

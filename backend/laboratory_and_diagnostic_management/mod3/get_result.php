@@ -48,7 +48,7 @@ function getAdvancedInterpretation($test, $value, $age, $gender) {
     $gender = strtoupper($gender[0] ?? 'M');
     $val = (float)$value;
 
-    // Normal Ranges based on Age/Gender
+    
     $ranges = [
         'wbc'        => ($age < 1)  ? [6.0, 17.5] : [4.0, 10.0],
         'rbc'        => ($gender == 'M') ? [4.5, 5.5] : [4.0, 5.0],
@@ -84,7 +84,7 @@ function getAdvancedInterpretation($test, $value, $age, $gender) {
 }
 
 
-// Fetch Result Data
+
 $query = "SELECT * FROM $table WHERE scheduleID = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $scheduleID);
@@ -98,7 +98,7 @@ if (!$data) {
     exit;
 }
 
-// Fetch Patient Info
+
 $queryPatient = "SELECT p.*, s.scheduleID 
                  FROM dl_schedule s 
                  LEFT JOIN patientinfo p ON s.patientId = p.patient_id 
@@ -108,9 +108,7 @@ $stmtPatient->bind_param("i", $scheduleID);
 $stmtPatient->execute();
 $patient = $stmtPatient->get_result()->fetch_assoc();
 
-/* ============================================================
-   DISPLAY HTML
-============================================================ */
+
 ?>
 
 <div style="font-family: Arial, sans-serif; margin: 20px auto; padding: 30px; border: 1px solid #333; border-radius: 8px; max-width: 850px; background-color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
@@ -176,7 +174,7 @@ $patient = $stmtPatient->get_result()->fetch_assoc();
         </tbody>
     </table>
     
-    <?php else: // Imaging Tests (Xray, MRI, CT) ?>
+    <?php else: ?>
         <table style="width:100%; border:1px solid #000; border-collapse:collapse; font-size:0.95rem;">
             <tr><th style="border:1px solid #000; padding:10px; text-align:left; background:#f2f2f2; width:20%;">Findings</th><td style="border:1px solid #000; padding:10px;"><?= nl2br(htmlspecialchars($data['findings'])) ?></td></tr>
             <tr><th style="border:1px solid #000; padding:10px; text-align:left; background:#f2f2f2;">Impression</th><td style="border:1px solid #000; padding:10px; font-weight:bold;"><?= nl2br(htmlspecialchars($data['impression'])) ?></td></tr>
