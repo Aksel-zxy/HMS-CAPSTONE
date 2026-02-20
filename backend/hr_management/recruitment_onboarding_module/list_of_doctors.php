@@ -326,6 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="role"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Role:</label>
                     <select id="role" name="role" required>
                         <option value="">--- Select Role ---</option>
+                        <option value="Non-Resident Doctor">Non-Resident Doctor</option>
                         <option value="Resident Doctor">Resident Doctor</option>
                         <option value="Chief Resident">Chief Resident</option>
                         <option value="Attending Physician/Consultant">Attending Physician/Consultant</option>

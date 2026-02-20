@@ -7,7 +7,9 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 if (isset($_POST['action']) && $_POST['action'] === 'ai_suggest') {
-    ob_clean();
+    if (ob_get_length() > 0) {
+        ob_clean();
+    }
     header('Content-Type: application/json');
 
     try {
@@ -21,64 +23,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'ai_suggest') {
 
         if (!$service) throw new Exception("Service ID not found.");
 
-        $requiredRoomType = $service['room_type'];
+        $scheduler = new SmartScheduler($conn);
+        $result = $scheduler->getOptimalSchedule($service_id, $date);
 
-        $staffList = $conn->query("SELECT employee_id FROM hr_employees WHERE profession = 'Laboratorist'")->fetch_all(MYSQLI_ASSOC);
-
-        $bestSlot = null;
-        $minLoad = 999;
-
-        for ($h = 8; $h < 17; $h++) {
-            $time = sprintf("%02d:00:00", $h);
-
-            $roomQuery = $conn->prepare("
-                SELECT COUNT(*) as booked 
-                FROM dl_schedule s
-                JOIN rooms r ON s.room_id = r.roomID
-                WHERE r.roomType = ? AND s.scheduleDate = ? AND s.scheduleTime = ?
-            ");
-
-            if (!$roomQuery) {
-                throw new Exception("DB Error: " . $conn->error);
-            }
-
-            $roomQuery->bind_param("sss", $requiredRoomType, $date, $time);
-            $roomQuery->execute();
-            $roomBooked = $roomQuery->get_result()->fetch_assoc()['booked'];
-
-            if ($roomBooked >= 1) continue;
-
-            foreach ($staffList as $staff) {
-                $eid = $staff['employee_id'];
-
-                $busyQuery = $conn->prepare("SELECT count(*) as c FROM dl_schedule WHERE employee_id=? AND scheduleDate=? AND scheduleTime=?");
-                $busyQuery->bind_param("iss", $eid, $date, $time);
-                $busyQuery->execute();
-                if ($busyQuery->get_result()->fetch_assoc()['c'] > 0) continue;
-
-                $loadQuery = $conn->prepare("SELECT count(*) as c FROM dl_schedule WHERE employee_id=? AND scheduleDate=?");
-                $loadQuery->bind_param("is", $eid, $date);
-                $loadQuery->execute();
-                $load = $loadQuery->get_result()->fetch_assoc()['c'];
-
-                if ($load < $minLoad) {
-                    $minLoad = $load;
-                    $bestSlot = [
-                        'success' => true,
-                        'recommended_staff_id' => $eid,
-                        'recommended_time' => $time,
-                        'message' => 'Optimal slot found.'
-                    ];
-                    break 2; 
-                }
-            }
-        }
-
-        if ($bestSlot) {
-            echo json_encode($bestSlot);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'No slots available for this date.']);
-        }
+        echo json_encode($result);
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
@@ -257,10 +205,20 @@ class SmartScheduler
 
         $laboratorists = $this->conn->query("SELECT employee_id FROM hr_employees WHERE profession = 'Laboratorist'")->fetch_all(MYSQLI_ASSOC);
 
-        $startHour = 8;
-        $endHour = 17;
+        $currentDate = date('Y-m-d');
+        $currentHour = (int)date('H');
 
-        for ($hour = $startHour; $hour < $endHour; $hour++) {
+        // Logic for 24-Hour Operation
+        if ($target_date === $currentDate) {
+            // Start from the next hour
+            $startHour = $currentHour + 1;
+        } else {
+            // If it's a future date, start from the beginning of that day (Midnight)
+            $startHour = 0;
+        }
+
+        // Loop through the 24-hour cycle (0 to 23)
+        for ($hour = $startHour; $hour < 24; $hour++) {
             $timeString = sprintf("%02d:00:00", $hour);
 
             $availableStaff = [];
@@ -276,6 +234,7 @@ class SmartScheduler
             }
 
             if (!empty($availableStaff)) {
+                // Sort by least workload to balance the team
                 usort($availableStaff, function ($a, $b) {
                     return $a['load'] <=> $b['load'];
                 });
@@ -288,13 +247,16 @@ class SmartScheduler
                         'recommended_staff_id' => $bestStaff['id'],
                         'recommended_time' => $timeString,
                         'recommended_date' => $target_date,
-                        'message' => 'Optimal slot found based on lowest staff workload.'
+                        'message' => 'Optimal 24-hour slot found.'
                     ];
                 }
             }
         }
 
-        return ['success' => false, 'message' => 'No slots available for this date.'];
+        return [
+            'success' => false,
+            'message' => 'No slots available for the remainder of this date.'
+        ];
     }
 
     private function isStaffFree($emp_id, $date, $time)
@@ -317,7 +279,7 @@ class SmartScheduler
 
     private function isRoomAvailable($room_type, $date, $time)
     {
-        $stmtTotal = $this->conn->prepare("SELECT COUNT(*) as total FROM rooms WHERE room_type = ?");
+        $stmtTotal = $this->conn->prepare("SELECT COUNT(*) as total FROM rooms WHERE roomType = ?");
         $stmtTotal->bind_param("s", $room_type);
         $stmtTotal->execute();
         $totalRooms = $stmtTotal->get_result()->fetch_assoc()['total'];
@@ -326,7 +288,7 @@ class SmartScheduler
             SELECT COUNT(*) as booked 
             FROM dl_schedule s
             JOIN rooms r ON s.room_id = r.roomID
-            WHERE r.room_type = ? AND s.scheduleDate = ? AND s.scheduleTime = ?
+            WHERE r.roomType = ? AND s.scheduleDate = ? AND s.scheduleTime = ?
         ");
         $stmtBooked->bind_param("sss", $room_type, $date, $time);
         $stmtBooked->execute();

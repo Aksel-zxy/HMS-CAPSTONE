@@ -396,54 +396,31 @@ $allPatients = $patient->getAllPatients();
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
 
-                // Add Schedule button click
+                // 1. Setup the Modal when "Lab Scheduling (+)" is clicked
                 document.querySelectorAll(".addScheduleBtn").forEach(button => {
                     button.addEventListener("click", function() {
+                        // Fill basic hidden fields
                         document.getElementById("modalPatientId").value = this.dataset.id || "";
                         document.getElementById("modalAppointmentId").value = this.dataset.appointmentId || "";
                         document.getElementById("modalPatientName").value = this.dataset.name || "";
 
-                        // Get test name
+                        // Get test name placeholder logic
                         let testName = (this.dataset.test && this.dataset.test.trim() !== "") ?
-                            `-- ${this.dataset.test} --` :
-                            "-- Select Test --";
+                            `-- ${this.dataset.test} --` : "-- Select Test --";
 
-                        // Update placeholder option
                         let placeholderOption = document.getElementById("modalTestNamePlaceholder");
                         placeholderOption.textContent = testName;
                         placeholderOption.value = "";
-                        placeholderOption.disabled = true;
-                        placeholderOption.selected = true;
-
-                        // Force browser to re-render selection
-                        let selectElement = placeholderOption.parentElement;
-                        selectElement.selectedIndex = 0;
-
-                        // Pre-fill date/time if available
-                        let dateTimeInput = document.querySelector("input[name='schedule_datetime']");
-                        if (this.dataset.date) {
-                            dateTimeInput.value = this.dataset.date.replace(" ", "T");
-                        } else {
-                            dateTimeInput.value = "";
-                        }
-                    });
-                });
-                // 1. Setup the Modal when "Lab Scheduling (+)" is clicked
-                document.querySelectorAll('.addScheduleBtn').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const id = this.getAttribute('data-id');
-                        const appointmentId = this.getAttribute('data-appointment-id');
-                        const name = this.getAttribute('data-name');
-
-                        // Fill basic hidden fields
-                        document.getElementById('modalPatientId').value = id;
-                        document.getElementById('modalAppointmentId').value = appointmentId;
-                        document.getElementById('modalPatientName').value = name;
 
                         // Reset the form for a fresh start
                         document.getElementById('suggestedTime').value = '';
                         document.getElementById('modalLaboratoristSelect').value = '';
-                        document.getElementById('scheduleDateInput').value = '';
+
+                        // Set MIN DATE to Today (Prevents booking in the past)
+                        const dateInput = document.getElementById('scheduleDateInput');
+                        const today = new Date().toISOString().split('T')[0];
+                        dateInput.setAttribute('min', today);
+                        dateInput.value = today; // Default to today for convenience
 
                         // Reset visual styles
                         document.getElementById('modalLaboratoristSelect').classList.remove('is-valid');
@@ -451,11 +428,11 @@ $allPatients = $patient->getAllPatients();
                     });
                 });
 
-                // 2. The AI Logic
+                // 2. The AI Logic (Optimized for 24h and Current Time)
                 function runAIScheduling() {
                     const serviceId = document.getElementById('modalTestNameSelect').value;
                     const date = document.getElementById('scheduleDateInput').value;
-                    const btn = document.querySelector('.btn-outline-primary'); // The Auto-Assign button
+                    const btn = document.getElementById('autoAssignBtn') || document.querySelector('.btn-outline-primary');
 
                     if (!serviceId) {
                         alert("Please select a Test Name first.");
@@ -476,47 +453,45 @@ $allPatients = $patient->getAllPatients();
                     formData.append('service_id', serviceId);
                     formData.append('date', date);
 
-                    // FIX: Ensure this path is correct relative to your browser URL
-                    // If your HTML is in the root folder, use 'oop/fetchdetails.php'
-                    // If your HTML is in a subfolder, use '../oop/fetchdetails.php'
+                    // Fetch using the relative path to your PHP controller
                     fetch('oop/fetchdetails.php', {
                             method: 'POST',
                             body: formData
                         })
                         .then(response => {
-                            if (!response.ok) {
-                                throw new Error('Network response was not ok');
-                            }
-                            return response.text(); // Get text first to debug if it's not JSON
+                            if (!response.ok) throw new Error('Network response was not ok');
+                            return response.text();
                         })
                         .then(text => {
                             try {
-                                return JSON.parse(text); // Try parsing JSON
+                                // Check if response contains PHP notices/errors before the JSON
+                                const jsonStart = text.indexOf('{');
+                                const cleanJson = text.substring(jsonStart);
+                                return JSON.parse(cleanJson);
                             } catch (e) {
-                                console.error("Server returned non-JSON:", text);
-                                throw new Error("Server Error: Check console for details.");
+                                console.error("Server raw response:", text);
+                                throw new Error("Server Error: Response was not valid JSON.");
                             }
                         })
                         .then(data => {
                             if (data.success) {
-                                // Fill Time
+                                // Fill Time (Supports 24h format HH:mm)
                                 document.getElementById('suggestedTime').value = data.recommended_time.substring(0, 5);
 
-                                // Fill Laboratorist (User can still change this!)
+                                // Fill Laboratorist
                                 const labSelect = document.getElementById('modalLaboratoristSelect');
                                 labSelect.value = data.recommended_staff_id;
 
-                                // Visual Success Indicators (Green borders)
+                                // Visual Success Indicators
                                 labSelect.classList.add('is-valid');
                                 document.getElementById('suggestedTime').classList.add('is-valid');
-
                             } else {
-                                alert("AI Message: " + data.message);
+                                alert("Scheduling Note: " + data.message);
                             }
                         })
                         .catch(error => {
                             console.error('Error:', error);
-                            alert("Could not connect to the scheduling AI. Check console (F12) for details.");
+                            alert("Scheduling Error: " + error.message);
                         })
                         .finally(() => {
                             btn.innerHTML = originalText;
@@ -524,20 +499,17 @@ $allPatients = $patient->getAllPatients();
                         });
                 }
 
-                // 3. Handle Form Submit (Combine Date + Time)
+                // 3. Handle Form Submit (Combine Date + Time for Database)
                 document.getElementById('scheduleForm').addEventListener('submit', function(e) {
                     const date = document.getElementById('scheduleDateInput').value;
                     const time = document.getElementById('suggestedTime').value;
 
-                    // If user used AI or manually picked date/time
                     if (date && time) {
-                        // Create YYYY-MM-DDTHH:MM format for the hidden input
+                        // Formats into YYYY-MM-DDTHH:MM for the hidden datetime-local input
                         document.getElementById('finalDateTime').value = date + 'T' + time;
                     } else {
-                        // Fallback: If they didn't use the new inputs, check if they used the old one?
-                        // But since we hid the old one, we must enforce this.
                         e.preventDefault();
-                        alert("Please ensure a Date and Time are selected.");
+                        alert("Please ensure both Date and Time are selected.");
                     }
                 });
             </script>

@@ -195,7 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="employee_id"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Employee ID:</label>
                     <input type="text" id="employee_id" name="employee_id" required pattern="^\d{3}$" title="Employee ID must be exactly 3 digits." oninput="updateUsername()">
                     <center>
-                        <span id="employee_idError" style="color: red;font-size: 15px;"></span>
+                        <span id="employee_idError" style="color: red;font-size: 15px;font-weight: bold;"></span>
                     </center>
                     <br />
 
