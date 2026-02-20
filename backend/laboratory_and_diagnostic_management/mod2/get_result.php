@@ -1,8 +1,6 @@
 <?php
-/* ============================================================
-   DATABASE CONNECTION FIX
-============================================================ */
-// We use realpath to verify the path exists before including
+
+
 $configPath = realpath(__DIR__ . "/../../../SQL/config.php");
 
 if ($configPath && file_exists($configPath)) {
@@ -11,14 +9,12 @@ if ($configPath && file_exists($configPath)) {
     die("Critcal Error: Config file not found at: " . __DIR__ . "/../../../SQL/config.php");
 }
 
-// Ensure $conn is actually defined from config.php
+
 if (!isset($conn)) {
     die("Critical Error: Database connection variable (\$conn) is not defined. Check config.php.");
 }
 
-/* ============================================================
-   REQUEST DATA HANDLING
-============================================================ */
+
 $scheduleID = $_GET['scheduleID'] ?? null;
 $testType   = $_GET['testType'] ?? null;
 
@@ -29,7 +25,7 @@ if (!$scheduleID || !$testType) {
 
 $testType = strtolower(trim($testType));
 
-// Determine table and mode
+
 if (strpos($testType, "cbc") !== false || strpos($testType, "complete blood count") !== false) {
     $table = "dl_lab_cbc";
     $mode = "cbc";
@@ -47,15 +43,13 @@ if (strpos($testType, "cbc") !== false || strpos($testType, "complete blood coun
     exit;
 }
 
-/* ============================================================
-   ADVANCED INTERPRETATION ENGINE
-============================================================ */
+
 function getAdvancedInterpretation($test, $value, $age, $gender) {
     $age = (int)$age;
     $gender = strtoupper($gender[0] ?? 'M');
     $val = (float)$value;
 
-    // Normal Ranges based on Age/Gender
+    
     $ranges = [
         'wbc'        => ($age < 1)  ? [6.0, 17.5] : [4.0, 10.0],
         'rbc'        => ($gender == 'M') ? [4.5, 5.5] : [4.0, 5.0],
@@ -73,13 +67,13 @@ function getAdvancedInterpretation($test, $value, $age, $gender) {
     $max = $ranges[$test][1];
     $median = ($min + $max) / 2;
     
-    // Determine Status
+    
     $status = "Normal";
     $color = "#198754"; 
     if ($val < $min) { $status = "LOW"; $color = "#0d6efd"; } 
     elseif ($val > $max) { $status = "HIGH"; $color = "#dc3545"; } 
 
-    // Calculate Deviation
+    
     $deviation = (($val - $median) / $median) * 100;
     $devStr = ($deviation >= 0 ? "+" : "") . number_format($deviation, 1) . "%";
     
@@ -90,10 +84,8 @@ function getAdvancedInterpretation($test, $value, $age, $gender) {
     ];
 }
 
-/* ============================================================
-   DATABASE QUERIES
-============================================================ */
-// Fetch Result Data
+
+
 $query = "SELECT * FROM $table WHERE scheduleID = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $scheduleID);
@@ -107,7 +99,7 @@ if (!$data) {
     exit;
 }
 
-// Fetch Patient Info
+
 $queryPatient = "SELECT p.*, s.scheduleID 
                  FROM dl_schedule s 
                  LEFT JOIN patientinfo p ON s.patientId = p.patient_id 
@@ -117,9 +109,7 @@ $stmtPatient->bind_param("i", $scheduleID);
 $stmtPatient->execute();
 $patient = $stmtPatient->get_result()->fetch_assoc();
 
-/* ============================================================
-   DISPLAY HTML
-============================================================ */
+
 ?>
 
 <div style="font-family: Arial, sans-serif; margin: 20px auto; padding: 30px; border: 1px solid #333; border-radius: 8px; max-width: 850px; background-color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
@@ -185,7 +175,7 @@ $patient = $stmtPatient->get_result()->fetch_assoc();
         </tbody>
     </table>
     
-    <?php else: // Imaging Tests (Xray, MRI, CT) ?>
+    <?php else: ?>
         <table style="width:100%; border:1px solid #000; border-collapse:collapse; font-size:0.95rem;">
             <tr><th style="border:1px solid #000; padding:10px; text-align:left; background:#f2f2f2; width:20%;">Findings</th><td style="border:1px solid #000; padding:10px;"><?= nl2br(htmlspecialchars($data['findings'])) ?></td></tr>
             <tr><th style="border:1px solid #000; padding:10px; text-align:left; background:#f2f2f2;">Impression</th><td style="border:1px solid #000; padding:10px; font-weight:bold;"><?= nl2br(htmlspecialchars($data['impression'])) ?></td></tr>

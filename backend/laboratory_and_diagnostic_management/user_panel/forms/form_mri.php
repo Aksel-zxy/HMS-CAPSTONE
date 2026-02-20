@@ -1,5 +1,5 @@
 <?php
-// Only include config.php if not already included
+
 if (!isset($conn)) {
     include __DIR__ . "/../../../../SQL/config.php";
 }
@@ -11,7 +11,7 @@ if (!$scheduleID) {
     exit();
 }
 
-// Fetch patient & schedule info
+
 $query = "SELECT s.scheduleID, s.patientID, s.serviceName, s.scheduleDate, s.scheduleTime,
                  p.fname, p.lname
           FROM dl_schedule s

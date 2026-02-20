@@ -11,7 +11,7 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// Fetch user details from database
+
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
@@ -39,7 +39,7 @@ if (!$user) {
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
@@ -48,7 +48,7 @@ if (!$user) {
 
             <div class="menu-title">Navigation</div>
 
-            <!----- Sidebar Navigation ----->
+            
         
             <li class="sidebar-item">
                 <a href="user_lab.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
@@ -72,8 +72,8 @@ if (!$user) {
                 </a>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -87,7 +87,7 @@ if (!$user) {
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['first_name']; ?> <?php echo $user['last_name']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['first_name']; ?> <?php echo $user['last_name']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -105,13 +105,13 @@ if (!$user) {
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <div class="container-fluid">
                <h1>N/A</h1>
             </div>
-            <!-- END CODING HERE -->
+            
         </div>
-        <!----- End of Main Content ----->
+        
     </div>
     <script>
         const toggler = document.querySelector(".toggler-btn");

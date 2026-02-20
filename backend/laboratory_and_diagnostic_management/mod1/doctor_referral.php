@@ -39,13 +39,13 @@ $allPatients = $patient->getAllPatients();
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
-            <!----- Sidebar Navigation ----->
+            
             <li class="sidebar-item">
                 <a href="../labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -155,8 +155,8 @@ $allPatients = $patient->getAllPatients();
                 </ul>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -170,7 +170,7 @@ $allPatients = $patient->getAllPatients();
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -188,7 +188,7 @@ $allPatients = $patient->getAllPatients();
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
                     🏥 Doctor Referral
@@ -316,7 +316,7 @@ $allPatients = $patient->getAllPatients();
                 </div>
             </div>
 
-            <!-- MODAL AREA HERE -->
+            
             <div class="modal fade" id="addScheduleModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
@@ -389,22 +389,22 @@ $allPatients = $patient->getAllPatients();
                     </div>
                 </div>
             </div>
-            <!----- End of Main Content ----->
+            
             <script>
-                // Sidebar toggle
+                
                 document.querySelector(".toggler-btn")?.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
                 });
 
-                // 1. Setup the Modal when "Lab Scheduling (+)" is clicked
+                
                 document.querySelectorAll(".addScheduleBtn").forEach(button => {
                     button.addEventListener("click", function() {
-                        // Fill basic hidden fields
+                        
                         document.getElementById("modalPatientId").value = this.dataset.id || "";
                         document.getElementById("modalAppointmentId").value = this.dataset.appointmentId || "";
                         document.getElementById("modalPatientName").value = this.dataset.name || "";
 
-                        // Get test name placeholder logic
+                        
                         let testName = (this.dataset.test && this.dataset.test.trim() !== "") ?
                             `-- ${this.dataset.test} --` : "-- Select Test --";
 
@@ -412,23 +412,23 @@ $allPatients = $patient->getAllPatients();
                         placeholderOption.textContent = testName;
                         placeholderOption.value = "";
 
-                        // Reset the form for a fresh start
+                        
                         document.getElementById('suggestedTime').value = '';
                         document.getElementById('modalLaboratoristSelect').value = '';
 
-                        // Set MIN DATE to Today (Prevents booking in the past)
+                        
                         const dateInput = document.getElementById('scheduleDateInput');
                         const today = new Date().toISOString().split('T')[0];
                         dateInput.setAttribute('min', today);
-                        dateInput.value = today; // Default to today for convenience
+                        dateInput.value = today; 
 
-                        // Reset visual styles
+                        
                         document.getElementById('modalLaboratoristSelect').classList.remove('is-valid');
                         document.getElementById('suggestedTime').classList.remove('is-valid');
                     });
                 });
 
-                // 2. The AI Logic (Optimized for 24h and Current Time)
+                
                 function runAIScheduling() {
                     const serviceId = document.getElementById('modalTestNameSelect').value;
                     const date = document.getElementById('scheduleDateInput').value;
@@ -443,7 +443,7 @@ $allPatients = $patient->getAllPatients();
                         return;
                     }
 
-                    // UI Feedback
+                    
                     const originalText = btn.innerHTML;
                     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Finding Slot...';
                     btn.disabled = true;
@@ -453,7 +453,7 @@ $allPatients = $patient->getAllPatients();
                     formData.append('service_id', serviceId);
                     formData.append('date', date);
 
-                    // Fetch using the relative path to your PHP controller
+                    
                     fetch('oop/fetchdetails.php', {
                             method: 'POST',
                             body: formData
@@ -464,7 +464,7 @@ $allPatients = $patient->getAllPatients();
                         })
                         .then(text => {
                             try {
-                                // Check if response contains PHP notices/errors before the JSON
+                                
                                 const jsonStart = text.indexOf('{');
                                 const cleanJson = text.substring(jsonStart);
                                 return JSON.parse(cleanJson);
@@ -475,14 +475,14 @@ $allPatients = $patient->getAllPatients();
                         })
                         .then(data => {
                             if (data.success) {
-                                // Fill Time (Supports 24h format HH:mm)
+                                
                                 document.getElementById('suggestedTime').value = data.recommended_time.substring(0, 5);
 
-                                // Fill Laboratorist
+                                
                                 const labSelect = document.getElementById('modalLaboratoristSelect');
                                 labSelect.value = data.recommended_staff_id;
 
-                                // Visual Success Indicators
+                                
                                 labSelect.classList.add('is-valid');
                                 document.getElementById('suggestedTime').classList.add('is-valid');
                             } else {
@@ -499,13 +499,13 @@ $allPatients = $patient->getAllPatients();
                         });
                 }
 
-                // 3. Handle Form Submit (Combine Date + Time for Database)
+                
                 document.getElementById('scheduleForm').addEventListener('submit', function(e) {
                     const date = document.getElementById('scheduleDateInput').value;
                     const time = document.getElementById('suggestedTime').value;
 
                     if (date && time) {
-                        // Formats into YYYY-MM-DDTHH:MM for the hidden datetime-local input
+                        
                         document.getElementById('finalDateTime').value = date + 'T' + time;
                     } else {
                         e.preventDefault();

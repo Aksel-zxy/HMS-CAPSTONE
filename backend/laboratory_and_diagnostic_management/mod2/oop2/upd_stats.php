@@ -86,7 +86,7 @@ class PatientSchedule
         $success = $stmt->execute();
         $stmt->close();
 
-        // ✅ If update succeeded and status is Completed, insert into dl_results (only if not exists)
+        
         if ($success && $new_status === "Completed") {
             $check = $this->conn->prepare("SELECT resultID FROM dl_results WHERE scheduleID = ?");
             $check->bind_param("i", $scheduleID);
@@ -96,7 +96,7 @@ class PatientSchedule
             if ($check->num_rows == 0) {
                 $check->close();
 
-                // fetch patientID from schedule safely
+                
                 $s = $this->conn->prepare("SELECT patientID FROM dl_schedule WHERE scheduleID = ? LIMIT 1");
                 $s->bind_param("i", $scheduleID);
                 $s->execute();
@@ -124,7 +124,7 @@ class PatientSchedule
 }
 
 
-// ----------------- POST Handling -----------------
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $patientSchedule = new PatientSchedule($conn);
 

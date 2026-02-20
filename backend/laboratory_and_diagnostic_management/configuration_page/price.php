@@ -67,13 +67,13 @@ $services = $service->getAll();
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
-            <!----- Sidebar Navigation ----->
+            
             <li class="sidebar-item">
                 <a href="../labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -183,8 +183,8 @@ $services = $service->getAll();
                 </ul>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -198,7 +198,7 @@ $services = $service->getAll();
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -216,20 +216,16 @@ $services = $service->getAll();
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
                     ⚙️ Add or Update Laboratory Services and Prices
                 </h2>
 
-                <!-- Search box -->
-                <!-- <div class="col-md-3 mb-3">
-                    <input type="text" id="searchMachineInput" class="form-control"
-                        style="width:300px; border-radius:20px; padding:8px 15px;"
-                        placeholder="🔍 Search machine type or name...">
-                </div> -->
+                
+                
 
-                <!-- Table container -->
+                
                 <div class="table-responsive" style="height:700px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
                     <table class="table table-bordered table-hover align-middle">
                         <thead class="table-success">
@@ -243,7 +239,7 @@ $services = $service->getAll();
                         </thead>
                         <tbody>
 
-                            <!-- ADD NEW SERVICE -->
+                            
                             <tr>
                                 <form method="POST">
                                     <td><input type="text" name="serviceName" class="form-control" required></td>
@@ -256,7 +252,7 @@ $services = $service->getAll();
                                 </form>
                             </tr>
 
-                            <!-- EXISTING SERVICES -->
+                            
                             <?php while ($row = $services->fetch_assoc()): ?>
                                 <tr>
                                     <form method="POST">
@@ -279,7 +275,7 @@ $services = $service->getAll();
                     </table>
                 </div>
             </div>
-            <!----- End of Main Content ----->
+            
             <script>
                 const toggler = document.querySelector(".toggler-btn");
                 toggler.addEventListener("click", function() {
