@@ -39,9 +39,7 @@ LEFT JOIN patientinfo pi
 LEFT JOIN dl_services ds 
     ON bi.service_id = ds.serviceID
 WHERE pi.patient_id = ?
-  AND br.payment_status = 'Pending';
-
-    ");
+  AND br.payment_status = 'Pending';");
     
     // ✅ Keep bind_param now
     $stmt->bind_param("i", $patient_id);
