@@ -38,19 +38,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'thirteenth_month' => $_POST['thirteenth_month'] ?? 0
     ];
 
+    // Save the compensation & benefits record
+    if ($cbObj->save($data)) {
+        echo "<script>alert('C&B saved successfully!');</script>";
+    } else {
+        echo "<script>alert('Failed to save C&B.');</script>";
+    }
+
+    // Optionally generate payroll after saving
     if (isset($_POST['generate_payroll'])) {
         if ($cbObj->generatePayroll($_POST['pay_period'])) {
-            echo "<script>
-                alert('Payroll generated for this period!');
-            </script>";
+            echo "<script>alert('Payroll generated for this period!');</script>";
         } else {
-            echo "<script>
-                alert('Failed to generate payroll.');
-            </script>";
+            echo "<script>alert('Failed to generate payroll.');</script>";
         }
     }
 
-    // Redirect to the same page or another page
     echo "<script>window.location.href='compensation_benifits.php';</script>";
 }
 

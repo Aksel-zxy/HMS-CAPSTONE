@@ -209,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <input type="text" id="username" name="username" required style="flex: 1;" readonly>
                 </div>
                 <center>
-                  <span id="usernameError" style="color: red;font-size: 15px;"></span>
+                  <span id="usernameError" style="color: red;font-size: 15px;font-weight: bold;"></span>
                 </center>
                 <br />
 

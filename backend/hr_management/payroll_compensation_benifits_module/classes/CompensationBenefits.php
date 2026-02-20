@@ -120,7 +120,7 @@ class CompensationBenefits {
                 ");
 
                 $stmt->bind_param(
-                    "issdddddddddd",
+                    "issiddddddddd",
                     $emp['employee_id'],
                     $period_start,
                     $period_end,
