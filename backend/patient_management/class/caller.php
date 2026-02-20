@@ -27,22 +27,19 @@ public function callBalance($patient_id) {
     bi.quantity,
     bi.unit_price,
     bi.total_price,
+    br.payment_status,
     ds.serviceName,
     ds.description,
     pi.patient_id
-
 FROM billing_items bi
-
 LEFT JOIN billing_records br 
     ON bi.billing_id = br.billing_id
-
-LEFT JOIN patientinfo pi 
+LEFT JOIN patientinfo pi
     ON br.patient_id = pi.patient_id
-
 LEFT JOIN dl_services ds 
     ON bi.service_id = ds.serviceID
-
 WHERE pi.patient_id = ?
+  AND br.payment_status = 'Pending';
 
     ");
     
