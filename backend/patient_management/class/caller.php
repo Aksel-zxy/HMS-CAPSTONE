@@ -36,7 +36,7 @@ FROM billing_items bi
 LEFT JOIN billing_records br 
     ON bi.billing_id = br.billing_id
 
-LEFT JOIN patientinfo PI 
+LEFT JOIN patientinfo pi 
     ON br.patient_id = pi.patient_id
 
 LEFT JOIN dl_services ds 
