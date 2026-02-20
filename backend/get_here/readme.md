@@ -70,3 +70,9 @@ view_payslip.php
 
 KAPAG MAY TANONG PO MAG ASK NA LANG PO SAKIN :))
 MAGSABI DIN PO KAPAG NAG ERROR PARA MAAYOS KO PO
+
+
+
+sa repair_request.php 
+
+add nyo na lang for maintenance ng mga equipment nyo lagay nyo na lang ng sidebar nyo goods na siya 
