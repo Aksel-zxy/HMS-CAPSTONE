@@ -1,26 +1,19 @@
-document.addEventListener("DOMContentLoaded", function() {
-    
-    // --- Sidebar Toggler ---
-    const toggler = document.querySelector(".toggler-btn");
-    if (toggler) {
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
-        });
-    }
+let lineChartInstance = null;
+let donutChartInstance = null;
 
-    // --- Retrieve Data from PHP Bridge ---
-    // We use a default empty array [] if the data is missing to prevent errors
-    const data = window.dashboardData || {};
+window.initCharts = function(data) {
     const lineLabels = data.lineLabels || [];
     const lineData = data.lineData || [];
     const donutLabels = data.donutLabels || [];
     const donutData = data.donutData || [];
 
-    // --- Chart 1: Line Chart (Tests Performed) ---
     const lineCanvas = document.getElementById('lineChart');
     if (lineCanvas) {
+        if (lineChartInstance) {
+            lineChartInstance.destroy();
+        }
         const ctxLine = lineCanvas.getContext('2d');
-        new Chart(ctxLine, {
+        lineChartInstance = new Chart(ctxLine, {
             type: 'line',
             data: {
                 labels: lineLabels.length ? lineLabels : ['No Data'],
@@ -46,22 +39,24 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // --- Chart 2: Donut Chart (Test Breakdown) ---
     const donutCanvas = document.getElementById('donutChart');
     if (donutCanvas) {
+        if (donutChartInstance) {
+            donutChartInstance.destroy();
+        }
         const ctxDonut = donutCanvas.getContext('2d');
-        new Chart(ctxDonut, {
+        donutChartInstance = new Chart(ctxDonut, {
             type: 'doughnut',
             data: {
                 labels: donutLabels.length ? donutLabels : ['No Data'],
                 datasets: [{
                     data: donutData.length ? donutData : [1],
                     backgroundColor: [
-                        '#0d47a1', // Dark Blue
+                        '#0d47a1', 
                         '#1976d2', 
                         '#42a5f5', 
                         '#90caf9', 
-                        '#cfd8dc'  // Grey
+                        '#cfd8dc'  
                     ],
                     borderWidth: 0
                 }]
@@ -78,5 +73,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             }
         });
+    }
+};
+
+document.addEventListener("DOMContentLoaded", function() {
+    const toggler = document.querySelector(".toggler-btn");
+    if (toggler) {
+        toggler.addEventListener("click", function() {
+            document.querySelector("#sidebar").classList.toggle("collapsed");
+        });
+    }
+
+    if (window.dashboardData) {
+        window.initCharts(window.dashboardData);
     }
 });

@@ -429,35 +429,46 @@ $notifCount = $notif->notifCount;
                                     <th>Note</th>
                                     <th>Dispensed Date</th>
                                     <th>Download</th>
+                                    <th>Dispensed By</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php
                                 $sql_records = "
-                SELECT 
-                    p.prescription_id,
-                    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
-                    CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
-                    GROUP_CONCAT(
-                        CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
-                        SEPARATOR '<br>'
-                    ) AS medicines_list,
-                    SUM(i.quantity_prescribed) AS total_quantity,
-                    SUM(i.quantity_dispensed) AS total_dispensed,
-                    p.status,
-                    p.payment_type,
-                    p.note,
-                    DATE_FORMAT(MAX(i.dispensed_date), '%b %e, %Y %l:%i%p') AS dispensed_date
-                FROM pharmacy_prescription p
-                JOIN patientinfo pi ON p.patient_id = pi.patient_id
-                JOIN hr_employees e ON p.doctor_id = e.employee_id
-                JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
-                JOIN pharmacy_inventory m ON i.med_id = m.med_id
-                WHERE p.status IN ('Dispensed', 'Cancelled') 
-                  AND LOWER(e.profession) = 'doctor'
-                GROUP BY p.prescription_id
-                ORDER BY MAX(i.dispensed_date) DESC
-            ";
+SELECT 
+    p.prescription_id,
+    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+    CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
+    GROUP_CONCAT(
+        CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
+        SEPARATOR '<br>'
+    ) AS medicines_list,
+    SUM(i.quantity_prescribed) AS total_quantity,
+    SUM(i.quantity_dispensed) AS total_dispensed,
+    MAX(p.status) AS status,
+    GROUP_CONCAT(
+        DISTINCT 
+        CASE 
+            WHEN i.dispensed_role = 'admin' THEN CONCAT(u.fname, ' ', u.lname)
+            WHEN i.dispensed_role = 'pharmacist' THEN CONCAT(h.first_name, ' ', h.last_name)
+            ELSE NULL
+        END
+        SEPARATOR ', '
+    ) AS staff_name,
+    MAX(p.payment_type) AS payment_type,
+    MAX(p.note) AS note,
+    DATE_FORMAT(MAX(i.dispensed_date), '%b %e, %Y %l:%i%p') AS dispensed_date
+FROM pharmacy_prescription p
+JOIN patientinfo pi ON p.patient_id = pi.patient_id
+JOIN hr_employees e ON p.doctor_id = e.employee_id
+JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
+JOIN pharmacy_inventory m ON i.med_id = m.med_id
+LEFT JOIN users u ON i.dispensed_by = u.user_id AND i.dispensed_role = 'admin'
+LEFT JOIN hr_employees h ON i.dispensed_by = h.employee_id AND i.dispensed_role = 'pharmacist'
+WHERE p.status IN ('Dispensed', 'Cancelled')
+GROUP BY p.prescription_id
+ORDER BY MAX(i.dispensed_date) DESC
+";
 
                                 $records_result = $conn->query($sql_records);
 
@@ -485,6 +496,7 @@ $notifCount = $notif->notifCount;
                                                     <i class="fa-solid fa-download"></i>
                                                 </a>
                                             </td>
+                                            <td><?= $row['staff_name'] ?? 'N/A'; ?></td>
                                         </tr>
 
                                         <!-- Modal for prescription note -->
@@ -507,7 +519,7 @@ $notifCount = $notif->notifCount;
                                 <?php
                                     }
                                 } else {
-                                    echo "<tr><td colspan='11' class='text-center'>No prescriptions found</td></tr>";
+                                    echo "<tr><td colspan='12' class='text-center'>No prescriptions found</td></tr>";
                                 }
                                 ?>
                             </tbody>
@@ -517,170 +529,179 @@ $notifCount = $notif->notifCount;
                             <ul class="pagination justify-content-center" id="recordPagination"></ul>
                         </nav>
                     </div>
+                </div>
+                <!-- 🔎 Search Script -->
+                <script>
+                    document.getElementById("recordSearchInput").addEventListener("keyup", function() {
+                        const searchValue = this.value.toLowerCase();
+                        const rows = document.querySelectorAll("#recordTable tbody tr");
 
-                    <!-- 🔎 Search Script -->
-                    <script>
-                        document.getElementById("recordSearchInput").addEventListener("keyup", function() {
-                            const searchValue = this.value.toLowerCase();
-                            const rows = document.querySelectorAll("#recordTable tbody tr");
-
-                            rows.forEach(row => {
-                                const patientName = row.cells[2].textContent.toLowerCase(); // Patient column
-                                row.style.display = patientName.includes(searchValue) ? "" : "none";
-                            });
+                        rows.forEach(row => {
+                            const patientName = row.cells[2].textContent.toLowerCase(); // Patient column
+                            row.style.display = patientName.includes(searchValue) ? "" : "none";
                         });
+                    });
 
-                        function setupPagination(tableId, paginationId, rowsPerPage = 15) {
-                            let currentPage = 1;
+                    function setupPagination(tableId, paginationId, rowsPerPage = 15) {
+                        let currentPage = 1;
 
-                            function paginate() {
-                                const table = document.getElementById(tableId);
-                                const rows = table.querySelectorAll("tbody tr");
-                                const totalRows = rows.length;
-                                const totalPages = Math.ceil(totalRows / rowsPerPage);
+                        function paginate() {
+                            const table = document.getElementById(tableId);
+                            const rows = table.querySelectorAll("tbody tr");
+                            const totalRows = rows.length;
+                            const totalPages = Math.ceil(totalRows / rowsPerPage);
 
-                                // Hide all rows
-                                rows.forEach(row => row.style.display = "none");
+                            // Hide all rows
+                            rows.forEach(row => row.style.display = "none");
 
-                                // Show only rows for current page
-                                const start = (currentPage - 1) * rowsPerPage;
-                                const end = start + rowsPerPage;
-                                for (let i = start; i < end && i < totalRows; i++) {
-                                    rows[i].style.display = "";
-                                }
-
-                                // Build pagination
-                                const pagination = document.getElementById(paginationId);
-                                pagination.innerHTML = "";
-
-                                // Prev button
-                                const prev = document.createElement("li");
-                                prev.className = "page-item" + (currentPage === 1 ? " disabled" : "");
-                                prev.innerHTML = `<a class="page-link" href="#">&laquo;</a>`;
-                                prev.addEventListener("click", e => {
-                                    e.preventDefault();
-                                    if (currentPage > 1) {
-                                        currentPage--;
-                                        paginate();
-                                    }
-                                });
-                                pagination.appendChild(prev);
-
-                                // Page numbers
-                                for (let i = 1; i <= totalPages; i++) {
-                                    const li = document.createElement("li");
-                                    li.className = "page-item" + (i === currentPage ? " active" : "");
-                                    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
-                                    li.addEventListener("click", e => {
-                                        e.preventDefault();
-                                        currentPage = i;
-                                        paginate();
-                                    });
-                                    pagination.appendChild(li);
-                                }
-
-                                // Next button
-                                const next = document.createElement("li");
-                                next.className = "page-item" + (currentPage === totalPages ? " disabled" : "");
-                                next.innerHTML = `<a class="page-link" href="#">&raquo;</a>`;
-                                next.addEventListener("click", e => {
-                                    e.preventDefault();
-                                    if (currentPage < totalPages) {
-                                        currentPage++;
-                                        paginate();
-                                    }
-                                });
-                                pagination.appendChild(next);
+                            // Show only rows for current page
+                            const start = (currentPage - 1) * rowsPerPage;
+                            const end = start + rowsPerPage;
+                            for (let i = start; i < end && i < totalRows; i++) {
+                                rows[i].style.display = "";
                             }
 
-                            paginate();
+                            // Build pagination
+                            const pagination = document.getElementById(paginationId);
+                            pagination.innerHTML = "";
+
+                            // Prev button
+                            const prev = document.createElement("li");
+                            prev.className = "page-item" + (currentPage === 1 ? " disabled" : "");
+                            prev.innerHTML = `<a class="page-link" href="#">&laquo;</a>`;
+                            prev.addEventListener("click", e => {
+                                e.preventDefault();
+                                if (currentPage > 1) {
+                                    currentPage--;
+                                    paginate();
+                                }
+                            });
+                            pagination.appendChild(prev);
+
+                            // Page numbers
+                            for (let i = 1; i <= totalPages; i++) {
+                                const li = document.createElement("li");
+                                li.className = "page-item" + (i === currentPage ? " active" : "");
+                                li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                                li.addEventListener("click", e => {
+                                    e.preventDefault();
+                                    currentPage = i;
+                                    paginate();
+                                });
+                                pagination.appendChild(li);
+                            }
+
+                            // Next button
+                            const next = document.createElement("li");
+                            next.className = "page-item" + (currentPage === totalPages ? " disabled" : "");
+                            next.innerHTML = `<a class="page-link" href="#">&raquo;</a>`;
+                            next.addEventListener("click", e => {
+                                e.preventDefault();
+                                if (currentPage < totalPages) {
+                                    currentPage++;
+                                    paginate();
+                                }
+                            });
+                            pagination.appendChild(next);
                         }
 
-                        // Initialize for both tabs
-                        document.addEventListener("DOMContentLoaded", function() {
-                            setupPagination("prescriptionTable", "prescriptionPagination", 15);
-                            setupPagination("recordTable", "recordPagination", 15);
-                        });
-                    </script>
+                        paginate();
+                    }
+
+                    // Initialize for both tabs
+                    document.addEventListener("DOMContentLoaded", function() {
+                        setupPagination("prescriptionTable", "prescriptionPagination", 15);
+                        setupPagination("recordTable", "recordPagination", 15);
+                    });
+                </script>
 
 
-
-                </div>
 
             </div>
 
-            <!-- END CODING HERE -->
         </div>
-        <!----- End of Main Content ----->
+
+        <!-- END CODING HERE -->
+    </div>
+    <!----- End of Main Content ----->
     </div>
     <script>
         function handleStatusChange(selectEl, prescriptionId, oldStatus) {
             const newStatus = selectEl.value;
 
-            // Prevent changing if old status is Dispensed or Cancelled
+            // 1️⃣ Prevent changing if already Dispensed or Cancelled
             if (oldStatus === 'Dispensed' || oldStatus === 'Cancelled') {
                 alert("Status cannot be changed once it is Dispensed or Cancelled.");
                 selectEl.value = oldStatus;
                 return;
             }
 
+            // 2️⃣ Do nothing if status didn't change
             if (newStatus === oldStatus) return;
 
-            if (!confirm("Are you sure you want to change status to " + newStatus + "?")) {
+            // 3️⃣ Confirm change
+            if (!confirm(`Are you sure you want to change status to "${newStatus}"?`)) {
                 selectEl.value = oldStatus;
                 return;
             }
 
+            // 4️⃣ Send update to backend
             fetch('update_prescription.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: 'prescription_id=' + prescriptionId + '&status=' + newStatus
+                    body: `prescription_id=${prescriptionId}&status=${newStatus}`
                 })
                 .then(res => res.json())
                 .then(data => {
+                    const row = selectEl.closest('tr');
+
                     if (data.error) {
                         alert(data.error);
                         selectEl.value = oldStatus;
-                    } else if (data.success) {
-                        alert(data.success);
-                        const row = selectEl.closest('tr');
+                        return;
+                    }
 
-                        // Update Quantity Dispensed if returned
-                        if (data.dispensed_quantity !== undefined) {
-                            row.querySelector('td:nth-child(6)').textContent = data.dispensed_quantity;
+                    // 5️⃣ Show success + warnings if any
+                    let message = data.success || "Status updated successfully.";
+                    if (data.warnings && data.warnings.length > 0) {
+                        message += "\n\nWarnings:\n- " + data.warnings.join("\n- ");
+                    }
+                    alert(message);
+
+                    // 6️⃣ Update Quantity Dispensed if returned
+                    if (data.dispensed_quantity !== undefined) {
+                        const qtyCell = row.querySelector('td:nth-child(6)');
+                        if (qtyCell) qtyCell.textContent = data.dispensed_quantity;
+                    }
+
+                    // 7️⃣ Move row between tabs based on new status
+                    if (newStatus === 'Dispensed' || newStatus === 'Cancelled') {
+                        // Disable select
+                        selectEl.disabled = true;
+
+                        // Replace payment type select with text
+                        const paymentCell = row.querySelector('td:nth-child(8)');
+                        const paymentSelect = paymentCell?.querySelector('select');
+                        if (paymentSelect) {
+                            paymentCell.textContent = paymentSelect.value.charAt(0).toUpperCase() + paymentSelect.value.slice(1);
                         }
 
-                        // Move to Record tab if Dispensed or Cancelled
-                        if (newStatus === 'Dispensed' || newStatus === 'Cancelled') {
-                            selectEl.disabled = true;
-
-                            // Update payment type text
-                            const paymentSelect = row.querySelector('td:nth-child(8) select');
-                            if (paymentSelect) {
-                                paymentSelect.parentNode.textContent = paymentSelect.value.charAt(0).toUpperCase() + paymentSelect.value.slice(1);
-                            }
-
-                            // Remove from Prescription tab
+                        // Move to Record tab
+                        const recordTable = document.querySelector("#record table tbody");
+                        if (recordTable) {
                             row.parentNode.removeChild(row);
-
-                            // Append to Record tab
-                            const recordTable = document.querySelector("#record table tbody");
-                            if (recordTable) {
-                                recordTable.appendChild(row);
-                                row.style.opacity = "0.8";
-                            }
+                            recordTable.appendChild(row);
+                            row.style.opacity = "0.8";
                         }
-
-                        // Keep in Prescription tab if Pending
-                        if (newStatus === 'Pending') {
-                            const prescriptionTable = document.querySelector("#prescription table tbody");
-                            if (prescriptionTable && row.closest("#record")) {
-                                row.parentNode.removeChild(row);
-                                prescriptionTable.appendChild(row);
-                                row.style.opacity = "1";
-                            }
+                    } else if (newStatus === 'Pending') {
+                        // Move back to Prescription tab if status reverted
+                        const prescriptionTable = document.querySelector("#prescription table tbody");
+                        if (prescriptionTable && row.closest("#record")) {
+                            row.parentNode.removeChild(row);
+                            prescriptionTable.appendChild(row);
+                            row.style.opacity = "1";
                         }
                     }
                 })

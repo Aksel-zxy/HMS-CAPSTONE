@@ -1,7 +1,7 @@
 <?php
 include __DIR__ . '../../../../SQL/config.php';
 
-// Query to join result schedules with results and schedule details
+
 $sql = "
     SELECT rs.id AS rsID, r.resultID, r.patientID, r.status, r.resultDate, r.result,
            s.scheduleID, s.serviceName

@@ -10,7 +10,7 @@ if (!$scheduleID) {
     exit();
 }
 
-// Fetch patient & schedule info
+
 $query = "SELECT s.scheduleID, s.patientID, s.serviceName, s.scheduleDate, s.scheduleTime,
                  p.fname, p.lname
           FROM dl_schedule s

@@ -15,7 +15,21 @@ $user_query->execute();
 $user = $user_query->get_result()->fetch_assoc();
 
 // --- 1. DATE & FILTER LOGIC ---
-$selected_week = $_GET['week'] ?? date('Y-m-d', strtotime('monday this week'));
+// If week is provided, get the Monday of that week. Otherwise, get Monday of current week.
+if (isset($_GET['week']) && !empty($_GET['week'])) {
+    $input_date = $_GET['week'];
+    // If the input date is already a Monday, strtotime('monday this week') might jump incorrectly depending on PHP version.
+    // It's safer to check if it's already Monday.
+    $day_of_week = date('N', strtotime($input_date));
+    if ($day_of_week == 1) {
+        $selected_week = $input_date;
+    } else {
+        $selected_week = date('Y-m-d', strtotime('monday this week', strtotime($input_date)));
+    }
+} else {
+    $selected_week = date('Y-m-d', strtotime('monday this week'));
+}
+
 $week_end = date('Y-m-d', strtotime("$selected_week +6 days"));
 $display_range = date('M d', strtotime($selected_week)) . " — " . date('M d, Y', strtotime($week_end));
 
@@ -26,7 +40,7 @@ $next_week = date('Y-m-d', strtotime("$selected_week +7 days"));
 $query = "SELECT e.first_name, e.last_name, e.profession, e.role, e.department, s.*
           FROM hr_employees e
           INNER JOIN shift_scheduling s ON e.employee_id = s.employee_id
-          WHERE s.week_start = ?
+          WHERE ? BETWEEN s.week_start AND DATE_ADD(s.week_start, INTERVAL 6 DAY)
           ORDER BY e.profession ASC, e.last_name ASC";
 
 $stmt = $conn->prepare($query);
@@ -41,6 +55,13 @@ $events = [];
 
 while ($row = $result->fetch_assoc()) {
     $table_rows[] = $row;
+    
+    // Override the visual week display to match the actual DB record (if off by 1-6 days)
+    if (count($table_rows) === 1) {
+        $actual_start = $row['week_start'];
+        $actual_end = date('Y-m-d', strtotime("$actual_start +6 days"));
+        $display_range = date('M d', strtotime($actual_start)) . " — " . date('M d, Y', strtotime($actual_end));
+    }
 
     foreach ($days_map as $prefix => $offset) {
         $start = $row[$prefix . '_start'];

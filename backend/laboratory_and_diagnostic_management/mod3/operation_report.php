@@ -22,8 +22,12 @@ if (!$user) {
     exit();
 }
 
+$selected_month = isset($_GET['month']) ? (int)$_GET['month'] : date('m');
+$selected_year = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
+$month_name = date("F", mktime(0, 0, 0, $selected_month, 10));
+
 $total_patients = 0;
-$sql_patients = "SELECT COUNT(DISTINCT patientID) as count FROM dl_schedule";
+$sql_patients = "SELECT COUNT(DISTINCT patientID) as count FROM dl_schedule WHERE MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year";
 $res_p = $conn->query($sql_patients);
 if ($res_p && $row = $res_p->fetch_assoc()) {
     $total_patients = $row['count'];
@@ -34,7 +38,7 @@ $chart_counts = [];
 
 $sql_line = "SELECT scheduleDate as log_date, COUNT(*) as total 
              FROM dl_schedule 
-             WHERE scheduleDate >= CURDATE() - INTERVAL 7 DAY 
+             WHERE MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year 
              GROUP BY scheduleDate 
              ORDER BY log_date ASC";
 
@@ -51,6 +55,7 @@ $donut_data = [];
 
 $sql_donut = "SELECT serviceName, COUNT(*) as total 
               FROM dl_schedule 
+              WHERE MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year 
               GROUP BY serviceName 
               ORDER BY total DESC 
               LIMIT 5";
@@ -66,7 +71,8 @@ if ($res_donut) {
 $avg_turnaround = "0";
 $sql_turnaround = "SELECT AVG(TIMESTAMPDIFF(MINUTE, CONCAT(scheduleDate, ' ', scheduleTime), completed_at)) as avg_min 
                    FROM dl_schedule 
-                   WHERE completed_at IS NOT NULL AND completed_at != '0000-00-00 00:00:00'";
+                   WHERE completed_at IS NOT NULL AND completed_at != '0000-00-00 00:00:00' 
+                   AND MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year";
 
 $res_turn = $conn->query($sql_turnaround);
 if ($res_turn && $row = $res_turn->fetch_assoc()) {
@@ -102,6 +108,40 @@ $json_dates = json_encode($chart_dates);
 $json_counts = json_encode($chart_counts);
 $json_donut_labels = json_encode($donut_labels);
 $json_donut_data = json_encode($donut_data);
+
+
+$sql_all_tests = "SELECT serviceName, COUNT(*) as total 
+                  FROM dl_schedule 
+                  WHERE MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year
+                  GROUP BY serviceName 
+                  ORDER BY total DESC";
+$res_all_tests = $conn->query($sql_all_tests);
+$all_tests = [];
+$total_all_tests = 0;
+if ($res_all_tests) {
+    while ($row = $res_all_tests->fetch_assoc()) {
+        $all_tests[] = $row;
+        $total_all_tests += $row['total'];
+    }
+}
+
+if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'total_patients' => number_format($total_patients),
+        'avg_turnaround' => $avg_turnaround,
+        'equipment_health' => $equipment_health,
+        'lineLabels' => $chart_dates,
+        'lineData' => $chart_counts,
+        'donutLabels' => $donut_labels,
+        'donutData' => $donut_data,
+        'all_tests' => $all_tests,
+        'total_all_tests' => $total_all_tests,
+        'month_name' => $month_name,
+        'selected_year' => $selected_year
+    ]);
+    exit();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -113,17 +153,132 @@ $json_donut_data = json_encode($donut_data);
     <link rel="shortcut icon" href="../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/CSS/super.css">
+    <style>
+        .print-container {
+            display: none;
+            width: 100%; 
+            background: white;
+        }
+        .print-header-banner {
+            background-color: #1e5b86 !important; 
+            color: #ffffff !important;
+            padding: 25px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .print-body { 
+            padding: 0 40px; 
+            font-family: Arial, sans-serif;
+        }
+        .print-info p { 
+            margin: 0; 
+            font-size: 15px; 
+        }
+        .print-info p strong {
+            font-weight: bold;
+        }
+        .print-line { 
+            border-top: 2px solid #a3b8c2; 
+            margin: 20px 0; 
+        }
+        .print-section-title { 
+            font-weight: bold; 
+            font-size: 16px; 
+            margin-bottom: 15px; 
+            text-transform: uppercase; 
+            color: #000;
+        }
+        .print-summary-text { 
+            font-size: 14px; 
+            line-height: 1.6; 
+            margin-bottom: 20px; 
+            text-align: justify; 
+        }
+        .print-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 50px; 
+            font-size: 14px; 
+            color: #000;
+        }
+        .print-table th { 
+            background-color: #ccebc5 !important; 
+            padding: 10px 15px; 
+            text-align: left; 
+            font-weight: bold;
+            color: #000;
+            border-bottom: 1px solid #ccebc5;
+        }
+        .print-table td { 
+            padding: 8px 15px; 
+            border-bottom: 1px solid #ddd;
+            color: #000;
+        }
+        .print-table tr:nth-child(even) td { 
+            background-color: #f2f2f2 !important; 
+        }
+        .print-signatures { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-top: 100px;
+            margin-bottom: 40px;
+        }
+        .signature-box { 
+            width: 25%; 
+            text-align: center; 
+        }
+        .signature-line { 
+            border-top: 1px solid black; 
+            margin-bottom: 5px; 
+        }
+        .signature-text { 
+            font-size: 14px; 
+            font-weight: bold; 
+            color: #000;
+        }
+
+        @media print {
+            @page {
+                size: auto;
+                margin: 0; 
+            }
+            body { 
+                margin: 0; 
+                padding: 0; 
+                background-color: #ffffff; 
+                -webkit-print-color-adjust: exact;
+                color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            #sidebar, .topbar, .no-print { 
+                display: none !important; 
+            }
+            .main { 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                width: 100% !important; 
+                background-color: #ffffff !important; 
+                overflow: visible !important;
+            }
+            .print-container { 
+                display: block !important; 
+            }
+        }
+    </style>
 </head>
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
-            <!----- Sidebar Navigation ----->
+            
             <li class="sidebar-item">
                 <a href="../labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -233,8 +388,8 @@ $json_donut_data = json_encode($donut_data);
                 </ul>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -248,7 +403,7 @@ $json_donut_data = json_encode($donut_data);
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -266,15 +421,25 @@ $json_donut_data = json_encode($donut_data);
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
-            <div class="container-fluid p-4">
+            
+            <div class="container-fluid p-4 no-print">
 
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h3 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;"
                      class="mb-0 text-secondary">Monthly Laboratory Report</h3>
-                    <button class="btn btn-primary px-4 py-2 shadow-sm" onclick="window.print()">
-                        <i class="fas fa-print me-2"></i> Print Report
-                    </button>
+                    <div class="d-flex align-items-center">
+                        <form id="filterForm" class="d-flex align-items-center me-3 mb-0" onsubmit="return false;">
+                            <select id="filterMonth" class="form-select me-2" style="width: auto;">
+                                
+                            </select>
+                            <select id="filterYear" class="form-select me-2" style="width: auto;">
+                                
+                            </select>
+                        </form>
+                        <button class="btn btn-primary px-4 py-2 shadow-sm" onclick="downloadPDF()">
+                            <i class="fas fa-file-pdf me-2"></i> Download Report
+                        </button>
+                    </div>
                 </div>
 
                 <div class="row g-4 mb-4">
@@ -306,7 +471,7 @@ $json_donut_data = json_encode($donut_data);
                                 <div class="me-3 rounded" style="width: 8px; height: 40px; background-color: #0d6efd;"></div>
                                 <div>
                                     <h6 class="text-muted mb-0">Total Patients</h6>
-                                    <h4 class="mb-0 fw-bold"><?php echo number_format($total_patients); ?></h4>
+                                    <h4 id="valTotalPatients" class="mb-0 fw-bold"><?php echo number_format($total_patients); ?></h4>
                                 </div>
                             </div>
                         </div>
@@ -318,7 +483,7 @@ $json_donut_data = json_encode($donut_data);
                                 <div class="me-3 rounded" style="width: 8px; height: 40px; background-color: #6ea8fe;"></div>
                                 <div>
                                     <h6 class="text-muted mb-0">Avg Turnaround Time</h6>
-                                    <h4 class="mb-0 fw-bold"><?php echo $avg_turnaround; ?> hrs</h4>
+                                    <h4 id="valAvgTurnaround" class="mb-0 fw-bold"><?php echo $avg_turnaround; ?> hrs</h4>
                                 </div>
                             </div>
                         </div>
@@ -328,17 +493,15 @@ $json_donut_data = json_encode($donut_data);
                         <div class="card border-0 shadow-sm">
                             <div class="card-body d-flex align-items-center">
 
-                                <div class="me-3 rounded" style="width: 8px; height: 40px; 
+                                <div id="equipHealthColor" class="me-3 rounded" style="width: 8px; height: 40px; 
                 background-color: <?php echo ($equipment_health < 50) ? '#dc3545' : (($equipment_health < 80) ? '#ffc107' : '#adb5bd'); ?>;">
                                 </div>
 
                                 <div>
                                     <h6 class="text-muted mb-0">Equipment Health</h6>
-                                    <h4 class="mb-0 fw-bold"><?php echo $equipment_health; ?>%</h4>
+                                    <h4 id="valEquipHealth" class="mb-0 fw-bold"><?php echo $equipment_health; ?>%</h4>
 
-                                    <?php if ($equipment_health < 100): ?>
-                                        <small class="text-danger" style="font-size: 12px;">Issues Detected</small>
-                                    <?php endif; ?>
+                                    <small id="equipHealthWarning" class="text-danger" style="font-size: 12px; display: <?php echo ($equipment_health < 100) ? 'block' : 'none'; ?>;">Issues Detected</small>
                                 </div>
                             </div>
                         </div>
@@ -346,8 +509,77 @@ $json_donut_data = json_encode($donut_data);
                 </div>
 
             </div>
+
+            
+            <div class="print-container">
+                <div class="print-header-banner">
+                    Diagnostic and Laboratory Services Report
+                </div>
+                <div class="print-body">
+                    <div class="print-info">
+                        <p><strong>Hospital:</strong> <?php echo "Dr. Eduardo V. Roquero Memorial Hospital"; ?></p>
+                        <p><strong>Reporting period:</strong> <span id="valPrintPeriod"><?php echo $month_name . ' ' . $selected_year; ?></span></p>
+                    </div>
+                    
+                    <div class="print-line"></div>
+                    
+                    <div class="print-section-title">SUMMARY</div>
+                    <p class="print-summary-text">
+                        This report presents the number of tests recorded per laboratory service category during the reporting period. It helps monitor testing trends, resource allocation, and overall laboratory performance.
+                    </p>
+                    
+                    <div class="print-line"></div>
+                    
+                    <div class="print-section-title">TEST STATISTIC</div>
+                    <table class="print-table">
+                        <thead>
+                            <tr>
+                                <th>TEST NAME</th>
+                                <th>TOTAL TESTS</th>
+                                <th>PERCENTAGE (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="printTableBody">
+                            <?php if (empty($all_tests)): ?>
+                            <tr>
+                                <td colspan="3" style="text-align:center;">No tests recorded in this period.</td>
+                            </tr>
+                            <?php else: ?>
+                                <?php foreach ($all_tests as $test): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($test['serviceName']); ?></td>
+                                    <td><?php echo number_format($test['total']); ?></td>
+                                    <td>
+                                        <?php 
+                                        $pct = ($total_all_tests > 0) ? round(($test['total'] / $total_all_tests) * 100) : 0;
+                                        echo $pct . '%'; 
+                                        ?>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                    
+                    <div class="print-signatures">
+                        <div class="signature-box">
+                            <div class="signature-line"></div>
+                            <div class="signature-text">Prepared by</div>
+                        </div>
+                        <div class="signature-box">
+                            <div class="signature-line"></div>
+                            <div class="signature-text">Reviewed by</div>
+                        </div>
+                        <div class="signature-box">
+                            <div class="signature-line"></div>
+                            <div class="signature-text">Approved by</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
         </div>
-        <!----- End of Main Content ----->
+        
         <script>
             window.dashboardData = {
                 lineLabels: <?php echo $json_dates; ?>,
@@ -355,11 +587,118 @@ $json_donut_data = json_encode($donut_data);
                 donutLabels: <?php echo $json_donut_labels; ?>,
                 donutData: <?php echo $json_donut_data; ?>
             };
+            
+            const selectedMonth = <?php echo $selected_month; ?>;
+            const selectedYear = <?php echo $selected_year; ?>;
+            const currentYear = new Date().getFullYear();
+            const currentMonth = new Date().getMonth() + 1;
+            
+            const filterMonth = document.getElementById('filterMonth');
+            const filterYear = document.getElementById('filterYear');
+
+            
+            for (let y = 2025; y <= currentYear; y++) {
+                let opt = new Option(y, y);
+                if (y == selectedYear) opt.selected = true;
+                filterYear.add(opt);
+            }
+
+            
+            function updateMonths() {
+                const year = parseInt(filterYear.value);
+                const maxMonth = (year === currentYear) ? currentMonth : 12;
+                
+                
+                let currentVal = parseInt(filterMonth.value) || selectedMonth; 
+                filterMonth.innerHTML = '';
+                
+                for (let m = 1; m <= maxMonth; m++) {
+                    const d = new Date(2000, m - 1, 1);
+                    const name = d.toLocaleString('en-US', { month: 'long' });
+                    let opt = new Option(name, m);
+                    if (m === currentVal) {
+                        opt.selected = true;
+                    }
+                    filterMonth.add(opt);
+                }
+                
+                
+                if (parseInt(filterMonth.value) !== currentVal && currentVal > maxMonth) {
+                    filterMonth.value = maxMonth;
+                }
+            }
+            updateMonths();
+
+            
+            function fetchReportData() {
+                const m = filterMonth.value;
+                const y = filterYear.value;
+                
+                fetch(`operation_report.php?ajax=1&month=${m}&year=${y}`)
+                .then(res => res.json())
+                .then(data => {
+                    
+                    document.getElementById('valTotalPatients').innerText = data.total_patients;
+                    document.getElementById('valAvgTurnaround').innerText = data.avg_turnaround + ' hrs';
+                    document.getElementById('valEquipHealth').innerText = data.equipment_health + '%';
+                    
+                    document.getElementById('equipHealthWarning').style.display = (data.equipment_health < 100) ? 'block' : 'none';
+                    let healthColor = (data.equipment_health < 50) ? '#dc3545' : ((data.equipment_health < 80) ? '#ffc107' : '#adb5bd');
+                    document.getElementById('equipHealthColor').style.backgroundColor = healthColor;
+
+                    
+                    const tbody = document.getElementById('printTableBody');
+                    tbody.innerHTML = '';
+                    if (data.all_tests.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No tests recorded in this period.</td></tr>';
+                    } else {
+                        data.all_tests.forEach(test => {
+                            let pct = (data.total_all_tests > 0) ? Math.round((test.total / data.total_all_tests) * 100) : 0;
+                            let tr = document.createElement('tr');
+                            tr.innerHTML = `<td>${test.serviceName}</td><td>${test.total}</td><td>${pct}%</td>`;
+                            tbody.appendChild(tr);
+                        });
+                    }
+
+                    
+                    document.getElementById('valPrintPeriod').innerText = `${data.month_name} ${data.selected_year}`;
+
+                    
+                    if (window.initCharts) {
+                        window.initCharts(data);
+                    }
+                })
+                .catch(err => console.error("Error fetching data: ", err));
+            }
+
+            filterYear.addEventListener('change', () => {
+                updateMonths();
+                fetchReportData();
+            });
+            filterMonth.addEventListener('change', fetchReportData);
             const toggler = document.querySelector(".toggler-btn");
             toggler.addEventListener("click", function() {
                 document.querySelector("#sidebar").classList.toggle("collapsed");
             });
+
+            function downloadPDF() {
+                const element = document.querySelector('.print-container');
+                element.style.display = 'block';
+                
+                var opt = {
+                    margin:       [0.5, 0], 
+                    filename:     'Lab_Report_<?php echo $month_name; ?>_<?php echo $selected_year; ?>.pdf',
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2 },
+                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+                
+                html2pdf().set(opt).from(element).save().then(() => {
+                    element.style.display = 'none';
+                });
+            }
         </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script src="../assets/javascript/lab_report.js"></script>
         <script src="../assets/Bootstrap/all.min.js"></script>

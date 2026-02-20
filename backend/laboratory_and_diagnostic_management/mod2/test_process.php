@@ -38,13 +38,13 @@ $allPatients = $patient->getAllPatients();
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
-            <!----- Sidebar Navigation ----->
+            
             <li class="sidebar-item">
                 <a href="../labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -154,8 +154,8 @@ $allPatients = $patient->getAllPatients();
                 </ul>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -169,7 +169,7 @@ $allPatients = $patient->getAllPatients();
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -187,7 +187,7 @@ $allPatients = $patient->getAllPatients();
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;">
                     🧾 Sample Processing
@@ -268,7 +268,7 @@ $allPatients = $patient->getAllPatients();
                                         $dateTimeDisplay = "N/A";
                                     }
 
-                                    // Placeholder AI impression (for modal)
+                                    
                                     $aiImpression = $allCompleted
                                         ? "AI Impression: All results appear stable."
                                         : "AI Impression: Awaiting completion of tests.";
@@ -307,7 +307,7 @@ $allPatients = $patient->getAllPatients();
                                         </td>
                                         <td style="padding:12px; text-align:center;">
                                             <?php if ($allCompleted): ?>
-                                                <!-- Open remarks modal -->
+                                                
                                                 <button class="btn btn-primary add-remarks-btn"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#remarksModal"
@@ -330,7 +330,7 @@ $allPatients = $patient->getAllPatients();
                     </table>
                 </div>
             </div>
-            <!-- MODAL AREA -->
+            
             <div class="modal fade" id="viewResultModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
@@ -392,7 +392,7 @@ $allPatients = $patient->getAllPatients();
                 </div>
             </div>
         </div>
-        <!----- End of Main Content ----->
+        
         <script src="../assets/javascript/test_process.js"></script>
         <script src="../assets/Bootstrap/all.min.js"></script>
         <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

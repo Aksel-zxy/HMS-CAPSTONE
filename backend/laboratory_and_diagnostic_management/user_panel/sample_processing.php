@@ -69,7 +69,7 @@ $result = $stmt->get_result();
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
@@ -78,7 +78,7 @@ $result = $stmt->get_result();
 
             <div class="menu-title">Navigation</div>
 
-            <!----- Sidebar Navigation ----->
+            
 
             <li class="sidebar-item">
                 <a href="user_lab.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
@@ -102,8 +102,8 @@ $result = $stmt->get_result();
                 </a>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -117,7 +117,7 @@ $result = $stmt->get_result();
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['first_name']; ?> <?php echo $user['last_name']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['first_name']; ?> <?php echo $user['last_name']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -135,7 +135,7 @@ $result = $stmt->get_result();
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <div class="container-fluid">
                 <h3>Scheduled Patients</h3>
                 <table class="table table-bordered">
@@ -170,9 +170,9 @@ $result = $stmt->get_result();
                     </tbody>
                 </table>
             </div>
-            <!-- END CODING HERE -->
+            
         </div>
-        <!----- End of Main Content ----->
+        
     </div>
     <script>
         const toggler = document.querySelector(".toggler-btn");

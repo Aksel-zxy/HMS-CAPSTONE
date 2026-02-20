@@ -35,13 +35,13 @@ if (!$user) {
 
 <body>
     <div class="d-flex">
-        <!----- Sidebar ----->
+        
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
             <div class="menu-title">Navigation</div>
-            <!----- Sidebar Navigation ----->
+            
             <li class="sidebar-item">
                 <a href="../labtech_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
@@ -151,8 +151,8 @@ if (!$user) {
                 </ul>
             </li>
         </aside>
-        <!----- End of Sidebar ----->
-        <!----- Main Content ----->
+        
+        
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -166,7 +166,7 @@ if (!$user) {
                 </div>
                 <div class="logo">
                     <div class="dropdown d-flex align-items-center">
-                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span><!-- Display the logged-in user's name -->
+                        <span class="username ml-1 me-2"><?php echo $user['fname']; ?> <?php echo $user['lname']; ?></span>
                         <button class="btn dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i>
                         </button>
@@ -184,20 +184,20 @@ if (!$user) {
                     </div>
                 </div>
             </div>
-            <!-- START CODING HERE -->
+            
             <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
                 <h2 style="font-family:Arial, sans-serif; color:#198754; margin-bottom:20px; border-bottom:2px solid #198754; padding-bottom:8px;">
                     ⚙️ Laboratory & Diagnostic Equipment and Maintenance Schedule
                 </h2>
 
-                <!-- Search box -->
+                
                 <div class="col-md-3 mb-3">
                     <input type="text" id="searchMachineInput" class="form-control"
                         style="width:300px; border-radius:20px; padding:8px 15px;"
                         placeholder="🔍 Search machine type or name...">
                 </div>
 
-                <!-- Table container -->
+                
                 <div style="height:600px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
                     <table id="machineTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
                         <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
@@ -218,16 +218,16 @@ if (!$user) {
 
                                         <td style="padding:12px; text-align:center;">
                                             <?php
-                                            // Check the status (ensure your DB has a 'status' column)
+                                            
                                             $status = isset($row['status']) ? $row['status'] : 'Available';
 
-                                            // Set color based on status
+                                            
                                             if ($status == 'Under Maintenance') {
-                                                $badgeClass = 'bg-danger'; // Red for Maintenance
+                                                $badgeClass = 'bg-danger'; 
                                             } elseif ($status == 'In Use') {
-                                                $badgeClass = 'bg-warning text-dark'; // Yellow for In Use
+                                                $badgeClass = 'bg-warning text-dark'; 
                                             } else {
-                                                $badgeClass = 'bg-success'; // Green for Available/active
+                                                $badgeClass = 'bg-success'; 
                                             }
                                             ?>
                                             <span class="badge rounded-pill <?php echo $badgeClass; ?>" style="font-size: 0.9em; padding: 8px 12px;">
@@ -248,7 +248,7 @@ if (!$user) {
                     </table>
                 </div>
             </div>
-            <!----- End of Main Content ----->
+            
             <script>
                 const toggler = document.querySelector(".toggler-btn");
                 toggler.addEventListener("click", function() {

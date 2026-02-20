@@ -215,15 +215,21 @@ class Medicine
 
     public function dispenseMedicine($med_id, $dispense_qty)
     {
+        // Get batches with non-expired stock only, earliest expiry first
         $stmt = $this->conn->prepare("
-            SELECT batch_id, stock_quantity 
-            FROM pharmacy_stock_batches 
-            WHERE med_id = ? AND stock_quantity > 0
-            ORDER BY expiry_date ASC
-        ");
+        SELECT batch_id, stock_quantity, expiry_date 
+        FROM pharmacy_stock_batches 
+        WHERE med_id = ? AND stock_quantity > 0 AND expiry_date >= CURDATE()
+        ORDER BY expiry_date ASC
+    ");
         $stmt->bind_param("i", $med_id);
         $stmt->execute();
         $result = $stmt->get_result();
+
+        if ($result->num_rows === 0) {
+            // No available non-expired stock
+            return false;
+        }
 
         while ($dispense_qty > 0 && ($row = $result->fetch_assoc())) {
             $batch_id = $row['batch_id'];
@@ -243,16 +249,18 @@ class Medicine
             }
         }
 
+        // Update total stock in inventory
         $stmt2 = $this->conn->prepare("
-            UPDATE pharmacy_inventory
-            SET stock_quantity = (SELECT IFNULL(SUM(stock_quantity),0) FROM pharmacy_stock_batches WHERE med_id = ?)
-            WHERE med_id = ?
-        ");
+        UPDATE pharmacy_inventory
+        SET stock_quantity = (SELECT IFNULL(SUM(stock_quantity),0) FROM pharmacy_stock_batches WHERE med_id = ?)
+        WHERE med_id = ?
+    ");
         $stmt2->bind_param("ii", $med_id, $med_id);
         $stmt2->execute();
 
         $this->autoUpdateStatus($med_id);
-        return $dispense_qty === 0;
+
+        return $dispense_qty === 0; // true if fully dispensed, false if insufficient non-expired stock
     }
 
     public function updateMedicine($med_id, $med_name, $generic_name, $brand_name, $prescription_required, $category, $dosage, $unit, $unit_price)
