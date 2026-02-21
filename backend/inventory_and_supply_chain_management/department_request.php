@@ -11,12 +11,42 @@ if (!isset($requests))       $requests       = [];
 /* =====================================================
    SAFE DEFAULTS (PREVENT UNDEFINED ERRORS)
 =====================================================*/
-$statusFilter = strtolower(trim($_GET['status'] ?? 'pending'));
-$searchDept   = trim($_GET['search_dept'] ?? '');
-$requests     = [];
-$counts       = [];
-$errorMessage = '';
+$statusFilter   = strtolower(trim($_GET['status'] ?? 'pending'));
+$searchDept     = trim($_GET['search_dept'] ?? '');
+$requests       = [];
+$counts         = [];
+$errorMessage   = '';
 $successMessage = '';
+
+// Helper: returns the correctly-cased status string.
+// Works for both ENUM and VARCHAR columns by checking existing rows
+// or falling back to ucfirst().
+function findDbEnumMatch(PDO $pdo, string $table, string $column, string $desired): string {
+    $sql  = "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$table, $column]);
+    $colType = $stmt->fetchColumn();
+
+    // If not found or not an ENUM, return ucfirst (handles VARCHAR)
+    if (!$colType || !preg_match("/^enum\(/i", $colType)) {
+        return ucfirst($desired);
+    }
+
+    // Handle ENUM columns
+    if (preg_match("/^enum\((.*)\)$/i", $colType, $m)) {
+        $csv  = $m[1];
+        $vals = str_getcsv($csv, ',', "'");
+        foreach ($vals as $v) {
+            if (strcasecmp($v, $desired) === 0) return $v;
+        }
+        foreach ($vals as $v) {
+            if (strcasecmp($v, ucfirst($desired)) === 0) return $v;
+        }
+        return $vals[0] ?? ucfirst($desired);
+    }
+
+    return ucfirst($desired);
+}
 
 /* =====================================================
    HANDLE ACTIONS (Approve / Reject / Purchase)
@@ -45,14 +75,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $approved_quantities = $_POST['approved_quantity'] ?? [];
 
                 foreach ($items as $item) {
-                    $idx = $item['id'];
+                    $idx      = $item['id'];
                     $approved = isset($approved_quantities[$idx]) ? (int)$approved_quantities[$idx] : 0;
-
-                    if ($approved < 0) $approved = 0;
+                    if ($approved < 0)                $approved = 0;
                     if ($approved > $item['quantity']) $approved = $item['quantity'];
 
-                    $stmtUpdate = $pdo->prepare("UPDATE department_request_items SET approved_quantity=? WHERE id=?");
-                    $stmtUpdate->execute([$approved, $idx]);
+                    $pdo->prepare("UPDATE department_request_items SET approved_quantity=? WHERE id=?")
+                        ->execute([$approved, $idx]);
                 }
 
                 $stmtTotal = $pdo->prepare("SELECT SUM(approved_quantity) FROM department_request_items WHERE request_id=?");
@@ -64,8 +93,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     exit;
                 }
 
-                $stmtUpdateRequest = $pdo->prepare("UPDATE department_request SET status=?, total_approved_items=? WHERE id=?");
-                $stmtUpdateRequest->execute(['approved', $totalApproved, $request_id]);
+                $dbStatus = findDbEnumMatch($pdo, 'department_request', 'status', 'approved');
+                $pdo->prepare("UPDATE department_request SET status=?, total_approved_items=? WHERE id=?")
+                    ->execute([$dbStatus, $totalApproved, $request_id]);
 
                 header("Location: department_request.php?status=approved&success=approved");
                 exit;
@@ -74,8 +104,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             /* ================= REJECT ================= */
             if ($_POST['action'] === 'reject' && $currentStatus === 'pending') {
 
-                $stmt = $pdo->prepare("UPDATE department_request SET status=? WHERE id=?");
-                $stmt->execute(['rejected', $request_id]);
+                $dbStatus = findDbEnumMatch($pdo, 'department_request', 'status', 'rejected');
+                $pdo->prepare("UPDATE department_request SET status=? WHERE id=?")
+                    ->execute([$dbStatus, $request_id]);
 
                 header("Location: department_request.php?status=rejected&success=rejected");
                 exit;
@@ -84,36 +115,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             /* ================= PURCHASE ================= */
             if ($_POST['action'] === 'purchase' && $currentStatus === 'approved') {
 
-                $prices       = $_POST['price'] ?? [];
-                $units        = $_POST['unit'] ?? [];
-                $pcsArr       = $_POST['pcs_per_box'] ?? [];
+                $prices       = $_POST['price']        ?? [];
+                $units        = $_POST['unit']         ?? [];
+                $pcsArr       = $_POST['pcs_per_box']  ?? [];
                 $payment_type = $_POST['payment_type'] ?? 'Direct';
 
                 foreach ($items as $item) {
-
-                    $item_id = $item['id'];
+                    $item_id      = $item['id'];
                     $approved_qty = (int)($item['approved_quantity'] ?? 0);
                     if ($approved_qty <= 0) continue;
 
-                    $unit = $units[$item_id] ?? 'pcs';
-                    $pcs  = (int)($pcsArr[$item_id] ?? 1);
+                    $unit  = $units[$item_id]   ?? 'pcs';
+                    $pcs   = (int)($pcsArr[$item_id] ?? 1);
                     $price = (float)($prices[$item_id] ?? 0);
                     $total = $price * $approved_qty;
 
-                    $stmtUpdate = $pdo->prepare("
+                    $pdo->prepare("
                         UPDATE department_request_items
                         SET price=?, total_price=?, unit=?, pcs_per_box=?
                         WHERE id=?
-                    ");
-                    $stmtUpdate->execute([$price, $total, $unit, $pcs, $item_id]);
+                    ")->execute([$price, $total, $unit, $pcs, $item_id]);
                 }
 
-                $stmt = $pdo->prepare("
+                $dbStatus = findDbEnumMatch($pdo, 'department_request', 'status', 'purchased');
+                $pdo->prepare("
                     UPDATE department_request
                     SET status=?, purchased_at=NOW(), payment_type=?
                     WHERE id=?
-                ");
-                $stmt->execute(['purchased', $payment_type, $request_id]);
+                ")->execute([$dbStatus, $payment_type, $request_id]);
 
                 header("Location: department_request.php?status=purchased&success=purchased");
                 exit;
@@ -147,10 +176,10 @@ try {
 =====================================================*/
 try {
     $params = [$statusFilter];
-    $sql = "SELECT * FROM department_request WHERE LOWER(status)=?";
+    $sql    = "SELECT * FROM department_request WHERE LOWER(status)=?";
 
     if (!empty($searchDept)) {
-        $sql .= " AND department LIKE ?";
+        $sql     .= " AND department LIKE ?";
         $params[] = "%$searchDept%";
     }
 
@@ -170,14 +199,13 @@ try {
 $errorMessages = [
     'no_approved' => 'Please set at least one approved quantity greater than zero.',
 ];
-
 $successMessages = [
     'approved'  => 'Request approved successfully.',
     'rejected'  => 'Request rejected successfully.',
     'purchased' => 'Purchase order confirmed successfully.',
 ];
 
-$errorMessage   = $errorMessages[$_GET['error'] ?? ''] ?? '';
+$errorMessage   = $errorMessages[$_GET['error']   ?? ''] ?? '';
 $successMessage = $successMessages[$_GET['success'] ?? ''] ?? '';
 ?>
 <!DOCTYPE html>
@@ -697,10 +725,8 @@ body {
             <?php foreach ($requests as $r):
                 $stmtI = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
                 $stmtI->execute([$r['id']]);
-                $itemsArr    = $stmtI->fetchAll(PDO::FETCH_ASSOC);
-
-                // Normalise status to lowercase for logic, display as ucfirst
-                $statusRaw   = strtolower(trim($r['status']));
+                $itemsArr  = $stmtI->fetchAll(PDO::FETCH_ASSOC);
+                $statusRaw = strtolower(trim($r['status']));
                 $statusLabel = ucfirst($statusRaw);
 
                 $badgeMap = [
@@ -743,7 +769,6 @@ body {
                     <?php endif; ?>
                 </td>
                 <td class="center">
-                    <!-- Pass lowercase status to JS for consistent comparison -->
                     <button class="btn-view view-items-btn"
                         data-id="<?= $r['id'] ?>"
                         data-dept="<?= htmlspecialchars((string)($r['department'] ?? '')) ?>"
@@ -801,7 +826,6 @@ function pad(n) { return String(n).padStart(4, '0'); }
 document.querySelectorAll('.view-items-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const items       = JSON.parse(btn.dataset.items || '[]');
-        // data-status is now already lowercase from PHP
         const _st         = (btn.dataset.status || '').toLowerCase().trim();
         const purchased   = btn.dataset.purchased || '';
         const dept        = btn.dataset.dept;
