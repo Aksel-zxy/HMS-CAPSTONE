@@ -15,15 +15,14 @@ if (!$userId) {
     die("User ID not set.");
 }
 
-$userModel = new User($conn);
-$leaveNotif = new LeaveNotification($conn);
-$attendance = new Attendance($conn);
-
 $userObj = new User($conn);
 $user = $userObj->getById($userId);
 if (!$user) {
     die("User not found.");
 }
+
+$leaveNotif = new LeaveNotification($conn);
+$attendance = new Attendance($conn);
 
 if (isset($_POST['check_leave'])) {
     $onLeave = $attendance->isOnLeave($_POST['employee_id'], $_POST['attendance_date']);
@@ -32,7 +31,21 @@ if (isset($_POST['check_leave'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['check_leave'])) {
-    $result = $attendance->saveAttendance($_POST['employee_id'], $_POST['attendance_date'], $_POST['time_in'] ?? null, $_POST['time_out'] ?? null);
+
+    $duty_status_val = trim($_POST['duty_status'] ?? 'On Duty');
+    if ($duty_status_val === '') $duty_status_val = 'On Duty';
+
+    $time_in  = !empty($_POST['time_in'])  ? $_POST['time_in']  : null;
+    $time_out = !empty($_POST['time_out']) ? $_POST['time_out'] : null;
+
+    $result = $attendance->saveAttendance(
+        $_POST['employee_id'], 
+        $_POST['attendance_date'], 
+        $time_in, 
+        $time_out,
+        $duty_status_val
+    );
+
     if ($result['success']) {
         echo "<script>alert('Attendance recorded successfully with status: {$result['status']}'); window.location.href='clock-in_clock-out.php';</script>";
         exit;
@@ -44,7 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['check_leave'])) {
 
 $employees = $attendance->getEmployees();
 $pendingCount = $leaveNotif->getPendingLeaveCount();
-
 ?>
 
 <!DOCTYPE html>
@@ -255,13 +267,19 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <option value="">----- Select Employee -----</option>
                         <?php foreach ($employees as $emp): ?>
                             <option value="<?php echo $emp['employee_id']; ?>">
-                                <?php echo htmlspecialchars($emp['full_name'] ?? ''); ?> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Employee ID: <?php echo $emp['employee_id']; ?>)
+                                <?php echo htmlspecialchars($emp['full_name'] ?? ''); ?> (ID: <?php echo $emp['employee_id']; ?>)
                             </option>
                         <?php endforeach; ?>
                     </select>
 
                     <label for="attendance_date">Date</label>
                     <input type="date" name="attendance_date" id="attendance_date" required>
+
+                    <label for="duty_status">Duty Status</label>
+                    <select name="duty_status" id="duty_status" required>
+                        <option value="On Duty" selected>On Duty</option>
+                        <option value="Off Duty">Off Duty</option>
+                    </select>
 
                     <label for="time_in">Time In</label>
                     <input type="time" name="time_in" id="time_in">
@@ -297,34 +315,58 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
 
-        document.getElementById('attendance_date').addEventListener('change', function() {
-            let employeeId = document.getElementById('employee_id').value;
-            let selectedDate = this.value;
+        const dutyStatus = document.getElementById('duty_status');
+        const timeIn = document.getElementById('time_in');
+        const timeOut = document.getElementById('time_out');
+        const employeeId = document.getElementById('employee_id');
+        const attendanceDate = document.getElementById('attendance_date');
 
-            if (selectedDate) {
-                fetch('clock-in_clock-out.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'check_leave=1&employee_id=' + employeeId + '&attendance_date=' + selectedDate
-                })
-                .then(res => res.json())
-                .then(data => {
-                    let timeIn = document.getElementById('time_in');
-                    let timeOut = document.getElementById('time_out');
-
-                    if (data.on_leave) {
-                        alert("This employee is on leave for " + selectedDate);
-                        timeIn.disabled = true;
-                        timeOut.disabled = true;
-                        timeIn.value = "";
-                        timeOut.value = "";
-                    } else {
-                        timeIn.disabled = false;
-                        timeOut.disabled = false;
-                    }
-                });
+        // Disable/enable time fields based on Duty Status
+        function updateTimeFields() {
+            if (dutyStatus.value === 'Off Duty') {
+                timeIn.value = '';
+                timeOut.value = '';
+                timeIn.disabled = true;
+                timeOut.disabled = true;
+            } else {
+                timeIn.disabled = false;
+                timeOut.disabled = false;
             }
-        });
+        }
+
+        // Trigger once on page load
+        updateTimeFields();
+
+        // Update on duty_status change
+        dutyStatus.addEventListener('change', updateTimeFields);
+
+        // Check leave when date or employee changes
+        function checkLeave() {
+            const empId = employeeId.value;
+            const date = attendanceDate.value;
+            if (!empId || !date) return;
+
+            fetch('clock-in_clock-out.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `check_leave=1&employee_id=${empId}&attendance_date=${date}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.on_leave) {
+                    alert(`This employee is on leave for ${date}`);
+                    timeIn.value = '';
+                    timeOut.value = '';
+                    timeIn.disabled = true;
+                    timeOut.disabled = true;
+                } else {
+                    updateTimeFields();
+                }
+            });
+        }
+
+        employeeId.addEventListener('change', checkLeave);
+        attendanceDate.addEventListener('change', checkLeave);
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

@@ -20,7 +20,7 @@ $result = $stmt->get_result();
 $statuses = [
     'Present', 'Late', 'Undertime', 'Overtime',
     'Half Day', 'On Leave', 'On Leave (Half Day)',
-    'Absent', 'Absent (Half Day)'
+    'Absent', 'Absent (Half Day)', 'Off Duty'
 ];
 
 $data = array_fill_keys($statuses, 0);

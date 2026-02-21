@@ -71,7 +71,7 @@ if (!$user) {
 }
 
 /* ---------- Pop-Up Form ---------- */
-.popup-form {
+.bastabubukas {
     display: none;
     position: fixed;
     top: 0;
@@ -84,7 +84,7 @@ if (!$user) {
     overflow-y: auto;
 }
 
-.form-container {
+.lalagyanannya {
     background-color: #F5F6F7;
     color: black;
     padding: 20px;
@@ -94,9 +94,9 @@ if (!$user) {
     max-height: 95vh;
 }
 
-.form-container input, 
-.form-container select,
-.form-container textarea {
+.lalagyanannya input, 
+.lalagyanannya select,
+.lalagyanannya textarea {
     width: 100%;
     padding: 8px;
     margin: 10px 0;
@@ -111,7 +111,7 @@ label{
     font-weight: bold;
 }
 
-.form-container button {
+.lalagyanannya button {
     padding: 10px;
     background-color: #0047ab;
     color: white;
@@ -123,7 +123,7 @@ label{
     border-radius: 5px;
 }
 
-.form-container button:hover {
+.lalagyanannya button:hover {
     background-color: #0096c7;
     transition: background-color 0.3s;
     font-weight: bold;
@@ -179,8 +179,8 @@ label{
         <button class="hahaha" onclick="openModal('accountingModal')">Accounting</button>
 
         <!-- Doctors Modal -->
-        <div id="doctorsModal" class="popup-form">
-            <div class="form-container">
+        <div id="doctorsModal" class="bastabubukas">
+            <div class="lalagyanannya">
                 <bttn class="close-btn" onclick="closeModal('doctorsModal')">X</bttn>
                 <center>
                     <h3 style="font-weight: bold;">Doctor Replacement Request</h3> 
@@ -247,8 +247,8 @@ label{
 
 
         <!-- Nurses Modal -->
-        <div id="nursesModal" class="popup-form">
-            <div class="form-container">
+        <div id="nursesModal" class="bastabubukas">
+            <div class="lalagyanannya">
                 <bttn class="close-btn" onclick="closeModal('nursesModal')">X</bttn>
                 <center>
                     <h3 style="font-weight: bold;">Nurse Replacement Request</h3> 
@@ -315,8 +315,8 @@ label{
 
 
         <!-- Pharmacy Modal -->
-        <div id="pharmacyModal" class="popup-form">
-            <div class="form-container">
+        <div id="pharmacyModal" class="bastabubukas">
+            <div class="lalagyanannya">
                 <bttn class="close-btn" onclick="closeModal('pharmacyModal')">X</bttn>
                 <center>
                     <h3 style="font-weight: bold;">Pharmacy Department Replacement Request</h3> 
@@ -363,8 +363,8 @@ label{
 
 
         <!-- Laboratory Modal -->
-        <div id="laboratoryModal" class="popup-form">
-            <div class="form-container">
+        <div id="laboratoryModal" class="bastabubukas">
+            <div class="lalagyanannya">
                 <bttn class="close-btn" onclick="closeModal('laboratoryModal')">X</bttn>
                 <center>
                     <h3 style="font-weight: bold;">Laboratory Department Replacement Request</h3> 
@@ -413,8 +413,8 @@ label{
 
 
         <!-- Accounting Modal -->
-        <div id="accountingModal" class="popup-form">
-            <div class="form-container">
+        <div id="accountingModal" class="bastabubukas">
+            <div class="lalagyanannya">
                 <bttn class="close-btn" onclick="closeModal('accountingModal')">X</bttn>
                 <center>
                     <h3 style="font-weight: bold;">Accounting Department Replacement Request</h3> 
