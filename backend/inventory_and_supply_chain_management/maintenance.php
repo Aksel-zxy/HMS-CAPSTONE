@@ -9,8 +9,7 @@ try { $pdo->exec("ALTER TABLE repair_requests ADD COLUMN remarks TEXT NULL"); } 
 try { $pdo->exec("ALTER TABLE repair_requests ADD COLUMN ticket_no VARCHAR(100) NULL"); } catch (PDOException $e) {}
 
 /* =====================================================
-   AJAX HANDLER — updates ONE request only
-   Triggered by X-Requested-With: XMLHttpRequest header
+   AJAX HANDLER
 =====================================================*/
 if (
     isset($_SERVER['HTTP_X_REQUESTED_WITH']) &&
@@ -63,13 +62,13 @@ if (
             echo json_encode(['success' => true, 'message' => 'Status updated to ' . $new_status . '.', 'deleted' => false, 'new_status' => $new_status]);
         }
     } else {
-        echo json_encode(['success' => false, 'message' => 'Invalid status transition.']);
+        echo json_encode(['success' => false, 'message' => 'Invalid status transition from ' . $current_status . ' to ' . $new_status . '.']);
     }
     exit;
 }
 
 /* =====================================================
-   NON-AJAX POST — schedule / edit / delete
+   NON-AJAX POST
 =====================================================*/
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -102,12 +101,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 /* =====================================================
    DATA FETCH
 =====================================================*/
-
-/*
- * ── ALL inventory items, grouped by item_type for the schedule dropdown.
- *    Changed from: WHERE item_type = 'Diagnostic Equipment'
- *    to: all items, ordered by type then name so the <optgroup> grouping works.
- */
 $stmt = $pdo->prepare("
     SELECT MIN(id) AS id, item_name, item_type
     FROM inventory
@@ -170,6 +163,13 @@ function statusBadgeHtml(string $status): string {
     };
     return "<span class=\"status-badge {$key}\"><i class=\"bi {$icon}\" style=\"font-size:.62rem;\"></i> " . htmlspecialchars($status) . "</span>";
 }
+
+/*
+ * FIX: remarks are shown ONLY when the selected value is 'Completed'
+ * (i.e., current status is 'In Progress' and dropdown is set to Completed)
+ * On initial page load, the dropdown defaults to current status, so
+ * remarks start hidden for all rows — they appear when user selects Completed.
+ */
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -257,13 +257,17 @@ function statusBadgeHtml(string $status): string {
         .pro-table tbody tr:hover td { background:var(--gray-50); }
 
         /* INLINE UPDATE CONTROLS */
-        .update-row { display:flex; gap:.4rem; align-items:center; flex-wrap:nowrap; }
+        .update-row { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; }
         .update-row select,
         .update-row input[type=text] { font-size:.82rem; border:1px solid var(--gray-200); border-radius:6px; padding:.3rem .55rem; background:#fff; color:var(--gray-800); transition:border-color .15s; }
         .update-row select:focus,
         .update-row input[type=text]:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.1); }
         .update-row select { min-width:130px; }
         .update-row input[type=text] { min-width:140px; flex:1; }
+
+        /* ── FIX: remarks hidden by default, shown only when Completed is selected ── */
+        .remarks-input { display:none; }
+        .remarks-input.visible { display:block; }
 
         .btn-save {
             display:inline-flex; align-items:center; gap:.3rem;
@@ -294,6 +298,8 @@ function statusBadgeHtml(string $status): string {
         .req-card-actions input[type=text] { width:100%; font-size:.83rem; border:1px solid var(--gray-200); border-radius:7px; padding:.45rem .7rem; color:var(--gray-800); background:#fff; }
         .req-card-actions select:focus,
         .req-card-actions input[type=text]:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+        .req-card-actions .remarks-input { display:none; width:100%; }
+        .req-card-actions .remarks-input.visible { display:block; }
         .btn-save-full { width:100%; display:flex; align-items:center; justify-content:center; gap:.4rem; font-size:.83rem; font-weight:600; padding:.5rem; border-radius:7px; background:var(--primary); color:#fff; border:none; cursor:pointer; transition:background .15s, opacity .15s; }
         .btn-save-full:hover    { background:#1d4ed8; }
         .btn-save-full:disabled { opacity:.55; cursor:not-allowed; }
@@ -439,7 +445,7 @@ function statusBadgeHtml(string $status): string {
                             <tr>
                                 <th>Ticket No.</th><th>Equipment</th><th>Issue / Type</th>
                                 <th>Location</th><th>Priority</th><th>Status</th>
-                                <th style="min-width:370px;">Update</th>
+                                <th style="min-width:380px;">Update</th>
                             </tr>
                         </thead>
                         <tbody id="requestTableBody">
@@ -448,7 +454,8 @@ function statusBadgeHtml(string $status): string {
                         <?php else: foreach ($requests as $req):
                             $opts = getStatusOptions($req['status']);
                         ?>
-                            <tr data-id="<?= intval($req['id']) ?>">
+                            <!-- ▼ FIX: NO data-id on <tr> — only on .update-row to avoid ambiguous closest('[data-id]') -->
+                            <tr class="req-row">
                                 <td><span class="ticket-no"><?= htmlspecialchars($req['ticket_no'] ?? 'N/A') ?></span></td>
                                 <td><strong><?= htmlspecialchars($req['equipment']) ?></strong></td>
                                 <td>
@@ -456,10 +463,15 @@ function statusBadgeHtml(string $status): string {
                                         <span class="d-flex align-items-center gap-1"><i class="bi bi-shield-check text-success"></i> Preventive</span>
                                     <?php else: ?><?= htmlspecialchars($req['issue']) ?><?php endif; ?>
                                 </td>
-                                <td style="color:var(--gray-600);"><i class="bi bi-geo-alt me-1"></i><?= htmlspecialchars($req['location'] ?: 'Unknown') ?></td>
+                                <td style="color:var(--gray-600);"><i class="bi bi-geo-alt me-1"></i><?= htmlspecialchars($req['location'] ?? 'Unknown') ?></td>
                                 <td><span class="priority-badge <?= priorityBadge($req['priority']) ?>"><?= htmlspecialchars($req['priority']) ?></span></td>
                                 <td class="status-cell"><?= statusBadgeHtml($req['status']) ?></td>
                                 <td>
+                                    <!--
+                                        ▼ KEY FIX: data-id lives ONLY here on .update-row
+                                          so btn.closest('.update-row') gives the right element
+                                          and we read data-id from it directly — no <tr> conflict.
+                                    -->
                                     <div class="update-row"
                                          data-id="<?= intval($req['id']) ?>"
                                          data-current="<?= htmlspecialchars($req['status']) ?>">
@@ -471,8 +483,12 @@ function statusBadgeHtml(string $status): string {
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
+                                        <!--
+                                            ▼ FIX: remarks start HIDDEN always.
+                                              They show only when dropdown changes TO 'Completed'.
+                                        -->
                                         <input type="text" class="remarks-input"
-                                               placeholder="Add remarks…"
+                                               placeholder="Enter completion remarks…"
                                                value="<?= htmlspecialchars($req['remarks'] ?? '') ?>">
                                         <button type="button" class="btn-save btn-update">
                                             <i class="bi bi-check2"></i> Save
@@ -494,7 +510,7 @@ function statusBadgeHtml(string $status): string {
                         $statusKey = strtolower(str_replace(' ', '-', $req['status']));
                         $statusIcon = match($req['status']) { 'Open'=>'bi-circle-fill','In Progress'=>'bi-arrow-repeat',default=>'bi-check-circle-fill' };
                     ?>
-                        <div class="req-card" data-id="<?= intval($req['id']) ?>">
+                        <div class="req-card">
                             <div class="req-card-header">
                                 <div>
                                     <p class="req-card-title"><?= htmlspecialchars($req['equipment']) ?></p>
@@ -511,10 +527,13 @@ function statusBadgeHtml(string $status): string {
                                         <i class="bi bi-shield-check text-success"></i> Preventive
                                     <?php else: ?><i class="bi bi-wrench text-primary"></i> <?= htmlspecialchars($req['issue']) ?><?php endif; ?>
                                 </span>
-                                <span><i class="bi bi-geo-alt"></i><?= htmlspecialchars($req['location'] ?: 'Unknown') ?></span>
+                                <span><i class="bi bi-geo-alt"></i><?= htmlspecialchars($req['location'] ?? 'Unknown') ?></span>
                                 <span><span class="priority-badge <?= priorityBadge($req['priority']) ?>"><?= htmlspecialchars($req['priority']) ?></span></span>
                             </div>
-                            <div class="req-card-actions"
+                            <!--
+                                ▼ FIX: data-id ONLY on .req-card-actions (same as .update-row pattern)
+                            -->
+                            <div class="req-card-actions update-row"
                                  data-id="<?= intval($req['id']) ?>"
                                  data-current="<?= htmlspecialchars($req['status']) ?>">
                                 <select class="status-select">
@@ -525,8 +544,9 @@ function statusBadgeHtml(string $status): string {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <!-- ▼ FIX: hidden by default, shown only on Completed -->
                                 <input type="text" class="remarks-input"
-                                       placeholder="Add remarks…"
+                                       placeholder="Enter completion remarks…"
                                        value="<?= htmlspecialchars($req['remarks'] ?? '') ?>">
                                 <button type="button" class="btn-save-full btn-update">
                                     <i class="bi bi-check2"></i> Save Changes
@@ -555,19 +575,9 @@ function statusBadgeHtml(string $status): string {
                                     <select name="inventory_id" class="form-select form-select-sm" required>
                                         <option value="" disabled selected>— Select item from inventory —</option>
                                         <?php
-                                        /*
-                                         * Build <optgroup> sections per item_type so the dropdown
-                                         * is easy to navigate even with many inventory items.
-                                         * Items already scheduled are shown as disabled.
-                                         */
                                         $scheduled_ids = array_column($schedules, 'inventory_id');
-
-                                        // Group by item_type
                                         $grouped = [];
-                                        foreach ($equipment as $eq) {
-                                            $grouped[$eq['item_type']][] = $eq;
-                                        }
-
+                                        foreach ($equipment as $eq) { $grouped[$eq['item_type']][] = $eq; }
                                         foreach ($grouped as $type => $items):
                                         ?>
                                             <optgroup label="<?= htmlspecialchars($type) ?>">
@@ -674,8 +684,8 @@ function statusBadgeHtml(string $status): string {
 
 /* ── Toast helper ── */
 function showToast(msg, type = 'ok') {
-    const wrap  = document.getElementById('toastWrap');
-    const el    = document.createElement('div');
+    const wrap = document.getElementById('toastWrap');
+    const el   = document.createElement('div');
     el.className = `toast-msg ${type}`;
     el.innerHTML = `<i class="bi ${type === 'ok' ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}"></i> ${msg}`;
     wrap.appendChild(el);
@@ -691,64 +701,131 @@ function adjustStat(id, delta) {
 function refreshBadge() {
     const badge = document.getElementById('openBadge');
     const n     = parseInt(document.getElementById('statOpen').textContent) || 0;
-    badge.textContent  = n;
+    badge.textContent   = n;
     badge.style.display = n > 0 ? '' : 'none';
 }
 
-/* ── JS mirror of PHP statusBadgeHtml() ── */
+/* ── JS mirror of statusBadgeHtml() ── */
 function makeBadge(status) {
     const key  = status.toLowerCase().replace(' ', '-');
-    const icons = { 'Open':'bi-circle-fill', 'In Progress':'bi-arrow-repeat', 'Completed':'bi-check-circle-fill' };
-    return `<span class="status-badge ${key}"><i class="bi ${icons[status]||'bi-circle'}" style="font-size:.62rem;"></i> ${status}</span>`;
+    const icons = { 'Open': 'bi-circle-fill', 'In Progress': 'bi-arrow-repeat', 'Completed': 'bi-check-circle-fill' };
+    return `<span class="status-badge ${key}"><i class="bi ${icons[status] || 'bi-circle'}" style="font-size:.62rem;"></i> ${status}</span>`;
 }
 
-/* ── AJAX UPDATE ── */
+/*
+ * ════════════════════════════════════════════════
+ *  FIX 1 — Toggle remarks visibility
+ *  Remarks are shown ONLY when the dropdown value
+ *  is 'Completed'. Hidden for all other values.
+ * ════════════════════════════════════════════════
+ */
+function toggleRemarks(wrap, selectedStatus) {
+    const remarksInput = wrap.querySelector('.remarks-input');
+    if (!remarksInput) return;
+    if (selectedStatus === 'Completed') {
+        remarksInput.classList.add('visible');
+        remarksInput.placeholder = 'Enter completion remarks…';
+    } else {
+        remarksInput.classList.remove('visible');
+    }
+}
+
+/* Listen for dropdown changes */
+document.addEventListener('change', function (e) {
+    const select = e.target.closest('.status-select');
+    if (!select) return;
+    /*
+     * FIX 2: use .closest('.update-row') — this is the element that
+     * holds data-id, whether it's the desktop .update-row div or
+     * the mobile .req-card-actions.update-row div.
+     * The old code used closest('[data-id]') which could accidentally
+     * grab the <tr data-id="..."> instead.
+     */
+    const wrap = select.closest('.update-row');
+    if (!wrap) return;
+    toggleRemarks(wrap, select.value);
+});
+
+/*
+ * ════════════════════════════════════════════════
+ *  FIX 3 — AJAX save with correct ID resolution
+ * ════════════════════════════════════════════════
+ */
 document.addEventListener('click', function (e) {
     const btn = e.target.closest('.btn-update');
     if (!btn) return;
 
-    const wrap      = btn.closest('[data-id]');
-    const id        = wrap.dataset.id;
+    /* ▼ CRITICAL FIX: always walk up to .update-row, never to a generic [data-id] */
+    const wrap = btn.closest('.update-row');
+    if (!wrap) { showToast('Could not find update container.', 'err'); return; }
+
+    const id = parseInt(wrap.dataset.id, 10);
+    if (!id || id <= 0) {
+        showToast('Invalid request ID (' + wrap.dataset.id + '). Please refresh the page.', 'err');
+        return;
+    }
+
     const oldStatus = wrap.dataset.current;
     const newStatus = wrap.querySelector('.status-select').value;
-    const remarks   = wrap.querySelector('.remarks-input').value.trim();
+    const remarksEl = wrap.querySelector('.remarks-input');
+    const remarks   = remarksEl ? remarksEl.value.trim() : '';
 
     btn.disabled = true;
     const origHtml = btn.innerHTML;
-    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+    btn.innerHTML  = '<i class="bi bi-hourglass-split"></i> Saving…';
 
     fetch(window.location.pathname, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-        body:    new URLSearchParams({ action: 'update_request', request_id: id, status: newStatus, remarks }).toString(),
+        headers: {
+            'Content-Type':     'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new URLSearchParams({
+            action:     'update_request',
+            request_id: id,
+            status:     newStatus,
+            remarks:    remarks
+        }).toString(),
     })
     .then(r => r.json())
     .then(data => {
         if (!data.success) {
             showToast(data.message || 'Update failed.', 'err');
-            btn.disabled = false; btn.innerHTML = origHtml; return;
+            btn.disabled  = false;
+            btn.innerHTML = origHtml;
+            return;
         }
+
         showToast(data.message, 'ok');
 
         if (data.deleted) {
-            document.querySelector(`#requestTableBody tr[data-id="${id}"]`)?.remove();
-            document.querySelector(`#mobileCards .req-card[data-id="${id}"]`)?.remove();
+            /* Remove the desktop row — find the parent <tr> from .update-row */
+            wrap.closest('tr')?.remove();
+            /* Remove the mobile card — walk up to .req-card */
+            wrap.closest('.req-card')?.remove();
 
             adjustStat('statTotal', -1);
             if (oldStatus === 'Open')        adjustStat('statOpen', -1);
             if (oldStatus === 'In Progress') adjustStat('statProg', -1);
             refreshBadge();
 
-            if (!document.querySelector('#requestTableBody tr[data-id]')) {
+            /* Show empty state if no rows left */
+            const tbody = document.getElementById('requestTableBody');
+            if (tbody && !tbody.querySelector('tr')) {
                 const emptyHtml = `<div class="empty-state"><i class="bi bi-inbox"></i><p>No repair requests found.</p></div>`;
-                document.getElementById('requestTableBody').innerHTML = `<tr><td colspan="7">${emptyHtml}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7">${emptyHtml}</td></tr>`;
                 document.getElementById('mobileCards').innerHTML = emptyHtml;
             }
         } else {
-            const tr = document.querySelector(`#requestTableBody tr[data-id="${id}"]`);
-            if (tr) tr.querySelector('.status-cell').innerHTML = makeBadge(newStatus);
+            /* Update desktop status badge */
+            const tr = wrap.closest('tr');
+            if (tr) {
+                const statusCell = tr.querySelector('.status-cell');
+                if (statusCell) statusCell.innerHTML = makeBadge(newStatus);
+            }
 
-            const card = document.querySelector(`#mobileCards .req-card[data-id="${id}"]`);
+            /* Update mobile status badge */
+            const card = wrap.closest('.req-card');
             if (card) {
                 const mb = card.querySelector('.mobile-status-badge');
                 if (mb) {
@@ -759,6 +836,10 @@ document.addEventListener('click', function (e) {
                 }
             }
 
+            /* Keep remarks visibility in sync */
+            toggleRemarks(wrap, newStatus);
+
+            /* Update counters */
             if (oldStatus !== newStatus) {
                 if (oldStatus === 'Open')        adjustStat('statOpen', -1);
                 if (oldStatus === 'In Progress') adjustStat('statProg', -1);
@@ -768,13 +849,15 @@ document.addEventListener('click', function (e) {
             }
 
             wrap.dataset.current = newStatus;
-            btn.disabled = false;
+            btn.disabled  = false;
             btn.innerHTML = origHtml;
         }
     })
-    .catch(() => {
+    .catch(err => {
         showToast('Network error. Please try again.', 'err');
-        btn.disabled = false; btn.innerHTML = origHtml;
+        btn.disabled  = false;
+        btn.innerHTML = origHtml;
+        console.error('AJAX error:', err);
     });
 });
 </script>
