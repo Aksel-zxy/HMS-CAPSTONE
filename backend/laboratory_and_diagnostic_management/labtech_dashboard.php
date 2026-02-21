@@ -289,7 +289,7 @@ $schedules = $schedule->getTodaysSchedules();
             </div>
 
             <center>
-                <button class="hahaha" onclick="openModal('laboratoryModal')">Laboratory</button>
+                <button class="hahaha" onclick="openModal('laboratoryModal')">Request Employee for <br /> Lab. Dept.</button>
             </center>
 
             <!-- Laboratory Modal -->
