@@ -592,13 +592,13 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
         const allStatuses = [
             'Present', 'Late', 'Undertime', 'Overtime',
             'Half Day', 'On Leave', 'On Leave (Half Day)',
-            'Absent', 'Absent (Half Day)'
+            'Absent', 'Absent (Half Day)', 'Off Duty'
         ];
 
         const statusColors = [
             'green', 'red', 'orange', 'blue',
             'lightgreen', 'gray', 'darkgray',
-            'black', 'dimgray'
+            'black', 'dimgray', 'purple'
         ];
 
         function forceCanvasReady(canvas) {

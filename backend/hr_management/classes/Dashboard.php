@@ -34,7 +34,8 @@ class Dashboard {
             'On Leave'           => 0,
             'On Leave (Half Day)' => 0,
             'Absent'             => 0,
-            'Absent (Half Day)'  => 0
+            'Absent (Half Day)'  => 0,
+            'Off Duty'           => 0
         ];
 
         while ($row = $result->fetch_assoc()) {

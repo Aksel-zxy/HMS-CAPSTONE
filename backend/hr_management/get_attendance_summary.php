@@ -11,7 +11,7 @@ $year       = isset($_GET['year']) ? (int)$_GET['year'] : null;
 $allStatuses = [
     'Present', 'Late', 'Undertime', 'Overtime',
     'Half Day', 'On Leave', 'On Leave (Half Day)',
-    'Absent', 'Absent (Half Day)'
+    'Absent', 'Absent (Half Day)', 'Off Duty'
 ];
 
 if ($employeeId) {

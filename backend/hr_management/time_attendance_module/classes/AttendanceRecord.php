@@ -32,6 +32,11 @@ class AttendanceRecord {
     public function getStatusText($row) {
         $status = $row['status'] ?? 'Absent';
 
+        // If the status itself is Off Duty → return as is
+        if ($status === 'Off Duty') {
+            return 'Off Duty';
+        }
+
         // Half Day leave but did not attend
         if (in_array($status, ['On Leave', 'On Leave (Half Day)', 'Absent (Half Day)']) &&
             empty($row['time_in']) && empty($row['time_out'])) {
