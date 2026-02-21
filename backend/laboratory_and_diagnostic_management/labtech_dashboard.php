@@ -287,6 +287,58 @@ $schedules = $schedule->getTodaysSchedules();
                     </div>
                 </div>
             </div>
+
+            <center>
+                <button class="hahaha" onclick="openModal('laboratoryModal')">Laboratory</button>
+            </center>
+
+            <!-- Laboratory Modal -->
+            <div id="laboratoryModal" class="bastabubukas">
+                <div class="lalagyanannya">
+                    <bttn class="close-btn" onclick="closeModal('laboratoryModal')">X</bttn>
+                    <center>
+                        <h3 style="font-weight: bold;">Laboratory Department Replacement Request</h3> 
+                    </center>
+                    <br />
+
+                    <form action="submit_replacement_request.php" method="POST">
+                        <input type="hidden" name="profession" value="Laboratorist" required>
+
+                        <label for="department">Department:</label>
+                        <select id="department" name="department" required>
+                            <option value="Laboratory">Laboratory</option>
+                        </select>
+
+                        <label>Specialist to Replace</label>
+                        <select name="position" required>
+                            <option value="">--Select Specialist--</option>
+                            <option value="Clinical Chemistry">Clinical Chemistry</option>
+                            <option value="Hematology">Hematology</option>
+                            <option value="Microbiology">Microbiology</option>
+                            <option value="Parasitology">Parasitology</option>
+                            <option value="Blood Bank / Immunohematology">Blood Bank / Immunohematology</option>
+                            <option value="Immunology / Serology">Immunology / Serology</option>
+                            <option value="Histopathology">Histopathology</option>
+                        </select>
+
+                        <label>Leaving Employee Name</label>
+                        <input type="text" name="leaving_employee_name">
+
+                        <label>Leaving Employee ID</label>
+                        <input type="text" name="leaving_employee_id">
+
+                        <label>Reason for Leaving</label>
+                        <textarea name="reason_for_leaving"></textarea>
+
+                        <label>Requested By</label>
+                        <input type="text" name="requested_by" required>
+
+                        <button type="submit">Submit Request</button>
+                    </form>
+                </div>
+            </div>
+
+
             
             <script>
                 
@@ -338,6 +390,22 @@ $schedules = $schedule->getTodaysSchedules();
                         }
                     }
                 });
+
+                function openModal(id) {
+                    document.getElementById(id).style.display = "flex";
+                }
+                function closeModal(id) {
+                    document.getElementById(id).style.display = "none";
+                }
+
+                window.onclick = function(event) {
+                    const modals = ['laboratoryModal'];
+                    modals.forEach(id => {
+                        const modal = document.getElementById(id);
+                        if(event.target == modal) closeModal(id);
+                    });
+                }
+
             </script>
             <script src="assets/Bootstrap/all.min.js"></script>
             <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
