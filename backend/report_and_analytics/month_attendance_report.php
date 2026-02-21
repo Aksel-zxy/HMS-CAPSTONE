@@ -72,7 +72,7 @@ $monthNames = [
     <div class="container py-4">
 
         <!-- Back Button -->
-        <a href="http://localhost:8080/backend/report_and_analytics/YEAR_ATTENDANCE_REPORT.PHP" class="btn btn-secondary back-btn">
+        <a href="https://bsis-03.keikaizen.xyz/backend/report_and_analytics/year_attendance_report.php" class="btn btn-secondary back-btn">
             <i class="bi bi-arrow-left"></i> Back
         </a>
 
@@ -125,7 +125,7 @@ $monthNames = [
         const month = <?= $month ?>;
         const year = <?= $year ?>;
 
-        const apiUrl = `http://localhost:5288/employee/getMonthAttendanceReport/${month}/${year}`;
+        const apiUrl = `https://bsis-03.keikaizen.xyz/employee/getMonthAttendanceReport/${month}/${year}`;
 
         function updateReport(url) {
             fetch(url)

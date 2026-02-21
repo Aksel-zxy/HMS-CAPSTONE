@@ -1,254 +1,202 @@
-<?php
-include 'header.php';
-?>
+<?php include 'header.php' ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monthly Billing Report</title>
+    <title>Billing Monthly Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
     <style>
-        .summary-card {
-            min-height: 120px;
+        body {
+            background: #f7f7f7;
         }
 
-        .chart-container {
-            height: 220px;
+        .small-text {
+            font-size: .85rem;
+            color: #6c757d;
+        }
+
+        .insight-box {
+            background: #ffffff;
+            border-radius: 10px;
         }
     </style>
 </head>
 
-<body class="bg-light">
+<body>
     <div class="d-flex">
-        <?php include "sidebar.php"; ?>
+
+        <!-- Sidebar -->
+        <?php include 'sidebar.php' ?>
+
         <div class="container py-4">
 
-            <h2 class="mb-4">Monthly Billing Report</h2>
+            <!-- HEADER -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-semibold mb-0">Billing Monthly Report</h4>
+            </div>
 
-            <!-- Summary Cards -->
+            <h5 id="headerDate" class="text-secondary mb-4"></h5>
+
+            <!-- SUMMARY CARDS -->
             <div class="row g-3 mb-4">
-                <div class="col-md-2">
-                    <div class="card shadow-sm summary-card text-center">
-                        <div class="card-body">
-                            <h6 class="card-title">Total Billed</h6>
-                            <h5 id="totalBilled" class="text-primary">₱ 0</h5>
-                        </div>
+
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Total Billed</div>
+                        <h5 id="totalBilled">₱0</h5>
                     </div>
                 </div>
 
-                <div class="col-md-2">
-                    <div class="card shadow-sm summary-card text-center">
-                        <div class="card-body">
-                            <h6 class="card-title">Total Paid</h6>
-                            <h5 id="totalPaid" class="text-success">₱ 0</h5>
-                        </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Total Paid</div>
+                        <h5 id="totalPaid">₱0</h5>
                     </div>
                 </div>
 
-                <div class="col-md-2">
-                    <div class="card shadow-sm summary-card text-center">
-                        <div class="card-body">
-                            <h6 class="card-title">Pending Count</h6>
-                            <h5 id="totalPending" class="text-danger">0</h5>
-                        </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Pending Transactions</div>
+                        <h5 id="pendingTransactions">0</h5>
                     </div>
                 </div>
 
-                <div class="col-md-2">
-                    <div class="card shadow-sm summary-card text-center">
-                        <div class="card-body">
-                            <h6 class="card-title">Pending Amount</h6>
-                            <h5 id="totalPendingAmount" class="text-danger">₱ 0</h5>
-                        </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Pending Amount</div>
+                        <h5 id="pendingAmount">₱0</h5>
                     </div>
                 </div>
 
-                <div class="col-md-2">
-                    <div class="card shadow-sm summary-card text-center">
-                        <div class="card-body">
-                            <h6 class="card-title">OOP Collected</h6>
-                            <h5 id="totalOOP" class="text-info">₱ 0</h5>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-md-2">
-                    <div class="card shadow-sm summary-card text-center">
-                        <div class="card-body">
-                            <h6 class="card-title">Insurance Covered</h6>
-                            <h5 id="totalInsurance" class="text-warning">₱ 0</h5>
-                        </div>
-                    </div>
-                </div>
             </div>
 
-            <!-- Chart -->
-            <div class="card shadow-sm p-3 mb-4">
-                <h5 class="text-center mb-3">Billing Distribution (OOP vs Insurance vs Pending Amount)</h5>
-                <div class="chart-container">
-                    <canvas id="billingChart"></canvas>
-                </div>
+            <!-- CHART -->
+            <div class="card p-4 mb-4" style="height:320px;">
+                <canvas id="billingChart"></canvas>
             </div>
 
-            <!-- Monthly Transactions Table -->
-            <div class="card shadow-sm p-3 mb-4">
-                <h5 class="mb-3">Transactions Throughout the Month</h5>
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover table-bordered align-middle" id="transactionsTable">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Date</th>
-                                <th>Total Billed</th>
-                                <th>Total Paid</th>
-                                <th>Pending Transactions</th>
-                                <th>Pending Amount</th>
-                                <th>OOP Collected</th>
-                                <th>Insurance Covered</th>
-                                <th>View</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-
-                <!-- Pagination Controls -->
-                <nav>
-                    <ul class="pagination justify-content-center mt-3">
-                        <li class="page-item" id="prevPage"><a class="page-link" href="#">Previous</a></li>
-                        <li class="page-item" id="nextPage"><a class="page-link" href="#">Next</a></li>
-                    </ul>
-                </nav>
+            <!-- INSIGHTS -->
+            <div class="card p-4 insight-box">
+                <h6 class="fw-semibold mb-3">Billing Insights</h6>
+                <div id="insightContent" class="small-text"></div>
             </div>
 
         </div>
-    </div>
 
-    <script>
-        Chart.register(ChartDataLabels);
+        <script>
+            // API base
+            const apiBase = "https://bsis-03.keikaizen.xyz/journal/getMonthBillingReport";
 
-        let billingChart;
-        let currentPage = 1;
-        const pageSize = 5;
+            const monthNames = [
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
+            ];
 
-        // Read month and year from URL query parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const month = urlParams.get('month');
-        const year = urlParams.get('year');
+            let billingChart;
 
-        async function loadBillingData() {
+            // Read month/year from URL
+            const params = new URLSearchParams(window.location.search);
+            const month = parseInt(params.get("month"));
+            const year = parseInt(params.get("year"));
+
+            // Validate parameters
             if (!month || !year) {
-                alert("Month or Year not provided in URL.");
-                return;
+                document.body.innerHTML =
+                    "<h3 class='text-center mt-5 text-danger'>Invalid month or year in URL.</h3>";
+                throw new Error("Missing URL parameters");
             }
 
-            const summaryUrl = `https://localhost:7212/journal/getMonthBillingReport/${month}/${year}`;
-            const tableUrl = `https://localhost:7212/journal/getMonthTransactions/${month}/${year}?page=${currentPage}&size=${pageSize}`;
+            // Set header
+            document.getElementById("headerDate").innerText =
+                `${monthNames[month - 1]} ${year}`;
 
-            try {
-                const res = await fetch(summaryUrl);
-                const data = await res.json();
+            // Load report
+            loadReport();
 
-                // Summary Cards
-                document.getElementById('totalBilled').innerText = `₱ ${Number(data.total_billed).toLocaleString()}`;
-                document.getElementById('totalPaid').innerText = `₱ ${Number(data.total_paid).toLocaleString()}`;
-                document.getElementById('totalPending').innerText = data.total_pending_transactions ?? 0;
-                document.getElementById('totalPendingAmount').innerText = `₱ ${Number(data.total_pending_amount).toLocaleString()}`;
-                document.getElementById('totalOOP').innerText = `₱ ${Number(data.total_oop_collected).toLocaleString()}`;
-                document.getElementById('totalInsurance').innerText = `₱ ${Number(data.total_insurance_covered).toLocaleString()}`;
+            function loadReport() {
 
-                // Chart
-                const chartData = [data.total_oop_collected, data.total_insurance_covered, data.total_pending_amount];
-                const chartLabels = ["OOP", "Insurance", "Pending Amount"];
-                const chartColors = ["#0dcaf0", "#ffc107", "#dc3545"];
-                const total = chartData.reduce((a, b) => a + b, 0);
+                fetch(`${apiBase}?month=${month}&year=${year}`)
+                    .then(res => res.json())
+                    .then(data => {
 
-                if (billingChart) billingChart.destroy();
-                billingChart = new Chart(document.getElementById('billingChart'), {
-                    type: 'bar',
-                    data: {
-                        labels: chartLabels,
-                        datasets: [{
-                            data: chartData,
-                            backgroundColor: chartColors
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            datalabels: {
-                                color: "#000",
-                                anchor: 'end',
-                                align: 'top',
-                                formatter: (value) => total ? ((value / total) * 100).toFixed(1) + "%" : "0%"
+                        // SUMMARY
+                        document.getElementById("totalBilled").innerText =
+                            "₱" + data.total_billed.toLocaleString();
+
+                        document.getElementById("totalPaid").innerText =
+                            "₱" + data.total_paid.toLocaleString();
+
+                        document.getElementById("pendingTransactions").innerText =
+                            data.total_pending_transaction;
+
+                        document.getElementById("pendingAmount").innerText =
+                            "₱" + data.total_pending_amount.toLocaleString();
+
+                        // CHART
+                        if (billingChart) billingChart.destroy();
+
+                        billingChart = new Chart(document.getElementById("billingChart"), {
+                            type: "bar",
+                            data: {
+                                labels: [
+                                    "Total Billed",
+                                    "Total Paid",
+                                    "OOP Collected",
+                                    "Insurance Covered",
+                                    "Pending Amount"
+                                ],
+                                datasets: [{
+                                    label: "₱ Amount",
+                                    data: [
+                                        data.total_billed,
+                                        data.total_paid,
+                                        data.total_oop_collected,
+                                        data.total_insurance_covered,
+                                        data.total_pending_amount
+                                    ],
+                                    backgroundColor: [
+                                        "#0d6efd",
+                                        "#198754",
+                                        "#fd7e14",
+                                        "#6f42c1",
+                                        "#dc3545"
+                                    ]
+                                }]
+                            },
+                            options: {
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        ticks: {
+                                            callback: v => "₱" + v.toLocaleString()
+                                        }
+                                    }
+                                }
                             }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true
-                            }
-                        }
-                    },
-                    plugins: [ChartDataLabels]
-                });
+                        });
 
-                // Transactions Table
-                const tableRes = await fetch(tableUrl);
-                const transactions = await tableRes.json();
-                const tbody = document.querySelector('#transactionsTable tbody');
-                tbody.innerHTML = '';
+                        // INSIGHTS
+                        const paidRate = ((data.total_paid / data.total_billed) * 100).toFixed(1);
+                        const pendingRate =
+                            ((data.total_pending_amount / data.total_billed) * 100).toFixed(1);
 
-                transactions.forEach(tx => {
-                    const tr = document.createElement('tr');
-                    tr.classList.toggle('table-danger', tx.total_pending_transactions > 0);
-                    tr.innerHTML = `
-                <td>${tx.report_date}</td>
-                <td>₱ ${Number(tx.total_billed).toLocaleString()}</td>
-                <td>₱ ${Number(tx.total_paid).toLocaleString()}</td>
-                <td>${tx.total_pending_transactions}</td>
-                <td>₱ ${Number(tx.total_pending_amount).toLocaleString()}</td>
-                <td>₱ ${Number(tx.total_oop_collected).toLocaleString()}</td>
-                <td>₱ ${Number(tx.total_insurance_covered).toLocaleString()}</td>
-                <td>
-                    <a href="daily_billing_report.php?date=${tx.report_date}" class="btn btn-primary btn-sm">View</a>
-                </td>
-            `;
-                    tbody.appendChild(tr);
-                });
-
-            } catch (err) {
-                console.error("Failed to load billing data:", err);
-                alert("Failed to fetch monthly billing report. Check API or CORS.");
+                        document.getElementById("insightContent").innerHTML = `
+                            • Total billed: <strong>₱${data.total_billed.toLocaleString()}</strong><br>
+                            • Paid coverage: <strong>${paidRate}%</strong><br>
+                            • Pending amount: <strong>₱${data.total_pending_amount.toLocaleString()} (${pendingRate}%)</strong><br>
+                            • OOP collected: <strong>₱${data.total_oop_collected.toLocaleString()}</strong><br>
+                            • Insurance covered: <strong>₱${data.total_insurance_covered.toLocaleString()}</strong><br>
+                        `;
+                    });
             }
-        }
-
-        // Pagination handlers
-        async function nextPage() {
-            currentPage++;
-            await loadBillingData();
-        }
-        async function prevPage() {
-            if (currentPage > 1) {
-                currentPage--;
-                await loadBillingData();
-            }
-        }
-        document.getElementById('nextPage').addEventListener('click', e => {
-            e.preventDefault();
-            nextPage();
-        });
-        document.getElementById('prevPage').addEventListener('click', e => {
-            e.preventDefault();
-            prevPage();
-        });
-
-        loadBillingData();
-    </script>
-
+        </script>
+    </div>
 </body>
 
 </html>

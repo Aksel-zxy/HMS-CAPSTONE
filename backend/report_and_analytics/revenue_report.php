@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Monthly Revenue Report</title>
+    <title>Yearly Revenue Report</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Premium Bootstrap -->
@@ -70,7 +70,7 @@
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
                 <div class="d-flex align-items-center gap-2 mb-2 mb-md-0">
-                    <h3 class="mb-0">Monthly Revenue Report</h3>
+                    <h3 class="mb-0">Yearly Revenue Report</h3>
                 </div>
                 <select id="yearSelect" class="form-select w-auto"></select>
             </div>
@@ -104,7 +104,7 @@
         </main>
 
         <script>
-            const API_BASE = "https://localhost:7212/journal/getMonthsDetailsRevenueReport";
+            const API_BASE = "https://bsis-03.keikaizen.xyz/journal/getMonthsDetailsRevenueReport";
             const monthNames = [
                 "January", "February", "March", "April", "May", "June",
                 "July", "August", "September", "October", "November", "December"

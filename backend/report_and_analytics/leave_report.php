@@ -227,7 +227,7 @@ include 'header.php'
             </li>
 
             <li class="sidebar-item">
-                <a href="../report_and_analytics/report_dashboard.php" class="sidebar-link">
+                <a href="../report_and_analytics/dashboard.php" class="sidebar-link">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                         class="bi bi-building" viewBox="0 0 16 16" style="margin-bottom: 7px;">
                         <path
@@ -349,7 +349,7 @@ include 'header.php'
         }
 
         async function loadReportData() {
-            const url = `https://localhost:7212/employee/getMonthLeaveReports/${month}/${year}`;
+            const url = `https://bsis-03.keikaizen.xyz/employee/getMonthLeaveReports/${month}/${year}`;
             try {
                 const res = await fetch(url);
                 const data = await res.json();

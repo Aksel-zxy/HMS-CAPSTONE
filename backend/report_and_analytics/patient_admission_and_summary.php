@@ -55,6 +55,21 @@ include 'header.php';
             color: #777;
             font-size: 14px;
         }
+
+        /* Insight Box */
+        .insight-box {
+            background: #ffffff;
+            border-left: 5px solid #007bff;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-top: 25px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+        }
+
+        .insight-box h5 {
+            font-weight: 700;
+            color: #007bff;
+        }
     </style>
 </head>
 
@@ -107,12 +122,20 @@ include 'header.php';
                 </div>
             </div>
 
+            <!-- Chart -->
             <div class="chart-container mb-5">
                 <h5 class="text-center mb-3">Bed Utilization Breakdown</h5>
                 <div class="chart-wrapper">
                     <canvas id="bedChart"></canvas>
                 </div>
             </div>
+
+            <!-- Insights Section -->
+            <div class="insight-box" id="insightBox" style="display:none;">
+                <h5>Insights</h5>
+                <p id="insightText"></p>
+            </div>
+
         </div>
     </div>
 
@@ -126,22 +149,26 @@ include 'header.php';
         let bedChart;
 
         if (month && year) {
-            const apiUrl = `https://localhost:7212/property/getMonthSummaryAdmissionAndDischargeReport?month=${month}&year=${year}`;
+            const apiUrl = `https://bsis-03.keikaizen.xyz/property/getMonthSummaryAdmissionAndDischargeReport?month=${month}&year=${year}`;
             fetch(apiUrl)
                 .then(res => res.json())
                 .then(data => {
-                    document.getElementById("totalBeds").innerText = data.total_beds || 0;
-                    document.getElementById("occupiedBeds").innerText = data.occupied_beds || 0;
-                    document.getElementById("availableBeds").innerText = data.available_beds || 0;
-                    document.getElementById("brokenBeds").innerText = data.broken_beds || 0;
-                    document.getElementById("dischargedCount").innerText = data.recently_discharged || 0;
-
-                    const ctx = document.getElementById('bedChart').getContext('2d');
+                    const totalBeds = data.total_beds || 0;
                     const occupied = data.occupied_beds || 0;
                     const available = data.available_beds || 0;
                     const broken = data.broken_beds || 0;
+                    const discharged = data.recently_discharged || 0;
+
+                    document.getElementById("totalBeds").innerText = totalBeds;
+                    document.getElementById("occupiedBeds").innerText = occupied;
+                    document.getElementById("availableBeds").innerText = available;
+                    document.getElementById("brokenBeds").innerText = broken;
+                    document.getElementById("dischargedCount").innerText = discharged;
+
+                    const ctx = document.getElementById('bedChart').getContext('2d');
                     const total = occupied + available + broken;
 
+                    // Chart
                     bedChart = new Chart(ctx, {
                         type: 'pie',
                         data: {
@@ -172,10 +199,56 @@ include 'header.php';
                         },
                         plugins: [ChartDataLabels]
                     });
+
+                    // =============================
+                    // Generate Insights
+                    // =============================
+                    let insights = [];
+
+                    // Occupancy level
+                    const occupancyRate = total ? (occupied / total) * 100 : 0;
+                    if (occupancyRate >= 85) {
+                        insights.push(`High bed occupancy detected (${occupancyRate.toFixed(1)}%). Hospital capacity is heavily utilized.`);
+                    } else if (occupancyRate >= 50) {
+                        insights.push(`Moderate occupancy at ${occupancyRate.toFixed(1)}%. Hospital is operating at a stable level.`);
+                    } else {
+                        insights.push(`Low occupancy at ${occupancyRate.toFixed(1)}%. There is significant bed availability.`);
+                    }
+
+                    // Broken beds
+                    if (broken > 5) {
+                        insights.push(`There are ${broken} broken beds. Maintenance is urgently needed.`);
+                    } else if (broken > 0) {
+                        insights.push(`${broken} beds require maintenance attention.`);
+                    }
+
+                    // Discharge trend
+                    if (discharged >= 10) {
+                        insights.push(`High number of recent discharges (${discharged}). Patient turnover is strong this month.`);
+                    } else if (discharged >= 3) {
+                        insights.push(`Moderate discharge count: ${discharged}.`);
+                    } else {
+                        insights.push(`Low discharge activity this month (${discharged}).`);
+                    }
+
+                    // Available beds
+                    if (available === 0) {
+                        insights.push(`No available beds remaining. Admission capacity is fully saturated.`);
+                    } else if (available <= 5) {
+                        insights.push(`Only ${available} beds available. Hospital nearing full capacity.`);
+                    } else {
+                        insights.push(`${available} beds are currently available for admission.`);
+                    }
+
+                    // Render Insight Text
+                    document.getElementById("insightText").innerHTML = insights.join("<br>");
+                    document.getElementById("insightBox").style.display = "block";
+
                 })
                 .catch(err => console.error(err));
         }
     </script>
+
 </body>
 
 </html>

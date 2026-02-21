@@ -189,8 +189,8 @@ include 'header.php'
                 });
                 document.getElementById('periodLabel').innerText = `${monthName} ${year}`;
 
-                const forecastEndpoint = `https://localhost:7212/journal/getMonthTotalRevenueForecast?month=${month}&year=${year}`;
-                const historyEndpoint = `https://localhost:7212/journal/getMonthsRevenueReport`;
+                const forecastEndpoint = `https://bsis-03.keikaizen.xyz/journal/getMonthTotalRevenueForecast?month=${month}&year=${year}`;
+                const historyEndpoint = `https://bsis-03.keikaizen.xyz/journal/getMonthsRevenueReport`;
 
                 try {
                     const [forecastRes, historyRes] = await Promise.all([

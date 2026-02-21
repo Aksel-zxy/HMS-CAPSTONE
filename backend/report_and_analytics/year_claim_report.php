@@ -6,10 +6,10 @@ include 'header.php';
 
 <head>
     <meta charset="UTF-8">
-    <title>Yearly Hospital Payroll Report</title>
+    <title>Yearly Insurance Claims Report</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Bootstrap -->
+    <!-- Minimal Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Chart.js -->
@@ -34,13 +34,14 @@ include 'header.php';
 <body>
     <div class="d-flex">
 
+        <!-- SIDEBAR -->
         <?php include 'sidebar.php'; ?>
 
         <div class="container py-4">
 
             <!-- HEADER + YEAR SELECT -->
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="fw-semibold mb-0">Hospital Payroll Yearly Report</h4>
+                <h4 class="fw-semibold mb-0">Insurance Claims Report</h4>
                 <select id="yearSelector" class="form-select w-auto"></select>
             </div>
 
@@ -48,43 +49,47 @@ include 'header.php';
             <div class="row g-3 mb-4">
                 <div class="col-md-3">
                     <div class="card p-3">
-                        <div class="small-text">Total Employees (December)</div>
-                        <h5 id="totalEmployees">0</h5>
+                        <div class="small-text">Total Claims</div>
+                        <h5 id="totalClaims">0</h5>
                     </div>
                 </div>
+
                 <div class="col-md-3">
                     <div class="card p-3">
-                        <div class="small-text">Year Gross Pay</div>
-                        <h5 id="totalGross">₱0</h5>
+                        <div class="small-text">Approved</div>
+                        <h5 id="totalApproved">0</h5>
                     </div>
                 </div>
+
                 <div class="col-md-3">
                     <div class="card p-3">
-                        <div class="small-text">Year Deductions</div>
-                        <h5 id="totalDeductions">₱0</h5>
+                        <div class="small-text">Denied</div>
+                        <h5 id="totalDenied">0</h5>
                     </div>
                 </div>
+
                 <div class="col-md-3">
                     <div class="card p-3">
-                        <div class="small-text">Year Net Pay</div>
-                        <h5 id="totalNet">₱0</h5>
+                        <div class="small-text">Year</div>
+                        <h5 id="yearLabel">-</h5>
                     </div>
                 </div>
             </div>
 
-            <!-- YEARLY NET PAY CHART -->
+            <!-- YEARLY CHART -->
             <div class="card p-4 mb-4" style="height:320px">
-                <canvas id="yearChart"></canvas>
+                <canvas id="yearChart" height="160"></canvas>
             </div>
 
-            <!-- MONTH CARDS -->
+            <!-- MONTH SUMMARY CARDS -->
             <div class="row g-3" id="monthCards"></div>
 
         </div>
     </div>
 
     <script>
-        const baseApi = "https://bsis-03.keikaizen.xyz/payroll/yearHospitalPayrollReport?year=";
+        const baseApi =
+            "https://bsis-03.keikaizen.xyz/insurance/getYearInsuranceReport?year=";
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
@@ -93,6 +98,7 @@ include 'header.php';
 
         let yearChart;
 
+        // Populate year selector
         const yearSelect = document.getElementById("yearSelector");
         const currentYear = new Date().getFullYear();
 
@@ -101,12 +107,7 @@ include 'header.php';
         }
 
         yearSelect.addEventListener("change", () => loadReport(yearSelect.value));
-
         loadReport(yearSelect.value);
-
-        function formatCurrency(value) {
-            return "₱" + Number(value).toLocaleString();
-        }
 
         function loadReport(year) {
 
@@ -114,57 +115,62 @@ include 'header.php';
                 .then(res => res.json())
                 .then(data => {
 
-                    // SUMMARY
-                    document.getElementById("totalEmployees").innerText = data.total_employees;
-                    document.getElementById("totalGross").innerText = formatCurrency(data.year_total_gross_pay);
-                    document.getElementById("totalDeductions").innerText = formatCurrency(data.year_total_deductions);
-                    document.getElementById("totalNet").innerText = formatCurrency(data.year_total_net_pay);
+                    // SUMMARY DATA
+                    document.getElementById("yearLabel").innerText = data.year;
+                    document.getElementById("totalClaims").innerText =
+                        data.total_claims.toLocaleString();
+                    document.getElementById("totalApproved").innerText =
+                        data.total_approved_claims.toLocaleString();
+                    document.getElementById("totalDenied").innerText =
+                        data.total_denied_claims.toLocaleString();
 
                     const labels = [];
-                    const netPays = [];
-
+                    const totals = [];
                     const container = document.getElementById("monthCards");
                     container.innerHTML = "";
 
-                    const maxNet = Math.max(...data.monthsPayroll.map(m => m.total_net_pay));
+                    const maxClaims = Math.max(
+                        ...data.monthsClaim.map(m => m.total_claims)
+                    );
 
-                    data.monthsPayroll.forEach(m => {
+                    // MONTH CARDS
+                    data.monthsClaim.forEach(m => {
 
                         labels.push(monthNames[m.month - 1]);
-                        netPays.push(m.total_net_pay);
+                        totals.push(m.total_claims);
 
-                        const percent = ((m.total_net_pay / maxNet) * 100).toFixed(0);
+                        const percent = ((m.total_claims / maxClaims) * 100).toFixed(0);
 
                         container.innerHTML += `
-                        <div class="col-xl-3 col-lg-4 col-md-6">
-                            <div class="card p-3 month-card">
-                                <h6 class="fw-semibold">${monthNames[m.month - 1]}</h6>
-                                <div class="small-text">Employees</div>
-                                <div>${m.total_employees}</div>
+                            <div class="col-xl-3 col-lg-4 col-md-6">
+                                <div class="card p-3 month-card">
+                                    <h6 class="fw-semibold">${monthNames[m.month - 1]}</h6>
 
-                                <div class="small-text mt-2">Gross</div>
-                                <div class="fw-semibold">${formatCurrency(m.total_gross_pay)}</div>
+                                    <div class="small-text">Total Claims</div>
+                                    <div class="fw-semibold">${m.total_claims.toLocaleString()}</div>
 
-                                <div class="small-text mt-2">Deductions</div>
-                                <div>${formatCurrency(m.total_deductions)}</div>
+                                    <div class="small-text mt-1">Approved</div>
+                                    <div>${m.total_approved_claims}</div>
 
-                                <div class="small-text mt-2">Net</div>
-                                <div class="fw-semibold">${formatCurrency(m.total_net_pay)}</div>
+                                    <div class="small-text mt-1">Denied</div>
+                                    <div>${m.total_denied_claims}</div>
 
-                                <div class="progress mt-3" style="height:6px">
-                                    <div class="progress-bar bg-success" style="width:${percent}%"></div>
-                                </div>
+                                    <div class="progress mt-2" style="height:6px">
+                                        <div class="progress-bar bg-primary" style="width:${percent}%"></div>
+                                    </div>
 
-                                <div class="d-flex justify-content-end mt-3">
-                                    <a href="/backend/report_and_analytics/salary_paid_report.php?month=${m.month}&year=${data.year}"
-                                       class="btn btn-sm btn-outline-primary">View</a>
+                                    <div class="d-flex justify-content-end mt-3">
+                                        <a href="http://localhost:8080/backend/report_and_analytics/month_insurance_claim_report.php?month=${m.month}&year=${data.year}"
+                                           class="btn btn-sm btn-outline-primary">
+                                           View
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
                         `;
                     });
 
-                    // DESTROY OLD CHART
+                    // YEAR CHART
                     if (yearChart) yearChart.destroy();
 
                     yearChart = new Chart(document.getElementById("yearChart"), {
@@ -172,9 +178,9 @@ include 'header.php';
                         data: {
                             labels: labels,
                             datasets: [{
-                                label: "Net Pay",
-                                data: netPays,
-                                backgroundColor: "#198754"
+                                label: "Total Claims",
+                                data: totals,
+                                backgroundColor: "#0d6efd"
                             }]
                         },
                         options: {
@@ -187,12 +193,13 @@ include 'header.php';
                             scales: {
                                 y: {
                                     ticks: {
-                                        callback: value => "₱" + value.toLocaleString()
+                                        callback: value => value.toLocaleString()
                                     }
                                 }
                             }
                         }
                     });
+
                 });
         }
     </script>
