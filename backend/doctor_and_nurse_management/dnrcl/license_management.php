@@ -335,11 +335,11 @@ $employees = $conn->query($emp_query);
                                         <div class="row g-3">
                                             <div class="col-md-4">
                                                 <label class="fw-bold small">License Type</label>
-                                                <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($emp_data['license_type'] ?? 'N/A') ?>" readonly>
+                                                <input type="text" name="license_type" class="form-control bg-light" value="<?= htmlspecialchars($emp_data['license_type'] ?? 'N/A') ?>" readonly>
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="fw-bold small">License Number</label>
-                                                <input type="text" class="form-control bg-light" value="<?= htmlspecialchars($emp_data['license_number'] ?? 'N/A') ?>" readonly>
+                                                <input type="text" name="license_number" class="form-control bg-light" value="<?= htmlspecialchars($emp_data['license_number'] ?? 'N/A') ?>" readonly>
                                             </div>
                                             <div class="col-md-4">
                                                 <label class="fw-bold small text-primary">Expiry Date</label>

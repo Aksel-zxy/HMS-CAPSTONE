@@ -19,6 +19,21 @@ if (!$user) {
     echo "No user found.";
     exit();
 }
+
+$equipQuery = "SELECT machine_name FROM machine_equipments ORDER BY machine_name ASC";
+$equipResult = $conn->query($equipQuery);
+$equipments = [];
+while ($row = $equipResult->fetch_assoc()) {
+    $equipments[] = $row['machine_name'];
+}
+
+$logsQuery = "SELECT * FROM maintenance_history ORDER BY maintenance_date DESC, created_at DESC";
+$logsResult = $conn->query($logsQuery);
+$maintenanceLogs = [];
+while ($row = $logsResult->fetch_assoc()) {
+    $maintenanceLogs[] = $row;
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -184,12 +199,158 @@ if (!$user) {
                 </div>
             </div>
             
-            <h1>MAINTENANCE</h1>
-            
+            <div style="width:95%; margin:20px auto; padding:15px; background:#f8f9fa; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.08);">
+                <?php if(isset($_GET['success']) && $_GET['success'] == 1): ?>
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <strong>Success!</strong> Maintenance log has been added.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
+                <?php if(isset($_GET['error'])): ?>
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <strong>Error!</strong> Could not add the maintenance log. Ensure all fields are filled properly.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
+
+                <div class="d-flex justify-content-between align-items-center mb-3" style="border-bottom:2px solid #198754; padding-bottom:8px;">
+                    <h2 style="font-family:Arial, sans-serif; color:#198754; margin:0;">
+                        ⚙️ Scheduled Maintenance & Repair Logs
+                    </h2>
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addMaintenanceModal">
+                        <i class="fas fa-plus"></i> Add Log
+                    </button>
+                </div>
+
+                <div class="col-md-3 mb-3">
+                    <input type="text" id="searchLogInput" class="form-control"
+                        style="width:300px; border-radius:20px; padding:8px 15px;"
+                        placeholder="🔍 Search equipment or type...">
+                </div>
+
+                <div style="height:600px; overflow-y:auto; border-radius:8px; box-shadow: inset 0 0 5px rgba(0,0,0,0.05);">
+                    <table id="logsTable" style="width:100%; border-collapse:collapse; font-family:Arial, sans-serif; font-size:14px; background:#fff;">
+                        <thead style="position:sticky; top:0; background:#f1f5f9; z-index:1; border-bottom:2px solid #dee2e6;">
+                            <tr>
+                                <th style="padding:12px; text-align:center;">Date</th>
+                                <th style="padding:12px; text-align:left;">Equipment</th>
+                                <th style="padding:12px; text-align:center;">Type</th>
+                                <th style="padding:12px; text-align:center;">Source</th>
+                                <th style="padding:12px; text-align:center;">Status</th>
+                                <th style="padding:12px; text-align:left;">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($maintenanceLogs)): ?>
+                                <?php foreach ($maintenanceLogs as $row): ?>
+                                    <tr style="border-bottom:1px solid #f1f1f1;">
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['maintenance_date']) ?></td>
+                                        <td style="padding:12px; text-align:left;"><?= htmlspecialchars($row['equipment']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['maintenance_type']) ?></td>
+                                        <td style="padding:12px; text-align:center;">
+                                            <span class="badge rounded-pill <?php echo ($row['source'] == 'Repair Request') ? 'bg-danger' : 'bg-info text-dark'; ?>">
+                                                <?= htmlspecialchars($row['source']) ?>
+                                            </span>
+                                        </td>
+                                        <td style="padding:12px; text-align:center;">
+                                            <?php
+                                            $status = $row['status'] ?? 'N/A';
+                                            $badgeClass = 'bg-secondary';
+                                            if (strtolower($status) == 'completed' || strtolower($status) == 'done') {
+                                                $badgeClass = 'bg-success';
+                                            } elseif (strtolower($status) == 'pending' || strtolower($status) == 'in progress') {
+                                                $badgeClass = 'bg-warning text-dark';
+                                            }
+                                            ?>
+                                            <span class="badge rounded-pill <?php echo $badgeClass; ?>">
+                                                <?= htmlspecialchars($status) ?>
+                                            </span>
+                                        </td>
+                                        <td style="padding:12px; text-align:left;"><?= htmlspecialchars($row['remarks']) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="6" style="text-align:center; padding:40px; color:#6c757d; font-style:italic;">
+                                        🧾 No maintenance logs found
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add Maintenance Modal -->
+            <div class="modal fade" id="addMaintenanceModal" tabindex="-1" aria-labelledby="addMaintenanceModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form action="add_maintenance.php" method="POST">
+                            <div class="modal-header bg-success text-white">
+                                <h5 class="modal-title" id="addMaintenanceModalLabel">Add Maintenance/Repair Log</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="source" class="form-label">Source <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="source" name="source" required>
+                                        <option value="Maintenance">Maintenance</option>
+                                        <option value="Repair Request">Repair Request</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="equipment" class="form-label">Equipment <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="equipment" name="equipment" required>
+                                        <option value="" disabled selected>Select equipment...</option>
+                                        <?php foreach ($equipments as $equip): ?>
+                                            <option value="<?= htmlspecialchars($equip) ?>"><?= htmlspecialchars($equip) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="maintenance_date" class="form-label">Date <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="maintenance_date" name="maintenance_date" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="maintenance_type" class="form-label">Type (e.g., Preventive, Corrective) <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="maintenance_type" name="maintenance_type" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="status" class="form-label">Status <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="status" name="status" required>
+                                        <option value="Completed">Completed</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Pending">Pending</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="remarks" class="form-label">Remarks</label>
+                                    <textarea class="form-control" id="remarks" name="remarks" rows="3"></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="submit" class="btn btn-success">Save Log</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             <script>
                 const toggler = document.querySelector(".toggler-btn");
                 toggler.addEventListener("click", function() {
                     document.querySelector("#sidebar").classList.toggle("collapsed");
+                });
+                
+                document.getElementById('searchLogInput').addEventListener('keyup', function() {
+                    const filter = this.value.toLowerCase();
+                    const rows = document.querySelectorAll('#logsTable tbody tr');
+
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(filter) ? '' : 'none';
+                    });
                 });
             </script>
             <script src="../assets/Bootstrap/all.min.js"></script>
