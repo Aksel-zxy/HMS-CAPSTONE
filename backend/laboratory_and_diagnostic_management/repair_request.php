@@ -7,757 +7,1204 @@ ini_set('display_errors', 1);
 
 // 🔐 Ensure login
 if (!isset($_SESSION['user_id'])) {
-    if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
-        header('Content-Type: application/json');
-        http_response_code(401);
-        echo json_encode(['error' => 'Unauthorized']);
-        exit();
-    }
     header("Location: ../../login.php");
     exit();
 }
 
-$user_id = (int)$_SESSION['user_id'];
+$user_id = $_SESSION['user_id'];
 
-/* =====================================================
-   🔁 AJAX — Fetch Request Items
-=====================================================*/
-if (isset($_GET['ajax']) && $_GET['ajax'] === 'items') {
-    header('Content-Type: application/json');
-    $request_id = (int)($_GET['id'] ?? 0);
-    if ($request_id <= 0) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Invalid request ID']);
-        exit();
-    }
-    try {
-        $check = $pdo->prepare("SELECT id FROM department_request WHERE id = ? AND user_id = ? LIMIT 1");
-        $check->execute([$request_id, $user_id]);
-        if (!$check->fetch()) {
-            http_response_code(403);
-            echo json_encode(['error' => 'Access denied — this request does not belong to you.']);
-            exit();
-        }
-        $stmt = $pdo->prepare("
-            SELECT item_name, description, unit, quantity, pcs_per_box, total_pcs
-            FROM department_request_items
-            WHERE request_id = ?
-            ORDER BY id ASC
-        ");
-        $stmt->execute([$request_id]);
-        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode($items);
-    } catch (Exception $e) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
-    }
-    exit();
-}
-
-/* =====================================================
-   👤 Fetch user info
-=====================================================*/
+// 👤 Fetch logged-in user info
 $user_stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ? LIMIT 1");
 $user_stmt->execute([$user_id]);
 $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
-if (!$user) die("User not found.");
 
-$full_name     = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
-$department    = $user['department']    ?? 'Unknown Department';
-$department_id = $user['department_id'] ?? 0;
-$request_date  = date('F d, Y');
+// Build full name from users table columns: fname, mname, lname
+$logged_user_name = trim(
+    ($user['fname']  ?? '') . ' ' .
+    ($user['mname']  ?? '') . ' ' .
+    ($user['lname']  ?? '')
+);
+// Collapse multiple spaces (if mname is empty)
+$logged_user_name = preg_replace('/\s+/', ' ', $logged_user_name);
+if (empty($logged_user_name)) {
+    $logged_user_name = $user['username'] ?? 'Unknown User';
+}
+$logged_user_dept = $user['department'] ?? '';
 
-/* =====================================================
-   📤 HANDLE FORM SUBMISSION
-=====================================================*/
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    try {
-        $pdo->beginTransaction();
-        $items       = $_POST['items'] ?? [];
-        $valid_items = array_filter($items, fn($i) => !empty(trim($i['name'] ?? '')));
-        if (count($valid_items) === 0) {
-            throw new Exception("Please add at least one item before submitting.");
-        }
+// ===============================
+// Auto-generate ticket number
+// ===============================
+function generateTicketNo($pdo) {
+    $prefix = 'TKT-' . date('Ymd') . '-';
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM repair_requests WHERE ticket_no LIKE ?");
+    $stmt->execute([$prefix . '%']);
+    $count = (int)$stmt->fetchColumn() + 1;
+    return $prefix . str_pad($count, 4, '0', STR_PAD_LEFT);
+}
+
+// ===============================
+// Handle new repair request submission
+// ===============================
+$success_msg = '';
+$error_msg   = '';
+$active_tab  = 'tickets'; // default tab
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_request'])) {
+    $active_tab = 'new'; // stay on form tab on error, switch to tickets on success
+    // Use logged-in user data from session (not editable by user)
+    $user_name = $logged_user_name;
+    $equipment = trim($_POST['equipment']   ?? '');
+    $issue     = trim($_POST['issue']       ?? '');
+    $location  = trim($_POST['location']    ?? '');
+    $priority  = trim($_POST['priority']    ?? 'Low');
+    $ticket_no = generateTicketNo($pdo);
+
+    $conf = min(100, (int)(strlen($issue) / 3) + match($priority) {
+        'Critical' => 30, 'High' => 20, 'Medium' => 10, default => 5
+    });
+
+    if ($user_name && $equipment && $issue && $location) {
         $stmt = $pdo->prepare("
-            INSERT INTO department_request
-            (user_id, department, department_id, month, total_items, status)
-            VALUES (?, ?, ?, ?, ?, 'Pending')
+            INSERT INTO repair_requests
+                (ticket_no, user_id, user_name, equipment, issue, location, priority, status, confidence_score)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'Open', ?)
         ");
-        $stmt->execute([$user_id, $department, $department_id, date('Y-m-d'), count($valid_items)]);
-        $request_id = $pdo->lastInsertId();
-        $item_stmt = $pdo->prepare("
-            INSERT INTO department_request_items
-            (request_id, item_name, description, unit, quantity, pcs_per_box, total_pcs)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        foreach ($valid_items as $item) {
-            $item_stmt->execute([
-                $request_id,
-                $item['name'],
-                $item['description'] ?? '',
-                $item['unit']        ?? '',
-                (int)($item['quantity']    ?? 0),
-                (int)($item['pcs_per_box'] ?? 1),
-                (int)($item['total_pcs']   ?? 0),
-            ]);
-        }
-        $pdo->commit();
-        $success = "Purchase request successfully submitted!";
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        $error = $e->getMessage();
+        $stmt->execute([$ticket_no, $user_id, $user_name, $equipment, $issue, $location, $priority, $conf]);
+        $success_msg = "Repair request submitted! Your ticket number is <strong>{$ticket_no}</strong>.";
+        $active_tab  = 'tickets'; // switch to tickets tab after success
+    } else {
+        $error_msg = "Please fill in all required fields.";
     }
 }
 
-/* =====================================================
-   🔎 FETCH USER REQUESTS
-=====================================================*/
-$request_stmt = $pdo->prepare("SELECT * FROM department_request WHERE user_id = ? ORDER BY created_at DESC");
-$request_stmt->execute([$user_id]);
-$my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
+// ===============================
+// Fetch all repair requests (with filters)
+// ===============================
+$filter_status   = $_GET['status']   ?? 'all';
+$filter_priority = $_GET['priority'] ?? 'all';
+$search          = trim($_GET['search'] ?? '');
+
+// If filter GET params present, show tickets tab
+if (!empty($_GET)) $active_tab = 'tickets';
+
+// Always filter by the logged-in user — only show their own tickets
+$where  = ["user_id = ?"];
+$params = [$user_id];
+
+if ($filter_status !== 'all') {
+    $where[]  = "status = ?";
+    $params[] = $filter_status;
+}
+if ($filter_priority !== 'all') {
+    $where[]  = "priority = ?";
+    $params[] = $filter_priority;
+}
+if ($search !== '') {
+    $where[]  = "(ticket_no LIKE ? OR equipment LIKE ? OR location LIKE ?)";
+    $like     = "%{$search}%";
+    array_push($params, $like, $like, $like);
+}
+
+$whereSQL = 'WHERE ' . implode(' AND ', $where);
+$stmt = $pdo->prepare("SELECT * FROM repair_requests {$whereSQL} ORDER BY created_at DESC");
+$stmt->execute($params);
+$requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Stats
+$stmt_stats = $pdo->prepare("
+    SELECT
+        COUNT(*) AS total,
+        SUM(status = 'Open') AS open_count,
+        SUM(status = 'In Progress') AS inprog_count,
+        SUM(status = 'Completed') AS done_count,
+        SUM(priority = 'Critical') AS critical_count
+    FROM repair_requests
+    WHERE user_id = ?
+");
+$stmt_stats->execute([$user_id]);
+$stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
+
+// Fetch distinct departments from users table (non-empty only), sorted alphabetically
+$dept_stmt = $pdo->query("
+    SELECT DISTINCT department
+    FROM users
+    WHERE department IS NOT NULL AND department != ''
+    ORDER BY department ASC
+");
+$departments = $dept_stmt->fetchAll(PDO::FETCH_COLUMN);
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Purchase Request — HMS Capstone</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repair Request System — HMS Capstone</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         :root {
-            --sidebar-w:    250px;
-            --sidebar-w-sm: 200px;
-            --topbar-h:     56px;
-            --accent:       #00acc1;
-            --navy:         #0b1d3a;
-            --surface:      #F5F6F7;
-            --card:         #ffffff;
-            --border:       #e0e6f0;
-            --text:         #374151;
-            --muted:        #6e768e;
-            --radius:       12px;
-            --shadow:       0 2px 16px rgba(11,29,58,.08);
-            --shadow-md:    0 4px 24px rgba(11,29,58,.12);
+            --navy:      #0b1d3a;
+            --navy-mid:  #122654;
+            --navy-soft: #1a3567;
+            --accent:    #2d8bff;
+            --accent2:   #00c9a7;
+            --gold:      #f4b942;
+            --danger:    #ff4d6d;
+            --warning:   #ff9f43;
+            --surface:   #f0f4fb;
+            --card:      #ffffff;
+            --border:    #dce6f5;
+            --text:      #1a2640;
+            --muted:     #7a8fb5;
+            --radius:    14px;
+            --shadow:    0 4px 24px rgba(11,29,58,.10);
+            --shadow-lg: 0 12px 48px rgba(11,29,58,.16);
         }
-
         *, *::before, *::after { box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
-
         body {
-            font-family: "Nunito", "Segoe UI", Arial, sans-serif;
+            font-family: 'Outfit', sans-serif;
             background: var(--surface);
             color: var(--text);
-            margin: 0;
-            margin-left: var(--sidebar-w);
-            transition: margin-left 0.3s ease-in-out;
             min-height: 100vh;
-            overflow-x: hidden;
         }
-
+        /* ── PAGE WRAPPER ── */
         .page-wrap {
-            padding: calc(var(--topbar-h) + 16px) 1.75rem 3rem 1.75rem;
+            padding: 0 2rem 3rem 2rem;
             max-width: 1400px;
             margin: 0 auto;
         }
 
-        /* ── PAGE HEADER ── */
-        .page-header {
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
+        /* ── HERO ── */
+        .page-hero {
+            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-soft) 60%, #1e4d8c 100%);
+            border-radius: 0 0 var(--radius) var(--radius);
+            padding: 2.5rem 2.5rem 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
         }
-
-        /* ── BACK BUTTON ── */
-        .btn-back {
+        .page-hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .page-hero::after {
+            content: '';
+            position: absolute;
+            right: -80px; top: -80px;
+            width: 340px; height: 340px;
+            background: radial-gradient(circle, rgba(45,139,255,.18) 0%, transparent 70%);
+            border-radius: 50%;
+        }
+        .hero-icon {
+            width: 56px; height: 56px;
+            background: rgba(45,139,255,.22);
+            border: 1.5px solid rgba(45,139,255,.4);
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem;
+            color: #a8d4ff;
+            margin-bottom: 1rem;
+        }
+        .page-hero h1 {
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: #fff;
+            margin: 0 0 .3rem;
+            letter-spacing: -.5px;
+        }
+        .page-hero p {
+            color: rgba(255,255,255,.6);
+            font-size: .93rem;
+            margin: 0;
+        }
+        .hero-badge {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 7px 16px;
-            background: var(--card);
-            color: var(--navy);
-            border: 1.5px solid var(--border);
-            border-radius: 9px;
-            font-size: .83rem;
-            font-weight: 700;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all .18s;
-            box-shadow: var(--shadow);
-            flex-shrink: 0;
-        }
-        .btn-back:hover {
-            background: var(--navy);
-            color: #fff;
-            border-color: var(--navy);
-            transform: translateX(-2px);
-        }
-        .btn-back i { font-size: .95rem; }
-
-        .page-header-icon {
-            width: 46px; height: 46px;
-            background: linear-gradient(135deg, var(--accent), #0088a3);
-            border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            color: #fff;
-            font-size: 1.3rem;
-            flex-shrink: 0;
-            box-shadow: 0 4px 12px rgba(0,172,193,.35);
-        }
-        .page-header h2 {
-            font-size: clamp(1.2rem, 3vw, 1.6rem);
-            font-weight: 800;
-            color: var(--navy);
-            margin: 0;
-        }
-        .page-header .date-chip {
-            margin-left: auto;
-            background: var(--card);
-            border: 1px solid var(--border);
+            background: rgba(255,255,255,.1);
+            border: 1px solid rgba(255,255,255,.15);
             border-radius: 999px;
             padding: 5px 14px;
-            font-size: .8rem;
-            color: var(--muted);
-            font-weight: 600;
-            white-space: nowrap;
+            font-size: .78rem;
+            color: rgba(255,255,255,.8);
+            font-weight: 500;
+        }
+
+        /* ── STAT CARDS ── */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.2rem 1.4rem;
             box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: transform .2s, box-shadow .2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+        .stat-card.total::before  { background: var(--accent); }
+        .stat-card.open::before   { background: var(--gold); }
+        .stat-card.inprog::before { background: var(--accent); }
+        .stat-card.done::before   { background: var(--accent2); }
+        .stat-card.crit::before   { background: var(--danger); }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+        .stat-icon {
+            width: 46px; height: 46px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+        .stat-card.total .stat-icon  { background:#eef4ff; color:var(--accent); }
+        .stat-card.open .stat-icon   { background:#fff8e6; color:var(--gold); }
+        .stat-card.inprog .stat-icon { background:#e8f3ff; color:var(--accent); }
+        .stat-card.done .stat-icon   { background:#e6faf5; color:var(--accent2); }
+        .stat-card.crit .stat-icon   { background:#fff0f3; color:var(--danger); }
+        .stat-num {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--navy);
+            line-height: 1;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .stat-lbl {
+            font-size: .78rem;
+            color: var(--muted);
+            font-weight: 500;
+            margin-top: 3px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
         }
 
-        /* ── ALERTS ── */
-        .alert { border-radius: var(--radius); font-size: .9rem; border: none; padding: .85rem 1.2rem; }
-        .alert-success { background: #e6faf5; color: #0d6e52; border-left: 4px solid #00c9a7; }
-        .alert-danger  { background: #fff0f3; color: #7a0020; border-left: 4px solid #ff4d6d; }
-        .alert-info    { background: #eef6ff; color: #1a4d8c; border-left: 4px solid var(--accent); }
+        /* ── ALERT BANNERS ── */
+        .alert-success-custom {
+            background: linear-gradient(135deg, #e6faf5, #f0fff8);
+            border: 1.5px solid #5cd6b0;
+            border-radius: var(--radius);
+            color: #0d5e45;
+            padding: 1rem 1.4rem;
+            font-size: .9rem;
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            margin-bottom: 1.2rem;
+        }
+        .alert-error-custom {
+            background: #fff0f3;
+            border: 1.5px solid #ff4d6d;
+            border-radius: var(--radius);
+            color: #7a0020;
+            padding: 1rem 1.4rem;
+            font-size: .9rem;
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            margin-bottom: 1.2rem;
+        }
 
-        /* ── TABS ── */
-        .nav-tabs {
+        /* ── TAB CONTAINER ── */
+        .tab-container {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        /* ── TAB NAV ── */
+        .tab-nav {
+            display: flex;
+            background: #f4f8ff;
             border-bottom: 2px solid var(--border);
-            gap: 4px; flex-wrap: nowrap;
-            overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            padding: 0 1.5rem;
+            gap: 0;
         }
-        .nav-tabs::-webkit-scrollbar { display: none; }
-        .nav-tabs .nav-link {
-            border: none; border-bottom: 3px solid transparent; border-radius: 0;
-            color: var(--muted); font-weight: 700; font-size: .88rem;
-            padding: .7rem 1.1rem; white-space: nowrap;
-            transition: color .2s, border-color .2s; margin-bottom: -2px;
+        .tab-btn {
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            padding: 1rem 1.4rem;
+            border: none;
+            background: transparent;
+            font-family: 'Outfit', sans-serif;
+            font-size: .9rem;
+            font-weight: 600;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: color .2s, border-color .2s;
+            white-space: nowrap;
+            position: relative;
         }
-        .nav-tabs .nav-link:hover { color: var(--navy); }
-        .nav-tabs .nav-link.active { color: var(--accent); border-bottom-color: var(--accent); background: transparent; }
+        .tab-btn .t-icon {
+            width: 30px; height: 30px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: .88rem;
+            background: #e8edf8;
+            color: var(--muted);
+            transition: background .2s, color .2s;
+        }
+        .tab-btn:hover { color: var(--navy); }
+        .tab-btn:hover .t-icon { background: #dce8ff; color: var(--accent); }
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .tab-btn.active .t-icon {
+            background: #dce8ff;
+            color: var(--accent);
+        }
+        .tab-count {
+            background: var(--danger);
+            color: #fff;
+            font-size: .65rem;
+            font-weight: 800;
+            border-radius: 999px;
+            padding: 2px 7px;
+            line-height: 1.4;
+            font-family: 'JetBrains Mono', monospace;
+            margin-left: 2px;
+        }
+        .tab-btn.active .tab-count { background: var(--accent); }
 
-        /* ── CARD ── */
-        .pr-card {
-            background: var(--card); border: 1px solid var(--border);
-            border-radius: var(--radius); box-shadow: var(--shadow);
-            padding: 1.75rem; margin-top: 1rem;
-        }
+        /* ── TAB PANES ── */
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+        .tab-body { padding: 2rem; }
 
-        /* ── INFO BOX ── */
-        .info-box {
-            display: flex; flex-wrap: wrap; gap: 1rem;
-            background: #eef6ff; border: 1px solid #c5d8ff;
-            border-radius: 10px; padding: .9rem 1.2rem;
-            font-size: .88rem; color: #1a4d8c; margin-bottom: 1.5rem;
+        /* ── FORM STYLES ── */
+        .form-label {
+            font-size: .8rem;
+            font-weight: 700;
+            color: var(--navy);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: .4rem;
         }
-        .info-box-item { display: flex; align-items: center; gap: .4rem; }
-        .info-box-item strong { font-weight: 700; }
-
-        /* ── FORM CONTROLS ── */
         .form-control, .form-select {
-            border: 1.5px solid var(--border); border-radius: 8px;
-            font-size: .85rem; color: var(--text); background: #fafcff;
-            min-height: 38px; transition: border-color .2s, box-shadow .2s;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: .9rem;
+            padding: .6rem 1rem;
+            color: var(--text);
+            background: #fafcff;
+            transition: border-color .2s, box-shadow .2s;
+            font-family: 'Outfit', sans-serif;
         }
         .form-control:focus, .form-select:focus {
-            border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,172,193,.12);
-            background: #fff; outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(45,139,255,.12);
+            background: #fff;
+            outline: none;
         }
-        input[readonly].form-control { background: #f0f4fb; color: var(--muted); }
+        textarea.form-control { resize: vertical; min-height: 110px; }
 
-        /* ── ITEMS TABLE ── */
-        .items-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; border: 1px solid var(--border); }
-        .items-table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: .85rem; }
-        .items-table thead th {
-            background: var(--navy); color: rgba(255,255,255,.8);
-            font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
-            padding: .75rem 1rem; white-space: nowrap; text-align: center;
+        /* Form section divider */
+        .form-section-title {
+            font-size: .72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+            padding-bottom: .6rem;
+            border-bottom: 1.5px dashed var(--border);
+            margin-bottom: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
         }
-        .items-table thead th:first-child { border-radius: 10px 0 0 0; }
-        .items-table thead th:last-child  { border-radius: 0 10px 0 0; }
-        .items-table tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
-        .items-table tbody tr:hover { background: #f7faff; }
-        .items-table tbody tr:last-child { border-bottom: none; }
-        .items-table tbody td { padding: .6rem .8rem; vertical-align: middle; text-align: center; }
-        .items-table tbody td:first-child,
-        .items-table tbody td:nth-child(2) { text-align: left; }
 
-        /* ── BUTTONS ── */
-        .btn-add {
-            background: #eef6ff; color: var(--accent);
-            border: 1.5px dashed var(--accent); border-radius: 10px;
-            padding: .55rem 1.4rem; font-size: .88rem; font-weight: 700;
-            transition: all .2s; cursor: pointer; min-height: 40px;
+        /* Priority radio cards */
+        .priority-group { display: flex; gap: .75rem; flex-wrap: wrap; }
+        .priority-item { flex: 1; min-width: 110px; }
+        .priority-item input[type="radio"] { display: none; }
+        .priority-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding: .8rem .5rem;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: .82rem;
+            font-weight: 600;
+            transition: all .18s;
+            background: #fafcff;
+            text-align: center;
         }
-        .btn-add:hover { background: #d8eeff; }
+        .priority-label .pi-icon { font-size: 1.4rem; }
+        .priority-item.p-low    input:checked + .priority-label { border-color:#28c76f; color:#1a7a42; background:#f0fff6; }
+        .priority-item.p-medium input:checked + .priority-label { border-color:#ff9f43; color:#a05a00; background:#fff8ee; }
+        .priority-item.p-high   input:checked + .priority-label { border-color:#ff6b6b; color:#a02020; background:#fff3f3; }
+        .priority-item.p-crit   input:checked + .priority-label { border-color:#ff4d6d; color:#8b0020; background:#fff0f3; box-shadow:0 0 0 3px rgba(255,77,109,.1); }
 
-        .btn-submit-pr {
-            background: linear-gradient(135deg, var(--accent), #0088a3);
-            color: #fff; border: none; border-radius: 10px;
-            padding: .7rem 2.2rem; font-size: .95rem; font-weight: 700;
-            box-shadow: 0 4px 14px rgba(0,172,193,.35);
-            transition: transform .2s, box-shadow .2s; min-height: 44px; cursor: pointer;
+        /* Equipment chips */
+        .equip-type-group { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: .6rem; }
+        .equip-chip {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 4px 12px;
+            font-size: .78rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--muted);
+            transition: all .15s;
+            user-select: none;
         }
-        .btn-submit-pr:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,172,193,.45); color: #fff; }
-
-        .btn-remove-row {
-            background: #fff0f3; border: 1.5px solid #ffb3c1; color: #c0392b;
-            border-radius: 7px; padding: 3px 9px; font-size: .8rem; font-weight: 700;
-            cursor: pointer; transition: all .15s; line-height: 1.6; min-height: 30px;
+        .equip-chip:hover, .equip-chip.active {
+            background: #eef4ff;
+            border-color: var(--accent);
+            color: var(--accent);
         }
-        .btn-remove-row:hover { background: #ff4d6d; color: #fff; border-color: #ff4d6d; }
 
-        /* ── MY REQUESTS TABLE ── */
-        .req-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; border: 1px solid var(--border); }
-        .req-table { width: 100%; min-width: 500px; border-collapse: collapse; font-size: .87rem; }
-        .req-table thead th {
-            background: var(--navy); color: rgba(255,255,255,.8);
-            font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
-            padding: .8rem 1rem; text-align: center; white-space: nowrap;
+        /* Buttons */
+        .btn-submit {
+            background: linear-gradient(135deg, var(--accent) 0%, #1a6fd4 100%);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: .75rem 2.5rem;
+            font-size: .95rem;
+            font-weight: 700;
+            font-family: 'Outfit', sans-serif;
+            transition: transform .2s, box-shadow .2s;
+            box-shadow: 0 6px 20px rgba(45,139,255,.35);
         }
-        .req-table thead th:first-child { border-radius: 10px 0 0 0; }
-        .req-table thead th:last-child  { border-radius: 0 10px 0 0; }
-        .req-table tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
-        .req-table tbody tr:hover { background: #f7faff; }
-        .req-table tbody tr:last-child { border-bottom: none; }
-        .req-table tbody td { padding: .8rem 1rem; vertical-align: middle; text-align: center; }
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(45,139,255,.45);
+            color: #fff;
+        }
+        .btn-clear {
+            background: #f0f4fb;
+            color: var(--muted);
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            padding: .73rem 1.4rem;
+            font-size: .9rem;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            transition: all .2s;
+        }
+        .btn-clear:hover { background: var(--border); color: var(--text); }
 
-        /* Mobile request cards */
-        .req-mobile-list { display: none; }
-        .req-mobile-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: .65rem; box-shadow: var(--shadow); }
-        .rmc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .6rem; gap: .5rem; flex-wrap: wrap; }
-        .rmc-id { font-family: monospace; font-size: .78rem; font-weight: 700; background: #f0f4fb; border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; color: var(--navy); }
-        .rmc-row { display: flex; justify-content: space-between; font-size: .82rem; margin-bottom: .3rem; gap: .5rem; }
-        .rmc-label { color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; }
-        .rmc-val { font-weight: 600; color: var(--text); }
+        /* ── FILTER BAR ── */
+        .filter-bar {
+            background: #f7faff;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.2rem;
+            margin-bottom: 1.4rem;
+            display: flex;
+            gap: .75rem;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .filter-bar .form-control,
+        .filter-bar .form-select { font-size: .85rem; padding: .5rem .9rem; }
+        .filter-bar label { font-size: .75rem; }
+        .btn-filter {
+            background: var(--navy);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: .52rem 1.2rem;
+            font-size: .85rem;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            transition: background .2s;
+        }
+        .btn-filter:hover { background: var(--navy-soft); color: #fff; }
+        .btn-reset-filter {
+            background: #fff;
+            color: var(--muted);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: .5rem 1rem;
+            font-size: .85rem;
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            transition: all .2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-reset-filter:hover { background: var(--border); color: var(--text); }
 
-        /* Status badges */
-        .badge-pending  { background: #fff8e6; color: #a05a00; border: 1.5px solid #ffd700; border-radius: 999px; padding: 3px 10px; font-size: .73rem; font-weight: 700; }
-        .badge-approved { background: #e6faf5; color: #0d6e52; border: 1.5px solid #5cd6b0; border-radius: 999px; padding: 3px 10px; font-size: .73rem; font-weight: 700; }
-        .badge-rejected { background: #fff0f3; color: #8b0020; border: 1.5px solid #ff4d6d; border-radius: 999px; padding: 3px 10px; font-size: .73rem; font-weight: 700; }
+        /* ── TABLE ── */
+        .requests-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: .875rem;
+        }
+        .requests-table thead th {
+            background: var(--navy);
+            color: rgba(255,255,255,.72);
+            font-size: .71rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            padding: .85rem 1.1rem;
+            border: none;
+            white-space: nowrap;
+        }
+        .requests-table thead th:first-child { border-radius: 10px 0 0 0; }
+        .requests-table thead th:last-child  { border-radius: 0 10px 0 0; }
+        .requests-table tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background .15s;
+        }
+        .requests-table tbody tr:hover { background: #f4f8ff; }
+        .requests-table tbody tr:last-child { border-bottom: none; }
+        .requests-table tbody td {
+            padding: .9rem 1.1rem;
+            vertical-align: middle;
+        }
 
-        .btn-view { background: #eef6ff; color: var(--accent); border: 1.5px solid #c5d8ff; border-radius: 7px; padding: 4px 12px; font-size: .8rem; font-weight: 700; cursor: pointer; transition: all .15s; }
-        .btn-view:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+        /* Ticket chip */
+        .ticket-chip {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .74rem;
+            font-weight: 600;
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            color: var(--navy-soft);
+            padding: 3px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+
+        /* Status badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: .74rem;
+            font-weight: 700;
+        }
+        .status-badge.open   { background:#fff8e6; color:#a05a00; border:1.5px solid #ffd700; }
+        .status-badge.inprog { background:#e8f3ff; color:#1a4d8c; border:1.5px solid #90bfff; }
+        .status-badge.done   { background:#e6faf5; color:#0d6e52; border:1.5px solid #5cd6b0; }
+
+        /* Priority badge */
+        .prio-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: .72rem;
+            font-weight: 700;
+        }
+        .prio-badge.low      { background:#f0fff6; color:#1a7a42; }
+        .prio-badge.medium   { background:#fff8ee; color:#a05a00; }
+        .prio-badge.high     { background:#fff3f3; color:#a02020; }
+        .prio-badge.critical { background:#fff0f3; color:#8b0020; }
+
+        /* Confidence bar */
+        .conf-bar-wrap { width: 80px; }
+        .conf-bar {
+            height: 5px;
+            border-radius: 99px;
+            background: #e2e9f5;
+            overflow: hidden;
+        }
+        .conf-bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, #2d8bff, #00c9a7);
+        }
+        .conf-num {
+            font-size: .7rem;
+            color: var(--muted);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
 
         /* Empty state */
-        .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
-        .empty-state i { font-size: 2.5rem; margin-bottom: .75rem; opacity: .4; }
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+        .empty-state .es-icon { font-size: 3.5rem; color: #cdd8ee; margin-bottom: 1rem; }
+        .empty-state h6 { color: var(--muted); font-weight: 600; }
+        .empty-state p  { color: var(--muted); font-size: .88rem; margin: 0; }
 
-        /* ── MODAL ── */
-        .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
-        .modal-header  { background: var(--navy); color: #fff; border-radius: var(--radius) var(--radius) 0 0; padding: 1rem 1.4rem; }
-        .modal-header .modal-title { font-weight: 700; font-size: 1rem; }
-        .modal-header .btn-close { filter: invert(1); }
-        .modal-table { font-size: .86rem; }
-        .modal-table thead th { background: #f4f8ff; color: var(--navy); font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; }
-
-        @supports (padding: env(safe-area-inset-bottom)) {
-            .page-wrap { padding-bottom: calc(3rem + env(safe-area-inset-bottom)); }
+        /* Table records label */
+        .records-label {
+            font-size: .8rem;
+            color: var(--muted);
+            font-weight: 500;
         }
 
-        @media (max-width: 991px) {
-            .page-wrap { padding: calc(var(--topbar-h) + 12px) 1.25rem 2rem 1.25rem; }
-            .pr-card { padding: 1.25rem; }
+        /* ── REQUESTOR DISPLAY CARD ── */
+        .requestor-display {
+            display: flex;
+            align-items: center;
+            gap: .9rem;
+            background: linear-gradient(135deg, #f0f6ff, #e8f0ff);
+            border: 1.5px solid #c5d8ff;
+            border-radius: 12px;
+            padding: .75rem 1.1rem;
         }
+        .requestor-avatar {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, var(--accent), #1a6fd4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 800;
+            color: #fff;
+            flex-shrink: 0;
+            box-shadow: 0 3px 10px rgba(45,139,255,.35);
+        }
+        .requestor-name {
+            font-size: .95rem;
+            font-weight: 700;
+            color: var(--navy);
+            line-height: 1.2;
+        }
+        .requestor-meta {
+            font-size: .75rem;
+            color: var(--muted);
+            margin-top: 3px;
+            font-weight: 500;
+        }
+
+        /* ── LOGGED-IN USER BANNER (hero) ── */
+        .user-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.2);
+            border-radius: 999px;
+            padding: 5px 14px 5px 6px;
+            font-size: .8rem;
+            color: rgba(255,255,255,.9);
+            font-weight: 600;
+        }
+        .user-pill-avatar {
+            width: 26px;
+            height: 26px;
+            background: linear-gradient(135deg, var(--accent), #1a6fd4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .72rem;
+            font-weight: 800;
+            color: #fff;
+            flex-shrink: 0;
+        }
+
         @media (max-width: 768px) {
-            body { margin-left: var(--sidebar-w-sm); }
-            .page-wrap { padding: calc(var(--topbar-h) + 10px) 1rem 2rem 1rem; }
-            .pr-card { padding: 1rem; }
-            .page-header h2 { font-size: 1.2rem; }
-            .page-header .date-chip { display: none; }
-            .req-table-desktop { display: none !important; }
-            .req-mobile-list   { display: block; }
-            .btn-submit-pr { width: 100%; }
-            .btn-add { width: 100%; }
-            .info-box { flex-direction: column; gap: .5rem; }
-        }
-        @media (max-width: 479px) {
-            body { margin-left: 0; }
-            .page-wrap { padding: 55px .75rem 2rem .75rem; }
-            .nav-tabs .nav-link { font-size: .8rem; padding: .6rem .75rem; }
-            .pr-card { padding: .85rem; }
-            .items-table { min-width: 580px; font-size: .8rem; }
-            .items-table tbody td { padding: .5rem .6rem; }
-            .form-control, .form-select { font-size: .82rem; }
-            .btn-back span { display: none; } /* show icon only on tiny screens */
+            .page-wrap { padding: 0 1rem 2rem; }
+            .stat-grid { grid-template-columns: repeat(2, 1fr); }
+            .tab-btn { padding: .8rem .8rem; font-size: .82rem; }
+            .tab-body { padding: 1.2rem; }
         }
     </style>
 </head>
 <body>
 
-<!-- Sidebar -->
 <div class="page-wrap">
 
-    <!-- ── PAGE HEADER ── -->
-    <div class="page-header">
-
-        <!-- BACK BUTTON -->
-        <button class="btn-back" onclick="history.back()" title="Go back">
-            <i class="bi bi-arrow-left-circle-fill"></i>
-            <span>Back</span>
-        </button>
-
-        <div class="page-header-icon"><i class="bi bi-cart3"></i></div>
-        <h2>Purchase Requests</h2>
-        <span class="date-chip"><i class="bi bi-calendar3 me-1"></i><?= $request_date ?></span>
+    <!-- ── HERO ── -->
+    <div class="page-hero">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <div class="hero-icon"><i class="bi bi-tools"></i></div>
+                <h1>Repair Request System</h1>
+                <p>Submit and track equipment &amp; network repair requests across hospital departments.</p>
+            </div>
+            <div class="d-flex flex-column align-items-end gap-2">
+                <span class="hero-badge"><i class="bi bi-circle-fill text-success" style="font-size:.5rem"></i>&nbsp;System Online</span>
+                <span class="hero-badge" style="background:rgba(255,255,255,.15); border-color:rgba(255,255,255,.25); gap:.6rem; padding:6px 14px 6px 8px;">
+                    <span style="width:28px;height:28px;background:linear-gradient(135deg,#2d8bff,#1a6fd4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#fff;flex-shrink:0;">
+                        <?= strtoupper(substr($logged_user_name, 0, 1)) ?>
+                    </span>
+                    <span style="display:flex;flex-direction:column;line-height:1.25;">
+                        <span style="font-size:.7rem;opacity:.65;font-weight:500;letter-spacing:.3px;">Logged in as</span>
+                        <span style="font-size:.82rem;font-weight:700;color:#fff;"><?= htmlspecialchars($logged_user_name) ?></span>
+                    </span>
+                </span>
+                <span class="hero-badge"><i class="bi bi-calendar3"></i>&nbsp;<?= date('F d, Y') ?></span>
+            </div>
+        </div>
     </div>
 
-    <!-- ── ALERTS ── -->
-    <?php if (isset($success)): ?>
-        <div class="alert alert-success mb-3" id="successAlert">
-            <i class="bi bi-check-circle-fill me-2"></i><?= htmlspecialchars($success) ?>
+    <!-- ── STAT CARDS ── -->
+    <div class="stat-grid">
+        <div class="stat-card total">
+            <div class="stat-icon"><i class="bi bi-ticket-detailed"></i></div>
+            <div>
+                <div class="stat-num"><?= $stats['total'] ?? 0 ?></div>
+                <div class="stat-lbl">My Tickets</div>
+            </div>
         </div>
-    <?php elseif (isset($error)): ?>
-        <div class="alert alert-danger mb-3">
-            <i class="bi bi-x-circle-fill me-2"></i><?= htmlspecialchars($error) ?>
+        <div class="stat-card open">
+            <div class="stat-icon"><i class="bi bi-hourglass-split"></i></div>
+            <div>
+                <div class="stat-num"><?= $stats['open_count'] ?? 0 ?></div>
+                <div class="stat-lbl">Open</div>
+            </div>
+        </div>
+        <div class="stat-card inprog">
+            <div class="stat-icon"><i class="bi bi-gear-wide-connected"></i></div>
+            <div>
+                <div class="stat-num"><?= $stats['inprog_count'] ?? 0 ?></div>
+                <div class="stat-lbl">In Progress</div>
+            </div>
+        </div>
+        <div class="stat-card done">
+            <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
+            <div>
+                <div class="stat-num"><?= $stats['done_count'] ?? 0 ?></div>
+                <div class="stat-lbl">Completed</div>
+            </div>
+        </div>
+        <div class="stat-card crit">
+            <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div>
+                <div class="stat-num"><?= $stats['critical_count'] ?? 0 ?></div>
+                <div class="stat-lbl">Critical</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── ALERT MESSAGES ── -->
+    <?php if ($success_msg): ?>
+        <div class="alert-success-custom" id="successAlert">
+            <i class="bi bi-check-circle-fill fs-5"></i>
+            <span><?= $success_msg ?></span>
+        </div>
+    <?php elseif ($error_msg): ?>
+        <div class="alert-error-custom">
+            <i class="bi bi-x-circle-fill fs-5"></i>
+            <span><?= htmlspecialchars($error_msg) ?></span>
         </div>
     <?php endif; ?>
 
-    <!-- ── TABS ── -->
-    <ul class="nav nav-tabs" role="tablist">
-        <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#form" role="tab">
-                <i class="bi bi-plus-circle me-1"></i> Request Form
+    <!-- ══════════════════════════
+         TAB CONTAINER
+    ══════════════════════════ -->
+    <div class="tab-container">
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn <?= $active_tab === 'new' ? 'active' : '' ?>"
+                    onclick="switchTab('new', this)" type="button">
+                <span class="t-icon"><i class="bi bi-plus-circle"></i></span>
+                New Repair Request
             </button>
-        </li>
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#my-requests" role="tab">
-                <i class="bi bi-list-check me-1"></i> My Requests
-                <?php if (!empty($my_requests)): ?>
-                    <span style="background:#00acc1;color:#fff;border-radius:999px;font-size:.65rem;padding:2px 7px;font-weight:800;margin-left:4px;">
-                        <?= count($my_requests) ?>
-                    </span>
+            <button class="tab-btn <?= $active_tab === 'tickets' ? 'active' : '' ?>"
+                    onclick="switchTab('tickets', this)" type="button">
+                <span class="t-icon"><i class="bi bi-list-check"></i></span>
+                Repair Tickets
+                <?php if (($stats['total'] ?? 0) > 0): ?>
+                    <span class="tab-count"><?= $stats['total'] ?></span>
                 <?php endif; ?>
             </button>
-        </li>
-    </ul>
+        </div>
 
-    <div class="tab-content">
-
-        <!-- TAB 1 — REQUEST FORM -->
-        <div class="tab-pane fade show active" id="form" role="tabpanel">
-            <div class="pr-card">
-
-                <div class="info-box">
-                    <div class="info-box-item"><i class="bi bi-building"></i><strong>Department:</strong> <?= htmlspecialchars($department) ?></div>
-                    <div class="info-box-item"><i class="bi bi-person"></i><strong>Requestor:</strong> <?= htmlspecialchars($full_name) ?></div>
-                    <div class="info-box-item"><i class="bi bi-calendar3"></i><strong>Date:</strong> <?= $request_date ?></div>
-                </div>
-
-                <form method="POST" id="requestForm">
-
-                    <div class="items-table-wrap mb-3">
-                        <table class="items-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:22%; text-align:left;">Item Name</th>
-                                    <th style="width:22%; text-align:left;">Description</th>
-                                    <th style="width:13%;">Unit</th>
-                                    <th style="width:10%;">Qty</th>
-                                    <th style="width:11%;">Pcs / Box</th>
-                                    <th style="width:11%;">Total Pcs</th>
-                                    <th style="width:11%;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="itemBody">
-                                <tr>
-                                    <td><input type="text"   name="items[0][name]"        class="form-control form-control-sm" placeholder="Item name" required></td>
-                                    <td><input type="text"   name="items[0][description]"  class="form-control form-control-sm" placeholder="Optional"></td>
-                                    <td>
-                                        <select name="items[0][unit]" class="form-select form-select-sm unit">
-                                            <option value="pcs">Per Piece</option>
-                                            <option value="box">Per Box</option>
-                                        </select>
-                                    </td>
-                                    <td><input type="number" name="items[0][quantity]"    class="form-control form-control-sm quantity"    value="1" min="1"></td>
-                                    <td><input type="number" name="items[0][pcs_per_box]" class="form-control form-control-sm pcs-per-box" value="1" min="1" disabled></td>
-                                    <td><input type="number" name="items[0][total_pcs]"   class="form-control form-control-sm total-pcs"   value="1" readonly></td>
-                                    <td><button type="button" class="btn-remove-row btn-remove">✕</button></td>
-                                </tr>
-                            </tbody>
-                        </table>
+        <!-- ═══════════════════
+             TAB 1: NEW REQUEST
+        ════════════════════ -->
+        <div class="tab-pane <?= $active_tab === 'new' ? 'active' : '' ?>" id="tab-new">
+            <div class="tab-body">
+                <form method="POST" action="" id="repairForm" novalidate>
+                    <input type="hidden" name="submit_request" value="1">
+                    <!-- Section: Requestor Info -->
+                    <div class="form-section-title">
+                        <i class="bi bi-person-badge"></i> Requestor Information
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-person me-1"></i>Requestor Name</label>
+                            <div class="requestor-display">
+                                <div class="requestor-avatar">
+                                    <?= strtoupper(substr($logged_user_name, 0, 1)) ?>
+                                </div>
+                                <div>
+                                    <div class="requestor-name"><?= htmlspecialchars($logged_user_name) ?></div>
+                                    <div class="requestor-meta">
+                                        <i class="bi bi-person-badge me-1"></i>User ID: <?= $user_id ?>
+                                        <?php if (!empty($user['role'])): ?>
+                                            &nbsp;·&nbsp;<i class="bi bi-shield me-1"></i><?= htmlspecialchars($user['role']) ?>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Hidden — submitted as the logged-in user -->
+                            <input type="hidden" name="user_id"   value="<?= $user_id ?>">
+                            <input type="hidden" name="user_name" value="<?= htmlspecialchars($logged_user_name) ?>">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-building me-1"></i>Department / Location <span class="text-danger">*</span></label>
+                            <select name="location" class="form-select" required>
+                                <option value="" disabled <?= empty($_POST['location']) && empty($logged_user_dept) ? 'selected' : '' ?>>— Select Department —</option>
+                                <?php foreach ($departments as $dept): ?>
+                                    <?php
+                                        $sel = '';
+                                        if (!empty($_POST['location']) && $_POST['location'] === $dept) $sel = 'selected';
+                                        elseif (empty($_POST['location']) && $logged_user_dept === $dept) $sel = 'selected';
+                                    ?>
+                                    <option value="<?= htmlspecialchars($dept) ?>" <?= $sel ?>>
+                                        <?= htmlspecialchars($dept) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="d-flex justify-content-center mb-4">
-                        <button type="button" id="addRowBtn" class="btn-add">
-                            <i class="bi bi-plus-circle me-1"></i> Add Item
+                    <!-- Section: Equipment & Issue -->
+                    <div class="form-section-title">
+                        <i class="bi bi-cpu"></i> Equipment &amp; Issue Details
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-tools me-1"></i>Equipment / Asset <span class="text-danger">*</span></label>
+                            <div class="equip-type-group" id="equipChips">
+                                <?php
+                                $equipTypes = [
+                                    'Computer / Desktop','Laptop','Printer','Network / Wi-Fi',
+                                    'Medical Monitor','Ventilator','IV Pump','Centrifuge',
+                                    'Server / Switch','CCTV / Camera','Telephone','UPS / Power',
+                                ];
+                                foreach ($equipTypes as $et): ?>
+                                    <span class="equip-chip"
+                                          onclick="fillEquip(this, '<?= htmlspecialchars($et) ?>')"><?= htmlspecialchars($et) ?></span>
+                                <?php endforeach; ?>
+                            </div>
+                            <input type="text" name="equipment" id="equipInput" class="form-control"
+                                   placeholder="Click a chip above or type equipment name"
+                                   value="<?= htmlspecialchars($_POST['equipment'] ?? '') ?>" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label"><i class="bi bi-chat-text me-1"></i>Issue Description <span class="text-danger">*</span></label>
+                            <textarea name="issue" class="form-control" rows="4"
+                                      placeholder="Describe the problem in detail — what happened, when it started, any error messages seen, etc."
+                                      required><?= htmlspecialchars($_POST['issue'] ?? '') ?></textarea>
+                            <div class="d-flex justify-content-end mt-1">
+                                <small class="text-muted" id="issueCount">0 characters</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section: Priority -->
+                    <div class="form-section-title">
+                        <i class="bi bi-flag"></i> Priority Level
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-12">
+                            <div class="priority-group">
+                                <div class="priority-item p-low">
+                                    <input type="radio" name="priority" id="prio_low" value="Low"
+                                        <?= (($_POST['priority'] ?? 'Low') === 'Low') ? 'checked' : '' ?>>
+                                    <label class="priority-label" for="prio_low">
+                                        <span class="pi-icon">🟢</span>
+                                        <span>Low</span>
+                                        <small style="font-weight:400;font-size:.7rem;opacity:.7">Non-urgent</small>
+                                    </label>
+                                </div>
+                                <div class="priority-item p-medium">
+                                    <input type="radio" name="priority" id="prio_med" value="Medium"
+                                        <?= (($_POST['priority'] ?? '') === 'Medium') ? 'checked' : '' ?>>
+                                    <label class="priority-label" for="prio_med">
+                                        <span class="pi-icon">🟡</span>
+                                        <span>Medium</span>
+                                        <small style="font-weight:400;font-size:.7rem;opacity:.7">Within 48 hrs</small>
+                                    </label>
+                                </div>
+                                <div class="priority-item p-high">
+                                    <input type="radio" name="priority" id="prio_high" value="High"
+                                        <?= (($_POST['priority'] ?? '') === 'High') ? 'checked' : '' ?>>
+                                    <label class="priority-label" for="prio_high">
+                                        <span class="pi-icon">🔴</span>
+                                        <span>High</span>
+                                        <small style="font-weight:400;font-size:.7rem;opacity:.7">Within 24 hrs</small>
+                                    </label>
+                                </div>
+                                <div class="priority-item p-crit">
+                                    <input type="radio" name="priority" id="prio_crit" value="Critical"
+                                        <?= (($_POST['priority'] ?? '') === 'Critical') ? 'checked' : '' ?>>
+                                    <label class="priority-label" for="prio_crit">
+                                        <span class="pi-icon">🚨</span>
+                                        <span>Critical</span>
+                                        <small style="font-weight:400;font-size:.7rem;opacity:.7">Immediate</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="d-flex justify-content-end gap-3 align-items-center pt-2"
+                         style="border-top: 1.5px dashed var(--border);">
+                        <button type="reset" class="btn-clear btn" onclick="clearChips()">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i> Clear Form
+                        </button>
+                        <button type="submit" class="btn-submit btn">
+                            <i class="bi bi-send me-2"></i> Submit Repair Request
                         </button>
                     </div>
-
-                    <div class="d-flex justify-content-center">
-                        <button type="submit" class="btn-submit-pr">
-                            <i class="bi bi-send me-2"></i> Submit Request
-                        </button>
-                    </div>
-
                 </form>
             </div>
         </div>
 
-        <!-- TAB 2 — MY REQUESTS -->
-        <div class="tab-pane fade" id="my-requests" role="tabpanel">
-            <div class="pr-card">
+        <!-- ═══════════════════════
+             TAB 2: REPAIR TICKETS
+        ════════════════════════ -->
+        <div class="tab-pane <?= $active_tab === 'tickets' ? 'active' : '' ?>" id="tab-tickets">
+            <div class="tab-body">
 
-                <?php if (empty($my_requests)): ?>
-                    <div class="empty-state">
-                        <div><i class="bi bi-inbox"></i></div>
-                        <p style="font-weight:600;">No purchase requests yet.</p>
-                        <p style="font-size:.85rem;">Submit your first request using the form tab.</p>
+                <!-- Filter Bar -->
+                <form method="GET" action="">
+                    <input type="hidden" name="tab" value="tickets">
+                    <div class="filter-bar">
+                        <div style="flex:2; min-width:200px;">
+                            <label class="form-label">Search</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"
+                                      style="border:1.5px solid var(--border); border-right:none; border-radius:10px 0 0 10px; padding:.5rem .9rem;">
+                                    <i class="bi bi-search" style="color:var(--muted);"></i>
+                                </span>
+                                <input type="text" name="search" class="form-control"
+                                       style="border-left:none; border-radius:0 10px 10px 0;"
+                                       placeholder="Ticket no, name, equipment, location…"
+                                       value="<?= htmlspecialchars($search) ?>">
+                            </div>
+                        </div>
+                        <div style="min-width:150px;">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="all"         <?= $filter_status === 'all'          ? 'selected' : '' ?>>All Statuses</option>
+                                <option value="Open"        <?= $filter_status === 'Open'         ? 'selected' : '' ?>>Open</option>
+                                <option value="In Progress" <?= $filter_status === 'In Progress'  ? 'selected' : '' ?>>In Progress</option>
+                                <option value="Completed"   <?= $filter_status === 'Completed'    ? 'selected' : '' ?>>Completed</option>
+                            </select>
+                        </div>
+                        <div style="min-width:140px;">
+                            <label class="form-label">Priority</label>
+                            <select name="priority" class="form-select">
+                                <option value="all"      <?= $filter_priority === 'all'       ? 'selected' : '' ?>>All Priorities</option>
+                                <option value="Low"      <?= $filter_priority === 'Low'       ? 'selected' : '' ?>>Low</option>
+                                <option value="Medium"   <?= $filter_priority === 'Medium'    ? 'selected' : '' ?>>Medium</option>
+                                <option value="High"     <?= $filter_priority === 'High'      ? 'selected' : '' ?>>High</option>
+                                <option value="Critical" <?= $filter_priority === 'Critical'  ? 'selected' : '' ?>>Critical</option>
+                            </select>
+                        </div>
+                        <div class="d-flex gap-2 align-items-end">
+                            <button type="submit" class="btn-filter btn">
+                                <i class="bi bi-funnel me-1"></i>Filter
+                            </button>
+                            <a href="<?= $_SERVER['PHP_SELF'] ?>" class="btn-reset-filter">
+                                <i class="bi bi-x-lg"></i> Reset
+                            </a>
+                        </div>
                     </div>
-                <?php else: ?>
+                </form>
 
-                    <!-- Desktop Table -->
-                    <div class="req-table-wrap req-table-desktop">
-                        <table class="req-table">
+                <!-- Records label -->
+                <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                    <span class="records-label">
+                        <i class="bi bi-table me-1"></i>
+                        <?= count($requests) ?> of your ticket<?= count($requests) !== 1 ? 's' : '' ?> found
+                    </span>
+                </div>
+
+                <!-- Table -->
+                <div style="overflow-x:auto; border-radius:12px; border:1px solid var(--border);">
+                    <?php if (empty($requests)): ?>
+                        <div class="empty-state">
+                            <div class="es-icon"><i class="bi bi-inbox"></i></div>
+                            <h6>No Repair Requests Found</h6>
+                            <p>You have not submitted any repair tickets yet, or none match your current filter.</p>
+                        </div>
+                    <?php else: ?>
+                        <table class="requests-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Department</th>
-                                    <th>Total Items</th>
-                                    <th>Status</th>
-                                    <th>Date Submitted</th>
-                                    <th>Action</th>
+                                    <th><i class="bi bi-hash me-1"></i>Ticket</th>
+                                    <th><i class="bi bi-building me-1"></i>Department</th>
+                                    <th><i class="bi bi-cpu me-1"></i>Equipment</th>
+                                    <th><i class="bi bi-chat-dots me-1"></i>Issue</th>
+                                    <th><i class="bi bi-flag me-1"></i>Priority</th>
+                                    <th><i class="bi bi-circle me-1"></i>Status</th>
+                                    <th><i class="bi bi-bar-chart me-1"></i>Confidence</th>
+                                    <th><i class="bi bi-clock me-1"></i>Submitted</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($my_requests as $req):
-                                    $badge = match($req['status']) {
-                                        'Approved' => '<span class="badge-approved">✅ Approved</span>',
-                                        'Rejected' => '<span class="badge-rejected">❌ Rejected</span>',
-                                        default    => '<span class="badge-pending">⏳ Pending</span>',
-                                    };
-                                ?>
-                                <tr>
-                                    <td><code style="font-size:.78rem;">#<?= htmlspecialchars($req['id']) ?></code></td>
-                                    <td><?= htmlspecialchars($req['department'] ?? $department) ?></td>
-                                    <td><?= htmlspecialchars($req['total_items']) ?></td>
-                                    <td><?= $badge ?></td>
-                                    <td style="font-size:.8rem;color:var(--muted);">
-                                        <?= date('M d, Y', strtotime($req['created_at'])) ?>
-                                        <br><small><?= date('h:i A', strtotime($req['created_at'])) ?></small>
-                                    </td>
-                                    <td>
-                                        <button class="btn-view btn-view-items" data-id="<?= (int)$req['id'] ?>">
-                                            <i class="bi bi-eye me-1"></i>View
-                                        </button>
-                                    </td>
-                                </tr>
+                                <?php foreach ($requests as $req): ?>
+                                    <?php
+                                        $statusClass = match($req['status']) {
+                                            'Open'        => 'open',
+                                            'In Progress' => 'inprog',
+                                            'Completed'   => 'done',
+                                            default       => 'open'
+                                        };
+                                        $prioClass = match($req['priority']) {
+                                            'Low'      => 'low',
+                                            'Medium'   => 'medium',
+                                            'High'     => 'high',
+                                            'Critical' => 'critical',
+                                            default    => 'low'
+                                        };
+                                        $statusIcon = match($req['status']) {
+                                            'Open'        => '⏳',
+                                            'In Progress' => '⚙️',
+                                            'Completed'   => '✅',
+                                            default       => '⏳'
+                                        };
+                                        $prioIcon = match($req['priority']) {
+                                            'Low'      => '🟢',
+                                            'Medium'   => '🟡',
+                                            'High'     => '🔴',
+                                            'Critical' => '🚨',
+                                            default    => '🟢'
+                                        };
+                                        $conf = intval($req['confidence_score'] ?? 0);
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <span class="ticket-chip"><?= htmlspecialchars($req['ticket_no'] ?? '—') ?></span>
+                                        </td>
+                                        <td style="font-size:.83rem; color:var(--muted); max-width:160px;">
+                                            <?= htmlspecialchars($req['location']) ?>
+                                        </td>
+                                        <td style="font-weight:600; color:var(--navy-soft); font-size:.88rem;">
+                                            <?= htmlspecialchars($req['equipment']) ?>
+                                        </td>
+                                        <td style="max-width:200px;">
+                                            <span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:.83rem;">
+                                                <?= htmlspecialchars($req['issue']) ?>
+                                            </span>
+                                            <?php if (!empty($req['remarks'])): ?>
+                                                <small class="d-block mt-1" style="color:var(--muted); font-size:.71rem;">
+                                                    <i class="bi bi-chat-left-text me-1"></i><?= htmlspecialchars(substr($req['remarks'], 0, 55)) ?>…
+                                                </small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <span class="prio-badge <?= $prioClass ?>">
+                                                <?= $prioIcon ?> <?= htmlspecialchars($req['priority']) ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="status-badge <?= $statusClass ?>">
+                                                <?= $statusIcon ?> <?= htmlspecialchars($req['status']) ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="conf-bar-wrap">
+                                                <div class="conf-bar">
+                                                    <div class="conf-bar-fill" style="width:<?= $conf ?>%"></div>
+                                                </div>
+                                                <div class="conf-num"><?= $conf ?>%</div>
+                                            </div>
+                                        </td>
+                                        <td style="white-space:nowrap; font-size:.8rem; color:var(--muted);">
+                                            <i class="bi bi-calendar3 me-1"></i><?= date('M d, Y', strtotime($req['created_at'])) ?>
+                                            <br><small><?= date('h:i A', strtotime($req['created_at'])) ?></small>
+                                        </td>
+                                    </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
-                    </div>
+                    <?php endif; ?>
+                </div>
 
-                    <!-- Mobile Cards -->
-                    <div class="req-mobile-list">
-                        <?php foreach ($my_requests as $req):
-                            $badge = match($req['status']) {
-                                'Approved' => '<span class="badge-approved">✅ Approved</span>',
-                                'Rejected' => '<span class="badge-rejected">❌ Rejected</span>',
-                                default    => '<span class="badge-pending">⏳ Pending</span>',
-                            };
-                        ?>
-                        <div class="req-mobile-card">
-                            <div class="rmc-header">
-                                <span class="rmc-id">#<?= htmlspecialchars($req['id']) ?></span>
-                                <?= $badge ?>
-                            </div>
-                            <div class="rmc-row">
-                                <span class="rmc-label">Total Items</span>
-                                <span class="rmc-val"><?= htmlspecialchars($req['total_items']) ?></span>
-                            </div>
-                            <div class="rmc-row">
-                                <span class="rmc-label">Submitted</span>
-                                <span class="rmc-val" style="font-size:.78rem;">
-                                    <?= date('M d, Y · h:i A', strtotime($req['created_at'])) ?>
-                                </span>
-                            </div>
-                            <div class="mt-2">
-                                <button class="btn-view btn-view-items w-100" data-id="<?= (int)$req['id'] ?>">
-                                    <i class="bi bi-eye me-1"></i> View Items
-                                </button>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                <?php endif; ?>
             </div>
         </div>
+        <!-- end tab-tickets -->
 
-    </div><!-- end tab-content -->
+    </div><!-- end tab-container -->
+
 </div><!-- end page-wrap -->
 
-<!-- MODAL — View Items -->
-<div class="modal fade" id="viewItemsModal" tabindex="-1" aria-labelledby="viewItemsModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="viewItemsModalLabel">
-                    <i class="bi bi-list-ul me-2"></i>Request Items
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div style="overflow-x:auto;">
-                    <table class="table table-bordered modal-table mb-0">
-                        <thead>
-                            <tr>
-                                <th>#</th><th>Item Name</th><th>Description</th>
-                                <th>Unit</th><th>Qty</th><th>Pcs/Box</th><th>Total Pcs</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modalItemBody">
-                            <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* ── SIDEBAR MARGIN SYNC ── */
-(function syncSidebarMargin() {
-    const sidebar = document.getElementById('mySidebar');
-    if (!sidebar) return;
-    function getWidth() {
-        if (window.innerWidth <= 480) return 0;
-        if (window.innerWidth <= 768) return 200;
-        return 250;
+// ── Tab switching ──
+function switchTab(tabId, btn) {
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+    btn.classList.add('active');
+}
+
+// ── Equipment chip fill ──
+function fillEquip(el, name) {
+    document.getElementById('equipInput').value = name;
+    document.querySelectorAll('.equip-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+}
+
+// ── Clear chips on form reset ──
+function clearChips() {
+    document.querySelectorAll('.equip-chip').forEach(c => c.classList.remove('active'));
+    document.getElementById('issueCount').textContent = '0 characters';
+}
+
+// ── Issue character counter ──
+const issueTA = document.querySelector('textarea[name="issue"]');
+const issueCount = document.getElementById('issueCount');
+if (issueTA) {
+    issueTA.addEventListener('input', () => {
+        issueCount.textContent = issueTA.value.length + ' characters';
+    });
+    // Init on page load (in case of POST back)
+    issueCount.textContent = issueTA.value.length + ' characters';
+}
+
+// ── Highlight active chip on page reload ──
+(function() {
+    const val = document.getElementById('equipInput')?.value;
+    if (val) {
+        document.querySelectorAll('.equip-chip').forEach(c => {
+            if (c.textContent.trim() === val) c.classList.add('active');
+        });
     }
-    function applyMargin() {
-        document.body.style.marginLeft = sidebar.classList.contains('closed') ? '0px' : getWidth() + 'px';
-    }
-    applyMargin();
-    new MutationObserver(applyMargin).observe(sidebar, { attributes: true, attributeFilter: ['class'] });
-    window.addEventListener('resize', applyMargin);
 })();
 
-/* ── ITEMS TABLE — Add / Remove / Calculate ── */
-let itemIndex = 1;
-const itemBody = document.getElementById('itemBody');
-
-document.getElementById('addRowBtn').addEventListener('click', () => {
-    const template = itemBody.querySelector('tr').cloneNode(true);
-    template.querySelectorAll('input, select').forEach(el => {
-        el.name = el.name.replace(/\[\d+\]/, `[${itemIndex}]`);
-        if (el.type === 'number')    el.value = 1;
-        if (el.type === 'text')      el.value = '';
-        if (el.tagName === 'SELECT') el.selectedIndex = 0;
-        if (el.classList.contains('pcs-per-box')) el.disabled = true;
-    });
-    template.querySelector('.total-pcs').value = 1;
-    itemBody.appendChild(template);
-    itemIndex++;
-});
-
-itemBody.addEventListener('click', e => {
-    if (e.target.classList.contains('btn-remove')) {
-        if (itemBody.querySelectorAll('tr').length > 1) {
-            e.target.closest('tr').remove();
-        } else {
-            alert('At least one item is required.');
-        }
-    }
-});
-
-itemBody.addEventListener('input', e => {
-    const row = e.target.closest('tr');
-    if (!row) return;
-    const unit      = row.querySelector('.unit').value;
-    const qty       = parseFloat(row.querySelector('.quantity').value) || 0;
-    const pcsBox    = row.querySelector('.pcs-per-box');
-    const pcsPerBox = parseFloat(pcsBox.value) || 1;
-    pcsBox.disabled = (unit !== 'box');
-    row.querySelector('.total-pcs').value = unit === 'box' ? qty * pcsPerBox : qty;
-});
-
-itemBody.addEventListener('change', e => {
-    if (e.target.classList.contains('unit')) {
-        const row    = e.target.closest('tr');
-        const pcsBox = row.querySelector('.pcs-per-box');
-        const qty    = parseFloat(row.querySelector('.quantity').value) || 0;
-        pcsBox.disabled = (e.target.value !== 'box');
-        row.querySelector('.total-pcs').value =
-            e.target.value === 'box' ? qty * (parseFloat(pcsBox.value) || 1) : qty;
-    }
-});
-
-/* ── VIEW ITEMS MODAL — AJAX ── */
-const viewModal = new bootstrap.Modal(document.getElementById('viewItemsModal'));
-
-document.addEventListener('click', e => {
-    const btn = e.target.closest('.btn-view-items');
-    if (!btn) return;
-
-    const modalBody = document.getElementById('modalItemBody');
-    modalBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>';
-    viewModal.show();
-
-    fetch('purchase_request.php?ajax=items&id=' + btn.dataset.id)
-        .then(res => res.text().then(text => {
-            try   { return { ok: res.ok, status: res.status, data: JSON.parse(text) }; }
-            catch { return { ok: false, status: res.status, parseError: true, raw: text }; }
-        }))
-        .then(({ ok, status, data, parseError, raw }) => {
-            if (parseError) {
-                const plain = raw.replace(/<[^>]*>/g, '').trim().substring(0, 300);
-                modalBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">
-                    <strong>Server returned invalid JSON (HTTP ${status}):</strong><br>
-                    <code style="font-size:.78rem;white-space:pre-wrap;">${plain}</code>
-                </td></tr>`;
-                return;
-            }
-            if (!ok || data.error) {
-                modalBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">
-                    ⚠ ${data.error ?? 'Unknown server error (HTTP ' + status + ')'}
-                </td></tr>`;
-                return;
-            }
-            if (!Array.isArray(data) || data.length === 0) {
-                modalBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No items found.</td></tr>';
-                return;
-            }
-            const esc = s => String(s ?? '—').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            modalBody.innerHTML = data.map((item, idx) => `
-                <tr>
-                    <td>${idx + 1}</td>
-                    <td>${esc(item.item_name)}</td>
-                    <td>${esc(item.description)}</td>
-                    <td>${esc(item.unit)}</td>
-                    <td class="text-center">${esc(item.quantity)}</td>
-                    <td class="text-center">${esc(item.pcs_per_box)}</td>
-                    <td class="text-center">${esc(item.total_pcs)}</td>
-                </tr>`).join('');
-        })
-        .catch(err => {
-            modalBody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-3">
-                ⚠ Network error.<br><code style="font-size:.78rem;">${err.message}</code>
-            </td></tr>`;
-        });
-});
-
-/* ── AUTO-DISMISS SUCCESS ALERT ── */
+// ── Auto-dismiss success alert ──
 const successAlert = document.getElementById('successAlert');
 if (successAlert) {
     setTimeout(() => {
         successAlert.style.transition = 'opacity .6s';
         successAlert.style.opacity = '0';
-        setTimeout(() => successAlert.remove(), 650);
-    }, 5000);
+        setTimeout(() => successAlert.remove(), 600);
+    }, 6000);
 }
 </script>
 </body>

@@ -172,12 +172,32 @@ $totals = $report->getSummaryTotals($payrolls);
         <aside id="sidebar" class="sidebar-toggle">
 
             <div class="sidebar-logo mt-3">
-                <img src="../../assets/image/logo-dark.png" width="90px" height="20px">
+                <img src="../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
             <div class="menu-title">Navigation</div>
 
-            <!----- Sidebar Navigation ----->
+            <li class="sidebar-item">
+                <a href="user_lab.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
+                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
+                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                    </svg>
+                    <span style="font-size: 18px;">Dashboard</span>
+                </a>
+            </li>
+
+            <li class="sidebar-item">
+                <a href="sample_processing.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
+                    aria-expanded="false" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-fill-up" viewBox="0 0 16 16">
+                    <path d="M12.5 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7m.354-5.854 1.5 1.5a.5.5 0 0 1-.708.708L13 11.707V14.5a.5.5 0 0 1-1 0v-2.793l-.646.647a.5.5 0 0 1-.708-.708l1.5-1.5a.5.5 0 0 1 .708 0M11 5a3 3 0 1 1-6 0 3 3 0 0 1 6 0"/>
+                    <path d="M2 13c0 1 1 1 1 1h5.256A4.5 4.5 0 0 1 8 12.5a4.5 4.5 0 0 1 1.544-3.393Q8.844 9.002 8 9c-5 0-6 3-6 4"/>
+                    </svg>
+                    <span style="font-size: 18px;">Sample Process</span>
+                </a>
+            </li>
             <li class="sidebar-item">
                 <a href="leave_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
