@@ -479,10 +479,6 @@ body {
                 <div class="date-day">Today</div>
                 <div class="date-full"><?= date('F d, Y') ?></div>
             </div>
-            <div class="ph-user-chip">
-                <div class="ph-avatar"><?= strtoupper(substr($user['username'] ?? 'U', 0, 1)) ?></div>
-                <?= htmlspecialchars($user['username'] ?? 'User') ?>
-            </div>
         </div>
     </div>
 
