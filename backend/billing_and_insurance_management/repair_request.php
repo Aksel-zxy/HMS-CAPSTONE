@@ -928,8 +928,8 @@ while ($row = $dept_result->fetch_row()) {
 </head>
 <body>
 
-<!-- ── SIDEBAR (inventory_sidebar.php) ── -->
-<?php include 'inventory_sidebar.php'; ?>
+<!-- ── SIDEBAR (billing_sidebar.php) ── -->
+<?php include 'billing_sidebar.php'; ?>
 
 <div class="page-wrap">
 
