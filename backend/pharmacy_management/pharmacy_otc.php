@@ -413,7 +413,12 @@ if (isset($_POST['submit_otc'])) {
                                             <select id="generic_name" name="generic_name" class="form-select" required>
                                                 <option value="">-- Select Generic --</option>
                                                 <?php
-                                                $q = $conn->query("SELECT DISTINCT generic_name FROM pharmacy_inventory ORDER BY generic_name");
+                                                $q = $conn->query("
+    SELECT DISTINCT generic_name 
+    FROM pharmacy_inventory 
+    WHERE prescription_required = 'No'
+    ORDER BY generic_name
+");
                                                 while ($row = $q->fetch_assoc()) {
                                                     echo "<option value='{$row['generic_name']}'>{$row['generic_name']}</option>";
                                                 }
