@@ -1,4 +1,4 @@
-<?
+<?php
 include 'header.php'
 ?>
 <!DOCTYPE html>
@@ -73,10 +73,9 @@ include 'header.php'
 
 <body>
     <div class="d-flex">
-        <?
-        include 'sidebar.php'
-        ?>
+        <?php include 'sidebar.php' ?>
         <div class="container py-4">
+
             <div class="text-center mb-3">
                 <h3 class="fw-bold">
                     <i class="bi bi-graph-up"></i> Insurance Forecast Dashboard
@@ -111,6 +110,7 @@ include 'header.php'
                         <div class="stat-label">Total Claims</div>
                     </div>
                 </div>
+
                 <div class="col-md-3">
                     <div class="card card-premium p-3 text-center">
                         <div class="stat-value" id="approvalRate">—</div>
@@ -183,14 +183,11 @@ include 'header.php'
                 });
                 document.getElementById('periodLabel').innerText = `${monthName} ${year}`;
 
-                const amountUrl = `https://localhost:7212/insurance/getMonthProviderAmountForecast?month=${month}&year=${year}`;
-                const statusUrl = `https://localhost:7212/insurance/getMonthProviderStatusForecast?month=${month}&year=${year}`;
+                const amountUrl = `https://bsis-03.keikaizen.xyz/insurance/getMonthProviderAmountForecast?month=${month}&year=${year}`;
+                const statusUrl = `https://bsis-03.keikaizen.xyz/insurance/getMonthProviderStatusForecast?month=${month}&year=${year}`;
 
                 try {
-                    const [amountRes, statusRes] = await Promise.all([
-                        fetch(amountUrl),
-                        fetch(statusUrl)
-                    ]);
+                    const [amountRes, statusRes] = await Promise.all([fetch(amountUrl), fetch(statusUrl)]);
 
                     const amountData = await amountRes.json();
                     const statusData = await statusRes.json();
@@ -236,17 +233,22 @@ include 'header.php'
 
                     document.getElementById('totalClaims').innerText = totalClaims;
 
-                    document.getElementById('approvalRate').innerText =
-                        totalClaims ? ((totalApprovedClaims / totalClaims) * 100).toFixed(2) + '%' : '0%';
+                    // ✅ CORRECT APPROVAL RATE (AMOUNT-BASED)
+                    const approvalRate =
+                        (totalApprovedAmount + totalDeclinedAmount) > 0 ?
+                        (totalApprovedAmount / (totalApprovedAmount + totalDeclinedAmount)) * 100 :
+                        0;
+
+                    document.getElementById('approvalRate').innerText = approvalRate.toFixed(2) + '%';
 
                     document.getElementById('summaryText').innerHTML = `
-                    For <strong>${monthName} ${year}</strong>, insurers are expected to process
-                    <strong>${totalClaims}</strong> claims, with
-                    <strong>${totalApprovedAmount.toLocaleString(undefined, { style: 'currency', currency: 'PHP' })}</strong>
-                    in approved payouts and
-                    <strong>${totalDeclinedAmount.toLocaleString(undefined, { style: 'currency', currency: 'PHP' })}</strong>
-                    in declined amounts.
-                `;
+                        For <strong>${monthName} ${year}</strong>, insurers are expected to process
+                        <strong>${totalClaims}</strong> claims, with
+                        <strong>${totalApprovedAmount.toLocaleString(undefined, { style: 'currency', currency: 'PHP' })}</strong>
+                        in approved payouts and
+                        <strong>${totalDeclinedAmount.toLocaleString(undefined, { style: 'currency', currency: 'PHP' })}</strong>
+                        in declined amounts.
+                    `;
 
                     renderAmountChart(merged);
                     renderStatusChart(merged);
@@ -297,14 +299,16 @@ include 'header.php'
                     data: {
                         labels: data.map(x => x.name),
                         datasets: [{
-                            label: 'Approved Claims',
-                            data: data.map(x => x.approved_claims),
-                            backgroundColor: '#198754aa'
-                        }, {
-                            label: 'Denied Claims',
-                            data: data.map(x => x.denied_claims),
-                            backgroundColor: '#dc3545aa'
-                        }]
+                                label: 'Approved Claims',
+                                data: data.map(x => x.approved_claims),
+                                backgroundColor: '#198754aa'
+                            },
+                            {
+                                label: 'Denied Claims',
+                                data: data.map(x => x.denied_claims),
+                                backgroundColor: '#dc3545aa'
+                            }
+                        ]
                     },
                     options: {
                         responsive: true,
@@ -367,12 +371,9 @@ include 'header.php'
                 document.getElementById('suggestionsList').innerHTML =
                     suggestions.map(s => `
                     <li>
-                        <span class="badge me-2 severity-${s.severity}">
-                            ${s.severity.toUpperCase()}
-                        </span>
+                        <span class="badge me-2 severity-${s.severity}">${s.severity.toUpperCase()}</span>
                         ${s.text}
-                    </li>
-                `).join('');
+                    </li>`).join('');
             }
 
             function exportCSV() {

@@ -152,7 +152,7 @@ include 'header.php'
         });
 
         const endpoint =
-            `https://localhost:7212/journal/getMonthPharmacySales/${month}/${year}`;
+            `https://bsis-03.keikaizen.xyz/journal/getMonthPharmacySales/${month}/${year}`;
 
         let distributionChart;
 
@@ -171,6 +171,7 @@ include 'header.php'
                 });
 
             document.getElementById("avgSale").innerText =
+
                 "₱" + avgSale.toLocaleString(undefined, {
                     minimumFractionDigits: 2
                 });

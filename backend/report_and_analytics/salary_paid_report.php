@@ -1,46 +1,28 @@
-<?php
-include 'header.php';
-?>
+<?php include 'header.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <title>Hospital Monthly Payroll Report</title>
+    <title>Payroll Monthly Report</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
+            background: #f7f7f7;
         }
 
-        .report-card {
-            border-radius: 16px;
-            border: 1px solid #ddd;
-            background: #fff;
-            padding: 30px;
-            margin-top: 20px;
+        .small-text {
+            font-size: .85rem;
+            color: #6c757d;
         }
 
-        .stat-title {
-            font-weight: 600;
-            color: #495057;
-        }
-
-        .stat-value {
-            font-weight: 700;
-            font-size: 1.3rem;
-        }
-
-        .stat-card {
-            background: #e9ecef;
-            border-radius: 12px;
-            padding: 20px;
+        .insight-box {
+            background: #ffffff;
+            border-radius: 10px;
         }
     </style>
 </head>
@@ -48,89 +30,180 @@ include 'header.php';
 <body>
     <div class="d-flex">
         <?php include 'sidebar.php'; ?>
-        <div class="container my-5">
 
-            <h3 class="fw-bold mb-4 text-center">💰 Hospital Monthly Payroll Report</h3>
+        <div class="container py-4">
 
-            <!-- Month/Year Filters -->
-            <div class="row g-3 mb-4 justify-content-center">
+            <!-- HEADER -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-semibold mb-0">Payroll Monthly Report</h4>
+                <h5 id="headerDate" class="mb-0 text-secondary"></h5>
+            </div>
+
+            <!-- SUMMARY CARDS -->
+            <div class="row g-3 mb-4">
                 <div class="col-md-3">
-                    <label class="form-label">Month</label>
-                    <input type="number" id="month" class="form-control" value="12" min="1" max="12">
+                    <div class="card p-3">
+                        <div class="small-text">Total Employees</div>
+                        <h5 id="totalEmployees">0</h5>
+                    </div>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Year</label>
-                    <input type="number" id="year" class="form-control" value="2025">
+                    <div class="card p-3">
+                        <div class="small-text">Gross Pay</div>
+                        <h5 id="totalGrossPay">₱0</h5>
+                    </div>
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button class="btn btn-dark w-100" onclick="loadPayroll()">Load Report</button>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Deductions</div>
+                        <h5 id="totalDeductions">₱0</h5>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Net Pay</div>
+                        <h5 id="totalNetPay">₱0</h5>
+                    </div>
                 </div>
             </div>
 
-            <!-- Payroll Report Card -->
-            <div id="payrollReport" class="report-card text-center">
-                <p class="text-muted">No data loaded</p>
+            <!-- CHART -->
+            <div class="card p-4 mb-4" style="height:320px;">
+                <canvas id="payrollChart"></canvas>
+            </div>
+
+            <!-- INSIGHTS -->
+            <div class="card p-4 insight-box">
+                <h6 class="fw-semibold mb-3">Payroll Insights</h6>
+                <div id="insightContent" class="small-text"></div>
             </div>
 
         </div>
     </div>
 
     <script>
-        function formatCurrency(amount) {
-            return amount.toLocaleString('en-US', {
-                style: 'currency',
-                currency: 'USD'
-            });
+        const apiBase = "https://bsis-03.keikaizen.xyz/payroll/getMonthPayrollSummary?month=";
+
+        const monthNames = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ];
+
+        let payrollChart;
+
+        // 🔥 Get MONTH & YEAR from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const month = parseInt(urlParams.get("month")) || (new Date().getMonth() + 1);
+        const year = parseInt(urlParams.get("year")) || new Date().getFullYear();
+
+        // Display header month/year
+        document.getElementById("headerDate").innerText = `${monthNames[month - 1]} ${year}`;
+
+        // Auto-load on page load
+        loadReport();
+
+        function loadReport() {
+            fetch(apiBase + month + "&year=" + year)
+                .then(res => res.json())
+                .then(data => {
+                    // SUMMARY CARDS
+                    document.getElementById("totalEmployees").innerText = data.totalEmployees;
+                    document.getElementById("totalGrossPay").innerText = "₱" + data.totalGrossPay.toLocaleString();
+                    document.getElementById("totalDeductions").innerText = "₱" + data.totalDeductions.toLocaleString();
+                    document.getElementById("totalNetPay").innerText = "₱" + data.totalNetPay.toLocaleString();
+
+                    // DESTROY OLD CHART IF EXISTS
+                    if (payrollChart) payrollChart.destroy();
+
+                    // CHART DATA
+                    const labels = [];
+                    const gross = [];
+                    const deductions = [];
+                    const net = [];
+
+                    data.monthsRecords.forEach(rec => {
+                        labels.push(monthNames[rec.month - 1] + " " + rec.year);
+                        gross.push(rec.total_gross_pay);
+                        deductions.push(rec.total_deductions);
+                        net.push(rec.total_net_pay);
+                    });
+
+                    // RENDER CHART
+                    payrollChart = new Chart(document.getElementById("payrollChart"), {
+                        type: "bar",
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                    label: "Gross Pay",
+                                    data: gross,
+                                    backgroundColor: "#87cefa"
+                                },
+                                {
+                                    label: "Deductions",
+                                    data: deductions,
+                                    backgroundColor: "#fd7e14"
+                                },
+                                {
+                                    label: "Net Pay",
+                                    data: net,
+                                    backgroundColor: "#90ee90"
+                                }
+                            ]
+                        },
+                        options: {
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: "top"
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: true
+                                },
+                                y: {
+                                    stacked: true,
+                                    ticks: {
+                                        callback: (v) => "₱" + v.toLocaleString()
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    // INSIGHTS
+                    const deductionRate = ((data.totalDeductions / data.totalGrossPay) * 100).toFixed(1);
+                    const avgNet = (data.totalNetPay / data.totalEmployees).toFixed(2);
+
+                    let insights = `
+                        • Payroll covers <strong>${data.totalEmployees}</strong> employees.<br>
+                        • Deductions are <strong>${deductionRate}%</strong> of gross.<br>
+                        • Avg net per employee: <strong>₱${Number(avgNet).toLocaleString()}</strong>.<br>
+                        • Net payroll released: <strong>₱${data.totalNetPay.toLocaleString()}</strong>.
+                    `;
+
+                    // Previous month comparison
+                    const prev = data.monthsRecords.find(r =>
+                        (r.month === month - 1 && r.year === year) ||
+                        (month === 1 && r.month === 12 && r.year === year - 1)
+                    );
+
+                    if (prev) {
+                        const diff = data.totalNetPay - prev.total_net_pay;
+                        const pct = ((diff / prev.total_net_pay) * 100).toFixed(2);
+                        const arrow = diff >= 0 ? "▲" : "▼";
+
+                        insights += `
+                            <br>• Compared to previous month: 
+                            <strong>${arrow} ₱${Math.abs(diff).toLocaleString()} (${pct}%)</strong>.
+                        `;
+                    }
+
+                    document.getElementById("insightContent").innerHTML = insights;
+                });
         }
-
-        async function loadPayroll() {
-            const month = document.getElementById("month").value;
-            const year = document.getElementById("year").value;
-
-            const reportDiv = document.getElementById("payrollReport");
-            reportDiv.innerHTML = `<p>Loading...</p>`;
-
-            try {
-                const res = await fetch(`https://localhost:7212/payroll/getHospitalMonthlyPayrollReport?month=${month}&year=${year}`);
-                if (!res.ok) throw new Error("Failed to fetch payroll report");
-
-                const data = await res.json();
-
-                reportDiv.innerHTML = `
-                    <div class="stat-card">
-                        <h5 class="fw-bold mb-3">Month: ${data.month}, Year: ${data.year}</h5>
-                        <div class="row text-center">
-                            <div class="col-md-3 mb-3">
-                                <div class="stat-title">Total Employees</div>
-                                <div class="stat-value">${data.total_employees}</div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="stat-title">Total Gross Pay</div>
-                                <div class="stat-value">${formatCurrency(data.total_gross_pay)}</div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="stat-title">Total Deductions</div>
-                                <div class="stat-value">${formatCurrency(data.total_deductions)}</div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="stat-title">Total Net Pay</div>
-                                <div class="stat-value">${formatCurrency(data.total_net_pay)}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-            } catch (err) {
-                console.error(err);
-                reportDiv.innerHTML = `<p class="text-danger">Failed to load payroll report</p>`;
-            }
-        }
-
-        // Load default report
-        loadPayroll();
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>

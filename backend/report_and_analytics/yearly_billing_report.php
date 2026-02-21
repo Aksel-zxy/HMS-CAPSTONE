@@ -1,206 +1,205 @@
-<?php
-include 'header.php'
-?>
+<?php include 'header.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <title>Yearly Billing Comparison</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Yearly Billing Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Bootstrap -->
+    <!-- Minimal Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body {
-            background: #f8f9fa;
-            font-family: "Poppins", sans-serif;
+            background: #f7f7f7;
         }
 
-        .stat-card {
-            border-radius: 16px;
-            border: 1px solid #ddd;
-            background: #fff;
-            padding: 20px;
+        .month-card {
+            border-radius: 10px;
         }
 
-        .diff-up {
-            color: #198754;
-            font-weight: 600;
-        }
-
-        .diff-down {
-            color: #dc3545;
-            font-weight: 600;
-        }
-
-        .diff-neutral {
+        .small-text {
+            font-size: .85rem;
             color: #6c757d;
-            font-weight: 600;
         }
     </style>
 </head>
 
 <body>
     <div class="d-flex">
-        <?php
-        include 'sidebar.php'
-        ?>
-        <div class="container my-5">
 
-            <h3 class="fw-bold mb-4 text-center">📊 Yearly Billing Comparison</h3>
+        <!-- SIDEBAR -->
+        <?php include 'sidebar.php'; ?>
 
-            <!-- Filters -->
-            <div class="row g-3 mb-4 justify-content-center">
+        <div class="container py-4">
+
+            <!-- HEADER + YEAR SELECT -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="fw-semibold mb-0">Billing Yearly Report</h4>
+                <select id="yearSelector" class="form-select w-auto"></select>
+            </div>
+
+            <!-- SUMMARY -->
+            <div class="row g-3 mb-4">
+
                 <div class="col-md-3">
-                    <label class="form-label">Base Year</label>
-                    <input type="number" id="baseYear" class="form-control" value="2025">
+                    <div class="card p-3">
+                        <div class="small-text">Total Billed</div>
+                        <h5 id="totalBilled">₱0</h5>
+                    </div>
                 </div>
+
                 <div class="col-md-3">
-                    <label class="form-label">Compared Year</label>
-                    <input type="number" id="comparedYear" class="form-control" value="2024">
+                    <div class="card p-3">
+                        <div class="small-text">Total Paid</div>
+                        <h5 id="totalPaid">₱0</h5>
+                    </div>
                 </div>
-                <div class="col-md-2 d-flex align-items-end">
-                    <button class="btn btn-dark w-100" onclick="loadComparison()">Compare</button>
+
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Pending Transactions</div>
+                        <h5 id="pendingTransactions">0</h5>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card p-3">
+                        <div class="small-text">Year</div>
+                        <h5 id="yearLabel">-</h5>
+                    </div>
                 </div>
             </div>
 
-            <!-- Comparison Table -->
-            <div class="stat-card">
-                <div class="table-responsive">
-                    <table class="table table-bordered align-middle text-center mb-0">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Metric</th>
-                                <th id="baseYearLabel">Base Year</th>
-                                <th id="comparedYearLabel">Compared Year</th>
-                                <th>Difference (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="comparisonBody">
-                            <tr>
-                                <td colspan="4" class="text-muted">No data loaded</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <!-- YEARLY CHART -->
+            <div class="card p-4 mb-4" style="height:320px">
+                <canvas id="yearChart"></canvas>
             </div>
 
-            <!-- Summary -->
-            <div class="stat-card mt-4">
-                <h5 class="fw-bold mb-2">📌 Summary</h5>
-                <div id="comparisonSummary" class="text-muted">
-                    No summary available.
-                </div>
-            </div>
+            <!-- MONTH SUMMARY CARDS -->
+            <div class="row g-3" id="monthCards"></div>
 
         </div>
+    </div>
 
-        <script>
-            function percentDiff(current, previous) {
-                if (previous === 0) return {
-                    text: "N/A",
-                    class: "diff-neutral",
-                    value: 0
-                };
+    <script>
+        const baseApi = "https://bsis-03.keikaizen.xyz/journal/yearBillingReportSummary?year=";
 
-                const diff = ((current - previous) / previous) * 100;
-                return {
-                    text: diff > 0 ?
-                        `▲ ${diff.toFixed(2)}%` : diff < 0 ?
-                        `▼ ${Math.abs(diff).toFixed(2)}%` : "0%",
-                    class: diff > 0 ? "diff-up" : diff < 0 ? "diff-down" : "diff-neutral",
-                    value: diff
-                };
-            }
+        const monthNames = [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ];
 
-            function buildSummary(rows, baseYear, comparedYear) {
-                let summaryHtml = `<strong>${baseYear} vs ${comparedYear}</strong><br>`;
-                let biggestChange = {
-                    name: "",
-                    value: 0
-                };
+        let yearChart;
 
-                rows.forEach(r => {
-                    const diff = percentDiff(r[1], r[2]);
+        // Populate year selector
+        const yearSelect = document.getElementById("yearSelector");
+        const currentYear = new Date().getFullYear();
+        for (let y = currentYear; y >= currentYear - 5; y--) {
+            yearSelect.innerHTML += `<option value="${y}">${y}</option>`;
+        }
 
-                    if (Math.abs(diff.value) > biggestChange.value) {
-                        biggestChange = {
-                            name: r[0],
-                            value: Math.abs(diff.value)
-                        };
-                    }
+        yearSelect.addEventListener("change", () => loadReport(yearSelect.value));
+        loadReport(yearSelect.value);
 
-                    if (diff.value > 0) {
-                        summaryHtml += `• <strong>${r[0]}</strong> increased by <span class="text-success">${diff.value.toFixed(2)}%</span><br>`;
-                    } else if (diff.value < 0) {
-                        summaryHtml += `• <strong>${r[0]}</strong> decreased by <span class="text-danger">${Math.abs(diff.value).toFixed(2)}%</span><br>`;
-                    } else {
-                        summaryHtml += `• <strong>${r[0]}</strong> remained unchanged<br>`;
-                    }
-                });
+        function loadReport(year) {
+            fetch(baseApi + year)
+                .then(res => res.json())
+                .then(data => {
 
-                if (biggestChange.name) {
-                    summaryHtml += `<br>The most significant change was <strong>${biggestChange.name}</strong>.`;
-                }
+                    // Summary
+                    document.getElementById("yearLabel").innerText = data.year;
+                    document.getElementById("totalBilled").innerText =
+                        "₱" + data.total_billed.toLocaleString();
+                    document.getElementById("totalPaid").innerText =
+                        "₱" + data.total_paid.toLocaleString();
+                    document.getElementById("pendingTransactions").innerText =
+                        data.total_pending_transaction;
 
-                document.getElementById("comparisonSummary").innerHTML = summaryHtml;
-            }
+                    const labels = [];
+                    const totals = [];
+                    const container = document.getElementById("monthCards");
+                    container.innerHTML = "";
 
-            async function loadComparison() {
-                const year = document.getElementById("baseYear").value;
-                const comparedYear = document.getElementById("comparedYear").value;
+                    const maxVal = Math.max(
+                        ...data.monthsBilling.map(m => m.total_billed)
+                    );
 
-                document.getElementById("baseYearLabel").innerText = year;
-                document.getElementById("comparedYearLabel").innerText = comparedYear;
+                    // Build month cards
+                    data.monthsBilling.forEach(m => {
 
-                const tbody = document.getElementById("comparisonBody");
-                tbody.innerHTML = `<tr><td colspan="4">Loading...</td></tr>`;
+                        labels.push(monthNames[m.month - 1]);
+                        totals.push(m.total_billed);
 
-                try {
-                    const res = await fetch(`https://localhost:7212/journal/getYearBillSummaryReport?year=${year}&comparedYear=${comparedYear}`);
-                    if (!res.ok) throw new Error("Failed to fetch data");
+                        const percent = ((m.total_billed / maxVal) * 100).toFixed(0);
 
-                    const d = await res.json();
+                        container.innerHTML += `
+                            <div class="col-xl-3 col-lg-4 col-md-6">
+                                <div class="card p-3 month-card">
+                                    <h6 class="fw-semibold">${monthNames[m.month - 1]}</h6>
 
-                    const rows = [
-                        ["Total Billed", d.total_billed, d.prev_total_billed],
-                        ["Total Paid", d.total_paid, d.prev_total_paid],
-                        ["Pending Transactions", d.total_pending_transaction, d.prev_total_pending_transaction],
-                        ["Out-of-Pocket Collected", d.total_oop_collected, d.prev_total_oop_collected],
-                        ["Insurance Covered", d.total_insurance_covered, d.prev_total_insurance_covered],
-                        ["Pending Amount", d.total_pending_amount, d.prev_total_pending_amount]
-                    ];
+                                    <div class="small-text">Total Billed</div>
+                                    <div class="fw-semibold">₱${m.total_billed.toLocaleString()}</div>
 
-                    tbody.innerHTML = "";
+                                    <div class="small-text mt-1">Paid</div>
+                                    <div>₱${m.total_paid.toLocaleString()}</div>
 
-                    rows.forEach(r => {
-                        const diff = percentDiff(r[1], r[2]);
-                        tbody.innerHTML += `
-                    <tr>
-                        <td class="fw-semibold">${r[0]}</td>
-                        <td>${r[1].toLocaleString()}</td>
-                        <td>${r[2].toLocaleString()}</td>
-                        <td class="${diff.class}">${diff.text}</td>
-                    </tr>
-                `;
+                                    <div class="small-text mt-1">Pending Tx</div>
+                                    <div>${m.total_pending_transaction}</div>
+
+                                    <div class="small-text mt-1">Pending Amount</div>
+                                    <div>₱${m.total_pending_amount.toLocaleString()}</div>
+
+                                    <div class="progress mt-2" style="height:6px">
+                                        <div class="progress-bar bg-primary" style="width:${percent}%"></div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-end mt-3">
+                                        <a href="/backend/report_and_analytics/month_billing_report.php?month=${m.month}&year=${data.year}"
+                                        class="btn btn-sm btn-outline-primary">View</a>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
                     });
 
-                    buildSummary(rows, year, comparedYear);
+                    // YEARLY CHART
+                    if (yearChart) yearChart.destroy();
 
-                } catch (err) {
-                    console.error(err);
-                    tbody.innerHTML = `<tr><td colspan="4" class="text-danger">Failed to load comparison</td></tr>`;
-                    document.getElementById("comparisonSummary").innerHTML = "Unable to generate summary.";
-                }
-            }
+                    yearChart = new Chart(document.getElementById("yearChart"), {
+                        type: "bar",
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: "Total Billed",
+                                data: totals,
+                                backgroundColor: "#0d6efd"
+                            }]
+                        },
+                        options: {
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    ticks: {
+                                        callback: v => "₱" + v.toLocaleString()
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+        }
+    </script>
 
-            // Load default comparison
-            loadComparison();
-        </script>
-    </div>
 </body>
 
 </html>

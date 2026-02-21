@@ -148,10 +148,10 @@ include 'header.php'
             let chart;
 
             const forecastUrl =
-                "https://localhost:7212/journal/getMonthCostManagementForecast";
+                "https://bsis-03.keikaizen.xyz/journal/getMonthCostManagementForecast";
 
             const historyUrl =
-                "https://localhost:7212/journal/getPreviousMonthsCostManagement";
+                "https://bsis-03.keikaizen.xyz/journal/getPreviousMonthsCostManagement";
 
             const API_KEY = "EZEKIEL_KLAYSKIE";
 

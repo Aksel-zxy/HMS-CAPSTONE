@@ -115,7 +115,7 @@ include 'header.php'
             // Fetch attendance data for given date
             async function loadAttendance(date) {
                 if (!date) return;
-                const res = await fetch(`http://localhost:5288/employee/attendanceReport/${date}`);
+                const res = await fetch(`https://bsis-03.keikaizen.xyz/employee/attendanceReport/${date}`);
                 const data = await res.json();
 
                 // Update chart

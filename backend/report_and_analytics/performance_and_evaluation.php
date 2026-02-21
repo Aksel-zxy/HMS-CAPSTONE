@@ -1,6 +1,4 @@
-<?php
-include 'header.php'
-?>
+<?php include 'header.php' ?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -22,6 +20,15 @@ include 'header.php'
         .summary-card {
             min-height: 120px;
         }
+
+        .insight-box {
+            border-left: 4px solid #0d6efd;
+            background: #fff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+            margin-bottom: 30px;
+        }
     </style>
 </head>
 
@@ -37,6 +44,7 @@ include 'header.php'
                 <div class="col-md-3">
                     <label class="form-label fw-semibold">Select Year</label>
                     <select id="yearSelector" onchange="updateSummary()" class="form-select">
+                        <option value="2026">2026</option>
                         <option value="2025">2025</option>
                         <option value="2024">2024</option>
                     </select>
@@ -45,15 +53,15 @@ include 'header.php'
                 <div class="col-md-3">
                     <label class="form-label fw-semibold">Select Month</label>
                     <select id="monthSelector" onchange="updateSummary()" class="form-select">
-                        <option value="01">January</option>
-                        <option value="02">February</option>
-                        <option value="03">March</option>
-                        <option value="04">April</option>
-                        <option value="05">May</option>
-                        <option value="06">June</option>
-                        <option value="07">July</option>
-                        <option value="08">August</option>
-                        <option value="09">September</option>
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
                         <option value="10" selected>October</option>
                         <option value="11">November</option>
                         <option value="12">December</option>
@@ -101,31 +109,10 @@ include 'header.php'
                 </div>
             </div>
 
-            <!-- TABLE -->
-            <div class="card shadow-sm">
-                <div class="card-header bg-white fw-semibold">List of Evaluated Employees</div>
-                <div class="card-body">
-                    <table class="table table-bordered table-hover">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Full Name</th>
-                                <th>Evaluation Date</th>
-                                <th>Score</th>
-                                <th>Rating</th>
-                                <th>Comments</th>
-                            </tr>
-                        </thead>
-                        <tbody id="employeeTableBody">
-                            <tr>
-                                <td colspan="5" class="text-center">Loading...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <!-- PAGINATION -->
-                    <div id="paginationControls" class="mt-3"></div>
-
-                </div>
+            <!-- INSIGHTS -->
+            <h4 class="fw-semibold mb-2">Key Insights</h4>
+            <div id="insightBox" class="insight-box">
+                Loading insights...
             </div>
 
         </div>
@@ -134,6 +121,7 @@ include 'header.php'
     <script>
         Chart.register(ChartDataLabels);
 
+        // Setup Chart
         let chart = new Chart(document.getElementById("performanceChart"), {
             type: "bar",
             data: {
@@ -161,119 +149,72 @@ include 'header.php'
             }
         });
 
-        /* PAGINATION */
-        let currentPage = 1;
-        let totalPages = 1;
-        const pageSize = 10;
-
-        /* SUMMARY LOADER */
+        /* LOAD SUMMARY USING NEW API FORMAT */
         async function loadSummary(month, year) {
-            const response = await fetch(`https://localhost:7212/employee/getEmployeeMonthReportPerformance/${month}/${year}`);
+            const response = await fetch(`https://bsis-03.keikaizen.xyz/employee/getEmployeeMonthReportPerformance?month=${month}&year=${year}`);
             const data = await response.json();
 
-            document.getElementById("avgScore").innerText = data.average_score.toFixed(2);
+            document.getElementById("avgScore").innerText = data.average_score;
             document.getElementById("totalEvaluations").innerText = data.total_evaluations;
             document.getElementById("poorPerformers").innerText = data.poor_performer_count;
 
+            /* Chart Distribution Estimate */
+            const total = data.total_evaluations;
             const poor = data.poor_performer_count;
-            const average = Math.floor((data.total_evaluations - poor) / 3);
+
+            // Simple logic to distribute remaining:
+            const average = Math.max(0, Math.floor((total - poor) / 3));
             const good = average;
-            const excellent = data.total_evaluations - (poor + good + average);
+            const excellent = Math.max(0, total - (poor + good + average));
 
             chart.data.datasets[0].data = [excellent, good, average, poor];
             chart.update();
+
+            generateInsights(data, excellent, good, average, poor);
         }
 
-        /* COLOR HELPERS */
-        function getScoreColor(score) {
-            if (score >= 5) return "#20c997";
-            if (score == 4) return "#4e73df";
-            if (score == 3) return "#f6c23e";
-            return "#e74a3b";
-        }
+        /* INSIGHT GENERATION */
+        function generateInsights(data, excellent, good, average, poor) {
+            let insights = [];
 
-        function getRatingColor(rating) {
-            const r = rating.toLowerCase();
-            if (r === "excellent") return "#20c997";
-            if (r === "good") return "#4e73df";
-            if (r === "average") return "#f6c23e";
-            return "#e74a3b";
-        }
-
-        /* EMPLOYEE TABLE (USES RAW ARRAY RESPONSE) */
-        async function loadEmployeeList(month, year, page = 1) {
-            const tableBody = document.getElementById("employeeTableBody");
-            tableBody.innerHTML = `<tr><td colspan="5" class="text-center">Loading...</td></tr>`;
-
-            const url = `https://localhost:7212/employee/getMonthListReport/${month}/${year}/${page}/${pageSize}`;
-            const response = await fetch(url);
-            const list = await response.json(); // 👈 YOUR API RETURNS ARRAY, NOT OBJECT
-
-            if (!Array.isArray(list) || list.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="5" class="text-center">No evaluations this month.</td></tr>`;
-                totalPages = 1;
-                renderPagination();
-                return;
+            // Insight #1 - Performance Strength
+            if (excellent > good && excellent > average && excellent > poor) {
+                insights.push("A large portion of employees achieved **Excellent** ratings, indicating strong overall performance.");
+            } else if (poor > excellent) {
+                insights.push("There is a noticeable concentration of **Poor performers**, signaling a need for training or intervention.");
             }
 
-            // Assuming backend does NOT return total pages → we simulate with fixed data count = 10
-            totalPages = 3; // adjust based on your backend later if needed
-
-            tableBody.innerHTML = "";
-
-            list.forEach(item => {
-                tableBody.innerHTML += `
-            <tr>
-                <td>${item.fullName}</td>
-                <td>${item.evaluationDate}</td>
-                <td style="font-weight:bold;color:${getScoreColor(item.score)};">${item.score}</td>
-                <td style="font-weight:bold;color:${getRatingColor(item.rating)};">${item.rating}</td>
-                <td>${item.comments}</td>
-            </tr>`;
-            });
-
-            renderPagination();
-        }
-
-        /* PAGINATION BUTTONS */
-        function renderPagination() {
-            const div = document.getElementById("paginationControls");
-            div.innerHTML = `
-        <div class="d-flex justify-content-between">
-            <button class="btn btn-secondary" onclick="prevPage()" ${currentPage === 1 ? "disabled" : ""}>Previous</button>
-            <span class="fw-semibold">Page ${currentPage} of ${totalPages}</span>
-            <button class="btn btn-secondary" onclick="nextPage()" ${currentPage === totalPages ? "disabled" : ""}>Next</button>
-        </div>
-    `;
-        }
-
-        function nextPage() {
-            if (currentPage < totalPages) {
-                currentPage++;
-                refreshPage();
+            // Insight #2 - Average Score Health
+            if (data.average_score >= 85) {
+                insights.push("The average score indicates **high-performing employees** this month.");
+            } else if (data.average_score >= 60) {
+                insights.push("Employee performance is **moderate**, with opportunities for improvement.");
+            } else {
+                insights.push("Performance level is **below expectations** — action may be required.");
             }
-        }
 
-        function prevPage() {
-            if (currentPage > 1) {
-                currentPage--;
-                refreshPage();
+            // Insight #3 - Evaluation count
+            if (data.total_evaluations <= 3) {
+                insights.push("Only a few evaluations were submitted — results may not represent the entire workforce.");
+            } else if (data.total_evaluations >= 10) {
+                insights.push("High evaluation count provides a **reliable performance overview**.");
             }
-        }
 
-        function refreshPage() {
-            const year = document.getElementById("yearSelector").value;
-            const month = document.getElementById("monthSelector").value;
-            loadEmployeeList(month, year, currentPage);
+            // Insight #4 - Poor performer ratio
+            const poorPct = (data.poor_performer_count / data.total_evaluations) * 100;
+            if (poorPct >= 30) {
+                insights.push("Over **30%** of employees scored poorly — check departmental issues or workload problems.");
+            }
+
+            document.getElementById("insightBox").innerHTML =
+                insights.map(i => `<p>• ${i}</p>`).join("");
         }
 
         /* MAIN UPDATE */
         async function updateSummary() {
             const year = document.getElementById("yearSelector").value;
             const month = document.getElementById("monthSelector").value;
-
             await loadSummary(month, year);
-            await loadEmployeeList(month, year, 1);
         }
 
         /* INITIAL LOAD */

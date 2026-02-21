@@ -7,256 +7,299 @@ include 'header.php';
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Beds Distribution Summary Report</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
     <style>
-        /* MONTHLY BOXES */
-        .month-card {
-            padding: 6px !important;
-            font-size: 12px;
+        body {
+            background: #f4f6f9;
         }
 
-        .month-card h6 {
-            font-size: 13px;
-            margin-bottom: 4px;
+        .summary-card {
+            border-radius: 12px;
+        }
+
+        .kpi-label {
+            font-size: .85rem;
+            color: #6c757d;
+        }
+
+        .kpi-value {
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+
+        .chart-card {
+            border-radius: 12px;
+            padding: 20px;
+            background: #fff;
+            height: 100%;
+        }
+
+        .insight-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            font-size: .9rem;
+        }
+
+        .back-btn {
+            text-decoration: none;
+        }
+
+        .month-card {
+            padding: 8px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
         }
 
         .month-card small {
-            display: block;
-            font-size: 11px;
-            line-height: 1.2;
-        }
-
-        .month-chart {
-            height: 80px !important;
-        }
-
-        /* PIE CHART SMALLER */
-        #pieChart {
-            max-height: 400px !important;
+            font-size: .8rem;
         }
     </style>
-
 </head>
 
-<body class="bg-light">
+<body>
     <div class="d-flex">
-        <?php
-        include 'sidebar.php'
-        ?>
+        <?php include 'sidebar.php'; ?>
+
         <div class="container py-4">
-            <h2 class="mb-4 text-center">Beds Distribution - Yearly Summary</h2>
 
-            <!-- Year Selector -->
-            <form id="yearForm" class="card p-3 shadow-sm mb-4">
-                <div class="row g-3 align-items-center">
-                    <div class="col-md-3">
-                        <label class="form-label fw-bold">Select Year</label>
-                        <select id="yearInput" class="form-select">
-                            <?php
-                            $currentYear = date("Y");
-                            for ($i = 2020; $i <= $currentYear + 2; $i++) {
-                                echo "<option value='$i'>$i</option>";
-                            }
-                            ?>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <button type="button" onclick="loadReport()" class="btn btn-primary mt-4 px-4">Load Report</button>
-                    </div>
-                </div>
-            </form>
+            <!-- HEADER WITH YEAR SELECTOR -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
 
-            <!-- SUMMARY -->
-            <div id="reportSection" class="d-none">
-                <div class="card p-3 shadow-sm mb-4">
-                    <h4 class="mb-3">Yearly Summary</h4>
-                    <div class="row text-center">
-                        <div class="col-md-3">
-                            <h6>Total Beds</h6>
-                            <p class="fs-4 fw-bold" id="totalBeds"></p>
-                        </div>
-                        <div class="col-md-3">
-                            <h6>Occupied Beds (%)</h6>
-                            <p class="fs-4 fw-bold text-primary" id="occupiedBeds"></p>
-                        </div>
-                        <div class="col-md-3">
-                            <h6>Available Beds (%)</h6>
-                            <p class="fs-4 fw-bold text-success" id="availableBeds"></p>
-                        </div>
-                        <div class="col-md-3">
-                            <h6>Broken Beds (%)</h6>
-                            <p class="fs-4 fw-bold text-danger" id="brokenBeds"></p>
-                        </div>
-                    </div>
+                <div>
+                    <h4 class="fw-semibold mb-0 mt-1">
+                        Beds Distribution Summary Report
+                    </h4>
                 </div>
 
-                <!-- MONTHLY BREAKDOWN AND PIE CHART SIDE BY SIDE -->
-                <div class="row">
-                    <!-- Monthly Breakdown -->
-                    <div class="col-lg-8">
-                        <div class="card p-3 shadow-sm mb-4">
-                            <h4 class="mb-3">Monthly Breakdown</h4>
-                            <div class="row g-2" id="monthlyCards"></div>
-                        </div>
-                    </div>
+                <div class="d-flex align-items-center">
+                    <select id="yearSelect" class="form-select form-select-sm me-2" style="width: 110px;">
+                        <?php
+                        $currentYear = date("Y");
+                        for ($i = 2020; $i <= $currentYear + 2; $i++) {
+                            echo "<option value='$i'>$i</option>";
+                        }
+                        ?>
+                    </select>
 
-                    <!-- Year-Level Pie Chart -->
-                    <div class="col-lg-4">
-                        <div class="card p-3 shadow-sm mb-4">
-                            <h5 class="text-center">Beds Distribution (Pie Chart)</h5>
-                            <canvas id="pieChart"></canvas>
-                        </div>
-                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="changeYear()">
+                        Load
+                    </button>
                 </div>
             </div>
+
+            <span class="text-muted" id="reportYear">Loading...</span>
+
+            <!-- KPI CARDS -->
+            <div class="row g-3 mb-4">
+
+                <div class="col-md-3">
+                    <div class="card summary-card p-3 text-center">
+                        <div class="kpi-label">Total Beds</div>
+                        <div class="kpi-value" id="totalBeds">0</div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card summary-card p-3 text-center">
+                        <div class="kpi-label">Occupied Beds (%)</div>
+                        <div class="kpi-value text-primary" id="occupiedBeds">0%</div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card summary-card p-3 text-center">
+                        <div class="kpi-label">Available Beds (%)</div>
+                        <div class="kpi-value text-success" id="availableBeds">0%</div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card summary-card p-3 text-center">
+                        <div class="kpi-label">Broken Beds (%)</div>
+                        <div class="kpi-value text-danger" id="brokenBeds">0%</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- CHART + INSIGHTS -->
+            <div class="row g-3">
+
+                <!-- Pie Chart -->
+                <div class="col-md-6">
+                    <div class="chart-card">
+                        <h6 class="fw-semibold mb-3">Beds Distribution (Pie Chart)</h6>
+                        <canvas id="bedsChart" height="260"></canvas>
+                    </div>
+                </div>
+
+                <!-- INSIGHTS -->
+                <div class="col-md-6">
+                    <div class="chart-card">
+                        <h6 class="fw-semibold mb-3">Insights</h6>
+                        <div class="insight-box" id="insightText">Loading insights...</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Monthly Breakdown -->
+            <div class="card p-3 shadow-sm mt-4">
+                <h4 class="fw-semibold mb-3">Monthly Breakdown</h4>
+                <div class="row g-3" id="monthlyCards"></div>
+            </div>
+
         </div>
     </div>
+
     <script>
-        let pieChart;
+        // --- YEAR PARAMETER HANDLING ---
+        const params = new URLSearchParams(window.location.search);
+        let year = params.get("year");
 
-        function loadReport() {
-            const year = document.getElementById("yearInput").value;
-            const endpoint = `https://localhost:7212/property/getYearBedsDistributionReport/${year}`;
-
-            fetch(endpoint)
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById("reportSection").classList.remove("d-none");
-                    document.getElementById("totalBeds").innerText = data.total_beds;
-                    document.getElementById("occupiedBeds").innerText = data.occupied_beds.toFixed(2);
-                    document.getElementById("availableBeds").innerText = data.available_beds.toFixed(2);
-                    document.getElementById("brokenBeds").innerText = data.broken_beds.toFixed(2);
-
-                    renderMonthlyCards(data.monthsAdmissionReport, year);
-                    updatePieChart(data);
-                })
-                .catch(err => {
-                    alert("Failed to load data.");
-                    console.error(err);
-                });
+        if (!year) {
+            const thisYear = new Date().getFullYear();
+            year = thisYear;
+            history.replaceState(null, "", `?year=${year}`);
         }
 
-        /* MONTHLY SUMMARY BOXES WITH BAR CHARTS AND VIEW BUTTONS */
-        function renderMonthlyCards(apiMonths, year) {
-            const container = document.getElementById("monthlyCards");
-            container.innerHTML = "";
-            const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        document.getElementById("yearSelect").value = year;
+        document.getElementById("reportYear").innerText = year;
 
-            const months = [];
-            for (let i = 1; i <= 12; i++) {
-                const found = apiMonths?.find(m => m.month === i);
-                months.push(found ?? {
-                    month: i,
-                    total_beds: 0,
-                    occupied_beds: 0,
-                    available_beds: 0,
-                    broken_beds: 0,
-                    recently_discharged: 0
-                });
-            }
-
-            months.forEach((m, index) => {
-                const chartId = "monthChart_" + index;
-
-                container.innerHTML += `
-        <div class="col-lg-3 col-md-4 col-sm-6 col-6">
-            <div class="card shadow-sm month-card">
-                <h6 class="text-center">${monthNames[m.month]}</h6>
-                <small><b>Total:</b> ${m.total_beds}</small>
-                <small><b>Occ:</b> ${m.occupied_beds}</small>
-                <small><b>Avail:</b> ${m.available_beds}</small>
-                <small><b>Broken:</b> ${m.broken_beds}</small>
-                <canvas id="${chartId}" class="month-chart mb-1"></canvas>
-                <button class="btn btn-sm btn-info w-100" onclick="viewDetails(${m.month}, ${year})">View</button>
-            </div>
-        </div>
-        `;
-
-                // Small bar chart inside the month card
-                setTimeout(() => {
-                    new Chart(document.getElementById(chartId), {
-                        type: "bar",
-                        data: {
-                            labels: ["Occ", "Avail", "Broken"],
-                            datasets: [{
-                                data: [m.occupied_beds, m.available_beds, m.broken_beds],
-                                backgroundColor: ["#0d6efd", "#198754", "#dc3545"]
-                            }]
-                        },
-                        options: {
-                            plugins: {
-                                datalabels: {
-                                    anchor: "end",
-                                    align: "top",
-                                    formatter: v => v,
-                                    font: {
-                                        size: 9,
-                                        weight: "bold"
-                                    }
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            },
-                            responsive: true,
-                            maintainAspectRatio: false
-                        },
-                        plugins: [ChartDataLabels]
-                    });
-                }, 100);
-            });
+        function changeYear() {
+            const selectedYear = document.getElementById("yearSelect").value;
+            window.location.href = `?year=${selectedYear}`;
         }
 
-        /* PIE CHART ONLY */
-        function updatePieChart(data) {
-            const values = [data.occupied_beds, data.available_beds, data.broken_beds];
-            const labels = ["Occupied", "Available", "Broken"];
-            const total = values.reduce((a, b) => a + b, 0);
+        // --- MAIN LOGIC ---
+        const endpoint = `https://bsis-03.keikaizen.xyz/property/getYearBedsDistributionReport/${year}`;
+        let bedsChart;
 
-            if (pieChart) pieChart.destroy();
+        async function loadReport() {
+            const res = await fetch(endpoint);
+            const data = await res.json();
 
-            pieChart = new Chart(document.getElementById("pieChart"), {
-                type: "pie",
+            document.getElementById("totalBeds").innerText = data.total_beds;
+            document.getElementById("occupiedBeds").innerText = data.occupied_beds.toFixed(2) + "%";
+            document.getElementById("availableBeds").innerText = data.available_beds.toFixed(2) + "%";
+            document.getElementById("brokenBeds").innerText = data.broken_beds.toFixed(2) + "%";
+
+            renderPieChart(data);
+            renderInsights(data);
+            renderMonthlyCards(data.monthsAdmissionReport, year);
+        }
+
+        function renderPieChart(data) {
+            const ctx = document.getElementById("bedsChart");
+
+            const values = [
+                data.occupied_beds,
+                data.available_beds,
+                data.broken_beds
+            ];
+
+            if (bedsChart) bedsChart.destroy();
+
+            bedsChart = new Chart(ctx, {
+                type: "doughnut",
                 data: {
-                    labels,
+                    labels: ["Occupied", "Available", "Broken"],
                     datasets: [{
-                        data: values
+                        data: values,
+                        backgroundColor: ["#0d6efd", "#198754", "#dc3545"],
+                        hoverOffset: 6
                     }]
                 },
                 options: {
                     plugins: {
+                        legend: {
+                            position: "bottom"
+                        },
                         datalabels: {
                             color: "#fff",
-                            formatter: v => ((v / total) * 100).toFixed(1) + "%",
+                            formatter: (value) => value.toFixed(1) + "%",
                             font: {
                                 weight: "bold",
-                                size: 12
+                                size: 14
                             }
                         }
-                    },
-                    responsive: true,
-                    maintainAspectRatio: false
+                    }
                 },
                 plugins: [ChartDataLabels]
             });
         }
 
-        /* NAVIGATE TO DETAIL PAGE WITH QUERY PARAMS */
-        function viewDetails(month, year) {
-            const viewUrl = `http://localhost:8080/backend/report_and_analytics/patient_admission_and_summary.php?month=${month}&year=${year}`;
-            window.location.href = viewUrl;
+        function renderInsights(data) {
+            let insights = [];
+
+            if (data.occupied_beds > 80)
+                insights.push("High occupancy detected — capacity is heavily utilized.");
+
+            if (data.occupied_beds < 40)
+                insights.push("Low bed occupancy — good availability.");
+
+            if (data.broken_beds > 10)
+                insights.push("High number of broken beds — maintenance needed.");
+
+            if (data.available_beds < 10)
+                insights.push("Very few available beds — nearing full capacity.");
+
+            if (insights.length === 0)
+                insights.push("Bed usage is stable and within optimal range.");
+
+            document.getElementById("insightText").innerHTML =
+                "<ul><li>" + insights.join("</li><li>") + "</li></ul>";
         }
+
+        function renderMonthlyCards(months, year) {
+            const container = document.getElementById("monthlyCards");
+            container.innerHTML = "";
+
+            const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+            for (let m = 1; m <= 12; m++) {
+                const row = months.find(x => x.month === m) || {
+                    occupied_beds: 0,
+                    available_beds: 0,
+                    broken_beds: 0,
+                    total_beds: 0
+                };
+
+                container.innerHTML += `
+                <div class="col-md-3 col-sm-6">
+                    <div class="month-card p-2">
+                        <h6 class="text-center">${names[m-1]}</h6>
+                        <small>Total: ${row.total_beds}</small><br>
+                        <small>Occ: ${row.occupied_beds}</small><br>
+                        <small>Avail: ${row.available_beds}</small><br>
+                        <small>Broken: ${row.broken_beds}</small><br>
+                        <button class="btn btn-sm btn-info w-100 mt-1"
+                            onclick="viewDetails(${m}, ${year})">View</button>
+                    </div>
+                </div>
+            `;
+            }
+        }
+
+        function viewDetails(month, year) {
+            window.location.href =
+                `patient_admission_and_summary.php?month=${month}&year=${year}`;
+        }
+
+        loadReport();
     </script>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
