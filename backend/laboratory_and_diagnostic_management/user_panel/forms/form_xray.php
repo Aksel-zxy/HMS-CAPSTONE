@@ -60,7 +60,7 @@ if (!$patient) {
     <div class="container mt-5">
         <div class="card shadow-sm">
             <div class="card-header">
-                X-ray (Chest) Test
+                X-ray Test
             </div>
             <div class="card-body">
                 <div class="mb-4">
