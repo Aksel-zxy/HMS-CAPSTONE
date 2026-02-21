@@ -707,7 +707,7 @@ document.addEventListener('click', e => {
     modalBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>';
     viewModal.show();
 
-    fetch('purchase_request.php?ajax=items&id=' + btn.dataset.id)
+    fetch('repair_request.php?ajax=items&id=' + btn.dataset.id)
         .then(res => res.text().then(text => {
             try   { return { ok: res.ok, status: res.status, data: JSON.parse(text) }; }
             catch { return { ok: false, status: res.status, parseError: true, raw: text }; }
