@@ -2,6 +2,7 @@
 session_start();
 include '../../SQL/config.php';
 
+
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -1111,7 +1112,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             modalBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>';
             viewModal.show();
 
-            fetch('purchase_request.php?ajax=items&id=' + btn.dataset.id)
+            fetch('pharmacy_supply_request.php?ajax=items&id=' + btn.dataset.id)
                 .then(res => res.text().then(text => {
                     try {
                         return {

@@ -454,7 +454,7 @@ if ($result->num_rows > 0) {
             }
         });
 
-        <!-- JavaScript For Nurse -->
+        // <!-- JavaScript For Nurse -->
         const nurseSpecializations = {
             "Anesthesiology & Pain Management": ["Anesthesia Nurse", "Pain Management Nurse"],
             "Cardiology (Heart & Vascular System)": ["Cardiac Nurse", "CCU Nurse"],
