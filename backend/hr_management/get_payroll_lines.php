@@ -13,6 +13,7 @@ SELECT
     SUM(CASE WHEN pay_period_start >= DATE_FORMAT(pay_period_start, '%Y-%m-16') THEN net_pay ELSE 0 END) AS second_half
 FROM hr_payroll
 WHERE YEAR(pay_period_start) = $year
+AND status = 'Paid'
 GROUP BY DATE_FORMAT(pay_period_start, '%Y-%m')
 ORDER BY DATE_FORMAT(pay_period_start, '%Y-%m');
 ";

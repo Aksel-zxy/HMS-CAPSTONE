@@ -39,7 +39,7 @@ class PayrollReports {
                 p.date_generated
             FROM hr_payroll p
             JOIN hr_employees e ON p.employee_id = e.employee_id
-            WHERE p.status = 'Pending'
+            WHERE p.status = 'Paid'
         ";
 
         $params = [];
