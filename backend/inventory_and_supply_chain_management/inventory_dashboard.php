@@ -606,7 +606,6 @@ body {
     </div>
 
 </div><!-- /main-content -->
-
 <script>
 const itemTypes  = <?= $item_types_json ?>;
 const values     = <?= $values_json ?>;
@@ -620,19 +619,23 @@ Chart.defaults.color       = '#8b93ad';
 const gridColor  = 'rgba(227,231,240,0.7)';
 const tickColor  = '#8b93ad';
 
-/* ── Value Chart ── */
+/* ── Value Chart (LINE) ── */
 new Chart(document.getElementById('assetValueChart'), {
-    type: 'bar',
+    type: 'line',
     data: {
         labels: itemTypes,
         datasets: [{
             label: 'Asset Value (₱)',
             data: values,
-            backgroundColor: values.map((_, i) => `hsla(${220 + i * 18}, 80%, 60%, 0.85)`),
-            borderColor:     values.map((_, i) => `hsl(${220 + i * 18}, 80%, 50%)`),
-            borderWidth: 1.5,
-            borderRadius: 6,
-            borderSkipped: false,
+            borderColor: '#1b56f5',
+            backgroundColor: 'rgba(27,86,245,0.15)',
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#1b56f5',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7
         }]
     },
     options: {
@@ -646,7 +649,8 @@ new Chart(document.getElementById('assetValueChart'), {
                 padding: 12,
                 cornerRadius: 8,
                 callbacks: {
-                    label: ctx => ' ₱' + ctx.parsed.y.toLocaleString('en-PH', { minimumFractionDigits: 2 })
+                    label: ctx => 
+                        ' ₱' + ctx.parsed.y.toLocaleString('en-PH', { minimumFractionDigits: 2 })
                 }
             }
         },
@@ -660,26 +664,31 @@ new Chart(document.getElementById('assetValueChart'), {
                 grid: { color: gridColor },
                 ticks: {
                     color: tickColor,
-                    callback: v => '₱' + (v >= 1000 ? (v/1000).toFixed(0) + 'K' : v.toLocaleString())
+                    callback: v => 
+                        '₱' + (v >= 1000 ? (v/1000).toFixed(0) + 'K' : v.toLocaleString())
                 }
             }
         }
     }
 });
 
-/* ── Quantity Chart ── */
+/* ── Quantity Chart (LINE) ── */
 new Chart(document.getElementById('assetQuantityChart'), {
-    type: 'bar',
+    type: 'line',
     data: {
         labels: itemTypes,
         datasets: [{
             label: 'Quantity',
             data: quantities,
-            backgroundColor: quantities.map((_, i) => `hsla(${170 + i * 20}, 65%, 55%, 0.85)`),
-            borderColor:     quantities.map((_, i) => `hsl(${170 + i * 20}, 65%, 42%)`),
-            borderWidth: 1.5,
-            borderRadius: 6,
-            borderSkipped: false,
+            borderColor: '#0580a4',
+            backgroundColor: 'rgba(5,128,164,0.15)',
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#0580a4',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 5,
+            pointHoverRadius: 7
         }]
     },
     options: {
@@ -693,7 +702,8 @@ new Chart(document.getElementById('assetQuantityChart'), {
                 padding: 12,
                 cornerRadius: 8,
                 callbacks: {
-                    label: ctx => ' ' + ctx.parsed.y.toLocaleString() + ' units'
+                    label: ctx => 
+                        ' ' + ctx.parsed.y.toLocaleString() + ' units'
                 }
             }
         },
@@ -707,7 +717,8 @@ new Chart(document.getElementById('assetQuantityChart'), {
                 grid: { color: gridColor },
                 ticks: {
                     color: tickColor,
-                    callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'K' : v
+                    callback: v => 
+                        v >= 1000 ? (v/1000).toFixed(0) + 'K' : v
                 }
             }
         }
