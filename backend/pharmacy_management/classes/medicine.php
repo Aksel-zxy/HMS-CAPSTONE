@@ -318,7 +318,18 @@ class Medicine
 
     public function autoUpdateOutOfStock()
     {
-        $sql = "UPDATE pharmacy_inventory SET status = CASE WHEN stock_quantity = 0 THEN 'Out of Stock' ELSE 'Available' END";
+        $today = date('Y-m-d');
+
+        $sql = "
+    UPDATE pharmacy_inventory i
+    LEFT JOIN pharmacy_stock_batches b ON i.med_id = b.med_id
+    SET i.status = CASE
+        WHEN b.expiry_date < '$today' THEN 'Expired'
+        WHEN i.stock_quantity = 0 THEN 'Out of Stock'
+        ELSE 'Available'
+    END
+    ";
+
         $this->conn->query($sql);
     }
 

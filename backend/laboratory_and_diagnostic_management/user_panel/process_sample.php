@@ -11,11 +11,15 @@ switch ($serviceName) {
         include __DIR__ . "/forms/form_xray.php";
         break;
 
+     case "X-Ray (Legs)":
+        include __DIR__ . "/forms/form_xray.php";
+        break;
+
     case "MRI Scan":
         include __DIR__ . "/forms/form_mri.php";
         break;
 
-    case "CT Scan":
+    case "CT-Scan":
         include __DIR__ . "/forms/form_ct.php";
         break;
 
