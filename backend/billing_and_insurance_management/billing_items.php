@@ -5,698 +5,1144 @@ include '../../SQL/config.php';
 $patient_id = isset($_GET['patient_id']) ? intval($_GET['patient_id']) : 0;
 
 /* =========================================================
-   PATIENT SELECTION PAGE
-   Only show patients with post_discharged + pending billing
+   PATIENT LIST PAGE
 ========================================================= */
 if ($patient_id <= 0) {
-
     $sql = "
-        SELECT DISTINCT
+        SELECT
             p.patient_id,
-            CONCAT(p.fname, ' ', IFNULL(NULLIF(p.mname,''),''), ' ', p.lname) AS full_name,
+            CONCAT(p.fname,' ',IFNULL(NULLIF(p.mname,''),''),' ',p.lname) AS full_name,
+            COUNT(DISTINCT dr.resultID)        AS lab_count,
+            COUNT(DISTINCT dnmr.record_id)     AS dnm_count,
             COUNT(DISTINCT pp.prescription_id) AS rx_count
         FROM patientinfo p
-        INNER JOIN pharmacy_prescription pp
-            ON pp.patient_id     = p.patient_id
-           AND pp.payment_type   = 'post_discharged'
-           AND pp.status         = 'Dispensed'
-           AND pp.billing_status = 'pending'
+        LEFT JOIN dl_results dr
+               ON dr.patientID = p.patient_id AND dr.status = 'Completed'
+        LEFT JOIN dnm_records dnmr
+               ON dnmr.doctor_id = p.patient_id
+        LEFT JOIN pharmacy_prescription pp
+               ON pp.patient_id     = p.patient_id
+              AND pp.payment_type   = 'post_discharged'
+              AND pp.status         = 'Dispensed'
+              AND pp.billing_status = 'pending'
         GROUP BY p.patient_id
+        HAVING lab_count > 0 OR dnm_count > 0 OR rx_count > 0
         ORDER BY p.lname ASC, p.fname ASC
     ";
     $patients = $conn->query($sql);
-    ?>
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Post-Discharged Billing</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/css/billing_sidebar.css">
-    <style>
-    :root {
-        --sidebar-w: 250px;
-        --navy:      #0b1d3a;
-        --accent:    #2563eb;
-        --ink:       #1e293b;
-        --ink-light: #64748b;
-        --border:    #e2e8f0;
-        --surface:   #f1f5f9;
-        --card:      #ffffff;
-        --radius:    14px;
-        --shadow:    0 2px 20px rgba(11,29,58,.08);
-        --ff-head:   'DM Serif Display', serif;
-        --ff-body:   'DM Sans', sans-serif;
-    }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: var(--ff-body); background: var(--surface); color: var(--ink); }
-    .cw { margin-left: var(--sidebar-w); padding: 48px 28px 60px; transition: margin-left .3s; }
-    .cw.sidebar-collapsed { margin-left: 0; }
-    .page-head { margin-bottom: 24px; }
-    .page-head h2 { font-family: var(--ff-head); font-size: 1.7rem; color: var(--navy); }
-    .page-head p  { font-size: .85rem; color: var(--ink-light); margin-top: 4px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
-    .card-header { background: var(--navy); padding: 14px 22px; display: flex; align-items: center; gap: 10px; }
-    .card-header h5 { font-family: var(--ff-head); color: #fff; margin: 0; font-size: 1rem; }
-    .card-header i { color: rgba(255,255,255,.6); }
-    .tbl { width: 100%; border-collapse: collapse; }
-    .tbl thead th { background: #f8fafc; color: var(--ink-light); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; padding: 11px 18px; border-bottom: 2px solid var(--border); text-align: left; }
-    .tbl tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
-    .tbl tbody tr:last-child { border-bottom: none; }
-    .tbl tbody tr:hover { background: #f7faff; }
-    .tbl td { padding: 13px 18px; vertical-align: middle; font-size: .88rem; }
-    .pat-cell { display: flex; align-items: center; gap: 10px; }
-    .pat-av   { width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg,var(--navy),var(--accent)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:700; flex-shrink:0; }
-    .pat-name { font-weight: 600; color: var(--navy); }
-    .rx-badge { display:inline-flex; align-items:center; gap:4px; background:#dbeafe; color:#1d4ed8; border-radius:999px; padding:3px 10px; font-size:.72rem; font-weight:700; }
-    .btn-billing { display:inline-flex; align-items:center; gap:5px; background:var(--accent); color:#fff; border:none; border-radius:8px; padding:7px 18px; font-size:.82rem; font-weight:700; font-family:var(--ff-body); text-decoration:none; cursor:pointer; transition:background .15s,transform .1s; }
-    .btn-billing:hover { background:#1d4ed8; color:#fff; transform:translateY(-1px); }
-    .empty-state { text-align:center; padding:56px 16px; color:var(--ink-light); }
-    .empty-state i { font-size:2.5rem; display:block; margin-bottom:12px; opacity:.3; }
-    @media(max-width:768px){ .cw{ margin-left:200px; padding:56px 14px; } }
-    @media(max-width:480px){ .cw{ margin-left:0!important; padding:52px 10px; } }
-    </style>
-    </head>
-    <body>
-    <?php include 'billing_sidebar.php'; ?>
-    <div class="cw" id="mainCw">
-        <div class="page-head">
-            <h2>Post-Discharged Billing</h2>
-            <p>Patients with dispensed prescriptions awaiting billing settlement.</p>
-        </div>
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-people-fill"></i>
-                <h5>Patients Ready for Billing</h5>
-            </div>
-            <div style="overflow-x:auto;">
-                <table class="tbl">
-                    <thead>
-                        <tr>
-                            <th>Patient</th>
-                            <th>Prescriptions</th>
-                            <th style="text-align:right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php if ($patients && $patients->num_rows > 0):
-                        while ($row = $patients->fetch_assoc()):
-                            $initials = strtoupper(substr(trim($row['full_name']), 0, 1));
-                    ?>
-                        <tr>
-                            <td>
-                                <div class="pat-cell">
-                                    <div class="pat-av"><?= $initials ?></div>
-                                    <span class="pat-name"><?= htmlspecialchars(trim($row['full_name'])) ?></span>
-                                </div>
-                            </td>
-                            <td>
-                                <span class="rx-badge">
-                                    <i class="bi bi-capsule"></i>
-                                    <?= $row['rx_count'] ?> Rx pending
-                                </span>
-                            </td>
-                            <td style="text-align:right;">
-                                <a href="billing_items.php?patient_id=<?= $row['patient_id'] ?>" class="btn-billing">
-                                    <i class="bi bi-receipt"></i> Manage Billing
-                                </a>
-                            </td>
-                        </tr>
-                    <?php endwhile; else: ?>
-                        <tr>
-                            <td colspan="3">
-                                <div class="empty-state">
-                                    <i class="bi bi-inbox"></i>
-                                    No patients with pending post-discharged prescriptions.
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    <script>
-    (function(){
-        const sb = document.getElementById('mySidebar');
-        const cw = document.getElementById('mainCw');
-        if(!sb||!cw) return;
-        function sync(){ cw.classList.toggle('sidebar-collapsed', sb.classList.contains('closed')); }
-        new MutationObserver(sync).observe(sb,{attributes:true,attributeFilter:['class']});
-        document.getElementById('sidebarToggle')?.addEventListener('click',()=>requestAnimationFrame(sync));
-        sync();
-    })();
-    </script>
-    </body>
-    </html>
-    <?php
-    exit;
-}
-
-/* =========================================================
-   LOAD PATIENT
-========================================================= */
-$stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
-$stmt->bind_param("i", $patient_id);
-$stmt->execute();
-$patient = $stmt->get_result()->fetch_assoc();
-if (!$patient) die("Patient not found.");
-
-/* =========================================================
-   AGE / SENIOR CHECK
-========================================================= */
-$age = 0;
-if (!empty($patient['dob']) && $patient['dob'] !== '0000-00-00') {
-    $age = (new DateTime())->diff(new DateTime($patient['dob']))->y;
-}
-$is_senior = $age >= 60;
-
-/* =========================================================
-   PWD TOGGLE
-========================================================= */
-if (isset($_GET['toggle_pwd'])) {
-    $_SESSION['is_pwd'][$patient_id] = (int)$_GET['toggle_pwd'];
-    header("Location: billing_items.php?patient_id=$patient_id");
-    exit;
-}
-$is_pwd = $_SESSION['is_pwd'][$patient_id] ?? (int)($patient['is_pwd'] ?? 0);
-
-/* =========================================================
-   INITIALIZE SESSION CART
-   Seed from post_discharged dispensed prescriptions
-   using pharmacy_inventory for medicine names (med_name column)
-========================================================= */
-if (!isset($_SESSION['billing_cart'][$patient_id])) {
-    $_SESSION['billing_cart'][$patient_id] = [];
-
-    $stmt = $conn->prepare("
-        SELECT
-            ppi.item_id,
-            ppi.med_id,
-            ppi.dosage,
-            ppi.frequency,
-            ppi.quantity_dispensed,
-            ppi.unit_price,
-            ppi.total_price,
-            pi2.med_name
-        FROM pharmacy_prescription pp
-        JOIN pharmacy_prescription_items ppi ON pp.prescription_id = ppi.prescription_id
-        JOIN pharmacy_inventory pi2          ON pi2.med_id = ppi.med_id
-        WHERE pp.patient_id     = ?
-          AND pp.payment_type   = 'post_discharged'
-          AND pp.status         = 'Dispensed'
-          AND pp.billing_status = 'pending'
-    ");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-
-    while ($row = $res->fetch_assoc()) {
-        $dosage_str = trim(($row['dosage'] ?? '') . ' ' . ($row['frequency'] ?? ''));
-        $label      = $row['med_name'] . ($dosage_str ? ' (' . trim($dosage_str) . ')' : '');
-
-        $_SESSION['billing_cart'][$patient_id][] = [
-            'cart_key'    => 'RX-' . $row['item_id'],
-            'med_id'      => $row['med_id'],
-            'serviceName' => $label,
-            'description' => 'Dispensed — Qty: ' . $row['quantity_dispensed']
-                           . ' × ₱' . number_format($row['unit_price'], 2),
-            'price'       => (float)$row['total_price'],
-            'source'      => 'rx',
-        ];
-    }
-}
-
-/* =========================================================
-   ADD EXTRA MEDICINE FROM pharmacy_inventory
-========================================================= */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_medicine'])) {
-    $med_id = (int)$_POST['med_id'];
-    $qty    = max(1, (int)($_POST['qty'] ?? 1));
-
-    if ($med_id > 0) {
-        $stmt = $conn->prepare("SELECT med_id, med_name, dosage, unit_price FROM pharmacy_inventory WHERE med_id=? LIMIT 1");
-        $stmt->bind_param("i", $med_id);
-        $stmt->execute();
-        $med = $stmt->get_result()->fetch_assoc();
-
-        if ($med) {
-            $_SESSION['billing_cart'][$patient_id][] = [
-                'cart_key'    => 'ADD-' . $med_id . '-' . time(),
-                'med_id'      => $med['med_id'],
-                'serviceName' => $med['med_name'] . (!empty($med['dosage']) ? ' (' . $med['dosage'] . ')' : ''),
-                'description' => 'Additional — Qty: ' . $qty . ' × ₱' . number_format($med['unit_price'], 2),
-                'price'       => round($med['unit_price'] * $qty, 2),
-                'source'      => 'add',
-            ];
-        }
-    }
-    header("Location: billing_items.php?patient_id=$patient_id");
-    exit;
-}
-
-/* =========================================================
-   DELETE (only manually-added items)
-========================================================= */
-if (isset($_GET['delete'])) {
-    $idx = (int)$_GET['delete'];
-    if (isset($_SESSION['billing_cart'][$patient_id][$idx])
-        && $_SESSION['billing_cart'][$patient_id][$idx]['source'] === 'add') {
-        unset($_SESSION['billing_cart'][$patient_id][$idx]);
-        $_SESSION['billing_cart'][$patient_id] = array_values($_SESSION['billing_cart'][$patient_id]);
-    }
-    header("Location: billing_items.php?patient_id=$patient_id");
-    exit;
-}
-
-/* =========================================================
-   FINALIZE
-========================================================= */
-if (isset($_GET['finalize']) && $_GET['finalize'] == 1) {
-    $subtotal_f = array_sum(array_column($_SESSION['billing_cart'][$patient_id], 'price'));
-    $discount_f = ($is_pwd || $is_senior) ? $subtotal_f * 0.20 : 0;
-    $grand_f    = $subtotal_f - $discount_f;
-    $txn        = 'TXN-' . strtoupper(uniqid());
-
-    $stmt = $conn->prepare("
-        INSERT INTO billing_records (patient_id, billing_date, total_amount, grand_total, status, transaction_id)
-        VALUES (?, NOW(), ?, ?, 'Pending', ?)
-    ");
-    $stmt->bind_param("idds", $patient_id, $subtotal_f, $grand_f, $txn);
-    $stmt->execute();
-    $new_billing_id = $conn->insert_id;
-
-    foreach ($_SESSION['billing_cart'][$patient_id] as $item) {
-        $s = $conn->prepare("
-            INSERT INTO billing_items (billing_id, patient_id, quantity, unit_price, total_price, finalized)
-            VALUES (?, ?, 1, ?, ?, 1)
-        ");
-        $s->bind_param("iidd", $new_billing_id, $patient_id, $item['price'], $item['price']);
-        $s->execute();
-    }
-
-    $up = $conn->prepare("
-        UPDATE pharmacy_prescription
-        SET billing_status = 'billed'
-        WHERE patient_id = ? AND payment_type = 'post_discharged' AND billing_status = 'pending'
-    ");
-    $up->bind_param("i", $patient_id);
-    $up->execute();
-
-    unset($_SESSION['billing_cart'][$patient_id]);
-
-    header("Location: billing_items.php?success=1");
-    exit;
-}
-
-/* =========================================================
-   CART TOTALS
-========================================================= */
-$cart        = $_SESSION['billing_cart'][$patient_id];
-$subtotal    = array_sum(array_column($cart, 'price'));
-$discount    = ($is_pwd || $is_senior) ? $subtotal * 0.20 : 0;
-$grand_total = $subtotal - $discount;
-
-/* =========================================================
-   MEDICINE DROPDOWN — pharmacy_inventory
-   Exclude med_ids already seeded from dispensed RX
-========================================================= */
-$seeded_med_ids = array_unique(array_column(
-    array_filter($cart, fn($c) => $c['source'] === 'rx'),
-    'med_id'
-));
-
-if ($seeded_med_ids) {
-    $ph   = implode(',', array_fill(0, count($seeded_med_ids), '?'));
-    $stmt = $conn->prepare("
-        SELECT med_id, med_name, dosage, unit_price
-        FROM pharmacy_inventory
-        WHERE med_id NOT IN ($ph)
-        ORDER BY med_name ASC
-    ");
-    $stmt->bind_param(str_repeat('i', count($seeded_med_ids)), ...$seeded_med_ids);
-    $stmt->execute();
-    $med_list = $stmt->get_result();
-} else {
-    $med_list = $conn->query("SELECT med_id, med_name, dosage, unit_price FROM pharmacy_inventory ORDER BY med_name ASC");
-}
-$medicines = [];
-while ($m = $med_list->fetch_assoc()) $medicines[] = $m;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Billing Items — <?= htmlspecialchars($patient['fname'].' '.$patient['lname']) ?></title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Patient Billing</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
+<link rel="stylesheet" href="assets/css/billing_sidebar.css">
+<style>
+:root{--sidebar-w:250px;--navy:#0b1d3a;--accent:#2563eb;--ink:#1e293b;--ink-light:#64748b;--border:#e2e8f0;--surface:#f1f5f9;--card:#fff;--radius:14px;--shadow:0 2px 20px rgba(11,29,58,.08);--ff-head:'DM Serif Display',serif;--ff-body:'DM Sans',sans-serif;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
+.cw{margin-left:var(--sidebar-w);padding:48px 28px 60px;transition:margin-left .3s;}
+.cw.sidebar-collapsed{margin-left:0;}
+.page-head{margin-bottom:24px;}
+.page-head h2{font-family:var(--ff-head);font-size:1.7rem;color:var(--navy);}
+.page-head p{font-size:.85rem;color:var(--ink-light);margin-top:4px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.card-header{background:var(--navy);padding:14px 22px;display:flex;align-items:center;gap:10px;}
+.card-header h5{font-family:var(--ff-head);color:#fff;margin:0;font-size:1rem;}
+.tbl{width:100%;border-collapse:collapse;}
+.tbl thead th{background:#f8fafc;color:var(--ink-light);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:11px 18px;border-bottom:2px solid var(--border);text-align:left;}
+.tbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
+.tbl tbody tr:hover{background:#f7faff;}
+.tbl td{padding:13px 18px;vertical-align:middle;font-size:.88rem;}
+.pat-cell{display:flex;align-items:center;gap:10px;}
+.pat-av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--accent));color:#fff;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;flex-shrink:0;}
+.pat-name{font-weight:600;color:var(--navy);}
+.badges{display:flex;gap:5px;flex-wrap:wrap;}
+.bdg{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;font-size:.7rem;font-weight:700;}
+.bdg-lab{background:#d1fae5;color:#065f46;}
+.bdg-dnm{background:#fdf4ff;color:#7e22ce;}
+.bdg-rx{background:#dbeafe;color:#1d4ed8;}
+.btn-bill{display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:.82rem;font-weight:700;font-family:var(--ff-body);text-decoration:none;transition:background .15s;}
+.btn-bill:hover{background:#1d4ed8;color:#fff;}
+.empty-state{text-align:center;padding:56px 16px;color:var(--ink-light);}
+.empty-state i{font-size:2.5rem;display:block;margin-bottom:12px;opacity:.3;}
+@media(max-width:768px){.cw{margin-left:0;padding:52px 14px;}}
+</style>
+</head>
+<body>
+<?php include 'billing_sidebar.php'; ?>
+<div class="cw" id="mainCw">
+    <div class="page-head">
+        <h2>Patient Billing</h2>
+        <p>Patients with completed lab results, procedures, or pending prescriptions.</p>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-people-fill" style="color:rgba(255,255,255,.6);"></i>
+            <h5>Patients Ready for Billing</h5>
+        </div>
+        <div style="overflow-x:auto;">
+        <table class="tbl">
+            <thead><tr><th>Patient</th><th>Services</th><th style="text-align:right;">Action</th></tr></thead>
+            <tbody>
+            <?php if ($patients && $patients->num_rows > 0):
+                while ($row = $patients->fetch_assoc()):
+                    $ini = strtoupper(substr(trim($row['full_name']),0,1));
+            ?>
+            <tr>
+                <td>
+                    <div class="pat-cell">
+                        <div class="pat-av"><?= $ini ?></div>
+                        <span class="pat-name"><?= htmlspecialchars(trim($row['full_name'])) ?></span>
+                    </div>
+                </td>
+                <td>
+                    <div class="badges">
+                        <?php if ($row['lab_count']>0): ?><span class="bdg bdg-lab"><i class="bi bi-eyedropper"></i> <?=$row['lab_count']?> Lab</span><?php endif; ?>
+                        <?php if ($row['dnm_count']>0): ?><span class="bdg bdg-dnm"><i class="bi bi-clipboard2-pulse"></i> <?=$row['dnm_count']?> Procedure</span><?php endif; ?>
+                        <?php if ($row['rx_count']>0):  ?><span class="bdg bdg-rx"><i class="bi bi-capsule"></i> <?=$row['rx_count']?> Rx</span><?php endif; ?>
+                    </div>
+                </td>
+                <td style="text-align:right;">
+                    <a href="billing_items.php?patient_id=<?=$row['patient_id']?>" class="btn-bill">
+                        <i class="bi bi-receipt"></i> Create Bill
+                    </a>
+                </td>
+            </tr>
+            <?php endwhile; else: ?>
+            <tr><td colspan="3"><div class="empty-state"><i class="bi bi-inbox"></i>No patients with pending billing items.</div></td></tr>
+            <?php endif; ?>
+            </tbody>
+        </table>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+    const sb=document.getElementById('mySidebar'),cw=document.getElementById('mainCw');
+    if(!sb||!cw)return;
+    function sync(){cw.classList.toggle('sidebar-collapsed',sb.classList.contains('closed'));}
+    new MutationObserver(sync).observe(sb,{attributes:true,attributeFilter:['class']});
+    document.getElementById('sidebarToggle')?.addEventListener('click',()=>requestAnimationFrame(sync));
+    sync();
+})();
+</script>
+</body></html>
+<?php exit; }
+
+/* =========================================================
+   LOAD PATIENT
+========================================================= */
+$stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id=?");
+$stmt->bind_param("i",$patient_id);
+$stmt->execute();
+$patient = $stmt->get_result()->fetch_assoc();
+if (!$patient) die("Patient not found.");
+
+/* AGE / SENIOR */
+$age = 0; $dob_display = '—';
+if (!empty($patient['dob']) && $patient['dob'] !== '0000-00-00') {
+    $dobObj      = new DateTime($patient['dob']);
+    $age         = (new DateTime())->diff($dobObj)->y;
+    $dob_display = $dobObj->format('F d, Y');
+}
+$is_senior = $age >= 60;
+
+/* PWD TOGGLE */
+if (isset($_GET['toggle_pwd'])) {
+    $_SESSION['is_pwd'][$patient_id] = (int)$_GET['toggle_pwd'];
+    header("Location: billing_items.php?patient_id=$patient_id"); exit;
+}
+$is_pwd = $_SESSION['is_pwd'][$patient_id] ?? (int)($patient['is_pwd'] ?? 0);
+
+/* EXISTING UNPAID BILL */
+$stmt = $conn->prepare("SELECT billing_id,status,grand_total FROM billing_records WHERE patient_id=? AND status NOT IN ('Paid') ORDER BY billing_id DESC LIMIT 1");
+$stmt->bind_param("i",$patient_id);
+$stmt->execute();
+$existing_bill = $stmt->get_result()->fetch_assoc();
+
+/* =========================================================
+   INITIALIZE SESSION CART
+========================================================= */
+if (!isset($_SESSION['billing_cart'][$patient_id])) {
+    $_SESSION['billing_cart'][$patient_id] = [];
+
+    /* ── 1. dl_results ──────────────────────────────────────
+       FIXED: Match dl_services by serviceName directly from dl_results.result
+       since dl_schedule may not have a serviceID column.
+    ────────────────────────────────────────────────────── */
+    $stmt = $conn->prepare("
+        SELECT
+            dr.resultID,
+            dr.resultDate,
+            COALESCE(svc.serviceName, dr.result, 'Laboratory Service') AS serviceName,
+            COALESCE(svc.price, 0) AS price
+        FROM dl_results dr
+        LEFT JOIN dl_services svc ON svc.serviceName = dr.result
+        WHERE dr.patientID = ?
+          AND dr.status    = 'Completed'
+        ORDER BY dr.resultDate ASC
+    ");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $_SESSION['billing_cart'][$patient_id][] = [
+            'cart_key'    => 'LAB-'.$row['resultID'],
+            'ref_id'      => $row['resultID'],
+            'med_id'      => null,
+            'serviceName' => $row['serviceName'],
+            'description' => 'Lab Result — '.date('M d, Y', strtotime($row['resultDate'])),
+            'price'       => (float)$row['price'],
+            'source'      => 'lab',
+            'category'    => 'laboratory',
+        ];
+    }
+
+    /* ── 2. dnm_records ─────────────────────────────────────
+       Try linking via duty_assignments if table exists, otherwise skip gracefully.
+    ────────────────────────────────────────────────────── */
+    $dnm_query = "
+        SELECT
+            dnmr.record_id,
+            dnmr.procedure_name,
+            dnmr.amount,
+            dnmr.created_at
+        FROM dnm_records dnmr
+        WHERE dnmr.duty_id IN (
+            SELECT da.duty_id
+            FROM dl_results dr
+            JOIN dl_schedule ds ON ds.scheduleID = dr.scheduleID
+            JOIN duty_assignments da ON da.appointment_id = ds.scheduleID
+            WHERE dr.patientID = ?
+        )
+        ORDER BY dnmr.created_at ASC
+    ";
+    $stmt = @$conn->prepare($dnm_query);
+    if ($stmt) {
+        $stmt->bind_param("i", $patient_id);
+        $stmt->execute();
+        foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+            $_SESSION['billing_cart'][$patient_id][] = [
+                'cart_key'    => 'DNM-'.$row['record_id'],
+                'ref_id'      => $row['record_id'],
+                'med_id'      => null,
+                'serviceName' => $row['procedure_name'],
+                'description' => 'Procedure — '.date('M d, Y', strtotime($row['created_at'])),
+                'price'       => (float)$row['amount'],
+                'source'      => 'dnm',
+                'category'    => 'service',
+            ];
+        }
+    }
+
+    /* ── 3. pharmacy_prescription_items ─────────────────────*/
+    $stmt = $conn->prepare("
+        SELECT
+            ppi.item_id,
+            ppi.med_id,
+            ppi.dosage              AS rx_dosage,
+            ppi.frequency,
+            ppi.quantity_dispensed,
+            ppi.unit_price,
+            ppi.total_price,
+            pi2.med_name,
+            pi2.dosage              AS inv_dosage
+        FROM pharmacy_prescription pp
+        JOIN pharmacy_prescription_items ppi ON ppi.prescription_id = pp.prescription_id
+        JOIN pharmacy_inventory          pi2 ON pi2.med_id          = ppi.med_id
+        WHERE pp.patient_id     = ?
+          AND pp.payment_type   = 'post_discharged'
+          AND pp.status         = 'Dispensed'
+          AND pp.billing_status = 'pending'
+        ORDER BY ppi.item_id ASC
+    ");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $dose = trim(($row['rx_dosage'] ?? $row['inv_dosage'] ?? '').' '.($row['frequency'] ?? ''));
+        $_SESSION['billing_cart'][$patient_id][] = [
+            'cart_key'    => 'RX-'.$row['item_id'],
+            'ref_id'      => $row['item_id'],
+            'med_id'      => $row['med_id'],
+            'serviceName' => $row['med_name'].($dose ? ' ('.$dose.')' : ''),
+            'description' => 'Dispensed — Qty: '.$row['quantity_dispensed'].' × ₱'.number_format($row['unit_price'],2),
+            'price'       => (float)$row['total_price'],
+            'source'      => 'rx',
+            'category'    => 'medicine',
+        ];
+    }
+}
+
+/* =========================================================
+   ADD EXTRA LABORATORY SERVICE (from dl_services)
+========================================================= */
+if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_lab'])) {
+    $svc_id = (int)$_POST['lab_service_id'];
+    $qty    = max(1,(int)($_POST['lab_qty'] ?? 1));
+    if ($svc_id > 0) {
+        $stmt = $conn->prepare("SELECT serviceID,serviceName,price FROM dl_services WHERE serviceID=? LIMIT 1");
+        $stmt->bind_param("i",$svc_id);
+        $stmt->execute();
+        $svc = $stmt->get_result()->fetch_assoc();
+        if ($svc) {
+            $_SESSION['billing_cart'][$patient_id][] = [
+                'cart_key'    => 'XLAB-'.$svc_id.'-'.time(),
+                'ref_id'      => $svc_id,
+                'med_id'      => null,
+                'serviceName' => $svc['serviceName'],
+                'description' => 'Added Lab Service'.($qty>1?' × '.$qty:'').' — ₱'.number_format($svc['price'],2).'/unit',
+                'price'       => round($svc['price']*$qty,2),
+                'source'      => 'add_lab',
+                'category'    => 'laboratory',
+            ];
+        }
+    }
+    header("Location: billing_items.php?patient_id=$patient_id"); exit;
+}
+
+/* =========================================================
+   ADD EXTRA SERVICE (manual, from dnm_procedure_list)
+========================================================= */
+if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_service'])) {
+    $proc_id = (int)$_POST['procedure_id'];
+    $qty     = max(1,(int)($_POST['svc_qty'] ?? 1));
+    if ($proc_id > 0) {
+        $stmt = $conn->prepare("SELECT procedure_id,procedure_name,price FROM dnm_procedure_list WHERE procedure_id=? AND status='Active' LIMIT 1");
+        $stmt->bind_param("i",$proc_id);
+        $stmt->execute();
+        $proc = $stmt->get_result()->fetch_assoc();
+        if ($proc) {
+            $_SESSION['billing_cart'][$patient_id][] = [
+                'cart_key'    => 'XSVC-'.$proc_id.'-'.time(),
+                'ref_id'      => $proc_id,
+                'med_id'      => null,
+                'serviceName' => $proc['procedure_name'],
+                'description' => 'Added'.($qty>1?' × '.$qty:'').' — ₱'.number_format($proc['price'],2).'/unit',
+                'price'       => round($proc['price']*$qty,2),
+                'source'      => 'add_svc',
+                'category'    => 'service',
+            ];
+        }
+    }
+    header("Location: billing_items.php?patient_id=$patient_id"); exit;
+}
+
+/* =========================================================
+   ADD EXTRA MEDICINE (manual, from pharmacy_inventory)
+========================================================= */
+if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_medicine'])) {
+    $med_id = (int)$_POST['med_id'];
+    $qty    = max(1,(int)($_POST['qty'] ?? 1));
+    if ($med_id > 0) {
+        $stmt = $conn->prepare("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory WHERE med_id=? LIMIT 1");
+        $stmt->bind_param("i",$med_id);
+        $stmt->execute();
+        $med = $stmt->get_result()->fetch_assoc();
+        if ($med) {
+            $_SESSION['billing_cart'][$patient_id][] = [
+                'cart_key'    => 'XMED-'.$med_id.'-'.time(),
+                'ref_id'      => $med_id,
+                'med_id'      => $med['med_id'],
+                'serviceName' => $med['med_name'].(!empty($med['dosage'])?' ('.$med['dosage'].')':''),
+                'description' => 'Added Medicine — Qty: '.$qty.' × ₱'.number_format($med['unit_price'],2),
+                'price'       => round($med['unit_price']*$qty,2),
+                'source'      => 'add_med',
+                'category'    => 'medicine',
+            ];
+        }
+    }
+    header("Location: billing_items.php?patient_id=$patient_id"); exit;
+}
+
+/* =========================================================
+   DELETE — only add_svc / add_med / add_lab
+========================================================= */
+if (isset($_GET['delete'])) {
+    $idx = (int)$_GET['delete'];
+    if (isset($_SESSION['billing_cart'][$patient_id][$idx])
+        && in_array($_SESSION['billing_cart'][$patient_id][$idx]['source'],['add_svc','add_med','add_lab'])) {
+        unset($_SESSION['billing_cart'][$patient_id][$idx]);
+        $_SESSION['billing_cart'][$patient_id] = array_values($_SESSION['billing_cart'][$patient_id]);
+    }
+    header("Location: billing_items.php?patient_id=$patient_id"); exit;
+}
+
+/* RESET CART */
+if (isset($_GET['reset_cart'])) {
+    unset($_SESSION['billing_cart'][$patient_id]);
+    header("Location: billing_items.php?patient_id=$patient_id"); exit;
+}
+
+/* =========================================================
+   FINALIZE
+   billing_records columns: patient_id, billing_date, total_amount,
+   grand_total, status, transaction_id  (NO total_discount column)
+   Discount is stored in patient_receipt.total_discount
+========================================================= */
+if (isset($_GET['finalize']) && $_GET['finalize']==1) {
+    $cart_f     = $_SESSION['billing_cart'][$patient_id];
+    $subtotal_f = array_sum(array_column($cart_f,'price'));
+    $discount_f = ($is_pwd||$is_senior) ? round($subtotal_f*0.20,2) : 0.00;
+    $grand_f    = round($subtotal_f - $discount_f, 2);
+    $txn        = 'TXN-'.strtoupper(uniqid());
+
+    /* ── billing_records (no total_discount column) ── */
+    if ($existing_bill) {
+        $billing_id = $existing_bill['billing_id'];
+        $s = $conn->prepare("
+            UPDATE billing_records
+            SET total_amount=?, grand_total=?, status='Pending', transaction_id=?
+            WHERE billing_id=?
+        ");
+        $s->bind_param("ddsi", $subtotal_f, $grand_f, $txn, $billing_id);
+        $s->execute();
+        $d = $conn->prepare("DELETE FROM billing_items WHERE billing_id=?");
+        $d->bind_param("i", $billing_id);
+        $d->execute();
+    } else {
+        $s = $conn->prepare("
+            INSERT INTO billing_records
+                (patient_id, billing_date, total_amount, grand_total, status, transaction_id)
+            VALUES (?, NOW(), ?, ?, 'Pending', ?)
+        ");
+        $s->bind_param("idds", $patient_id, $subtotal_f, $grand_f, $txn);
+        $s->execute();
+        $billing_id = $conn->insert_id;
+    }
+
+    /* ── billing_items ── */
+    foreach ($cart_f as $item) {
+        $s = $conn->prepare("
+            INSERT INTO billing_items (billing_id, patient_id, quantity, unit_price, total_price, finalized)
+            VALUES (?, ?, 1, ?, ?, 1)
+        ");
+        $s->bind_param("iidd", $billing_id, $patient_id, $item['price'], $item['price']);
+        $s->execute();
+    }
+
+    /* ── patient_receipt — upsert discount & totals ── */
+    $pwd_flag = ($is_pwd || $is_senior) ? 1 : 0;
+    $chk = $conn->prepare("SELECT receipt_id FROM patient_receipt WHERE billing_id=? LIMIT 1");
+    $chk->bind_param("i", $billing_id);
+    $chk->execute();
+    $existing_receipt = $chk->get_result()->fetch_assoc();
+
+    if ($existing_receipt) {
+        $r = $conn->prepare("
+            UPDATE patient_receipt
+            SET total_charges=?, total_discount=?, grand_total=?,
+                total_out_of_pocket=?, status='Pending', transaction_id=?, is_pwd=?
+            WHERE billing_id=?
+        ");
+        $r->bind_param("ddddsii", $subtotal_f, $discount_f, $grand_f, $grand_f, $txn, $pwd_flag, $billing_id);
+        $r->execute();
+    } else {
+        $r = $conn->prepare("
+            INSERT INTO patient_receipt
+                (patient_id, billing_id, total_charges, total_vat, total_discount,
+                 total_out_of_pocket, grand_total, status, transaction_id, is_pwd)
+            VALUES (?, ?, ?, 0, ?, ?, ?, 'Pending', ?, ?)
+        ");
+        $r->bind_param("iiddddsi", $patient_id, $billing_id, $subtotal_f, $discount_f, $grand_f, $grand_f, $txn, $pwd_flag);
+        $r->execute();
+    }
+
+    /* ── mark pharmacy prescriptions as billed ── */
+    $u = $conn->prepare("
+        UPDATE pharmacy_prescription
+        SET billing_status='billed'
+        WHERE patient_id=? AND payment_type='post_discharged' AND billing_status='pending'
+    ");
+    $u->bind_param("i", $patient_id);
+    $u->execute();
+
+    unset($_SESSION['billing_cart'][$patient_id]);
+    header("Location: patient_billing.php?patient_id=$patient_id"); exit;
+}
+
+/* =========================================================
+   CART TOTALS & GROUPING
+========================================================= */
+$cart        = $_SESSION['billing_cart'][$patient_id];
+$subtotal    = array_sum(array_column($cart,'price'));
+$discount    = ($is_pwd||$is_senior) ? $subtotal*0.20 : 0;
+$grand_total = $subtotal - $discount;
+
+$cat_services   = array_values(array_filter($cart, fn($c)=>$c['category']==='service'));
+$cat_laboratory = array_values(array_filter($cart, fn($c)=>$c['category']==='laboratory'));
+$cat_medicines  = array_values(array_filter($cart, fn($c)=>$c['category']==='medicine'));
+
+$svc_total = array_sum(array_column($cat_services,  'price'));
+$lab_total = array_sum(array_column($cat_laboratory,'price'));
+$med_total = array_sum(array_column($cat_medicines, 'price'));
+
+/* =========================================================
+   DROPDOWNS
+========================================================= */
+// Lab services
+$lab_svc_res = $conn->query("SELECT serviceID,serviceName,price FROM dl_services ORDER BY serviceName");
+$lab_services = [];
+while ($ls = $lab_svc_res->fetch_assoc()) $lab_services[] = $ls;
+
+// Procedures
+$proc_res   = $conn->query("SELECT procedure_id,procedure_name,price FROM dnm_procedure_list WHERE status='Active' ORDER BY procedure_name");
+$procedures = [];
+while ($p = $proc_res->fetch_assoc()) $procedures[] = $p;
+
+// Medicines
+$seeded_ids = array_unique(array_filter(array_column($cart,'med_id')));
+if ($seeded_ids) {
+    $ph   = implode(',',array_fill(0,count($seeded_ids),'?'));
+    $stmt = $conn->prepare("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory WHERE med_id NOT IN ($ph) ORDER BY med_name");
+    $stmt->bind_param(str_repeat('i',count($seeded_ids)),...$seeded_ids);
+    $stmt->execute();
+    $med_res = $stmt->get_result();
+} else {
+    $med_res = $conn->query("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory ORDER BY med_name");
+}
+$medicines = [];
+while ($m = $med_res->fetch_assoc()) $medicines[] = $m;
+
+/* Patient helpers */
+$full_name  = trim($patient['fname'].' '.($patient['mname']??'').' '.$patient['lname']);
+$gender     = ucfirst($patient['gender'] ?? '—');
+$contact    = $patient['contact_no'] ?? $patient['phone'] ?? '—';
+$address    = $patient['address'] ?? '—';
+$patient_no = $patient['patient_no'] ?? $patient['patient_id'];
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>Patient Bill — <?= htmlspecialchars($full_name) ?></title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
 <link rel="stylesheet" href="assets/css/billing_sidebar.css">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
 <style>
-:root {
-    --sidebar-w:  250px;
-    --navy:       #0b1d3a;
-    --accent:     #2563eb;
-    --success:    #059669;
-    --danger:     #dc2626;
-    --ink:        #1e293b;
-    --ink-light:  #64748b;
-    --border:     #e2e8f0;
-    --surface:    #f1f5f9;
-    --card:       #ffffff;
-    --radius:     14px;
-    --shadow:     0 2px 20px rgba(11,29,58,.08);
-    --ff-head:    'DM Serif Display', serif;
-    --ff-body:    'DM Sans', sans-serif;
+:root{
+    --sidebar-w:250px;--navy:#0b1d3a;--accent:#2563eb;
+    --success:#059669;--danger:#dc2626;
+    --ink:#1e293b;--ink-light:#64748b;--border:#e2e8f0;
+    --surface:#f1f5f9;--card:#fff;--radius:14px;
+    --shadow:0 2px 20px rgba(11,29,58,.08);
+    --ff-head:'DM Serif Display',serif;--ff-body:'DM Sans',sans-serif;
+    --c-lab:#065f46;--bg-lab:#d1fae5;
+    --c-svc:#7e22ce;--bg-svc:#fdf4ff;
+    --c-rx:#1d4ed8;--bg-rx:#dbeafe;
 }
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--ff-body); background: var(--surface); color: var(--ink); }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
+.cw{margin-left:var(--sidebar-w);padding:44px 28px 80px;transition:margin-left .3s;}
+.cw.sidebar-collapsed{margin-left:0;}
 
-.cw { margin-left: var(--sidebar-w); padding: 48px 28px 80px; transition: margin-left .3s; }
-.cw.sidebar-collapsed { margin-left: 0; }
+/* Page header */
+.page-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.head-icon{width:50px;height:50px;background:linear-gradient(135deg,var(--navy),var(--accent));border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;box-shadow:0 6px 18px rgba(11,29,58,.2);flex-shrink:0;}
+.page-head h2{font-family:var(--ff-head);font-size:clamp(1.2rem,2.5vw,1.7rem);color:var(--navy);margin:0;}
+.page-head p{font-size:.82rem;color:var(--ink-light);margin-top:3px;}
 
-/* ── Page Header ── */
-.page-head { display:flex; align-items:center; gap:14px; margin-bottom:26px; }
-.head-icon { width:52px; height:52px; background:linear-gradient(135deg,var(--navy),var(--accent)); border-radius:13px; display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.4rem; box-shadow:0 6px 18px rgba(11,29,58,.2); flex-shrink:0; }
-.page-head h2 { font-family:var(--ff-head); font-size:clamp(1.2rem,2.5vw,1.75rem); color:var(--navy); margin:0; }
-.page-head p  { font-size:.82rem; color:var(--ink-light); margin-top:3px; }
+/* Patient card */
+.pat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+.pat-head{background:linear-gradient(135deg,var(--navy),#1e3a6e);padding:16px 22px;display:flex;align-items:center;gap:14px;}
+.pat-av{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.18);border:2.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-family:var(--ff-head);font-size:1.35rem;color:#fff;flex-shrink:0;}
+.pat-fullname{font-family:var(--ff-head);font-size:1.1rem;color:#fff;}
+.pat-pid{font-size:.74rem;color:rgba(255,255,255,.6);margin-top:3px;}
+.pat-chips{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:4px 12px;font-size:.71rem;font-weight:700;white-space:nowrap;}
+.chip-sc{background:#dbeafe;color:#1d4ed8;}
+.chip-pwd{background:#d1fae5;color:#065f46;}
+.chip-g{background:rgba(255,255,255,.15);color:#fff;}
+.pat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
+.pat-gi{padding:12px 22px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+.pat-gi:last-child{border-right:none;}
+.gi-lbl{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-light);display:flex;align-items:center;gap:4px;margin-bottom:3px;}
+.gi-val{font-size:.9rem;font-weight:600;color:var(--navy);}
 
-/* ── Alert ── */
-.alert-ok { background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:13px 18px; display:flex; align-items:center; gap:10px; font-weight:600; color:var(--success); margin-bottom:20px; }
+/* Banners */
+.alert-ok{background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-weight:600;color:var(--success);margin-bottom:16px;}
+.bill-banner{display:flex;align-items:center;gap:10px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:12px 18px;margin-bottom:16px;font-size:.87rem;font-weight:600;color:#92400e;flex-wrap:wrap;}
+.bb-acts{margin-left:auto;display:flex;gap:7px;}
+.bb-acts a{display:inline-flex;align-items:center;gap:4px;background:#fff;color:#92400e;border:1.5px solid #fde68a;border-radius:7px;padding:4px 12px;font-size:.77rem;font-weight:700;text-decoration:none;}
+.bb-acts a:hover{background:#fef3c7;}
 
-/* ── Card ── */
-.bcard { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; margin-bottom:22px; }
-.bcard-head { background:var(--navy); padding:13px 20px; display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.8); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.7px; }
-.bcard-body { padding:20px; }
+/* Discount */
+.disc-bar{display:flex;align-items:center;gap:10px;padding:11px 16px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;margin-bottom:16px;font-size:.87rem;color:#065f46;font-weight:600;}
+.disc-bar.sc{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
+.disc-bar input{width:17px;height:17px;accent-color:var(--success);cursor:pointer;flex-shrink:0;}
+.d-badge{margin-left:auto;border-radius:999px;padding:3px 11px;font-size:.71rem;font-weight:700;color:#fff;background:#059669;}
 
-/* ── PWD Toggle ── */
-.discount-toggle { display:flex; align-items:center; gap:10px; padding:12px 16px; background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:10px; margin-bottom:20px; font-size:.88rem; color:#065f46; font-weight:600; }
-.discount-toggle.senior { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
-.discount-toggle input[type="checkbox"] { width:18px; height:18px; accent-color:var(--success); cursor:pointer; flex-shrink:0; }
-.d-badge { margin-left:auto; border-radius:999px; padding:3px 12px; font-size:.72rem; font-weight:700; color:#fff; background:#059669; }
+/* ── TWO-COLUMN LAYOUT — left=panel, right=table ── */
+.billing-layout{display:grid;grid-template-columns:400px 1fr;gap:22px;align-items:start;}
+.billing-left{}
+.billing-right{}
 
-/* ── Add Medicine Form ── */
-.add-form { display:grid; grid-template-columns:1fr 100px auto; gap:10px; align-items:end; }
-.add-form label { font-size:.74rem; font-weight:700; color:var(--ink-light); text-transform:uppercase; letter-spacing:.5px; display:block; margin-bottom:5px; }
-.add-form select,
-.add-form input[type="number"] { width:100%; padding:9px 13px; border:1.5px solid var(--border); border-radius:9px; font-family:var(--ff-body); font-size:.88rem; color:var(--ink); background:var(--card); outline:none; transition:border-color .2s,box-shadow .2s; }
-.add-form select:focus,
-.add-form input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.1); }
-.btn-add { padding:9px 20px; background:var(--accent); color:#fff; border:none; border-radius:9px; font-family:var(--ff-body); font-size:.88rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; transition:background .15s,transform .1s; height:40px; }
-.btn-add:hover { background:#1d4ed8; transform:translateY(-1px); }
+/* Bill table */
+.bcard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+.bcard-head{padding:11px 20px;display:flex;align-items:center;gap:8px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.88);}
+.h-bill{background:linear-gradient(90deg,var(--navy),#1e40af);}
+.h-svc{background:#5b21b6;}
+.h-med{background:var(--navy);}
+.h-lab{background:#047857;}
+.bcard-body{padding:18px;}
 
-/* ── Items Table ── */
-.itbl { width:100%; border-collapse:collapse; font-size:.88rem; }
-.itbl thead th { background:#f8fafc; color:var(--ink-light); font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; padding:11px 16px; border-bottom:2px solid var(--border); text-align:left; white-space:nowrap; }
-.itbl thead th.r { text-align:right; }
-.itbl thead th.c { text-align:center; }
-.itbl tbody tr { border-bottom:1px solid var(--border); transition:background .12s; }
-.itbl tbody tr:last-child { border-bottom:none; }
-.itbl tbody tr:hover { background:#f7faff; }
-.itbl td { padding:12px 16px; vertical-align:middle; }
-.itbl td.r { text-align:right; font-weight:600; color:var(--success); }
-.itbl td.c { text-align:center; }
+/* Add cards */
+.add-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px;}
+.add-card:last-of-type{margin-bottom:0;}
+.add-card-header{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--border);}
+.add-card-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;}
+.add-card-lab .add-card-icon{background:#d1fae5;color:#047857;}
+.add-card-svc .add-card-icon{background:#ede9fe;color:#6d28d9;}
+.add-card-med .add-card-icon{background:#dbeafe;color:#1d4ed8;}
+.add-card-lab .add-card-header{background:#f0fdf8;}
+.add-card-svc .add-card-header{background:#faf5ff;}
+.add-card-med .add-card-header{background:#eff6ff;}
+.add-card-title{font-weight:700;font-size:.88rem;color:var(--navy);line-height:1.2;}
+.add-card-sub{font-size:.69rem;color:var(--ink-light);margin-top:1px;}
+.add-card-body{padding:14px 18px;}
 
-.med-name { font-weight:600; color:var(--navy); }
-.med-desc { font-size:.75rem; color:var(--ink-light); margin-top:2px; }
+/* Add form fields */
+.af-field{margin-bottom:10px;}
+.af-label{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.55px;color:var(--ink-light);display:block;margin-bottom:5px;}
+.af-select{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:var(--ff-body);font-size:.85rem;color:var(--ink);background:var(--card);outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;transition:border-color .2s,box-shadow .2s;cursor:pointer;}
+.af-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+.add-card-lab .af-select:focus{border-color:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.1);}
+.add-card-svc .af-select:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.1);}
 
-.tag { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:999px; font-size:.68rem; font-weight:700; margin-right:4px; }
-.tag-rx  { background:#dbeafe; color:#1d4ed8; }
-.tag-add { background:#fef9c3; color:#854d0e; }
+/* Add buttons */
+.af-btn{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:10px 16px;border:none;border-radius:9px;font-family:var(--ff-body);font-size:.87rem;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.2px;}
+.af-btn-lab{background:#059669;color:#fff;box-shadow:0 3px 10px rgba(5,150,105,.25);}
+.af-btn-lab:hover{background:#047857;transform:translateY(-1px);}
+.af-btn-svc{background:#7c3aed;color:#fff;box-shadow:0 3px 10px rgba(124,58,237,.25);}
+.af-btn-svc:hover{background:#6d28d9;transform:translateY(-1px);}
+.af-btn-med{background:var(--accent);color:#fff;box-shadow:0 3px 10px rgba(37,99,235,.25);}
+.af-btn-med:hover{background:#1d4ed8;transform:translateY(-1px);}
 
-.btn-del { background:#fff1f2; color:var(--danger); border:1.5px solid #fecdd3; border-radius:7px; padding:5px 12px; font-size:.78rem; font-weight:700; font-family:var(--ff-body); cursor:pointer; display:inline-flex; align-items:center; gap:4px; text-decoration:none; transition:all .15s; }
-.btn-del:hover { background:var(--danger); color:#fff; border-color:var(--danger); }
-.lock-icon { color:var(--ink-light); font-size:.85rem; }
+/* ── BILL FOOTER ── */
+.bill-footer{border-top:2px solid var(--border);background:#fafbfc;}
 
-.empty-state { text-align:center; padding:40px 16px; color:var(--ink-light); }
-.empty-state i { font-size:2rem; display:block; margin-bottom:8px; opacity:.3; }
+/* Totals block */
+.bf-totals-block{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
+.bf-line{display:flex;justify-content:space-between;align-items:center;}
+.bf-lbl{font-size:.88rem;color:var(--ink-light);font-weight:500;}
+.bf-amount{font-size:.95rem;font-weight:700;color:var(--ink);}
+.bf-disc-line .bf-lbl{color:var(--danger);font-size:.84rem;}
+.bf-disc-line .bf-amount{color:var(--danger);font-weight:700;}
+.bf-divider{border:none;border-top:1.5px dashed var(--border);margin:4px 0;}
+.bf-grand-line{margin-top:2px;}
+.bf-grand-lbl{font-size:1.05rem;font-weight:800;color:var(--navy);}
+.bf-grand-amt{font-size:1.25rem;font-weight:800;color:var(--success);}
 
-/* ── Totals ── */
-.totals-panel { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px 26px; margin-bottom:22px; }
-.t-row { display:flex; justify-content:space-between; align-items:center; padding:9px 0; font-size:.9rem; border-bottom:1px solid var(--border); gap:12px; }
-.t-row:last-child { border-bottom:none; }
-.t-lbl { color:var(--ink-light); font-weight:500; }
-.t-val { font-weight:600; }
-.t-row.grand .t-lbl { font-size:1rem; font-weight:700; color:var(--navy); }
-.t-row.grand .t-val { font-size:1.2rem; font-weight:700; color:var(--navy); }
-.disc-val { color:var(--danger)!important; }
+/* Actions row */
+.bf-actions{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:14px 20px;gap:12px;}
+.bf-act-left{display:flex;justify-content:flex-start;}
+.bf-act-center{display:flex;justify-content:center;}
+.bf-act-right{display:flex;justify-content:flex-end;gap:8px;}
+.bf-empty-note{color:var(--ink-light);font-size:.82rem;font-style:italic;}
 
-/* ── Actions ── */
-.actions-bar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
-.btn-back { padding:10px 22px; background:var(--card); color:var(--ink-light); border:1.5px solid var(--border); border-radius:9px; font-family:var(--ff-body); font-size:.88rem; font-weight:600; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:all .15s; }
-.btn-back:hover { border-color:var(--accent); color:var(--accent); background:#eff6ff; }
-.btn-finalize { padding:10px 28px; background:var(--success); color:#fff; border:none; border-radius:9px; font-family:var(--ff-body); font-size:.88rem; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background .15s,transform .1s; box-shadow:0 4px 14px rgba(5,150,105,.3); }
-.btn-finalize:hover { background:#047857; transform:translateY(-1px); }
+.bf-btn-finalize{display:inline-flex;align-items:center;gap:8px;padding:11px 28px;background:var(--success);color:#fff;border:none;border-radius:10px;font-family:var(--ff-head);font-size:.95rem;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(5,150,105,.3);transition:all .15s;white-space:nowrap;}
+.bf-btn-finalize:hover{background:#047857;transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,.35);}
+.bf-btn-back{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
+.bf-btn-back:hover{border-color:var(--accent);color:var(--accent);background:#eff6ff;}
+.bf-btn-reload{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
+.bf-btn-reload:hover{border-color:var(--danger);color:var(--danger);}
+.bf-btn-view{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:#fffbeb;color:#92400e;border:1.5px solid #fde68a;border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
+.bf-btn-view:hover{background:#fef3c7;}
 
-/* ── Mobile ── */
-.itbl-mobile { display:none; }
-.m-card { background:var(--card); border:1px solid var(--border); border-radius:11px; padding:14px; margin-bottom:10px; box-shadow:0 1px 6px rgba(11,29,58,.06); }
-.m-top  { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px; }
-.m-price { font-weight:700; color:var(--success); white-space:nowrap; }
-.m-desc  { font-size:.76rem; color:var(--ink-light); margin-bottom:10px; }
+@media(max-width:640px){.bf-actions{grid-template-columns:1fr 1fr;}.bf-act-center{grid-column:1/-1;order:-1;}.bf-btn-finalize{width:100%;justify-content:center;}}
+.af-qty-row{display:flex;align-items:flex-end;gap:10px;}
+.qty-stepper{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:9px;overflow:hidden;height:38px;}
+.qty-btn{width:36px;height:100%;background:#f8fafc;border:none;color:var(--ink);font-size:1.1rem;font-weight:700;cursor:pointer;flex-shrink:0;transition:background .12s;}
+.qty-btn:hover{background:#e2e8f0;}
+.qty-input{width:54px;height:100%;border:none;border-left:1.5px solid var(--border);border-right:1.5px solid var(--border);text-align:center;font-family:var(--ff-body);font-size:.9rem;font-weight:700;color:var(--navy);outline:none;}
+.qty-input::-webkit-inner-spin-button,.qty-input::-webkit-outer-spin-button{-webkit-appearance:none;}
 
-@media(max-width:900px){ .add-form{ grid-template-columns:1fr 80px auto; } }
-@media(max-width:768px){
-    .cw{ margin-left:200px; padding:56px 14px 60px; }
-    .itbl{ display:none; }
-    .itbl-mobile{ display:block; }
-    .add-form{ grid-template-columns:1fr 70px; }
-    .add-form .btn-wrap{ grid-column:1/-1; }
-    .btn-add{ width:100%; justify-content:center; }
-}
-@media(max-width:480px){
-    .cw{ margin-left:0!important; padding:52px 10px 60px; }
-    .actions-bar{ flex-direction:column-reverse; }
-    .btn-back,.btn-finalize{ width:100%; justify-content:center; }
-}
-@supports(padding:env(safe-area-inset-bottom)){
-    .cw{ padding-bottom:calc(60px + env(safe-area-inset-bottom)); }
-}
+.af-empty{color:var(--ink-light);font-size:.84rem;font-style:italic;text-align:center;padding:10px 0;}
+
+/* Breakdown rows in totals */
+.t-breakdown-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:9px;margin-bottom:5px;opacity:.45;transition:opacity .2s;}
+.t-breakdown-row.active{opacity:1;background:#f8fafc;}
+.t-bd-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+.t-breakdown-row.active .t-bd-icon.svc{background:#ede9fe;color:#6d28d9;}
+.t-breakdown-row.active .t-bd-icon.lab{background:#d1fae5;color:#047857;}
+.t-breakdown-row.active .t-bd-icon.med{background:#dbeafe;color:#1d4ed8;}
+.t-bd-icon.svc{background:#f1f1f1;color:#aaa;}
+.t-bd-icon.lab{background:#f1f1f1;color:#aaa;}
+.t-bd-icon.med{background:#f1f1f1;color:#aaa;}
+.t-bd-info{flex:1;min-width:0;}
+.t-bd-label{font-size:.84rem;font-weight:600;color:var(--navy);display:block;}
+.t-bd-count{font-size:.68rem;color:var(--ink-light);}
+.t-bd-amt{font-size:.9rem;font-weight:700;color:var(--navy);white-space:nowrap;}
+
+/* Bill table */
+.itbl{width:100%;border-collapse:collapse;font-size:.85rem;}
+.itbl thead th{background:#f8fafc;color:var(--ink-light);font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:9px 14px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;}
+.itbl thead th.r{text-align:right;}.itbl thead th.c{text-align:center;}
+.itbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
+.itbl tbody tr:last-child{border-bottom:none;}
+.itbl tbody tr:hover:not(.sec-row){background:#f7faff;}
+.itbl td{padding:10px 14px;vertical-align:middle;}
+.itbl td.r{text-align:right;font-weight:600;color:var(--success);}
+.itbl td.c{text-align:center;}
+.sec-row td{padding:7px 14px;font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;border-top:2px solid var(--border);border-bottom:1px solid var(--border);}
+.sec-row.s-svc td{color:var(--c-svc);background:#fdf4ff;}
+.sec-row.s-lab td{color:var(--c-lab);background:#f0fdf9;}
+.sec-row.s-med td{color:var(--c-rx);background:#eff6ff;}
+.sec-total{float:right;font-weight:800;}
+.r-lab{border-left:3px solid #6ee7b7;}
+.r-dnm{border-left:3px solid #c4b5fd;}
+.r-xsvc{border-left:3px solid #fb923c;}
+.r-rx{border-left:3px solid #93c5fd;}
+.r-xmed{border-left:3px solid #fda4af;}
+.r-xlab{border-left:3px solid #34d399;}
+.item-name{font-weight:600;color:var(--navy);font-size:.87rem;}
+.item-desc{font-size:.72rem;color:var(--ink-light);margin-top:2px;}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;font-size:.6rem;font-weight:700;margin-right:3px;white-space:nowrap;}
+.tag-lab{background:var(--bg-lab);color:var(--c-lab);}
+.tag-dnm{background:var(--bg-svc);color:var(--c-svc);}
+.tag-xsvc{background:#ffedd5;color:#c2410c;}
+.tag-rx{background:var(--bg-rx);color:var(--c-rx);}
+.tag-xmed{background:#fce7f3;color:#9d174d;}
+.tag-xlab{background:#d1fae5;color:#065f46;}
+.btn-del{background:#fff1f2;color:var(--danger);border:1.5px solid #fecdd3;border-radius:7px;padding:3px 9px;font-size:.72rem;font-weight:700;font-family:var(--ff-body);cursor:pointer;display:inline-flex;align-items:center;gap:3px;text-decoration:none;transition:all .15s;}
+.btn-del:hover{background:var(--danger);color:#fff;border-color:var(--danger);}
+.lock-i{color:var(--ink-light);font-size:.82rem;}
+.empty-row td{text-align:center;padding:28px;color:var(--ink-light);font-style:italic;font-size:.84rem;}
+
+/* ── TOTALS PANEL (sticky right column) ── */
+.totals-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;position:sticky;top:20px;}
+.totals-header{background:linear-gradient(135deg,var(--navy),#1e40af);padding:14px 20px;display:flex;align-items:center;gap:8px;}
+.totals-header h5{font-family:var(--ff-head);color:#fff;margin:0;font-size:1rem;}
+.totals-body{padding:20px;}
+
+.t-section{margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);}
+.t-section:last-of-type{border-bottom:none;margin-bottom:0;}
+.t-section-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink-light);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.t-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:.87rem;gap:8px;}
+.t-lbl{color:var(--ink-light);font-weight:500;}
+.t-val{font-weight:600;color:var(--ink);}
+.t-sub-row{display:flex;justify-content:space-between;padding:3px 0 3px 12px;font-size:.8rem;}
+.t-sub-lbl{color:var(--ink-light);}
+.t-sub-val{font-weight:500;}
+.t-divider{border:none;border-top:2px solid var(--border);margin:12px 0;}
+.t-grand-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f0fdf4;border-radius:10px;margin-top:10px;}
+.t-grand-lbl{font-size:1rem;font-weight:700;color:var(--navy);}
+.t-grand-val{font-size:1.3rem;font-weight:700;color:var(--success);}
+.t-discount-row{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#fff7f7;border-radius:8px;margin-bottom:8px;font-size:.86rem;}
+.t-discount-lbl{color:var(--danger);font-weight:600;}
+.t-discount-val{color:var(--danger);font-weight:700;}
+.t-zero{color:var(--ink-light);font-style:italic;font-size:.8rem;text-align:center;padding:8px 0;}
+
+/* Finalize button in panel */
+.btn-finalize-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:8px;padding:12px;background:var(--success);color:#fff;border:none;border-radius:10px;font-family:var(--ff-head);font-size:1rem;cursor:pointer;margin-top:14px;transition:background .15s,transform .1s;box-shadow:0 4px 14px rgba(5,150,105,.3);}
+.btn-finalize-panel:hover{background:#047857;transform:translateY(-1px);}
+.btn-viewbill-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:9px;background:#fffbeb;color:#92400e;border:1.5px solid #fde68a;border-radius:10px;font-family:var(--ff-body);font-size:.87rem;font-weight:700;text-decoration:none;margin-top:8px;transition:all .15s;}
+.btn-viewbill-panel:hover{background:#fef3c7;}
+.btn-reset-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:7px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:10px;font-family:var(--ff-body);font-size:.82rem;font-weight:600;text-decoration:none;margin-top:6px;transition:all .15s;}
+.btn-reset-panel:hover{border-color:var(--danger);color:var(--danger);}
+
+/* Item count badge */
+.item-count{background:rgba(255,255,255,.2);border-radius:999px;padding:2px 9px;font-size:.68rem;margin-left:auto;}
+
+/* Actions bottom */
+.actions-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;}
+.btn-back{padding:10px 20px;background:var(--card);color:var(--ink-light);border:1.5px solid var(--border);border-radius:9px;font-family:var(--ff-body);font-size:.87rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
+.btn-back:hover{border-color:var(--accent);color:var(--accent);background:#eff6ff;}
+
+/* Accordion-style add panels */
+.add-section{margin-bottom:12px;}
+.add-section:last-child{margin-bottom:0;}
+.add-sect-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-light);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+
+@media(max-width:1100px){.billing-layout{grid-template-columns:360px 1fr;}}
+@media(max-width:900px){.billing-layout{grid-template-columns:1fr;}.totals-panel{position:static;}.af-qty-row{flex-direction:column;}.af-btn{width:100%;}}
+@media(max-width:768px){.cw{margin-left:0;padding:52px 14px 60px;}.pat-chips{display:none;}}
+@media(max-width:480px){.cw{padding:48px 10px 60px;}.actions-bar{flex-direction:column-reverse;}.btn-back{width:100%;justify-content:center;}.pat-grid{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
-
 <?php include 'billing_sidebar.php'; ?>
-
 <div class="cw" id="mainCw">
 
-    <?php if (isset($_GET['success'])): ?>
-    <div class="alert-ok">
-        <i class="bi bi-check-circle-fill" style="font-size:1.3rem;"></i>
-        Billing finalized successfully!
-    </div>
-    <?php endif; ?>
+<?php if (isset($_GET['success'])): ?>
+<div class="alert-ok"><i class="bi bi-check-circle-fill" style="font-size:1.3rem;"></i> Billing finalized successfully!</div>
+<?php endif; ?>
 
-    <!-- Page Header -->
-    <div class="page-head">
-        <div class="head-icon"><i class="bi bi-receipt-cutoff"></i></div>
-        <div>
-            <h2>Billing Items</h2>
-            <p><?= htmlspecialchars(trim($patient['fname'].' '.$patient['lname'])) ?>
-               &mdash; Post-Discharged Prescription Billing</p>
-        </div>
-    </div>
-
-    <!-- PWD / Senior -->
-    <?php if ($is_senior): ?>
-    <div class="discount-toggle senior">
-        <i class="bi bi-person-check-fill" style="font-size:1.1rem;"></i>
-        Senior Citizen (60+) — 20% discount applied automatically
-        <span class="d-badge" style="background:#1d4ed8;">SC Discount</span>
-    </div>
-    <?php else: ?>
-    <div class="discount-toggle">
-        <input type="checkbox" id="pwdChk" <?= $is_pwd ? 'checked' : '' ?>
-               onchange="window.location='billing_items.php?patient_id=<?= $patient_id ?>&toggle_pwd='+(this.checked?1:0)">
-        <label for="pwdChk" style="cursor:pointer;">Mark as PWD (applies 20% discount)</label>
-        <?php if ($is_pwd): ?><span class="d-badge">PWD Active</span><?php endif; ?>
-    </div>
-    <?php endif; ?>
-
-    <!-- Add Extra Medicine -->
-    <div class="bcard">
-        <div class="bcard-head">
-            <i class="bi bi-plus-circle-fill"></i>
-            Add Extra Medicine from Inventory
-        </div>
-        <div class="bcard-body">
-            <?php if ($medicines): ?>
-            <form method="POST" class="add-form">
-                <div>
-                    <label>Medicine</label>
-                    <select name="med_id" required>
-                        <option value="">— Select medicine from inventory —</option>
-                        <?php foreach ($medicines as $m): ?>
-                        <option value="<?= $m['med_id'] ?>">
-                            <?= htmlspecialchars($m['med_name']) ?>
-                            <?= !empty($m['dosage']) ? '(' . htmlspecialchars($m['dosage']) . ')' : '' ?>
-                            — ₱<?= number_format($m['unit_price'], 2) ?>/unit
-                        </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label>Qty</label>
-                    <input type="number" name="qty" value="1" min="1" max="999">
-                </div>
-                <div class="btn-wrap" style="margin-top:20px;">
-                    <button type="submit" name="add_medicine" class="btn-add">
-                        <i class="bi bi-plus-lg"></i> Add
-                    </button>
-                </div>
-            </form>
-            <?php else: ?>
-            <p style="color:var(--ink-light);font-size:.88rem;">No additional medicines available in inventory.</p>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Items -->
-    <div class="bcard">
-        <div class="bcard-head">
-            <i class="bi bi-list-check"></i>
-            Medicines to Bill
-            <span style="margin-left:auto;font-weight:400;opacity:.7;"><?= count($cart) ?> item<?= count($cart)!==1?'s':'' ?></span>
-        </div>
-        <div class="bcard-body" style="padding:0;">
-
-            <!-- Desktop Table -->
-            <div style="overflow-x:auto;">
-                <table class="itbl">
-                    <thead>
-                        <tr>
-                            <th>Medicine</th>
-                            <th>Details</th>
-                            <th class="r">Amount</th>
-                            <th class="c">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php if (empty($cart)): ?>
-                        <tr><td colspan="4"><div class="empty-state"><i class="bi bi-inbox"></i>No medicines added yet.</div></td></tr>
-                    <?php else:
-                        foreach ($cart as $idx => $item): ?>
-                        <tr>
-                            <td>
-                                <?php if ($item['source']==='rx'): ?>
-                                    <span class="tag tag-rx"><i class="bi bi-capsule"></i> Dispensed</span>
-                                <?php else: ?>
-                                    <span class="tag tag-add"><i class="bi bi-plus-circle"></i> Added</span>
-                                <?php endif; ?>
-                                <span class="med-name"><?= htmlspecialchars($item['serviceName']) ?></span>
-                            </td>
-                            <td><span class="med-desc"><?= htmlspecialchars($item['description']) ?></span></td>
-                            <td class="r">₱<?= number_format($item['price'], 2) ?></td>
-                            <td class="c">
-                                <?php if ($item['source']==='add'): ?>
-                                <a href="billing_items.php?patient_id=<?= $patient_id ?>&delete=<?= $idx ?>"
-                                   class="btn-del" onclick="return confirm('Remove this item?')">
-                                    <i class="bi bi-trash"></i> Remove
-                                </a>
-                                <?php else: ?>
-                                <i class="bi bi-lock-fill lock-icon" title="Dispensed — cannot remove"></i>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Mobile Cards -->
-            <div class="itbl-mobile" style="padding:14px;">
-                <?php if (empty($cart)): ?>
-                <div class="empty-state"><i class="bi bi-inbox"></i>No medicines added yet.</div>
-                <?php else: foreach ($cart as $idx => $item): ?>
-                <div class="m-card">
-                    <div class="m-top">
-                        <div>
-                            <?php if ($item['source']==='rx'): ?>
-                                <span class="tag tag-rx"><i class="bi bi-capsule"></i> Dispensed</span>
-                            <?php else: ?>
-                                <span class="tag tag-add"><i class="bi bi-plus-circle"></i> Added</span>
-                            <?php endif; ?>
-                            <span class="med-name"><?= htmlspecialchars($item['serviceName']) ?></span>
-                        </div>
-                        <span class="m-price">₱<?= number_format($item['price'],2) ?></span>
-                    </div>
-                    <div class="m-desc"><?= htmlspecialchars($item['description']) ?></div>
-                    <?php if ($item['source']==='add'): ?>
-                    <a href="billing_items.php?patient_id=<?= $patient_id ?>&delete=<?= $idx ?>"
-                       class="btn-del" onclick="return confirm('Remove this item?')"
-                       style="width:100%;justify-content:center;">
-                        <i class="bi bi-trash"></i> Remove
-                    </a>
-                    <?php else: ?>
-                    <span style="font-size:.75rem;color:var(--ink-light);">
-                        <i class="bi bi-lock-fill"></i> Dispensed item — locked
-                    </span>
-                    <?php endif; ?>
-                </div>
-                <?php endforeach; endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- Totals -->
-    <div class="totals-panel">
-        <div class="t-row">
-            <span class="t-lbl">Subtotal</span>
-            <span class="t-val">₱<?= number_format($subtotal, 2) ?></span>
-        </div>
-        <?php if ($discount > 0): ?>
-        <div class="t-row">
-            <span class="t-lbl"><?= $is_senior ? 'Senior Citizen' : 'PWD' ?> Discount (20%)</span>
-            <span class="t-val disc-val">−₱<?= number_format($discount, 2) ?></span>
-        </div>
-        <?php endif; ?>
-        <div class="t-row grand">
-            <span class="t-lbl">Grand Total</span>
-            <span class="t-val">₱<?= number_format($grand_total, 2) ?></span>
-        </div>
-    </div>
-
-    <!-- Actions -->
-    <div class="actions-bar">
-        <a href="billing_items.php" class="btn-back"><i class="bi bi-arrow-left"></i> Back</a>
-        <?php if (!empty($cart)): ?>
-        <button class="btn-finalize" onclick="confirmFinalize()">
-            <i class="bi bi-check-circle-fill"></i> Finalize Billing
-        </button>
-        <?php endif; ?>
-    </div>
-
+<div class="page-head">
+    <div class="head-icon"><i class="bi bi-receipt-cutoff"></i></div>
+    <div><h2>Patient Bill</h2><p>Lab Results, Procedures &amp; Medicines</p></div>
 </div>
 
+<!-- Patient Info -->
+<div class="pat-card">
+    <div class="pat-head">
+        <div class="pat-av"><?= strtoupper(substr(trim($patient['fname']),0,1)) ?></div>
+        <div>
+            <div class="pat-fullname"><?= htmlspecialchars($full_name) ?></div>
+            <div class="pat-pid">Patient ID #<?= htmlspecialchars($patient_no) ?></div>
+        </div>
+        <div class="pat-chips">
+            <?php if ($is_senior): ?><span class="chip chip-sc"><i class="bi bi-person-check-fill"></i> Senior</span><?php endif; ?>
+            <?php if ($is_pwd):    ?><span class="chip chip-pwd"><i class="bi bi-accessibility"></i> PWD</span><?php endif; ?>
+            <span class="chip chip-g"><i class="bi bi-<?= strtolower($gender)==='female'?'gender-female':'gender-male' ?>"></i> <?= htmlspecialchars($gender) ?></span>
+        </div>
+    </div>
+    <div class="pat-grid">
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-cake2"></i> Date of Birth</div><div class="gi-val"><?= htmlspecialchars($dob_display) ?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-hourglass-split"></i> Age</div><div class="gi-val"><?= $age>0?$age.' yrs old':'—' ?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-gender-ambiguous"></i> Gender</div><div class="gi-val"><?= htmlspecialchars($gender) ?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-telephone"></i> Contact</div><div class="gi-val"><?= htmlspecialchars($contact) ?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-geo-alt"></i> Address</div><div class="gi-val"><?= htmlspecialchars($address) ?></div></div>
+    </div>
+</div>
+
+<?php if ($existing_bill): ?>
+<div class="bill-banner">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    Existing <strong><?=$existing_bill['status']?></strong> bill (ID #<?=$existing_bill['billing_id']?> — ₱<?=number_format($existing_bill['grand_total'],2)?>). Finalizing will <strong>update</strong> it.
+    <div class="bb-acts">
+        <a href="patient_billing.php?patient_id=<?=$patient_id?>"><i class="bi bi-eye"></i> View</a>
+        <a href="billing_items.php?patient_id=<?=$patient_id?>&reset_cart=1"><i class="bi bi-arrow-clockwise"></i> Reload</a>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($is_senior): ?>
+<div class="disc-bar sc"><i class="bi bi-person-check-fill" style="font-size:1.1rem;"></i> Senior Citizen (60+) — 20% discount applied automatically<span class="d-badge" style="background:#1d4ed8;">SC Discount</span></div>
+<?php else: ?>
+<div class="disc-bar">
+    <input type="checkbox" id="pwdChk" <?=$is_pwd?'checked':''?> onchange="window.location='billing_items.php?patient_id=<?=$patient_id?>&toggle_pwd='+(this.checked?1:0)">
+    <label for="pwdChk" style="cursor:pointer;">Mark as PWD (applies 20% discount)</label>
+    <?php if ($is_pwd): ?><span class="d-badge">PWD Active</span><?php endif; ?>
+</div>
+<?php endif; ?>
+
+<!-- ══════════════════════════════════════════════════
+     TWO-COLUMN LAYOUT  |  LEFT = Summary + Add Panels  |  RIGHT = Bill Table
+══════════════════════════════════════════════════ -->
+<div class="billing-layout">
+
+    <!-- ════════════════════════════════
+         LEFT COLUMN — Summary & Add Items
+    ════════════════════════════════ -->
+    <div class="billing-left">
+
+
+
+        <!-- ADD LABORATORY SERVICE -->
+        <div class="add-card add-card-lab">
+            <div class="add-card-header">
+                <div class="add-card-icon"><i class="bi bi-eyedropper-fill"></i></div>
+                <div>
+                    <div class="add-card-title">Add Laboratory Service</div>
+                    <div class="add-card-sub">From dl_services catalog</div>
+                </div>
+            </div>
+            <div class="add-card-body">
+                <?php if ($lab_services): ?>
+                <form method="POST">
+                    <div class="af-field">
+                        <label class="af-label">Select Lab Service</label>
+                        <select name="lab_service_id" class="af-select" required>
+                            <option value="">— Choose a service —</option>
+                            <?php foreach ($lab_services as $ls): ?>
+                            <option value="<?=$ls['serviceID']?>">
+                                <?=htmlspecialchars($ls['serviceName'])?> — ₱<?=number_format($ls['price'],2)?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" name="add_lab" class="af-btn af-btn-lab">
+                        <i class="bi bi-plus-circle-fill"></i> Add to Bill
+                    </button>
+                </form>
+                <?php else: ?>
+                <div class="af-empty"><i class="bi bi-info-circle"></i> No lab services found.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- ADD EXTRA PROCEDURE -->
+        <div class="add-card add-card-svc">
+            <div class="add-card-header">
+                <div class="add-card-icon"><i class="bi bi-clipboard2-plus-fill"></i></div>
+                <div>
+                    <div class="add-card-title">Add Procedure / Service</div>
+                    <div class="add-card-sub">From active procedure list</div>
+                </div>
+            </div>
+            <div class="add-card-body">
+                <?php if ($procedures): ?>
+                <form method="POST">
+                    <div class="af-field">
+                        <label class="af-label">Select Procedure</label>
+                        <select name="procedure_id" class="af-select" required>
+                            <option value="">— Choose a procedure —</option>
+                            <?php foreach ($procedures as $p): ?>
+                            <option value="<?=$p['procedure_id']?>">
+                                <?=htmlspecialchars($p['procedure_name'])?> — ₱<?=number_format($p['price'],2)?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" name="add_service" class="af-btn af-btn-svc">
+                        <i class="bi bi-plus-circle-fill"></i> Add to Bill
+                    </button>
+                </form>
+                <?php else: ?>
+                <div class="af-empty"><i class="bi bi-info-circle"></i> No active procedures found.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- ADD EXTRA MEDICINE -->
+        <div class="add-card add-card-med">
+            <div class="add-card-header">
+                <div class="add-card-icon"><i class="bi bi-capsule-fill"></i></div>
+                <div>
+                    <div class="add-card-title">Add Medicine</div>
+                    <div class="add-card-sub">From pharmacy inventory</div>
+                </div>
+            </div>
+            <div class="add-card-body">
+                <?php if ($medicines): ?>
+                <form method="POST">
+                    <div class="af-field">
+                        <label class="af-label">Select Medicine</label>
+                        <select name="med_id" class="af-select" required>
+                            <option value="">— Choose a medicine —</option>
+                            <?php foreach ($medicines as $m): ?>
+                            <option value="<?=$m['med_id']?>">
+                                <?=htmlspecialchars($m['med_name'])?><?=!empty($m['dosage'])?' ('.$m['dosage'].')':''?> — ₱<?=number_format($m['unit_price'],2)?>/unit
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="af-qty-row">
+                        <div class="af-field" style="flex:1;">
+                            <label class="af-label">Quantity</label>
+                            <div class="qty-stepper">
+                                <button type="button" class="qty-btn" onclick="stepQty(this,-1)">−</button>
+                                <input type="number" name="qty" value="1" min="1" max="999" class="qty-input" id="medQtyInput">
+                                <button type="button" class="qty-btn" onclick="stepQty(this,1)">+</button>
+                            </div>
+                        </div>
+                        <button type="submit" name="add_medicine" class="af-btn af-btn-med" style="align-self:flex-end;">
+                            <i class="bi bi-plus-circle-fill"></i> Add to Bill
+                        </button>
+                    </div>
+                </form>
+                <?php else: ?>
+                <div class="af-empty"><i class="bi bi-info-circle"></i> No medicines available.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+    </div><!-- /.billing-left -->
+
+
+    <!-- ════════════════════════════════
+         RIGHT COLUMN — Bill Table
+    ════════════════════════════════ -->
+    <div class="billing-right">
+        <div class="bcard">
+            <div class="bcard-head h-bill">
+                <i class="bi bi-clipboard2-check-fill"></i> Patient Bill
+                <span class="item-count"><?=count($cart)?> item<?=count($cart)!==1?'s':''?></span>
+            </div>
+            <div style="overflow-x:auto;">
+            <table class="itbl">
+                <thead>
+                    <tr>
+                        <th>Item / Service</th>
+                        <th>Details</th>
+                        <th class="r">Amount</th>
+                        <th class="c">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($cart)): ?>
+                <tr><td colspan="4" class="empty-row"><i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:.3;"></i>No billing items found for this patient.</td></tr>
+                <?php endif; ?>
+
+                <!-- SERVICES (DNM + added) -->
+                <?php if (!empty($cat_services)): ?>
+                <tr class="sec-row s-svc">
+                    <td colspan="4">
+                        <i class="bi bi-clipboard2-pulse-fill"></i> Doctor / Nurse Procedures
+                        <span class="sec-total">₱<?=number_format($svc_total,2)?></span>
+                    </td>
+                </tr>
+                <?php foreach ($cart as $idx => $item):
+                    if ($item['category']!=='service') continue;
+                    $is_x = $item['source']==='add_svc'; ?>
+                <tr class="<?=$is_x?'r-xsvc':'r-dnm'?>">
+                    <td>
+                        <span class="tag <?=$is_x?'tag-xsvc':'tag-dnm'?>">
+                            <i class="bi <?=$is_x?'bi-plus-circle':'bi-clipboard2-pulse'?>"></i>
+                            <?=$is_x?'Added':'Procedure'?>
+                        </span>
+                        <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
+                    </td>
+                    <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
+                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="c">
+                        <?php if ($is_x): ?>
+                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
+                        <?php else: ?><i class="bi bi-lock-fill lock-i" title="Auto-loaded"></i><?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; endif; ?>
+
+                <!-- LAB RESULTS -->
+                <?php if (!empty($cat_laboratory)): ?>
+                <tr class="sec-row s-lab">
+                    <td colspan="4">
+                        <i class="bi bi-eyedropper-fill"></i> Laboratory Results
+                        <span class="sec-total">₱<?=number_format($lab_total,2)?></span>
+                    </td>
+                </tr>
+                <?php foreach ($cart as $idx => $item):
+                    if ($item['category']!=='laboratory') continue;
+                    $is_x = $item['source']==='add_lab'; ?>
+                <tr class="<?=$is_x?'r-xlab':'r-lab'?>">
+                    <td>
+                        <span class="tag <?=$is_x?'tag-xlab':'tag-lab'?>">
+                            <i class="bi <?=$is_x?'bi-plus-circle':'bi-eyedropper'?>"></i>
+                            <?=$is_x?'Added':'Lab'?>
+                        </span>
+                        <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
+                    </td>
+                    <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
+                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="c">
+                        <?php if ($is_x): ?>
+                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
+                        <?php else: ?><i class="bi bi-lock-fill lock-i" title="Auto-loaded"></i><?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; endif; ?>
+
+                <!-- MEDICINES -->
+                <?php if (!empty($cat_medicines)): ?>
+                <tr class="sec-row s-med">
+                    <td colspan="4">
+                        <i class="bi bi-capsule-pill"></i> Medicines
+                        <span class="sec-total">₱<?=number_format($med_total,2)?></span>
+                    </td>
+                </tr>
+                <?php foreach ($cart as $idx => $item):
+                    if ($item['category']!=='medicine') continue;
+                    $is_x = $item['source']==='add_med'; ?>
+                <tr class="<?=$is_x?'r-xmed':'r-rx'?>">
+                    <td>
+                        <span class="tag <?=$is_x?'tag-xmed':'tag-rx'?>">
+                            <i class="bi <?=$is_x?'bi-plus-circle':'bi-capsule'?>"></i>
+                            <?=$is_x?'Added':'Dispensed'?>
+                        </span>
+                        <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
+                    </td>
+                    <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
+                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="c">
+                        <?php if ($is_x): ?>
+                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
+                        <?php else: ?><i class="bi bi-lock-fill lock-i" title="Dispensed — locked"></i><?php endif; ?>
+                    </td>
+                </tr>
+                <?php endforeach; endif; ?>
+
+                </tbody>
+            </table>
+            </div>
+
+            <!-- ── BILL FOOTER: Totals + Finalize ── -->
+            <div class="bill-footer">
+
+                <!-- Row 1: Subtotal / Discount / Grand Total -->
+                <div class="bf-totals-block">
+                    <div class="bf-line">
+                        <span class="bf-lbl">Subtotal</span>
+                        <span class="bf-amount">₱<?=number_format($subtotal,2)?></span>
+                    </div>
+                    <?php if ($discount > 0): ?>
+                    <div class="bf-line bf-disc-line">
+                        <span class="bf-lbl"><i class="bi bi-tag-fill"></i> <?=$is_senior?'Senior Citizen':'PWD'?> Discount (20%)</span>
+                        <span class="bf-amount">−₱<?=number_format($discount,2)?></span>
+                    </div>
+                    <?php endif; ?>
+                    <div class="bf-divider"></div>
+                    <div class="bf-line bf-grand-line">
+                        <span class="bf-grand-lbl">Grand Total</span>
+                        <span class="bf-grand-amt">₱<?=number_format($grand_total,2)?></span>
+                    </div>
+                </div>
+
+                <!-- Row 2: Action buttons — Back left, Finalize center, Reload right -->
+                <div class="bf-actions">
+                    <div class="bf-act-left">
+                        <a href="billing_items.php" class="bf-btn-back"><i class="bi bi-arrow-left"></i> Back</a>
+                    </div>
+                    <div class="bf-act-center">
+                        <?php if (!empty($cart)): ?>
+                        <button class="bf-btn-finalize" onclick="confirmFinalize()">
+                            <i class="bi bi-check-circle-fill"></i>
+                            <?=$existing_bill?'Update &amp; Finalize':'Finalize Billing'?>
+                        </button>
+                        <?php else: ?>
+                        <span class="bf-empty-note"><i class="bi bi-inbox"></i> No items to finalize</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="bf-act-right">
+                        <?php if ($existing_bill): ?>
+                        <a href="patient_billing.php?patient_id=<?=$patient_id?>" class="bf-btn-view"><i class="bi bi-eye"></i> View</a>
+                        <?php endif; ?>
+                        <a href="billing_items.php?patient_id=<?=$patient_id?>&reset_cart=1" class="bf-btn-reload" onclick="return confirm('Reload all items from database?')"><i class="bi bi-arrow-clockwise"></i> Reload</a>
+                    </div>
+                </div>
+
+            </div>
+
+        </div><!-- /.bcard -->
+    </div><!-- /.billing-right -->
+
+</div><!-- /.billing-layout -->
+
+</div>
 <script>
-function confirmFinalize() {
+function stepQty(btn, delta) {
+    const input = btn.parentElement.querySelector('.qty-input');
+    let v = parseInt(input.value)||1;
+    v = Math.max(1, Math.min(999, v + delta));
+    input.value = v;
+}
+function confirmFinalize(){
     Swal.fire({
-        title: 'Finalize Billing?',
-        html: `Grand Total: <strong>₱<?= number_format($grand_total, 2) ?></strong><br>
-               <small style="color:#64748b;">Prescriptions will be marked as billed. This cannot be undone.</small>`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#059669',
-        cancelButtonColor:  '#64748b',
-        confirmButtonText:  'Yes, Finalize',
-        cancelButtonText:   'Cancel'
-    }).then(r => {
-        if (r.isConfirmed)
-            window.location.href = 'billing_items.php?patient_id=<?= $patient_id ?>&finalize=1';
-    });
+        title:'<?=$existing_bill?"Update Bill?":"Finalize Bill?"?>',
+        html:`<div style="text-align:left;font-size:.9rem;line-height:2;">
+            <?php if(!empty($cat_services)):?><div>🩺 Procedures: <strong>₱<?=number_format($svc_total,2)?></strong></div><?php endif;?>
+            <?php if(!empty($cat_laboratory)):?><div>🧪 Laboratory: <strong>₱<?=number_format($lab_total,2)?></strong></div><?php endif;?>
+            <?php if(!empty($cat_medicines)):?><div>💊 Medicines: <strong>₱<?=number_format($med_total,2)?></strong></div><?php endif;?>
+            <hr style="margin:8px 0;border-color:#e2e8f0;">
+            <?php if($discount>0):?><div style="color:#dc2626;">🏷 Discount (<?=$is_senior?'Senior':'PWD'?>): −₱<?=number_format($discount,2)?></div><?php endif;?>
+            <div style="font-weight:700;font-size:1.05rem;margin-top:4px;">Grand Total: ₱<?=number_format($grand_total,2)?></div>
+            <small style="color:#64748b;"><?=$existing_bill?"This will update the existing bill.":"This cannot be undone."?></small>
+        </div>`,
+        icon:'question',showCancelButton:true,
+        confirmButtonColor:'#059669',cancelButtonColor:'#64748b',
+        confirmButtonText:'<?=$existing_bill?"Yes, Update":"Yes, Finalize"?>',cancelButtonText:'Cancel'
+    }).then(r=>{if(r.isConfirmed)window.location.href='billing_items.php?patient_id=<?=$patient_id?>&finalize=1';});
 }
 (function(){
-    const sb = document.getElementById('mySidebar');
-    const cw = document.getElementById('mainCw');
-    if(!sb||!cw) return;
-    function sync(){ cw.classList.toggle('sidebar-collapsed', sb.classList.contains('closed')); }
+    const sb=document.getElementById('mySidebar'),cw=document.getElementById('mainCw');
+    if(!sb||!cw)return;
+    function sync(){cw.classList.toggle('sidebar-collapsed',sb.classList.contains('closed'));}
     new MutationObserver(sync).observe(sb,{attributes:true,attributeFilter:['class']});
     document.getElementById('sidebarToggle')?.addEventListener('click',()=>requestAnimationFrame(sync));
     sync();

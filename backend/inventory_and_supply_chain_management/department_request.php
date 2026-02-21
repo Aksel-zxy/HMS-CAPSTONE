@@ -6,7 +6,10 @@ include '../../SQL/config.php';
 =====================================================*/
 if (isset($_POST['action'])) {
 
-    $request_id = $_POST['id'];
+    $request_id = (int)$_POST['id'];
+
+    // Allowed ENUM values (must match DB exactly)
+    $allowedStatuses = ['Pending','Approved','Rejected','Purchased','Receiving','Completed'];
 
     $stmt = $pdo->prepare("SELECT * FROM department_request WHERE id=? LIMIT 1");
     $stmt->execute([$request_id]);
@@ -17,20 +20,24 @@ if (isset($_POST['action'])) {
         exit;
     }
 
+    $currentStatus = $request['status'];
+
     $stmtItems = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
     $stmtItems->execute([$request_id]);
     $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
 
     /* ================= APPROVE ================= */
-    if ($_POST['action'] === 'approve' && strcasecmp(trim($request['status']), 'Pending') === 0) {
+    if ($_POST['action'] === 'approve' && $currentStatus === 'Pending') {
 
         $approved_quantities = $_POST['approved_quantity'] ?? [];
 
         foreach ($items as $item) {
             $idx      = $item['id'];
             $approved = isset($approved_quantities[$idx]) ? (int)$approved_quantities[$idx] : 0;
+
             if ($approved < 0) $approved = 0;
             if ($approved > $item['quantity']) $approved = $item['quantity'];
+
             $stmtUpdate = $pdo->prepare("UPDATE department_request_items SET approved_quantity=? WHERE id=?");
             $stmtUpdate->execute([$approved, $idx]);
         }
@@ -44,23 +51,25 @@ if (isset($_POST['action'])) {
             exit;
         }
 
-        $stmtUpdateRequest = $pdo->prepare("UPDATE department_request SET status='Approved', total_approved_items=? WHERE id=?");
-        $stmtUpdateRequest->execute([$totalApproved, $request_id]);
+        $stmtUpdateRequest = $pdo->prepare("UPDATE department_request SET status=?, total_approved_items=? WHERE id=?");
+        $stmtUpdateRequest->execute(['Approved', $totalApproved, $request_id]);
 
         header("Location: department_request.php?status=Approved&success=approved");
         exit;
     }
 
     /* ================= REJECT ================= */
-    if ($_POST['action'] === 'reject' && strcasecmp(trim($request['status']), 'Pending') === 0) {
-        $stmt = $pdo->prepare("UPDATE department_request SET status='Rejected' WHERE id=?");
-        $stmt->execute([$request_id]);
+    if ($_POST['action'] === 'reject' && $currentStatus === 'Pending') {
+
+        $stmt = $pdo->prepare("UPDATE department_request SET status=? WHERE id=?");
+        $stmt->execute(['Rejected', $request_id]);
+
         header("Location: department_request.php?status=Rejected&success=rejected");
         exit;
     }
 
     /* ================= PURCHASE ================= */
-    if ($_POST['action'] === 'purchase' && strcasecmp(trim($request['status']), 'Approved') === 0) {
+    if ($_POST['action'] === 'purchase' && $currentStatus === 'Approved') {
 
         $stmtCheck = $pdo->prepare("SELECT SUM(approved_quantity) FROM department_request_items WHERE request_id=?");
         $stmtCheck->execute([$request_id]);
@@ -77,73 +86,43 @@ if (isset($_POST['action'])) {
         $payment_type    = $_POST['payment_type'] ?? 'Direct';
 
         foreach ($items as $item) {
+
             $item_id      = $item['id'];
             $approved_qty = $item['approved_quantity'] ?? 0;
             if ($approved_qty <= 0) continue;
 
-            $unit_type   = strtolower($units[$item_id]       ?? $item['unit']        ?? 'pcs');
+            $unit_type   = $units[$item_id]       ?? $item['unit']        ?? 'pcs';
             $pcs_per_box = intval($pcs_per_box_arr[$item_id] ?? $item['pcs_per_box'] ?? 1);
-            $price       = floatval($prices[$item_id]        ?? $item['price']       ?? 0);
+            $price       = floatval($prices[$item_id] ?? 0);
             $total_price = $price * $approved_qty;
 
-            $stmtUpdatePrice = $pdo->prepare("UPDATE department_request_items SET price=?, total_price=?, unit=?, pcs_per_box=? WHERE id=?");
-            $stmtUpdatePrice->execute([$price, $total_price, ucfirst($unit_type), $pcs_per_box, $item_id]);
+            $stmtUpdatePrice = $pdo->prepare("
+                UPDATE department_request_items 
+                SET price=?, total_price=?, unit=?, pcs_per_box=? 
+                WHERE id=?
+            ");
+            $stmtUpdatePrice->execute([
+                $price,
+                $total_price,
+                ucfirst(strtolower($unit_type)),
+                $pcs_per_box,
+                $item_id
+            ]);
         }
 
-        $stmt = $pdo->prepare("UPDATE department_request SET status='Purchased', purchased_at=NOW(), payment_type=? WHERE id=?");
-        $stmt->execute([$payment_type, $request_id]);
+        $stmt = $pdo->prepare("
+            UPDATE department_request 
+            SET status=?, purchased_at=NOW(), payment_type=? 
+            WHERE id=?
+        ");
+        $stmt->execute(['Purchased', $payment_type, $request_id]);
 
         header("Location: department_request.php?status=Purchased&success=purchased");
         exit;
     }
 
-    // Fallback: stay on same status tab
-    header("Location: department_request.php?status=" . urlencode($request['status']));
+    header("Location: department_request.php?status=" . urlencode($currentStatus));
     exit;
-}
-
-/* =====================================================
-   FETCH REQUESTS
-=====================================================*/
-$statusFilter   = $_GET['status'] ?? 'Pending';
-$searchDept     = $_GET['search_dept'] ?? '';
-$errorMessage   = '';
-$successMessage = '';
-
-if (isset($_GET['error'])) {
-    if ($_GET['error'] === 'no_approved')          $errorMessage = "You must approve at least one quantity before approving.";
-    if ($_GET['error'] === 'no_approved_purchase') $errorMessage = "Cannot purchase because no approved quantity is set.";
-}
-if (isset($_GET['success'])) {
-    if ($_GET['success'] === 'approved')  $successMessage = "Request has been approved successfully.";
-    if ($_GET['success'] === 'rejected')  $successMessage = "Request has been rejected.";
-    if ($_GET['success'] === 'purchased') $successMessage = "Purchase confirmed! The request is now waiting for delivery.";
-}
-
-$query  = "SELECT * FROM department_request WHERE 1=1";
-$params = [];
-
-if ($statusFilter && $statusFilter !== 'All') {
-    $query   .= " AND LOWER(TRIM(status)) = ?";
-    $params[] = strtolower(trim($statusFilter));
-}
-if ($searchDept) {
-    $query   .= " AND department LIKE ?";
-    $params[] = "%$searchDept%";
-}
-$query .= " ORDER BY created_at DESC";
-
-$stmt = $pdo->prepare($query);
-$stmt->execute($params);
-$requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Count per status for stat cards
-$statuses = ['Pending','Approved','Purchased','Receiving','Completed','Rejected'];
-$counts   = [];
-foreach ($statuses as $s) {
-    $sc = $pdo->prepare("SELECT COUNT(*) FROM department_request WHERE LOWER(TRIM(status))=?");
-    $sc->execute([strtolower($s)]);
-    $counts[$s] = $sc->fetchColumn();
 }
 ?>
 <!DOCTYPE html>
