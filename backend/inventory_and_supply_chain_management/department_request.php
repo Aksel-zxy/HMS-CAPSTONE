@@ -1,129 +1,184 @@
 <?php
 include '../../SQL/config.php';
 
+// Ensure variables have safe defaults in case earlier logic didn't run
+if (!isset($statusFilter))   $statusFilter   = strtolower(trim($_GET['status'] ?? 'pending'));
+if (!isset($searchDept))     $searchDept     = trim($_GET['search_dept'] ?? '');
+if (!isset($errorMessage))   $errorMessage   = '';
+if (!isset($successMessage)) $successMessage = '';
+if (!isset($requests))       $requests       = [];
+
+/* =====================================================
+   SAFE DEFAULTS (PREVENT UNDEFINED ERRORS)
+=====================================================*/
+$statusFilter = strtolower(trim($_GET['status'] ?? 'pending'));
+$searchDept   = trim($_GET['search_dept'] ?? '');
+$requests     = [];
+$counts       = [];
+$errorMessage = '';
+$successMessage = '';
+
 /* =====================================================
    HANDLE ACTIONS (Approve / Reject / Purchase)
 =====================================================*/
-if (isset($_POST['action'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
-    $request_id = (int)$_POST['id'];
+    $request_id = (int)($_POST['id'] ?? 0);
 
-    // Allowed ENUM values (must match DB exactly)
-    $allowedStatuses = ['Pending','Approved','Rejected','Purchased','Receiving','Completed'];
+    if ($request_id > 0) {
 
-    $stmt = $pdo->prepare("SELECT * FROM department_request WHERE id=? LIMIT 1");
-    $stmt->execute([$request_id]);
-    $request = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt = $pdo->prepare("SELECT * FROM department_request WHERE id=? LIMIT 1");
+        $stmt->execute([$request_id]);
+        $request = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$request) {
-        header("Location: department_request.php");
-        exit;
+        if ($request) {
+
+            $currentStatus = strtolower(trim($request['status'] ?? ''));
+
+            $stmtItems = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
+            $stmtItems->execute([$request_id]);
+            $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC) ?? [];
+
+            /* ================= APPROVE ================= */
+            if ($_POST['action'] === 'approve' && $currentStatus === 'pending') {
+
+                $approved_quantities = $_POST['approved_quantity'] ?? [];
+
+                foreach ($items as $item) {
+                    $idx = $item['id'];
+                    $approved = isset($approved_quantities[$idx]) ? (int)$approved_quantities[$idx] : 0;
+
+                    if ($approved < 0) $approved = 0;
+                    if ($approved > $item['quantity']) $approved = $item['quantity'];
+
+                    $stmtUpdate = $pdo->prepare("UPDATE department_request_items SET approved_quantity=? WHERE id=?");
+                    $stmtUpdate->execute([$approved, $idx]);
+                }
+
+                $stmtTotal = $pdo->prepare("SELECT SUM(approved_quantity) FROM department_request_items WHERE request_id=?");
+                $stmtTotal->execute([$request_id]);
+                $totalApproved = (int)($stmtTotal->fetchColumn() ?? 0);
+
+                if ($totalApproved <= 0) {
+                    header("Location: department_request.php?status=pending&error=no_approved");
+                    exit;
+                }
+
+                $stmtUpdateRequest = $pdo->prepare("UPDATE department_request SET status=?, total_approved_items=? WHERE id=?");
+                $stmtUpdateRequest->execute(['approved', $totalApproved, $request_id]);
+
+                header("Location: department_request.php?status=approved&success=approved");
+                exit;
+            }
+
+            /* ================= REJECT ================= */
+            if ($_POST['action'] === 'reject' && $currentStatus === 'pending') {
+
+                $stmt = $pdo->prepare("UPDATE department_request SET status=? WHERE id=?");
+                $stmt->execute(['rejected', $request_id]);
+
+                header("Location: department_request.php?status=rejected&success=rejected");
+                exit;
+            }
+
+            /* ================= PURCHASE ================= */
+            if ($_POST['action'] === 'purchase' && $currentStatus === 'approved') {
+
+                $prices       = $_POST['price'] ?? [];
+                $units        = $_POST['unit'] ?? [];
+                $pcsArr       = $_POST['pcs_per_box'] ?? [];
+                $payment_type = $_POST['payment_type'] ?? 'Direct';
+
+                foreach ($items as $item) {
+
+                    $item_id = $item['id'];
+                    $approved_qty = (int)($item['approved_quantity'] ?? 0);
+                    if ($approved_qty <= 0) continue;
+
+                    $unit = $units[$item_id] ?? 'pcs';
+                    $pcs  = (int)($pcsArr[$item_id] ?? 1);
+                    $price = (float)($prices[$item_id] ?? 0);
+                    $total = $price * $approved_qty;
+
+                    $stmtUpdate = $pdo->prepare("
+                        UPDATE department_request_items
+                        SET price=?, total_price=?, unit=?, pcs_per_box=?
+                        WHERE id=?
+                    ");
+                    $stmtUpdate->execute([$price, $total, $unit, $pcs, $item_id]);
+                }
+
+                $stmt = $pdo->prepare("
+                    UPDATE department_request
+                    SET status=?, purchased_at=NOW(), payment_type=?
+                    WHERE id=?
+                ");
+                $stmt->execute(['purchased', $payment_type, $request_id]);
+
+                header("Location: department_request.php?status=purchased&success=purchased");
+                exit;
+            }
+        }
     }
 
-    $currentStatus = $request['status'];
-
-    $stmtItems = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
-    $stmtItems->execute([$request_id]);
-    $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
-
-    /* ================= APPROVE ================= */
-    if ($_POST['action'] === 'approve' && $currentStatus === 'Pending') {
-
-        $approved_quantities = $_POST['approved_quantity'] ?? [];
-
-        foreach ($items as $item) {
-            $idx      = $item['id'];
-            $approved = isset($approved_quantities[$idx]) ? (int)$approved_quantities[$idx] : 0;
-
-            if ($approved < 0) $approved = 0;
-            if ($approved > $item['quantity']) $approved = $item['quantity'];
-
-            $stmtUpdate = $pdo->prepare("UPDATE department_request_items SET approved_quantity=? WHERE id=?");
-            $stmtUpdate->execute([$approved, $idx]);
-        }
-
-        $stmtTotal = $pdo->prepare("SELECT SUM(approved_quantity) FROM department_request_items WHERE request_id=?");
-        $stmtTotal->execute([$request_id]);
-        $totalApproved = $stmtTotal->fetchColumn() ?: 0;
-
-        if ($totalApproved <= 0) {
-            header("Location: department_request.php?status=Pending&error=no_approved");
-            exit;
-        }
-
-        $stmtUpdateRequest = $pdo->prepare("UPDATE department_request SET status=?, total_approved_items=? WHERE id=?");
-        $stmtUpdateRequest->execute(['Approved', $totalApproved, $request_id]);
-
-        header("Location: department_request.php?status=Approved&success=approved");
-        exit;
-    }
-
-    /* ================= REJECT ================= */
-    if ($_POST['action'] === 'reject' && $currentStatus === 'Pending') {
-
-        $stmt = $pdo->prepare("UPDATE department_request SET status=? WHERE id=?");
-        $stmt->execute(['Rejected', $request_id]);
-
-        header("Location: department_request.php?status=Rejected&success=rejected");
-        exit;
-    }
-
-    /* ================= PURCHASE ================= */
-    if ($_POST['action'] === 'purchase' && $currentStatus === 'Approved') {
-
-        $stmtCheck = $pdo->prepare("SELECT SUM(approved_quantity) FROM department_request_items WHERE request_id=?");
-        $stmtCheck->execute([$request_id]);
-        $totalApproved = $stmtCheck->fetchColumn() ?: 0;
-
-        if ($totalApproved <= 0) {
-            header("Location: department_request.php?status=Approved&error=no_approved_purchase");
-            exit;
-        }
-
-        $prices          = $_POST['price']       ?? [];
-        $units           = $_POST['unit']        ?? [];
-        $pcs_per_box_arr = $_POST['pcs_per_box'] ?? [];
-        $payment_type    = $_POST['payment_type'] ?? 'Direct';
-
-        foreach ($items as $item) {
-
-            $item_id      = $item['id'];
-            $approved_qty = $item['approved_quantity'] ?? 0;
-            if ($approved_qty <= 0) continue;
-
-            $unit_type   = $units[$item_id]       ?? $item['unit']        ?? 'pcs';
-            $pcs_per_box = intval($pcs_per_box_arr[$item_id] ?? $item['pcs_per_box'] ?? 1);
-            $price       = floatval($prices[$item_id] ?? 0);
-            $total_price = $price * $approved_qty;
-
-            $stmtUpdatePrice = $pdo->prepare("
-                UPDATE department_request_items 
-                SET price=?, total_price=?, unit=?, pcs_per_box=? 
-                WHERE id=?
-            ");
-            $stmtUpdatePrice->execute([
-                $price,
-                $total_price,
-                ucfirst(strtolower($unit_type)),
-                $pcs_per_box,
-                $item_id
-            ]);
-        }
-
-        $stmt = $pdo->prepare("
-            UPDATE department_request 
-            SET status=?, purchased_at=NOW(), payment_type=? 
-            WHERE id=?
-        ");
-        $stmt->execute(['Purchased', $payment_type, $request_id]);
-
-        header("Location: department_request.php?status=Purchased&success=purchased");
-        exit;
-    }
-
-    header("Location: department_request.php?status=" . urlencode($currentStatus));
+    header("Location: department_request.php");
     exit;
 }
+
+/* =====================================================
+   LOAD STATUS COUNTS
+=====================================================*/
+try {
+    $countsRaw = $pdo->query("
+        SELECT LOWER(status) AS s, COUNT(*) AS cnt
+        FROM department_request
+        GROUP BY LOWER(status)
+    ")->fetchAll(PDO::FETCH_ASSOC) ?? [];
+
+    foreach ($countsRaw as $c) {
+        $counts[ucfirst($c['s'])] = $c['cnt'];
+    }
+} catch (Exception $e) {
+    $counts = [];
+}
+
+/* =====================================================
+   FETCH FILTERED REQUESTS
+=====================================================*/
+try {
+    $params = [$statusFilter];
+    $sql = "SELECT * FROM department_request WHERE LOWER(status)=?";
+
+    if (!empty($searchDept)) {
+        $sql .= " AND department LIKE ?";
+        $params[] = "%$searchDept%";
+    }
+
+    $sql .= " ORDER BY created_at DESC";
+
+    $stmtR = $pdo->prepare($sql);
+    $stmtR->execute($params);
+    $requests = $stmtR->fetchAll(PDO::FETCH_ASSOC) ?? [];
+
+} catch (Exception $e) {
+    $requests = [];
+}
+
+/* =====================================================
+   ALERT MESSAGES
+=====================================================*/
+$errorMessages = [
+    'no_approved' => 'Please set at least one approved quantity greater than zero.',
+];
+
+$successMessages = [
+    'approved'  => 'Request approved successfully.',
+    'rejected'  => 'Request rejected successfully.',
+    'purchased' => 'Purchase order confirmed successfully.',
+];
+
+$errorMessage   = $errorMessages[$_GET['error'] ?? ''] ?? '';
+$successMessage = $successMessages[$_GET['success'] ?? ''] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -183,21 +238,13 @@ body {
     line-height: 1.6;
 }
 
-/* ════════════════════════════════════
-   SIDEBAR — transparent, no background override
-════════════════════════════════════*/
 .main-sidebar {
     position: fixed;
     left: 0; top: 0; bottom: 0;
     width: var(--sidebar-w);
     z-index: 1000;
     overflow-y: auto;
-    /* Background intentionally left out — controlled by inventory_sidebar.php */
 }
-
-/* ════════════════════════════════════
-   LAYOUT
-════════════════════════════════════*/
 .main-content {
     margin-left: var(--sidebar-w);
     min-height: 100vh;
@@ -205,56 +252,27 @@ body {
     transition: margin-left .25s;
 }
 
-/* ════════════════════════════════════
-   PAGE HEADER
-════════════════════════════════════*/
+/* ── Page Header ── */
 .page-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 28px;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px; margin-bottom: 28px;
 }
 .page-header-left h1 {
-    font-size: 1.6rem;
-    font-weight: 800;
-    color: var(--gray-900);
-    letter-spacing: -.4px;
+    font-size: 1.6rem; font-weight: 800; color: var(--gray-900); letter-spacing: -.4px;
 }
-.page-header-left p {
-    color: var(--gray-500);
-    margin-top: 2px;
-    font-size: .85rem;
-}
+.page-header-left p { color: var(--gray-500); margin-top: 2px; font-size: .85rem; }
 .page-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--primary-light);
-    color: var(--primary);
-    font-size: .72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .6px;
-    padding: 4px 10px;
-    border-radius: 100px;
-    margin-bottom: 6px;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--primary-light); color: var(--primary);
+    font-size: .72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; padding: 4px 10px; border-radius: 100px; margin-bottom: 6px;
 }
 
-/* ════════════════════════════════════
-   ALERTS
-════════════════════════════════════*/
+/* ── Alerts ── */
 .alert-custom {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 18px;
-    border-radius: var(--radius);
-    margin-bottom: 20px;
-    font-size: .875rem;
-    font-weight: 500;
-    animation: slideDown .25s ease;
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px; border-radius: var(--radius); margin-bottom: 20px;
+    font-size: .875rem; font-weight: 500; animation: slideDown .25s ease;
 }
 @keyframes slideDown {
     from { opacity: 0; transform: translateY(-8px); }
@@ -263,33 +281,20 @@ body {
 .alert-danger-custom  { background: var(--danger-light);  color: #991b1b; border: 1px solid #fca5a5; }
 .alert-success-custom { background: var(--success-light); color: #065f46; border: 1px solid #6ee7b7; }
 
-/* ════════════════════════════════════
-   STAT CARDS
-════════════════════════════════════*/
+/* ── Stat Cards ── */
 .stats-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 14px;
-    margin-bottom: 24px;
+    gap: 14px; margin-bottom: 24px;
 }
 .stat-card {
-    background: #fff;
-    border-radius: var(--radius);
-    padding: 16px 18px;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--gray-200);
-    cursor: pointer;
-    transition: all .2s;
-    text-decoration: none;
-    display: block;
-    position: relative;
-    overflow: hidden;
+    background: #fff; border-radius: var(--radius); padding: 16px 18px;
+    box-shadow: var(--shadow-sm); border: 1px solid var(--gray-200);
+    cursor: pointer; transition: all .2s; text-decoration: none;
+    display: block; position: relative; overflow: hidden;
 }
 .stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
     border-radius: var(--radius) var(--radius) 0 0;
 }
 .stat-card.sc-pending::before   { background: #f59e0b; }
@@ -298,27 +303,15 @@ body {
 .stat-card.sc-receiving::before { background: var(--info); }
 .stat-card.sc-completed::before { background: #6366f1; }
 .stat-card.sc-rejected::before  { background: var(--danger); }
-.stat-card:hover                { box-shadow: var(--shadow); transform: translateY(-2px); }
+.stat-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
 .stat-card.sc-pending.active    { border-color: #f59e0b; background: #fffbeb; }
 .stat-card.sc-approved.active   { border-color: var(--success); background: var(--success-light); }
 .stat-card.sc-purchased.active  { border-color: var(--primary); background: var(--primary-light); }
 .stat-card.sc-receiving.active  { border-color: var(--info); background: var(--info-light); }
 .stat-card.sc-completed.active  { border-color: #6366f1; background: #eef2ff; }
 .stat-card.sc-rejected.active   { border-color: var(--danger); background: var(--danger-light); }
-.stat-label {
-    font-size: .72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--gray-500);
-    margin-bottom: 6px;
-}
-.stat-number {
-    font-size: 1.8rem;
-    font-weight: 800;
-    line-height: 1;
-    font-family: 'JetBrains Mono', monospace;
-}
+.stat-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); margin-bottom: 6px; }
+.stat-number { font-size: 1.8rem; font-weight: 800; line-height: 1; font-family: 'JetBrains Mono', monospace; }
 .sc-pending   .stat-number { color: #d97706; }
 .sc-approved  .stat-number { color: var(--success); }
 .sc-purchased .stat-number { color: var(--primary); }
@@ -326,98 +319,44 @@ body {
 .sc-completed .stat-number { color: #6366f1; }
 .sc-rejected  .stat-number { color: var(--danger); }
 
-/* ════════════════════════════════════
-   PANEL
-════════════════════════════════════*/
-.panel {
-    background: #fff;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
-    border: 1px solid var(--gray-200);
-    overflow: hidden;
-}
+/* ── Panel ── */
+.panel { background: #fff; border-radius: var(--radius-lg); box-shadow: var(--shadow); border: 1px solid var(--gray-200); overflow: hidden; }
 .panel-header {
-    padding: 18px 24px;
-    border-bottom: 1px solid var(--gray-100);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 12px;
+    padding: 18px 24px; border-bottom: 1px solid var(--gray-100);
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
 }
-.panel-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--gray-800);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
+.panel-title { font-size: 1rem; font-weight: 700; color: var(--gray-800); display: flex; align-items: center; gap: 6px; }
 
-/* ════════════════════════════════════
-   FILTER BAR
-════════════════════════════════════*/
-.filter-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
+/* ── Filter Bar ── */
+.filter-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .filter-bar .form-control {
-    font-size: .83rem;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--gray-200);
-    padding: 8px 12px;
-    background: var(--gray-50);
-    color: var(--gray-700);
-    transition: all .2s;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    min-width: 200px;
+    font-size: .83rem; border-radius: var(--radius-sm); border: 1px solid var(--gray-200);
+    padding: 8px 12px; background: var(--gray-50); color: var(--gray-700);
+    transition: all .2s; font-family: 'Plus Jakarta Sans', sans-serif; min-width: 200px;
 }
-.filter-bar .form-control:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(26,86,219,.12);
-    background: #fff;
-    outline: none;
-}
+.filter-bar .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,.12); background: #fff; outline: none; }
 .btn-filter {
-    background: var(--primary);
-    color: #fff; border: none;
-    border-radius: var(--radius-sm);
+    background: var(--primary); color: #fff; border: none; border-radius: var(--radius-sm);
     padding: 8px 18px; font-size: .83rem; font-weight: 600;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all .2s;
+    font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all .2s;
 }
 .btn-filter:hover { background: var(--primary-dark); }
 .btn-reset {
-    background: var(--gray-100); color: var(--gray-600);
-    border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
-    padding: 8px 14px; font-size: .83rem; font-weight: 600;
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-200);
+    border-radius: var(--radius-sm); padding: 8px 14px; font-size: .83rem; font-weight: 600;
+    font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
     text-decoration: none; transition: all .2s;
 }
 .btn-reset:hover { background: var(--gray-200); color: var(--gray-700); }
 
-/* ════════════════════════════════════
-   DATA TABLE
-════════════════════════════════════*/
+/* ── Data Table ── */
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table thead th {
-    background: var(--gray-50);
-    color: var(--gray-500);
-    font-size: .7rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .6px;
-    padding: 12px 20px;
-    border-bottom: 1px solid var(--gray-200);
-    text-align: left; white-space: nowrap;
+    background: var(--gray-50); color: var(--gray-500); font-size: .7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .6px; padding: 12px 20px;
+    border-bottom: 1px solid var(--gray-200); text-align: left; white-space: nowrap;
 }
-.data-table tbody td {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--gray-100);
-    color: var(--gray-700);
-    vertical-align: middle; font-size: .875rem;
-}
+.data-table tbody td { padding: 14px 20px; border-bottom: 1px solid var(--gray-100); color: var(--gray-700); vertical-align: middle; font-size: .875rem; }
 .data-table tbody tr:last-child td { border-bottom: none; }
 .data-table tbody tr { transition: background .15s; }
 .data-table tbody tr:hover { background: var(--gray-50); }
@@ -426,9 +365,8 @@ body {
 
 .req-id {
     display: inline-flex; align-items: center;
-    background: var(--gray-100); border-radius: 6px;
-    padding: 3px 8px; font-family: 'JetBrains Mono', monospace;
-    font-size: .75rem; font-weight: 500; color: var(--gray-600);
+    background: var(--gray-100); border-radius: 6px; padding: 3px 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: .75rem; font-weight: 500; color: var(--gray-600);
 }
 .dept-pill {
     display: inline-flex; align-items: center; gap: 5px;
@@ -436,9 +374,8 @@ body {
     border-radius: 100px; padding: 3px 10px; font-size: .75rem; font-weight: 600;
 }
 .badge-status {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 4px 10px; border-radius: 100px;
-    font-size: .72rem; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+    border-radius: 100px; font-size: .72rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
 }
 .bs-pending   { background: #fef3c7; color: #92400e; }
@@ -450,18 +387,17 @@ body {
 
 .item-count {
     display: inline-flex; align-items: center; justify-content: center;
-    background: var(--gray-100); color: var(--gray-600);
-    border-radius: 6px; padding: 2px 8px;
-    font-size: .78rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; min-width: 28px;
+    background: var(--gray-100); color: var(--gray-600); border-radius: 6px;
+    padding: 2px 8px; font-size: .78rem; font-weight: 600;
+    font-family: 'JetBrains Mono', monospace; min-width: 28px;
 }
 .purchased-date { display: inline-flex; align-items: center; gap: 5px; color: var(--success); font-size: .78rem; font-weight: 600; }
 .no-date        { color: var(--gray-300); font-size: .85rem; }
 
 .btn-view {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 6px 14px; border-radius: var(--radius-sm);
-    font-size: .78rem; font-weight: 600; border: none; cursor: pointer; transition: all .2s;
-    background: var(--primary-light); color: var(--primary);
+    display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px;
+    border-radius: var(--radius-sm); font-size: .78rem; font-weight: 600; border: none;
+    cursor: pointer; transition: all .2s; background: var(--primary-light); color: var(--primary);
     font-family: 'Plus Jakarta Sans', sans-serif;
 }
 .btn-view:hover { background: var(--primary); color: #fff; }
@@ -470,31 +406,19 @@ body {
 .empty-state i { font-size: 3rem; margin-bottom: 12px; display: block; opacity: .4; }
 .empty-state p { font-size: .9rem; }
 
-/* ════════════════════════════════════
-   MODAL
-════════════════════════════════════*/
+/* ── Modal ── */
 .modal-content {
-    border: none;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    overflow: hidden;
+    border: none; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden;
 }
 .modal-header {
     background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
-    padding: 20px 24px; border-bottom: none;
-    display: flex; align-items: flex-start; gap: 12px;
+    padding: 20px 24px; border-bottom: none; display: flex; align-items: flex-start; gap: 12px;
 }
 .modal-title-wrap { flex: 1; min-width: 0; }
-.modal-title {
-    color: #fff; font-size: 1rem; font-weight: 700;
-    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
-}
+.modal-title { color: #fff; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .modal-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.modal-meta-chip {
-    background: rgba(255,255,255,.15); color: rgba(255,255,255,.9);
-    border-radius: 6px; padding: 3px 10px; font-size: .72rem; font-weight: 600;
-}
+.modal-meta-chip { background: rgba(255,255,255,.15); color: rgba(255,255,255,.9); border-radius: 6px; padding: 3px 10px; font-size: .72rem; font-weight: 600; }
 .btn-close-custom {
     background: rgba(255,255,255,.15); border: none; border-radius: 8px;
     width: 32px; height: 32px; flex-shrink: 0;
@@ -502,7 +426,6 @@ body {
     color: #fff; cursor: pointer; transition: background .2s; margin-top: 2px;
 }
 .btn-close-custom:hover { background: rgba(255,255,255,.28); }
-
 .modal-body { padding: 24px; background: var(--gray-50); }
 
 /* ── Status banners ── */
@@ -518,11 +441,7 @@ body {
 .mb-rejected  { background: var(--danger-light); color: #991b1b; border: 1px solid #fca5a5; }
 .mb-receiving { background: var(--info-light); color: #155e75; border: 1px solid #a5f3fc; }
 .mb-completed { background: #ede9fe; color: #4c1d95; border: 1px solid #ddd6fe; }
-/* Waiting for delivery — orange accent */
-.mb-waiting {
-    background: #fff7ed; color: #7c2d12;
-    border: 1px solid #fed7aa; border-left: 4px solid var(--orange);
-}
+.mb-waiting   { background: #fff7ed; color: #7c2d12; border: 1px solid #fed7aa; border-left: 4px solid var(--orange); }
 .delivery-info { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .delivery-chip {
     display: inline-flex; align-items: center; gap: 5px;
@@ -530,32 +449,24 @@ body {
     border-radius: 6px; padding: 3px 10px; font-size: .75rem; font-weight: 600;
 }
 
-/* ── Action selector (Pending) ── */
+/* ── Action Selector ── */
 .action-selector {
     background: #fff; border-radius: var(--radius); border: 1px solid var(--gray-200);
     padding: 16px 18px; margin-bottom: 20px; transition: all .3s;
 }
-.action-selector label {
-    font-size: .72rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .5px; color: var(--gray-500); margin-bottom: 8px; display: block;
-}
+.action-selector label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); margin-bottom: 8px; display: block; }
 .action-selector select {
-    width: 100%; padding: 10px 14px;
-    border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+    width: 100%; padding: 10px 14px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
     font-family: 'Plus Jakarta Sans', sans-serif; font-size: .875rem; font-weight: 500;
-    color: var(--gray-700); background: var(--gray-50); cursor: pointer; transition: all .2s;
-    appearance: auto;
+    color: var(--gray-700); background: var(--gray-50); cursor: pointer; transition: all .2s; appearance: auto;
 }
 .action-selector select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,.12); background: #fff; }
 .action-selector.is-approve { border-color: var(--success); background: var(--success-light); }
-.action-selector.is-reject  { border-color: var(--danger);  background: var(--danger-light); }
+.action-selector.is-reject  { border-color: var(--danger);  background: var(--danger-light);  }
 .hint-text { font-size: .75rem; color: var(--gray-400); margin-top: 6px; }
 
-/* ── Items card ── */
-.items-card {
-    background: #fff; border-radius: var(--radius); border: 1px solid var(--gray-200);
-    overflow: hidden; margin-bottom: 20px; box-shadow: var(--shadow-sm);
-}
+/* ── Items Card ── */
+.items-card { background: #fff; border-radius: var(--radius); border: 1px solid var(--gray-200); overflow: hidden; margin-bottom: 20px; box-shadow: var(--shadow-sm); }
 .items-card-header {
     background: var(--gray-50); padding: 10px 16px; border-bottom: 1px solid var(--gray-100);
     font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500);
@@ -567,24 +478,16 @@ body {
     text-transform: uppercase; letter-spacing: .5px; padding: 10px 14px;
     border-bottom: 1px solid var(--gray-100); text-align: left; white-space: nowrap;
 }
-.modal-table td {
-    padding: 11px 14px; border-bottom: 1px solid var(--gray-100);
-    font-size: .83rem; color: var(--gray-700); vertical-align: middle;
-}
+.modal-table td { padding: 11px 14px; border-bottom: 1px solid var(--gray-100); font-size: .83rem; color: var(--gray-700); vertical-align: middle; }
 .modal-table tbody tr:last-child td { border-bottom: none; }
 .modal-table tbody tr:hover { background: #fafafa; }
 
 .qty-input, .price-input {
-    width: 84px; padding: 6px 10px;
-    border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
-    font-family: 'JetBrains Mono', monospace; font-size: .8rem; text-align: right; transition: all .2s;
-    background: var(--gray-50);
+    width: 84px; padding: 6px 10px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+    font-family: 'JetBrains Mono', monospace; font-size: .8rem; text-align: right; transition: all .2s; background: var(--gray-50);
 }
-.qty-input:focus, .price-input:focus {
-    outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,86,219,.12); background: #fff;
-}
-.qty-input[readonly], .price-input[readonly],
-.qty-input:disabled  { background: var(--gray-100); color: var(--gray-400); cursor: not-allowed; }
+.qty-input:focus, .price-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,86,219,.12); background: #fff; }
+.qty-input[readonly], .price-input[readonly], .qty-input:disabled { background: var(--gray-100); color: var(--gray-400); cursor: not-allowed; }
 .locked-icon { font-size: .68rem; color: var(--gray-400); margin-left: 4px; vertical-align: middle; }
 
 /* ── Purchase form ── */
@@ -592,10 +495,7 @@ body {
     background: #fff; border-radius: var(--radius); border: 1px solid var(--gray-200);
     padding: 18px; margin-bottom: 20px; box-shadow: var(--shadow-sm);
 }
-.purchase-section label {
-    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
-    color: var(--gray-500); margin-bottom: 8px; display: block;
-}
+.purchase-section label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); margin-bottom: 8px; display: block; }
 .purchase-section select {
     padding: 8px 14px; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
     font-family: 'Plus Jakarta Sans', sans-serif; font-size: .875rem; font-weight: 600;
@@ -608,7 +508,7 @@ body {
     background: var(--primary-light); border-radius: var(--radius);
     padding: 14px 18px; margin-bottom: 16px; border: 1px solid #bfdbfe;
 }
-.grand-total-bar .gtlabel { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+.grand-total-bar .gtlabel  { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
 .grand-total-bar .gtamount { font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; font-weight: 700; color: var(--primary-dark); }
 
 .summary-total-bar {
@@ -616,31 +516,26 @@ body {
     background: var(--gray-100); border-radius: var(--radius);
     padding: 12px 18px; margin-bottom: 16px; border: 1px solid var(--gray-200);
 }
-.summary-total-bar .stlabel { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); }
+.summary-total-bar .stlabel  { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); }
 .summary-total-bar .stamount { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; color: var(--gray-700); }
 
 /* ── Modal footer ── */
 .modal-footer-btns {
     display: flex; align-items: center; justify-content: flex-end;
-    gap: 10px; flex-wrap: wrap;
-    padding-top: 16px; border-top: 1px solid var(--gray-200);
+    gap: 10px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid var(--gray-200);
 }
-
-/* ── Buttons ── */
 .btn-approve {
     background: var(--success); color: #fff; border: none; border-radius: var(--radius-sm);
     padding: 10px 22px; font-size: .875rem; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;
     cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all .2s;
 }
 .btn-approve:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(14,159,110,.3); }
-
 .btn-reject {
     background: var(--danger); color: #fff; border: none; border-radius: var(--radius-sm);
     padding: 10px 22px; font-size: .875rem; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;
     cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all .2s;
 }
 .btn-reject:hover { background: #c81e1e; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(224,36,36,.3); }
-
 .btn-purchase {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: #fff; border: none; border-radius: var(--radius-sm);
@@ -649,7 +544,6 @@ body {
     box-shadow: 0 2px 8px rgba(26,86,219,.25);
 }
 .btn-purchase:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(26,86,219,.35); }
-
 .btn-cancel-modal {
     background: var(--gray-100); color: var(--gray-600); border: 1px solid var(--gray-200);
     border-radius: var(--radius-sm); padding: 10px 16px; font-size: .875rem; font-weight: 600;
@@ -657,18 +551,14 @@ body {
     cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all .2s;
 }
 .btn-cancel-modal:hover { background: var(--gray-200); }
-
 .price-cell { font-family: 'JetBrains Mono', monospace; font-size: .82rem; text-align: right; }
 .price-cell.total { font-weight: 700; color: var(--gray-800); }
 
-/* ════════════════════════════════════
-   RESPONSIVE
-════════════════════════════════════*/
+/* ── Responsive ── */
 @media (max-width: 1024px) {
     .main-content { padding: 20px; }
     .stats-row { grid-template-columns: repeat(3, 1fr); }
 }
-
 @media (max-width: 768px) {
     :root { --sidebar-w: 0px; }
     .main-sidebar { transform: translateX(-260px); width: 260px; transition: transform .25s; }
@@ -680,9 +570,7 @@ body {
     .stat-number { font-size: 1.5rem; }
     .filter-bar { flex-direction: column; align-items: stretch; }
     .filter-bar .form-control, .btn-filter, .btn-reset { width: 100%; }
-    /* Hide User column on tablet */
-    .data-table thead th:nth-child(3),
-    .data-table tbody td:nth-child(3) { display: none; }
+    .data-table thead th:nth-child(3), .data-table tbody td:nth-child(3) { display: none; }
     .panel-header { flex-direction: column; align-items: flex-start; }
     .modal-dialog { margin: 8px; max-width: calc(100vw - 16px); }
     .grand-total-bar .gtamount { font-size: 1.1rem; }
@@ -691,19 +579,13 @@ body {
     .modal-footer-btns { justify-content: stretch; }
     .modal-footer-btns > * { flex: 1; justify-content: center; }
 }
-
 @media (max-width: 480px) {
     .stats-row { grid-template-columns: repeat(2, 1fr); }
     .stat-number { font-size: 1.4rem; }
-    /* Hide Purchased At on very small screens */
-    .data-table thead th:nth-child(7),
-    .data-table tbody td:nth-child(7) { display: none; }
-    /* Hide Unit & Pcs in modal table */
+    .data-table thead th:nth-child(7), .data-table tbody td:nth-child(7) { display: none; }
     .modal-table th:nth-child(4), .modal-table td:nth-child(4),
     .modal-table th:nth-child(5), .modal-table td:nth-child(5) { display: none; }
 }
-
-/* ── Mobile sidebar toggle ── */
 .sidebar-toggle {
     display: none; background: #fff; border: 1px solid var(--gray-200);
     border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer;
@@ -711,51 +593,40 @@ body {
     align-items: center; gap: 6px; box-shadow: var(--shadow-sm); margin-bottom: 10px;
 }
 @media (max-width: 768px) { .sidebar-toggle { display: inline-flex; } }
-
-.sidebar-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,.4); z-index: 999; backdrop-filter: blur(2px);
-}
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 999; backdrop-filter: blur(2px); }
 .sidebar-overlay.show { display: block; }
 </style>
 </head>
 <body>
 
-<!-- Mobile sidebar overlay -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
-
-<!-- Sidebar (no background override — inventory_sidebar.php controls its own styling) -->
 <div class="main-sidebar" id="mainSidebar">
     <?php include 'inventory_sidebar.php'; ?>
 </div>
 
-<!-- ════════════════════ MAIN CONTENT ════════════════════ -->
 <div class="main-content">
 
     <!-- Page Header -->
     <div class="page-header">
         <div class="page-header-left">
-            <button class="sidebar-toggle" onclick="openSidebar()">
-                <i class="bi bi-list"></i> Menu
-            </button>
+            <button class="sidebar-toggle" onclick="openSidebar()"><i class="bi bi-list"></i> Menu</button>
             <div class="page-badge"><i class="bi bi-bag-check"></i> Purchase Management</div>
             <h1>Department Requests</h1>
             <p>Review, approve, and process departmental purchase orders</p>
         </div>
     </div>
 
-    <!-- Error / Success Alerts -->
+    <!-- Alerts -->
     <?php if ($errorMessage): ?>
     <div class="alert-custom alert-danger-custom">
         <i class="bi bi-exclamation-triangle-fill"></i>
-        <span><?= htmlspecialchars($errorMessage) ?></span>
+        <span><?= htmlspecialchars((string)($errorMessage ?? '')) ?></span>
     </div>
     <?php endif; ?>
-
     <?php if ($successMessage): ?>
     <div class="alert-custom alert-success-custom">
         <i class="bi bi-check-circle-fill"></i>
-        <span><?= htmlspecialchars($successMessage) ?></span>
+        <span><?= htmlspecialchars((string)($successMessage ?? '')) ?></span>
     </div>
     <?php endif; ?>
 
@@ -763,20 +634,20 @@ body {
     <div class="stats-row">
         <?php
         $statDefs = [
-            'Pending'   => 'sc-pending',
-            'Approved'  => 'sc-approved',
-            'Purchased' => 'sc-purchased',
-            'Receiving' => 'sc-receiving',
-            'Completed' => 'sc-completed',
-            'Rejected'  => 'sc-rejected',
+            'pending'   => 'sc-pending',
+            'approved'  => 'sc-approved',
+            'purchased' => 'sc-purchased',
+            'receiving' => 'sc-receiving',
+            'completed' => 'sc-completed',
+            'rejected'  => 'sc-rejected',
         ];
         foreach ($statDefs as $sKey => $cls):
-            $isActive = $statusFilter === $sKey ? 'active' : '';
+            $isActive = ($statusFilter === $sKey) ? 'active' : '';
         ?>
         <a href="?status=<?= $sKey ?>&search_dept=<?= urlencode($searchDept) ?>"
            class="stat-card <?= $cls ?> <?= $isActive ?>">
-            <div class="stat-label"><?= $sKey ?></div>
-            <div class="stat-number"><?= $counts[$sKey] ?? 0 ?></div>
+            <div class="stat-label"><?= ucfirst($sKey) ?></div>
+            <div class="stat-number"><?= $counts[ucfirst($sKey)] ?? 0 ?></div>
         </a>
         <?php endforeach; ?>
     </div>
@@ -788,22 +659,17 @@ body {
                 <i class="bi bi-table" style="color:var(--primary);"></i>
                 Request List
                 <span style="font-size:.75rem;font-weight:600;color:var(--gray-400);">
-                    — <?= htmlspecialchars($statusFilter) ?> (<?= count($requests) ?>)
+                    — <?= ucfirst((string)($statusFilter ?? '')) ?> (<?= is_countable($requests) ? count($requests) : 0 ?>)
                 </span>
             </div>
-
             <form method="get" class="filter-bar">
-                <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                <input type="hidden" name="status" value="<?= htmlspecialchars((string)($statusFilter ?? '')) ?>">
                 <input type="text" name="search_dept" class="form-control"
                        placeholder="Search department…"
                        value="<?= htmlspecialchars($searchDept) ?>"
                        style="max-width:220px;">
-                <button type="submit" class="btn-filter">
-                    <i class="bi bi-search"></i> Search
-                </button>
-                <a href="department_request.php" class="btn-reset">
-                    <i class="bi bi-arrow-counterclockwise"></i> Reset
-                </a>
+                <button type="submit" class="btn-filter"><i class="bi bi-search"></i> Search</button>
+                <a href="department_request.php" class="btn-reset"><i class="bi bi-arrow-counterclockwise"></i> Reset</a>
             </form>
         </div>
 
@@ -811,7 +677,7 @@ body {
         <?php if (empty($requests)): ?>
             <div class="empty-state">
                 <i class="bi bi-inbox"></i>
-                <p>No <?= strtolower(htmlspecialchars($statusFilter)) ?> requests found.</p>
+                <p>No <?= htmlspecialchars((string)($statusFilter ?? '')) ?> requests found.</p>
             </div>
         <?php else: ?>
         <table class="data-table">
@@ -832,8 +698,10 @@ body {
                 $stmtI = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
                 $stmtI->execute([$r['id']]);
                 $itemsArr    = $stmtI->fetchAll(PDO::FETCH_ASSOC);
-                $status      = ucfirst(strtolower(trim($r['status'])));
-                $statusLower = strtolower($status);
+
+                // Normalise status to lowercase for logic, display as ucfirst
+                $statusRaw   = strtolower(trim($r['status']));
+                $statusLabel = ucfirst($statusRaw);
 
                 $badgeMap = [
                     'pending'   => ['bs-pending',   'bi-hourglass-split'],
@@ -843,7 +711,7 @@ body {
                     'completed' => ['bs-completed', 'bi-patch-check-fill'],
                     'rejected'  => ['bs-rejected',  'bi-x-circle'],
                 ];
-                [$bClass, $bIcon] = $badgeMap[$statusLower] ?? ['', 'bi-circle'];
+                [$bClass, $bIcon] = $badgeMap[$statusRaw] ?? ['', 'bi-circle'];
             ?>
             <tr>
                 <td><span class="req-id">#<?= str_pad($r['id'], 4, '0', STR_PAD_LEFT) ?></span></td>
@@ -857,7 +725,7 @@ body {
                 <td class="center"><span class="item-count"><?= count($itemsArr) ?></span></td>
                 <td>
                     <span class="badge-status <?= $bClass ?>">
-                        <i class="bi <?= $bIcon ?>"></i> <?= $status ?>
+                        <i class="bi <?= $bIcon ?>"></i> <?= $statusLabel ?>
                     </span>
                 </td>
                 <td class="mono" style="font-size:.78rem;">
@@ -875,13 +743,14 @@ body {
                     <?php endif; ?>
                 </td>
                 <td class="center">
+                    <!-- Pass lowercase status to JS for consistent comparison -->
                     <button class="btn-view view-items-btn"
                         data-id="<?= $r['id'] ?>"
-                        data-dept="<?= htmlspecialchars($r['department']) ?>"
-                        data-status="<?= $status ?>"
-                        data-purchased="<?= htmlspecialchars($r['purchased_at'] ?? '') ?>"
-                        data-paymenttype="<?= htmlspecialchars($r['payment_type'] ?? '') ?>"
-                        data-items='<?= htmlspecialchars(json_encode($itemsArr, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>'>
+                        data-dept="<?= htmlspecialchars((string)($r['department'] ?? '')) ?>"
+                        data-status="<?= htmlspecialchars((string)($statusRaw ?? '')) ?>"
+                        data-purchased="<?= htmlspecialchars((string)($r['purchased_at'] ?? '')) ?>"
+                        data-paymenttype="<?= htmlspecialchars((string)($r['payment_type'] ?? '')) ?>"
+                        data-items='<?= htmlspecialchars((string)json_encode($itemsArr, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>'>
                         <i class="bi bi-eye"></i> View
                     </button>
                 </td>
@@ -891,12 +760,11 @@ body {
         </table>
         <?php endif; ?>
         </div>
-    </div><!-- /panel -->
+    </div>
 
 </div><!-- /main-content -->
 
-
-<!-- ════════════════════════ MODAL ════════════════════════ -->
+<!-- ════════════════ MODAL ════════════════ -->
 <div class="modal fade" id="viewModal" tabindex="-1">
 <div class="modal-dialog modal-lg modal-dialog-scrollable">
 <div class="modal-content">
@@ -933,24 +801,21 @@ function pad(n) { return String(n).padStart(4, '0'); }
 document.querySelectorAll('.view-items-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         const items       = JSON.parse(btn.dataset.items || '[]');
-        const status      = btn.dataset.status;            // "Pending", "Approved", "Purchased", etc.
-        const purchased   = btn.dataset.purchased || '';   // datetime string or ""
+        // data-status is now already lowercase from PHP
+        const _st         = (btn.dataset.status || '').toLowerCase().trim();
+        const purchased   = btn.dataset.purchased || '';
         const dept        = btn.dataset.dept;
         const reqId       = btn.dataset.id;
         const paymentType = btn.dataset.paymenttype || '';
 
-        const _st = status.toLowerCase().trim();
-
-        const isPending          = _st === 'pending';
-        const isApproved         = _st === 'approved';
-        const isPurchased        = _st === 'purchased';
-        const isReceiving        = _st === 'receiving';
-        const isCompleted        = _st === 'completed';
-        const isRejected         = _st === 'rejected';
-        const isDone             = isPurchased || isReceiving || isCompleted;
-
-        // Show purchase form ONLY for strictly "Approved" status
-        const showPurchaseForm   = isApproved;
+        const isPending   = _st === 'pending';
+        const isApproved  = _st === 'approved';
+        const isPurchased = _st === 'purchased';
+        const isReceiving = _st === 'receiving';
+        const isCompleted = _st === 'completed';
+        const isRejected  = _st === 'rejected';
+        const isDone      = isPurchased || isReceiving || isCompleted;
+        const showPurchaseForm = isApproved;
 
         /* ── Modal title & meta ── */
         document.getElementById('modalTitle').textContent = `Request #${pad(reqId)} — ${dept}`;
@@ -964,6 +829,7 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
             rejected:  'background:#fde8e8;color:#991b1b;',
         };
         const sc = statusColors[_st] || 'background:rgba(255,255,255,.2);color:#fff;';
+        const statusLabel = _st.charAt(0).toUpperCase() + _st.slice(1);
 
         let purchasedChip = '';
         if (purchased) {
@@ -978,13 +844,12 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
 
         document.getElementById('modalMeta').innerHTML =
             `<span class="modal-meta-chip">${items.length} item${items.length !== 1 ? 's' : ''}</span>
-             <span style="${sc}border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">${status}</span>
+             <span style="${sc}border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">${statusLabel}</span>
              ${purchasedChip}`;
 
         let html = `<form method="post"><input type="hidden" name="id" value="${reqId}">`;
 
-        /* ═══════════ BANNERS ═══════════ */
-
+        /* ── Banners ── */
         if (isPurchased) {
             html += `<div class="modal-banner mb-waiting">
                 <i class="bi bi-truck"></i>
@@ -1000,46 +865,36 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
         } else if (isReceiving) {
             html += `<div class="modal-banner mb-receiving">
                 <i class="bi bi-box-seam"></i>
-                <div>
-                    <strong>Items Being Received</strong>
-                    <small>This order is currently being received and checked into inventory.</small>
-                </div>
+                <div><strong>Items Being Received</strong>
+                <small>This order is currently being received and checked into inventory.</small></div>
             </div>`;
         } else if (isCompleted) {
             html += `<div class="modal-banner mb-completed">
                 <i class="bi bi-patch-check-fill"></i>
-                <div>
-                    <strong>Order Completed</strong>
-                    <small>All items have been received and added to inventory successfully.</small>
-                </div>
+                <div><strong>Order Completed</strong>
+                <small>All items have been received and added to inventory successfully.</small></div>
             </div>`;
         } else if (isApproved) {
             html += `<div class="modal-banner mb-approved">
                 <i class="bi bi-check-circle-fill"></i>
-                <div>
-                    <strong>Request Approved</strong>
-                    <small>Approved quantities are locked. Enter unit prices below to confirm the purchase order.</small>
-                </div>
+                <div><strong>Request Approved</strong>
+                <small>Approved quantities are locked. Enter unit prices below to confirm the purchase order.</small></div>
             </div>`;
         } else if (isPending) {
             html += `<div class="modal-banner mb-pending">
                 <i class="bi bi-hourglass-split"></i>
-                <div>
-                    <strong>Awaiting Review</strong>
-                    <small>Choose an action below to approve or reject this request.</small>
-                </div>
+                <div><strong>Awaiting Review</strong>
+                <small>Choose an action below to approve or reject this request.</small></div>
             </div>`;
         } else if (isRejected) {
             html += `<div class="modal-banner mb-rejected">
                 <i class="bi bi-x-circle-fill"></i>
-                <div>
-                    <strong>Request Rejected</strong>
-                    <small>This request was denied. No items will be purchased.</small>
-                </div>
+                <div><strong>Request Rejected</strong>
+                <small>This request was denied. No items will be purchased.</small></div>
             </div>`;
         }
 
-        /* ═══════════ ACTION SELECTOR (Pending only) ═══════════ */
+        /* ── Action selector (Pending only) ── */
         if (isPending) {
             html += `<div class="action-selector" id="actionSection">
                 <label>Select Action</label>
@@ -1052,24 +907,21 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
             </div>`;
         }
 
-        /* ═══════════ ITEMS TABLE ═══════════ */
+        /* ── Items Table ── */
         const locked = (isApproved || isDone)
             ? `<i class="bi bi-lock-fill locked-icon" title="Locked"></i>` : '';
 
         html += `<div class="items-card">
             <div class="items-card-header"><i class="bi bi-list-ul"></i> Requested Items</div>
             <div style="overflow-x:auto;">
-            <table class="modal-table">
-            <thead><tr>
+            <table class="modal-table"><thead><tr>
                 <th>Item Name</th>
                 <th style="text-align:center;">Requested</th>
                 <th style="text-align:center;">Approved ${locked}</th>
                 <th>Unit</th>
                 <th style="text-align:center;">Pcs/Box</th>`;
-
         if (showPurchaseForm) html += `<th style="text-align:right;">Price (₱)</th><th style="text-align:right;">Total (₱)</th>`;
         if (isDone)           html += `<th style="text-align:right;">Price (₱)</th><th style="text-align:right;">Total (₱)</th>`;
-
         html += `</tr></thead><tbody>`;
 
         let grandTotalStatic = 0;
@@ -1083,9 +935,8 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
             const lineTotal = parseFloat(item.total_price || 0);
             grandTotalStatic += lineTotal;
 
-            // Qty: editable only for Pending (after dropdown), readonly otherwise
             const qtyAttr = isPending
-                ? `disabled style="background:var(--gray-100);"` // enabled when approve selected
+                ? `disabled style="background:var(--gray-100);"` 
                 : `readonly style="background:var(--gray-100);"`;
 
             html += `<tr>
@@ -1108,13 +959,11 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
                 html += `<td class="price-cell">${fc(price)}</td>
                          <td class="price-cell total">${fc(lineTotal)}</td>`;
             }
-
             html += `</tr>`;
         });
-
         html += `</tbody></table></div></div>`;
 
-        /* ═══════════ PURCHASE FORM (Approved → confirm purchase) ═══════════ */
+        /* ── Purchase form (Approved only) ── */
         if (showPurchaseForm) {
             html += `<div class="purchase-section">
                 <label>Payment Method</label>
@@ -1130,7 +979,7 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
             </div>`;
         }
 
-        /* ═══════════ SUMMARY TOTAL (read-only for done states) ═══════════ */
+        /* ── Summary total (read-only for done states) ── */
         if (isDone && grandTotalStatic > 0) {
             html += `<div class="summary-total-bar">
                 <span class="stlabel"><i class="bi bi-receipt" style="margin-right:5px;"></i> Total Amount Purchased</span>
@@ -1138,7 +987,7 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
             </div>`;
         }
 
-        /* ═══════════ FOOTER BUTTONS ═══════════ */
+        /* ── Footer buttons ── */
         html += `<div class="modal-footer-btns">
             <button type="button" class="btn-cancel-modal" data-bs-dismiss="modal">
                 <i class="bi bi-x"></i> Close
@@ -1162,7 +1011,7 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
 
         document.getElementById('modalBodyContent').innerHTML = html;
 
-        /* ═══════════ PENDING: DROPDOWN LOGIC ═══════════ */
+        /* ── Pending: dropdown logic ── */
         if (isPending) {
             const dd       = document.getElementById('actionDropdown');
             const secEl    = document.getElementById('actionSection');
@@ -1175,39 +1024,24 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
                 secEl.classList.remove('is-approve', 'is-reject');
 
                 if (v === 'approve') {
-                    qtyIns.forEach(i => {
-                        i.disabled = false;
-                        i.style.background  = '#fff';
-                        i.style.borderColor = 'var(--success)';
-                    });
+                    qtyIns.forEach(i => { i.disabled = false; i.style.background = '#fff'; i.style.borderColor = 'var(--success)'; });
                     secEl.classList.add('is-approve');
                     btnApprv.style.display = 'inline-flex';
                     btnRej.style.display   = 'none';
-
                 } else if (v === 'reject') {
-                    qtyIns.forEach(i => {
-                        i.disabled = true;
-                        i.value    = 0;
-                        i.style.background  = 'var(--danger-light)';
-                        i.style.borderColor = 'var(--danger)';
-                    });
+                    qtyIns.forEach(i => { i.disabled = true; i.value = 0; i.style.background = 'var(--danger-light)'; i.style.borderColor = 'var(--danger)'; });
                     secEl.classList.add('is-reject');
                     btnApprv.style.display = 'none';
                     btnRej.style.display   = 'inline-flex';
-
                 } else {
-                    qtyIns.forEach(i => {
-                        i.disabled = true;
-                        i.style.background  = 'var(--gray-100)';
-                        i.style.borderColor = '';
-                    });
+                    qtyIns.forEach(i => { i.disabled = true; i.style.background = 'var(--gray-100)'; i.style.borderColor = ''; });
                     btnApprv.style.display = 'none';
                     btnRej.style.display   = 'none';
                 }
             });
         }
 
-        /* ═══════════ LIVE PRICE CALCULATION ═══════════ */
+        /* ── Live price calculation ── */
         if (showPurchaseForm) {
             function computeTotals() {
                 let grand = 0;
@@ -1225,7 +1059,6 @@ document.querySelectorAll('.view-items-btn').forEach(btn => {
                 const gt = document.getElementById('grandTotal');
                 if (gt) gt.textContent = fc(grand);
             }
-
             document.querySelectorAll('#modalBodyContent .price-input, #modalBodyContent .qty-input')
                     .forEach(i => i.addEventListener('input', computeTotals));
             computeTotals();

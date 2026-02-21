@@ -17,7 +17,7 @@ function classifyAccount($name, $isExpense = false) {
 $totals  = ["Asset" => 0, "Liability" => 0, "Revenue" => 0, "Expense" => 0];
 $records = [];
 
-// 1. Billing items
+// 1. Billing items (finalized service line-items)
 $billing = $conn->query("
     SELECT bi.item_id, bi.total_price, bi.billing_id, ds.serviceName
     FROM billing_items bi
@@ -36,6 +36,68 @@ if ($billing) {
             'date'   => date('Y-m-d H:i:s'),
             'type'   => $type,
             'source' => 'Billing',
+        ];
+    }
+}
+
+// 1b. Paid billing records (actual payments received from billing_records)
+$payments = $conn->query("
+    SELECT 
+        br.billing_id,
+        br.paid_amount,
+        br.grand_total,
+        br.total_amount,
+        br.payment_date,
+        br.billing_date,
+        br.payment_method,
+        br.status,
+        br.payment_status,
+        CONCAT(
+            'Payment #', br.billing_id,
+            IF(br.payment_method IS NOT NULL AND br.payment_method != '',
+               CONCAT(' (', br.payment_method, ')'), '')
+        ) AS payment_label
+    FROM billing_records br
+    WHERE br.status = 'Paid'
+       OR br.paid_amount > 0
+       OR br.payment_status = 'paid'
+    ORDER BY br.billing_id DESC
+");
+if ($payments) {
+    // Track billing_ids already covered by billing_items to avoid double-counting
+    $billingItemIds = [];
+    $conn->query("SELECT DISTINCT billing_id FROM billing_items WHERE finalized = 1")->data_seek(0);
+    $biCheck = $conn->query("SELECT DISTINCT billing_id FROM billing_items WHERE finalized = 1");
+    if ($biCheck) {
+        while ($biRow = $biCheck->fetch_assoc()) {
+            $billingItemIds[] = $biRow['billing_id'];
+        }
+    }
+
+    while ($row = $payments->fetch_assoc()) {
+        // Use paid_amount if available, else grand_total, else total_amount
+        $amount = floatval($row['paid_amount']) > 0
+                    ? floatval($row['paid_amount'])
+                    : (floatval($row['grand_total']) > 0
+                        ? floatval($row['grand_total'])
+                        : floatval($row['total_amount']));
+
+        if ($amount <= 0) continue;
+
+        // Use payment_date if available, else billing_date
+        $date = (!empty($row['payment_date']) && $row['payment_date'] !== '0000-00-00 00:00:00')
+                    ? $row['payment_date']
+                    : ($row['billing_date'] ?? date('Y-m-d H:i:s'));
+
+        $type = "Revenue";
+        $totals[$type] += $amount;
+        $records[] = [
+            'id'     => $row['billing_id'],
+            'name'   => $row['payment_label'],
+            'amount' => $amount,
+            'date'   => $date,
+            'type'   => $type,
+            'source' => 'Payment',
         ];
     }
 }
@@ -328,6 +390,7 @@ body {
 .src-billing { background: #ede9fe; color: #5b21b6; }
 .src-expense { background: #fef3c7; color: #92400e; }
 .src-journal { background: #e0f2fe; color: #0369a1; }
+.src-payment { background: #d1fae5; color: #065f46; }
 
 /* Amount */
 .amt-positive { font-weight: 700; color: var(--success); }
@@ -423,7 +486,7 @@ body {
     <div class="page-head-icon"><i class="bi bi-book-half"></i></div>
     <div>
       <h1>Journal Accounts</h1>
-      <p>Aggregated view of billing, expenses, and journal entries</p>
+      <p>Aggregated view of billing, payments, expenses, and journal entries</p>
     </div>
     <div style="margin-left:auto;">
       <span style="font-size:.82rem;color:var(--ink-light);">
@@ -515,7 +578,13 @@ body {
           <?php foreach ($pageRecords as $i => $rec):
             $typeKey  = strtolower($rec['type']);
             $srcKey   = strtolower($rec['source']);
-            $srcClass = ['billing' => 'src-billing', 'expense' => 'src-expense', 'journal' => 'src-journal'][$srcKey] ?? 'src-journal';
+            $srcClassMap = [
+              'billing' => 'src-billing',
+              'expense' => 'src-expense',
+              'journal' => 'src-journal',
+              'payment' => 'src-payment',
+            ];
+            $srcClass = $srcClassMap[$srcKey] ?? 'src-journal';
             $initial  = strtoupper(substr($rec['name'], 0, 1));
             $isNeg    = $rec['amount'] < 0;
           ?>
@@ -597,7 +666,13 @@ body {
       <?php foreach ($pageRecords as $i => $rec):
         $typeKey  = strtolower($rec['type']);
         $srcKey   = strtolower($rec['source']);
-        $srcClass = ['billing' => 'src-billing', 'expense' => 'src-expense', 'journal' => 'src-journal'][$srcKey] ?? 'src-journal';
+        $srcClassMap = [
+          'billing' => 'src-billing',
+          'expense' => 'src-expense',
+          'journal' => 'src-journal',
+          'payment' => 'src-payment',
+        ];
+        $srcClass = $srcClassMap[$srcKey] ?? 'src-journal';
         $isNeg    = $rec['amount'] < 0;
       ?>
       <div class="m-jnl-card mobile-row" data-type="<?= $typeKey ?>">

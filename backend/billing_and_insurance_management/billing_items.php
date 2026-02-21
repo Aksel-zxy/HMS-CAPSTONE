@@ -166,308 +166,256 @@ $stmt->execute();
 $existing_bill = $stmt->get_result()->fetch_assoc();
 
 /* =========================================================
-   INITIALIZE SESSION CART
+   HANDLE MANUALLY-ADDED EXTRA ITEMS
+   Stored separately in $_SESSION['billing_extra'][$patient_id]
+   so they persist across page loads while auto items always
+   come fresh from the DB.
 ========================================================= */
-if (!isset($_SESSION['billing_cart'][$patient_id])) {
-    $_SESSION['billing_cart'][$patient_id] = [];
 
-    /* ── 1. dl_results ──────────────────────────────────────
-       FIXED: Match dl_services by serviceName directly from dl_results.result
-       since dl_schedule may not have a serviceID column.
-    ────────────────────────────────────────────────────── */
-    $stmt = $conn->prepare("
-        SELECT
-            dr.resultID,
-            dr.resultDate,
-            COALESCE(svc.serviceName, dr.result, 'Laboratory Service') AS serviceName,
-            COALESCE(svc.price, 0) AS price
-        FROM dl_results dr
-        LEFT JOIN dl_services svc ON svc.serviceName = dr.result
-        WHERE dr.patientID = ?
-          AND dr.status    = 'Completed'
-        ORDER BY dr.resultDate ASC
-    ");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
-        $_SESSION['billing_cart'][$patient_id][] = [
-            'cart_key'    => 'LAB-'.$row['resultID'],
-            'ref_id'      => $row['resultID'],
-            'med_id'      => null,
-            'serviceName' => $row['serviceName'],
-            'description' => 'Lab Result — '.date('M d, Y', strtotime($row['resultDate'])),
-            'price'       => (float)$row['price'],
-            'source'      => 'lab',
-            'category'    => 'laboratory',
-        ];
-    }
-
-    /* ── 2. dnm_records ─────────────────────────────────────
-       Try linking via duty_assignments if table exists, otherwise skip gracefully.
-    ────────────────────────────────────────────────────── */
-    $dnm_query = "
-        SELECT
-            dnmr.record_id,
-            dnmr.procedure_name,
-            dnmr.amount,
-            dnmr.created_at
-        FROM dnm_records dnmr
-        WHERE dnmr.duty_id IN (
-            SELECT da.duty_id
-            FROM dl_results dr
-            JOIN dl_schedule ds ON ds.scheduleID = dr.scheduleID
-            JOIN duty_assignments da ON da.appointment_id = ds.scheduleID
-            WHERE dr.patientID = ?
-        )
-        ORDER BY dnmr.created_at ASC
-    ";
-    $stmt = @$conn->prepare($dnm_query);
-    if ($stmt) {
-        $stmt->bind_param("i", $patient_id);
-        $stmt->execute();
-        foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
-            $_SESSION['billing_cart'][$patient_id][] = [
-                'cart_key'    => 'DNM-'.$row['record_id'],
-                'ref_id'      => $row['record_id'],
-                'med_id'      => null,
-                'serviceName' => $row['procedure_name'],
-                'description' => 'Procedure — '.date('M d, Y', strtotime($row['created_at'])),
-                'price'       => (float)$row['amount'],
-                'source'      => 'dnm',
-                'category'    => 'service',
-            ];
-        }
-    }
-
-    /* ── 3. pharmacy_prescription_items ─────────────────────*/
-    $stmt = $conn->prepare("
-        SELECT
-            ppi.item_id,
-            ppi.med_id,
-            ppi.dosage              AS rx_dosage,
-            ppi.frequency,
-            ppi.quantity_dispensed,
-            ppi.unit_price,
-            ppi.total_price,
-            pi2.med_name,
-            pi2.dosage              AS inv_dosage
-        FROM pharmacy_prescription pp
-        JOIN pharmacy_prescription_items ppi ON ppi.prescription_id = pp.prescription_id
-        JOIN pharmacy_inventory          pi2 ON pi2.med_id          = ppi.med_id
-        WHERE pp.patient_id     = ?
-          AND pp.payment_type   = 'post_discharged'
-          AND pp.status         = 'Dispensed'
-          AND pp.billing_status = 'pending'
-        ORDER BY ppi.item_id ASC
-    ");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
-        $dose = trim(($row['rx_dosage'] ?? $row['inv_dosage'] ?? '').' '.($row['frequency'] ?? ''));
-        $_SESSION['billing_cart'][$patient_id][] = [
-            'cart_key'    => 'RX-'.$row['item_id'],
-            'ref_id'      => $row['item_id'],
-            'med_id'      => $row['med_id'],
-            'serviceName' => $row['med_name'].($dose ? ' ('.$dose.')' : ''),
-            'description' => 'Dispensed — Qty: '.$row['quantity_dispensed'].' × ₱'.number_format($row['unit_price'],2),
-            'price'       => (float)$row['total_price'],
-            'source'      => 'rx',
-            'category'    => 'medicine',
-        ];
-    }
-}
-
-/* =========================================================
-   ADD EXTRA LABORATORY SERVICE (from dl_services)
-========================================================= */
+/* ADD EXTRA LAB SERVICE */
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_lab'])) {
     $svc_id = (int)$_POST['lab_service_id'];
     $qty    = max(1,(int)($_POST['lab_qty'] ?? 1));
     if ($svc_id > 0) {
-        $stmt = $conn->prepare("SELECT serviceID,serviceName,price FROM dl_services WHERE serviceID=? LIMIT 1");
-        $stmt->bind_param("i",$svc_id);
-        $stmt->execute();
-        $svc = $stmt->get_result()->fetch_assoc();
+        $s = $conn->prepare("SELECT serviceID,serviceName,price FROM dl_services WHERE serviceID=? LIMIT 1");
+        $s->bind_param("i",$svc_id); $s->execute();
+        $svc = $s->get_result()->fetch_assoc();
         if ($svc) {
-            $_SESSION['billing_cart'][$patient_id][] = [
+            if (!isset($_SESSION['billing_extra'][$patient_id])) $_SESSION['billing_extra'][$patient_id] = [];
+            $_SESSION['billing_extra'][$patient_id][] = [
                 'cart_key'    => 'XLAB-'.$svc_id.'-'.time(),
-                'ref_id'      => $svc_id,
-                'med_id'      => null,
+                'ref_id'      => $svc_id, 'med_id' => null,
                 'serviceName' => $svc['serviceName'],
-                'description' => 'Added Lab Service'.($qty>1?' × '.$qty:'').' — ₱'.number_format($svc['price'],2).'/unit',
+                'description' => 'Added Lab'.($qty>1?' × '.$qty:'').' — ₱'.number_format($svc['price'],2).'/unit',
                 'price'       => round($svc['price']*$qty,2),
-                'source'      => 'add_lab',
-                'category'    => 'laboratory',
+                'source'      => 'add_lab', 'category' => 'laboratory',
             ];
         }
     }
     header("Location: billing_items.php?patient_id=$patient_id"); exit;
 }
 
-/* =========================================================
-   ADD EXTRA SERVICE (manual, from dnm_procedure_list)
-========================================================= */
+/* ADD EXTRA SERVICE */
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_service'])) {
     $proc_id = (int)$_POST['procedure_id'];
     $qty     = max(1,(int)($_POST['svc_qty'] ?? 1));
     if ($proc_id > 0) {
-        $stmt = $conn->prepare("SELECT procedure_id,procedure_name,price FROM dnm_procedure_list WHERE procedure_id=? AND status='Active' LIMIT 1");
-        $stmt->bind_param("i",$proc_id);
-        $stmt->execute();
-        $proc = $stmt->get_result()->fetch_assoc();
+        $s = $conn->prepare("SELECT procedure_id,procedure_name,price FROM dnm_procedure_list WHERE procedure_id=? AND status='Active' LIMIT 1");
+        $s->bind_param("i",$proc_id); $s->execute();
+        $proc = $s->get_result()->fetch_assoc();
         if ($proc) {
-            $_SESSION['billing_cart'][$patient_id][] = [
+            if (!isset($_SESSION['billing_extra'][$patient_id])) $_SESSION['billing_extra'][$patient_id] = [];
+            $_SESSION['billing_extra'][$patient_id][] = [
                 'cart_key'    => 'XSVC-'.$proc_id.'-'.time(),
-                'ref_id'      => $proc_id,
-                'med_id'      => null,
+                'ref_id'      => $proc_id, 'med_id' => null,
                 'serviceName' => $proc['procedure_name'],
                 'description' => 'Added'.($qty>1?' × '.$qty:'').' — ₱'.number_format($proc['price'],2).'/unit',
                 'price'       => round($proc['price']*$qty,2),
-                'source'      => 'add_svc',
-                'category'    => 'service',
+                'source'      => 'add_svc', 'category' => 'service',
             ];
         }
     }
     header("Location: billing_items.php?patient_id=$patient_id"); exit;
 }
 
-/* =========================================================
-   ADD EXTRA MEDICINE (manual, from pharmacy_inventory)
-========================================================= */
+/* ADD EXTRA MEDICINE */
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_medicine'])) {
     $med_id = (int)$_POST['med_id'];
     $qty    = max(1,(int)($_POST['qty'] ?? 1));
     if ($med_id > 0) {
-        $stmt = $conn->prepare("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory WHERE med_id=? LIMIT 1");
-        $stmt->bind_param("i",$med_id);
-        $stmt->execute();
-        $med = $stmt->get_result()->fetch_assoc();
+        $s = $conn->prepare("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory WHERE med_id=? LIMIT 1");
+        $s->bind_param("i",$med_id); $s->execute();
+        $med = $s->get_result()->fetch_assoc();
         if ($med) {
-            $_SESSION['billing_cart'][$patient_id][] = [
+            if (!isset($_SESSION['billing_extra'][$patient_id])) $_SESSION['billing_extra'][$patient_id] = [];
+            $_SESSION['billing_extra'][$patient_id][] = [
                 'cart_key'    => 'XMED-'.$med_id.'-'.time(),
-                'ref_id'      => $med_id,
-                'med_id'      => $med['med_id'],
+                'ref_id'      => $med_id, 'med_id' => $med['med_id'],
                 'serviceName' => $med['med_name'].(!empty($med['dosage'])?' ('.$med['dosage'].')':''),
-                'description' => 'Added Medicine — Qty: '.$qty.' × ₱'.number_format($med['unit_price'],2),
+                'description' => 'Added Medicine — Qty:'.$qty.' × ₱'.number_format($med['unit_price'],2),
                 'price'       => round($med['unit_price']*$qty,2),
-                'source'      => 'add_med',
-                'category'    => 'medicine',
+                'source'      => 'add_med', 'category' => 'medicine',
             ];
         }
     }
     header("Location: billing_items.php?patient_id=$patient_id"); exit;
 }
 
-/* =========================================================
-   DELETE — only add_svc / add_med / add_lab
-========================================================= */
+/* DELETE extra item (index into billing_extra array) */
 if (isset($_GET['delete'])) {
-    $idx = (int)$_GET['delete'];
-    if (isset($_SESSION['billing_cart'][$patient_id][$idx])
-        && in_array($_SESSION['billing_cart'][$patient_id][$idx]['source'],['add_svc','add_med','add_lab'])) {
-        unset($_SESSION['billing_cart'][$patient_id][$idx]);
-        $_SESSION['billing_cart'][$patient_id] = array_values($_SESSION['billing_cart'][$patient_id]);
+    $idx    = (int)$_GET['delete'];
+    $extras = $_SESSION['billing_extra'][$patient_id] ?? [];
+    if (isset($extras[$idx]) && in_array($extras[$idx]['source'], ['add_lab','add_svc','add_med'])) {
+        unset($extras[$idx]);
+        $_SESSION['billing_extra'][$patient_id] = array_values($extras);
     }
     header("Location: billing_items.php?patient_id=$patient_id"); exit;
 }
 
-/* RESET CART */
+/* CLEAR EXTRAS */
 if (isset($_GET['reset_cart'])) {
-    unset($_SESSION['billing_cart'][$patient_id]);
+    unset($_SESSION['billing_extra'][$patient_id]);
     header("Location: billing_items.php?patient_id=$patient_id"); exit;
 }
+
+/* =========================================================
+   PRICE HELPER — match dl_results.result against dl_services
+========================================================= */
+function findLabPrice(string $name, array $svc_map): float {
+    $key = strtolower(trim($name));
+    /* 1) Exact match */
+    if (isset($svc_map[$key])) return $svc_map[$key];
+    /* 2) Keyword match (strip parenthetical, first word) */
+    $kw = strtolower(trim(preg_replace('/\s*\(.*?\)/', '', $name)));
+    $kw = trim(strtok($kw, ' '));
+    if (strlen($kw) >= 2) {
+        foreach ($svc_map as $k => $p) {
+            if (strpos($k, $kw) !== false) return $p;
+        }
+    }
+    return 0.0;
+}
+
+/* =========================================================
+   BUILD AUTO ITEMS FRESH FROM DB ON EVERY PAGE LOAD
+========================================================= */
+$auto_items = [];
+
+/* Load dl_services price map */
+$svc_map = [];
+$svr = $conn->query("SELECT serviceName, price FROM dl_services ORDER BY serviceID");
+if ($svr) { while ($sv = $svr->fetch_assoc()) $svc_map[strtolower(trim($sv['serviceName']))] = (float)$sv['price']; }
+
+/* LAB RESULTS — always show dl_results.result as service name */
+$ls = $conn->prepare("SELECT resultID, resultDate, result AS serviceName FROM dl_results WHERE patientID=? AND status='Completed' ORDER BY resultDate ASC");
+if ($ls) {
+    $ls->bind_param("i",$patient_id); $ls->execute();
+    foreach ($ls->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $sname = trim($row['serviceName']);
+        $auto_items[] = [
+            'cart_key'    => 'LAB-'.$row['resultID'],
+            'ref_id'      => $row['resultID'], 'med_id' => null,
+            'serviceName' => $sname ?: 'Laboratory Service',
+            'description' => 'Lab Result — '.date('M d, Y', strtotime($row['resultDate'])),
+            'price'       => findLabPrice($sname, $svc_map),
+            'source'      => 'lab', 'category' => 'laboratory',
+        ];
+    }
+}
+
+/* DNM / PROCEDURE RECORDS */
+$ds = @$conn->prepare("
+    SELECT dnmr.record_id, dnmr.procedure_name, dnmr.amount, dnmr.created_at
+    FROM dnm_records dnmr
+    WHERE dnmr.duty_id IN (
+        SELECT da.duty_id FROM dl_results dr
+        JOIN dl_schedule ds      ON ds.scheduleID     = dr.scheduleID
+        JOIN duty_assignments da ON da.appointment_id = ds.scheduleID
+        WHERE dr.patientID = ?
+    ) ORDER BY dnmr.created_at ASC
+");
+if ($ds) {
+    $ds->bind_param("i",$patient_id); $ds->execute();
+    foreach ($ds->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $dnm_price = (float)$row['amount'];
+        if ($dnm_price == 0 && !empty($row['procedure_name'])) {
+            $ps = $conn->prepare("SELECT price FROM dnm_procedure_list WHERE LOWER(TRIM(procedure_name))=LOWER(TRIM(?)) AND status='Active' LIMIT 1");
+            if ($ps) { $ps->bind_param("s",$row['procedure_name']); $ps->execute(); $pr=$ps->get_result()->fetch_assoc(); if($pr) $dnm_price=(float)$pr['price']; }
+        }
+        $auto_items[] = [
+            'cart_key'    => 'DNM-'.$row['record_id'],
+            'ref_id'      => $row['record_id'], 'med_id' => null,
+            'serviceName' => $row['procedure_name'],
+            'description' => 'Procedure — '.date('M d, Y', strtotime($row['created_at'])),
+            'price'       => $dnm_price,
+            'source'      => 'dnm', 'category' => 'service',
+        ];
+    }
+}
+
+/* PHARMACY / DISPENSED MEDICINES */
+$rs = $conn->prepare("
+    SELECT ppi.item_id, ppi.med_id, ppi.dosage AS rx_dosage, ppi.frequency,
+           ppi.quantity_dispensed, ppi.unit_price, ppi.total_price,
+           pi2.med_name, pi2.dosage AS inv_dosage, pi2.unit_price AS inv_unit_price
+    FROM pharmacy_prescription pp
+    JOIN pharmacy_prescription_items ppi ON ppi.prescription_id=pp.prescription_id
+    JOIN pharmacy_inventory          pi2 ON pi2.med_id=ppi.med_id
+    WHERE pp.patient_id=? AND pp.payment_type='post_discharged'
+      AND pp.status='Dispensed' AND pp.billing_status='pending'
+    ORDER BY ppi.item_id ASC
+");
+if ($rs) {
+    $rs->bind_param("i",$patient_id); $rs->execute();
+    foreach ($rs->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $dose     = trim(($row['rx_dosage']??$row['inv_dosage']??'').' '.($row['frequency']??''));
+        $rx_total = (float)$row['total_price'];
+        if ($rx_total == 0) {
+            $unit     = (float)($row['unit_price'] ?: $row['inv_unit_price'] ?: 0);
+            $rx_total = round($unit * (int)($row['quantity_dispensed']?:1), 2);
+        }
+        $auto_items[] = [
+            'cart_key'    => 'RX-'.$row['item_id'],
+            'ref_id'      => $row['item_id'], 'med_id' => $row['med_id'],
+            'serviceName' => $row['med_name'].($dose?' ('.$dose.')':''),
+            'description' => 'Dispensed — Qty:'.$row['quantity_dispensed'].' × ₱'.number_format((float)($row['unit_price']?:$row['inv_unit_price']),2),
+            'price'       => $rx_total,
+            'source'      => 'rx', 'category' => 'medicine',
+        ];
+    }
+}
+
+/* Merge auto + manually-added extras */
+$extra_items = array_values($_SESSION['billing_extra'][$patient_id] ?? []);
+$auto_count  = count($auto_items);
+$cart        = array_merge($auto_items, $extra_items);
 
 /* =========================================================
    FINALIZE
-   billing_records columns: patient_id, billing_date, total_amount,
-   grand_total, status, transaction_id  (NO total_discount column)
-   Discount is stored in patient_receipt.total_discount
 ========================================================= */
 if (isset($_GET['finalize']) && $_GET['finalize']==1) {
-    $cart_f     = $_SESSION['billing_cart'][$patient_id];
-    $subtotal_f = array_sum(array_column($cart_f,'price'));
+    $subtotal_f = array_sum(array_column($cart,'price'));
     $discount_f = ($is_pwd||$is_senior) ? round($subtotal_f*0.20,2) : 0.00;
-    $grand_f    = round($subtotal_f - $discount_f, 2);
-    $txn        = 'TXN-'.strtoupper(uniqid());
+    $grand_f    = round($subtotal_f-$discount_f,2);
+    if ($grand_f <= 0) { header("Location: billing_items.php?patient_id=$patient_id&err=zero_total"); exit; }
 
-    /* ── billing_records (no total_discount column) ── */
+    $txn = 'TXN-'.strtoupper(uniqid());
     if ($existing_bill) {
         $billing_id = $existing_bill['billing_id'];
-        $s = $conn->prepare("
-            UPDATE billing_records
-            SET total_amount=?, grand_total=?, status='Pending', transaction_id=?
-            WHERE billing_id=?
-        ");
-        $s->bind_param("ddsi", $subtotal_f, $grand_f, $txn, $billing_id);
-        $s->execute();
-        $d = $conn->prepare("DELETE FROM billing_items WHERE billing_id=?");
-        $d->bind_param("i", $billing_id);
-        $d->execute();
+        $s=$conn->prepare("UPDATE billing_records SET total_amount=?,grand_total=?,status='Pending',transaction_id=? WHERE billing_id=?");
+        $s->bind_param("ddsi",$subtotal_f,$grand_f,$txn,$billing_id); $s->execute();
+        $d=$conn->prepare("DELETE FROM billing_items WHERE billing_id=?"); $d->bind_param("i",$billing_id); $d->execute();
     } else {
-        $s = $conn->prepare("
-            INSERT INTO billing_records
-                (patient_id, billing_date, total_amount, grand_total, status, transaction_id)
-            VALUES (?, NOW(), ?, ?, 'Pending', ?)
-        ");
-        $s->bind_param("idds", $patient_id, $subtotal_f, $grand_f, $txn);
-        $s->execute();
-        $billing_id = $conn->insert_id;
+        $s=$conn->prepare("INSERT INTO billing_records(patient_id,billing_date,total_amount,grand_total,status,transaction_id) VALUES(?,NOW(),?,?,'Pending',?)");
+        $s->bind_param("idds",$patient_id,$subtotal_f,$grand_f,$txn); $s->execute();
+        $billing_id=$conn->insert_id;
     }
-
-    /* ── billing_items ── */
-    foreach ($cart_f as $item) {
-        $s = $conn->prepare("
-            INSERT INTO billing_items (billing_id, patient_id, quantity, unit_price, total_price, finalized)
-            VALUES (?, ?, 1, ?, ?, 1)
-        ");
-        $s->bind_param("iidd", $billing_id, $patient_id, $item['price'], $item['price']);
+    foreach ($cart as $item) {
+        $service_id = (int)($item['ref_id'] ?? 0);
+        $s=$conn->prepare("INSERT INTO billing_items(billing_id,patient_id,service_id,quantity,unit_price,total_price,finalized) VALUES(?,?,?,1,?,?,1)");
+        $s->bind_param("iiidd",$billing_id,$patient_id,$service_id,$item['price'],$item['price']);
         $s->execute();
     }
-
-    /* ── patient_receipt — upsert discount & totals ── */
-    $pwd_flag = ($is_pwd || $is_senior) ? 1 : 0;
-    $chk = $conn->prepare("SELECT receipt_id FROM patient_receipt WHERE billing_id=? LIMIT 1");
-    $chk->bind_param("i", $billing_id);
-    $chk->execute();
-    $existing_receipt = $chk->get_result()->fetch_assoc();
-
+    $pwd_flag=($is_pwd||$is_senior)?1:0;
+    $chk=$conn->prepare("SELECT receipt_id FROM patient_receipt WHERE billing_id=? LIMIT 1");
+    $chk->bind_param("i",$billing_id); $chk->execute();
+    $existing_receipt=$chk->get_result()->fetch_assoc();
     if ($existing_receipt) {
-        $r = $conn->prepare("
-            UPDATE patient_receipt
-            SET total_charges=?, total_discount=?, grand_total=?,
-                total_out_of_pocket=?, status='Pending', transaction_id=?, is_pwd=?
-            WHERE billing_id=?
-        ");
-        $r->bind_param("ddddsii", $subtotal_f, $discount_f, $grand_f, $grand_f, $txn, $pwd_flag, $billing_id);
-        $r->execute();
+        $r=$conn->prepare("UPDATE patient_receipt SET total_charges=?,total_discount=?,grand_total=?,total_out_of_pocket=?,status='Pending',transaction_id=?,is_pwd=? WHERE billing_id=?");
+        $r->bind_param("ddddsii",$subtotal_f,$discount_f,$grand_f,$grand_f,$txn,$pwd_flag,$billing_id); $r->execute();
     } else {
-        $r = $conn->prepare("
-            INSERT INTO patient_receipt
-                (patient_id, billing_id, total_charges, total_vat, total_discount,
-                 total_out_of_pocket, grand_total, status, transaction_id, is_pwd)
-            VALUES (?, ?, ?, 0, ?, ?, ?, 'Pending', ?, ?)
-        ");
-        $r->bind_param("iiddddsi", $patient_id, $billing_id, $subtotal_f, $discount_f, $grand_f, $grand_f, $txn, $pwd_flag);
-        $r->execute();
+        $r=$conn->prepare("INSERT INTO patient_receipt(patient_id,billing_id,total_charges,total_vat,total_discount,total_out_of_pocket,grand_total,status,transaction_id,is_pwd) VALUES(?,?,?,0,?,?,?,'Pending',?,?)");
+        $r->bind_param("iiddddsi",$patient_id,$billing_id,$subtotal_f,$discount_f,$grand_f,$grand_f,$txn,$pwd_flag); $r->execute();
     }
-
-    /* ── mark pharmacy prescriptions as billed ── */
-    $u = $conn->prepare("
-        UPDATE pharmacy_prescription
-        SET billing_status='billed'
-        WHERE patient_id=? AND payment_type='post_discharged' AND billing_status='pending'
-    ");
-    $u->bind_param("i", $patient_id);
-    $u->execute();
-
-    unset($_SESSION['billing_cart'][$patient_id]);
+    $u=$conn->prepare("UPDATE pharmacy_prescription SET billing_status='billed' WHERE patient_id=? AND payment_type='post_discharged' AND billing_status='pending'");
+    $u->bind_param("i",$patient_id); $u->execute();
+    unset($_SESSION['billing_extra'][$patient_id]);
     header("Location: patient_billing.php?patient_id=$patient_id"); exit;
 }
 
 /* =========================================================
    CART TOTALS & GROUPING
 ========================================================= */
-$cart        = $_SESSION['billing_cart'][$patient_id];
 $subtotal    = array_sum(array_column($cart,'price'));
 $discount    = ($is_pwd||$is_senior) ? $subtotal*0.20 : 0;
 $grand_total = $subtotal - $discount;
@@ -476,50 +424,72 @@ $cat_services   = array_values(array_filter($cart, fn($c)=>$c['category']==='ser
 $cat_laboratory = array_values(array_filter($cart, fn($c)=>$c['category']==='laboratory'));
 $cat_medicines  = array_values(array_filter($cart, fn($c)=>$c['category']==='medicine'));
 
-$svc_total = array_sum(array_column($cat_services,  'price'));
+$svc_total = array_sum(array_column($cat_services,'price'));
 $lab_total = array_sum(array_column($cat_laboratory,'price'));
-$med_total = array_sum(array_column($cat_medicines, 'price'));
+$med_total = array_sum(array_column($cat_medicines,'price'));
+$can_finalize = !empty($cart) && $grand_total > 0;
 
-/* =========================================================
-   DROPDOWNS
-========================================================= */
-// Lab services
+/* DROPDOWNS
+   Exclude services/procedures already in the cart so they can't be added twice.
+*/
+
+/* Collect ALL lab service names already in the cart (any source)
+   so they disappear from the dropdown once added — no duplicates. */
+$used_lab_names = [];
+foreach ($cart as $item) {
+    if ($item['category'] === 'laboratory') {
+        $used_lab_names[] = strtolower(trim($item['serviceName']));
+    }
+}
+
 $lab_svc_res = $conn->query("SELECT serviceID,serviceName,price FROM dl_services ORDER BY serviceName");
 $lab_services = [];
-while ($ls = $lab_svc_res->fetch_assoc()) $lab_services[] = $ls;
-
-// Procedures
-$proc_res   = $conn->query("SELECT procedure_id,procedure_name,price FROM dnm_procedure_list WHERE status='Active' ORDER BY procedure_name");
-$procedures = [];
-while ($p = $proc_res->fetch_assoc()) $procedures[] = $p;
-
-// Medicines
-$seeded_ids = array_unique(array_filter(array_column($cart,'med_id')));
-if ($seeded_ids) {
-    $ph   = implode(',',array_fill(0,count($seeded_ids),'?'));
-    $stmt = $conn->prepare("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory WHERE med_id NOT IN ($ph) ORDER BY med_name");
-    $stmt->bind_param(str_repeat('i',count($seeded_ids)),...$seeded_ids);
-    $stmt->execute();
-    $med_res = $stmt->get_result();
-} else {
-    $med_res = $conn->query("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory ORDER BY med_name");
+while ($ls = $lab_svc_res->fetch_assoc()) {
+    /* Hide from dropdown if this service name is already anywhere in the bill */
+    if (in_array(strtolower(trim($ls['serviceName'])), $used_lab_names)) continue;
+    $lab_services[] = $ls;
 }
-$medicines = [];
-while ($m = $med_res->fetch_assoc()) $medicines[] = $m;
 
-/* Patient helpers */
+/* Collect ALL procedure names already in the cart (any source)
+   so they disappear from the dropdown once added — no duplicates. */
+$used_proc_names = [];
+foreach ($cart as $item) {
+    if ($item['category'] === 'service') {
+        $used_proc_names[] = strtolower(trim($item['serviceName']));
+    }
+}
+
+$proc_res = $conn->query("SELECT procedure_id,procedure_name,price FROM dnm_procedure_list WHERE status='Active' ORDER BY procedure_name");
+$procedures = [];
+while ($p = $proc_res->fetch_assoc()) {
+    if (in_array(strtolower(trim($p['procedure_name'])), $used_proc_names)) continue;
+    $procedures[] = $p;
+}
+
+$seeded_ids=array_unique(array_filter(array_column($cart,'med_id')));
+if($seeded_ids){
+    $ph=implode(',',array_fill(0,count($seeded_ids),'?'));
+    $stmt=$conn->prepare("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory WHERE med_id NOT IN ($ph) ORDER BY med_name");
+    $stmt->bind_param(str_repeat('i',count($seeded_ids)),...$seeded_ids); $stmt->execute();
+    $med_res=$stmt->get_result();
+} else {
+    $med_res=$conn->query("SELECT med_id,med_name,dosage,unit_price FROM pharmacy_inventory ORDER BY med_name");
+}
+$medicines=[];
+while($m=$med_res->fetch_assoc()) $medicines[]=$m;
+
 $full_name  = trim($patient['fname'].' '.($patient['mname']??'').' '.$patient['lname']);
-$gender     = ucfirst($patient['gender'] ?? '—');
-$contact    = $patient['contact_no'] ?? $patient['phone'] ?? '—';
-$address    = $patient['address'] ?? '—';
-$patient_no = $patient['patient_no'] ?? $patient['patient_id'];
+$gender     = ucfirst($patient['gender']??'—');
+$contact    = $patient['contact_no']??$patient['phone']??'—';
+$address    = $patient['address']??'—';
+$patient_no = $patient['patient_no']??$patient['patient_id'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<title>Patient Bill — <?= htmlspecialchars($full_name) ?></title>
+<title>Patient Bill — <?=htmlspecialchars($full_name)?></title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
@@ -527,28 +497,20 @@ $patient_no = $patient['patient_no'] ?? $patient['patient_id'];
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <style>
 :root{
-    --sidebar-w:250px;--navy:#0b1d3a;--accent:#2563eb;
-    --success:#059669;--danger:#dc2626;
-    --ink:#1e293b;--ink-light:#64748b;--border:#e2e8f0;
-    --surface:#f1f5f9;--card:#fff;--radius:14px;
-    --shadow:0 2px 20px rgba(11,29,58,.08);
+    --sidebar-w:250px;--navy:#0b1d3a;--accent:#2563eb;--success:#059669;--danger:#dc2626;
+    --ink:#1e293b;--ink-light:#64748b;--border:#e2e8f0;--surface:#f1f5f9;--card:#fff;
+    --radius:14px;--shadow:0 2px 20px rgba(11,29,58,.08);
     --ff-head:'DM Serif Display',serif;--ff-body:'DM Sans',sans-serif;
-    --c-lab:#065f46;--bg-lab:#d1fae5;
-    --c-svc:#7e22ce;--bg-svc:#fdf4ff;
-    --c-rx:#1d4ed8;--bg-rx:#dbeafe;
+    --c-lab:#065f46;--bg-lab:#d1fae5;--c-svc:#7e22ce;--bg-svc:#fdf4ff;--c-rx:#1d4ed8;--bg-rx:#dbeafe;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .cw{margin-left:var(--sidebar-w);padding:44px 28px 80px;transition:margin-left .3s;}
 .cw.sidebar-collapsed{margin-left:0;}
-
-/* Page header */
 .page-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
 .head-icon{width:50px;height:50px;background:linear-gradient(135deg,var(--navy),var(--accent));border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;box-shadow:0 6px 18px rgba(11,29,58,.2);flex-shrink:0;}
 .page-head h2{font-family:var(--ff-head);font-size:clamp(1.2rem,2.5vw,1.7rem);color:var(--navy);margin:0;}
 .page-head p{font-size:.82rem;color:var(--ink-light);margin-top:3px;}
-
-/* Patient card */
 .pat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
 .pat-head{background:linear-gradient(135deg,var(--navy),#1e3a6e);padding:16px 22px;display:flex;align-items:center;gap:14px;}
 .pat-av{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.18);border:2.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-family:var(--ff-head);font-size:1.35rem;color:#fff;flex-shrink:0;}
@@ -556,43 +518,27 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .pat-pid{font-size:.74rem;color:rgba(255,255,255,.6);margin-top:3px;}
 .pat-chips{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
 .chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:4px 12px;font-size:.71rem;font-weight:700;white-space:nowrap;}
-.chip-sc{background:#dbeafe;color:#1d4ed8;}
-.chip-pwd{background:#d1fae5;color:#065f46;}
+.chip-sc{background:#dbeafe;color:#1d4ed8;}.chip-pwd{background:#d1fae5;color:#065f46;}
 .chip-g{background:rgba(255,255,255,.15);color:#fff;}
 .pat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
 .pat-gi{padding:12px 22px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
 .pat-gi:last-child{border-right:none;}
 .gi-lbl{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-light);display:flex;align-items:center;gap:4px;margin-bottom:3px;}
 .gi-val{font-size:.9rem;font-weight:600;color:var(--navy);}
-
-/* Banners */
 .alert-ok{background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-weight:600;color:var(--success);margin-bottom:16px;}
+.alert-zero{background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-weight:600;color:#c2410c;margin-bottom:16px;}
 .bill-banner{display:flex;align-items:center;gap:10px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:12px 18px;margin-bottom:16px;font-size:.87rem;font-weight:600;color:#92400e;flex-wrap:wrap;}
 .bb-acts{margin-left:auto;display:flex;gap:7px;}
 .bb-acts a{display:inline-flex;align-items:center;gap:4px;background:#fff;color:#92400e;border:1.5px solid #fde68a;border-radius:7px;padding:4px 12px;font-size:.77rem;font-weight:700;text-decoration:none;}
 .bb-acts a:hover{background:#fef3c7;}
-
-/* Discount */
 .disc-bar{display:flex;align-items:center;gap:10px;padding:11px 16px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;margin-bottom:16px;font-size:.87rem;color:#065f46;font-weight:600;}
 .disc-bar.sc{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
 .disc-bar input{width:17px;height:17px;accent-color:var(--success);cursor:pointer;flex-shrink:0;}
 .d-badge{margin-left:auto;border-radius:999px;padding:3px 11px;font-size:.71rem;font-weight:700;color:#fff;background:#059669;}
-
-/* ── TWO-COLUMN LAYOUT — left=panel, right=table ── */
 .billing-layout{display:grid;grid-template-columns:400px 1fr;gap:22px;align-items:start;}
-.billing-left{}
-.billing-right{}
-
-/* Bill table */
-.bcard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+.bcard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
 .bcard-head{padding:11px 20px;display:flex;align-items:center;gap:8px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.88);}
 .h-bill{background:linear-gradient(90deg,var(--navy),#1e40af);}
-.h-svc{background:#5b21b6;}
-.h-med{background:var(--navy);}
-.h-lab{background:#047857;}
-.bcard-body{padding:18px;}
-
-/* Add cards */
 .add-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px;}
 .add-card:last-of-type{margin-bottom:0;}
 .add-card-header{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--border);}
@@ -606,28 +552,20 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .add-card-title{font-weight:700;font-size:.88rem;color:var(--navy);line-height:1.2;}
 .add-card-sub{font-size:.69rem;color:var(--ink-light);margin-top:1px;}
 .add-card-body{padding:14px 18px;}
-
-/* Add form fields */
 .af-field{margin-bottom:10px;}
 .af-label{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.55px;color:var(--ink-light);display:block;margin-bottom:5px;}
-.af-select{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:var(--ff-body);font-size:.85rem;color:var(--ink);background:var(--card);outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;transition:border-color .2s,box-shadow .2s;cursor:pointer;}
+.af-select{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:var(--ff-body);font-size:.85rem;color:var(--ink);background:var(--card);outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;cursor:pointer;}
 .af-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1);}
 .add-card-lab .af-select:focus{border-color:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.1);}
 .add-card-svc .af-select:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.1);}
-
-/* Add buttons */
-.af-btn{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:10px 16px;border:none;border-radius:9px;font-family:var(--ff-body);font-size:.87rem;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.2px;}
+.af-btn{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:10px 16px;border:none;border-radius:9px;font-family:var(--ff-body);font-size:.87rem;font-weight:700;cursor:pointer;transition:all .15s;}
 .af-btn-lab{background:#059669;color:#fff;box-shadow:0 3px 10px rgba(5,150,105,.25);}
 .af-btn-lab:hover{background:#047857;transform:translateY(-1px);}
 .af-btn-svc{background:#7c3aed;color:#fff;box-shadow:0 3px 10px rgba(124,58,237,.25);}
 .af-btn-svc:hover{background:#6d28d9;transform:translateY(-1px);}
 .af-btn-med{background:var(--accent);color:#fff;box-shadow:0 3px 10px rgba(37,99,235,.25);}
 .af-btn-med:hover{background:#1d4ed8;transform:translateY(-1px);}
-
-/* ── BILL FOOTER ── */
 .bill-footer{border-top:2px solid var(--border);background:#fafbfc;}
-
-/* Totals block */
 .bf-totals-block{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
 .bf-line{display:flex;justify-content:space-between;align-items:center;}
 .bf-lbl{font-size:.88rem;color:var(--ink-light);font-weight:500;}
@@ -635,52 +573,33 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .bf-disc-line .bf-lbl{color:var(--danger);font-size:.84rem;}
 .bf-disc-line .bf-amount{color:var(--danger);font-weight:700;}
 .bf-divider{border:none;border-top:1.5px dashed var(--border);margin:4px 0;}
-.bf-grand-line{margin-top:2px;}
 .bf-grand-lbl{font-size:1.05rem;font-weight:800;color:var(--navy);}
 .bf-grand-amt{font-size:1.25rem;font-weight:800;color:var(--success);}
-
-/* Actions row */
+.bf-grand-amt.zero{color:var(--danger);}
 .bf-actions{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:14px 20px;gap:12px;}
 .bf-act-left{display:flex;justify-content:flex-start;}
 .bf-act-center{display:flex;justify-content:center;}
 .bf-act-right{display:flex;justify-content:flex-end;gap:8px;}
 .bf-empty-note{color:var(--ink-light);font-size:.82rem;font-style:italic;}
-
 .bf-btn-finalize{display:inline-flex;align-items:center;gap:8px;padding:11px 28px;background:var(--success);color:#fff;border:none;border-radius:10px;font-family:var(--ff-head);font-size:.95rem;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(5,150,105,.3);transition:all .15s;white-space:nowrap;}
-.bf-btn-finalize:hover{background:#047857;transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,.35);}
+.bf-btn-finalize:hover{background:#047857;transform:translateY(-1px);}
+.bf-btn-finalize-disabled{display:inline-flex;align-items:center;gap:8px;padding:11px 28px;background:#e2e8f0;color:#94a3b8;border:none;border-radius:10px;font-family:var(--ff-head);font-size:.95rem;font-weight:700;cursor:not-allowed;white-space:nowrap;}
 .bf-btn-back{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
 .bf-btn-back:hover{border-color:var(--accent);color:var(--accent);background:#eff6ff;}
 .bf-btn-reload{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
 .bf-btn-reload:hover{border-color:var(--danger);color:var(--danger);}
-.bf-btn-view{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:#fffbeb;color:#92400e;border:1.5px solid #fde68a;border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
+.bf-btn-view{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:#fffbeb;color:#92400e;border:1.5px solid #fde68a;border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;}
 .bf-btn-view:hover{background:#fef3c7;}
-
-@media(max-width:640px){.bf-actions{grid-template-columns:1fr 1fr;}.bf-act-center{grid-column:1/-1;order:-1;}.bf-btn-finalize{width:100%;justify-content:center;}}
+@media(max-width:640px){.bf-actions{grid-template-columns:1fr 1fr;}.bf-act-center{grid-column:1/-1;order:-1;}.bf-btn-finalize,.bf-btn-finalize-disabled{width:100%;justify-content:center;}}
 .af-qty-row{display:flex;align-items:flex-end;gap:10px;}
 .qty-stepper{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:9px;overflow:hidden;height:38px;}
 .qty-btn{width:36px;height:100%;background:#f8fafc;border:none;color:var(--ink);font-size:1.1rem;font-weight:700;cursor:pointer;flex-shrink:0;transition:background .12s;}
 .qty-btn:hover{background:#e2e8f0;}
 .qty-input{width:54px;height:100%;border:none;border-left:1.5px solid var(--border);border-right:1.5px solid var(--border);text-align:center;font-family:var(--ff-body);font-size:.9rem;font-weight:700;color:var(--navy);outline:none;}
 .qty-input::-webkit-inner-spin-button,.qty-input::-webkit-outer-spin-button{-webkit-appearance:none;}
-
 .af-empty{color:var(--ink-light);font-size:.84rem;font-style:italic;text-align:center;padding:10px 0;}
-
-/* Breakdown rows in totals */
-.t-breakdown-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:9px;margin-bottom:5px;opacity:.45;transition:opacity .2s;}
-.t-breakdown-row.active{opacity:1;background:#f8fafc;}
-.t-bd-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
-.t-breakdown-row.active .t-bd-icon.svc{background:#ede9fe;color:#6d28d9;}
-.t-breakdown-row.active .t-bd-icon.lab{background:#d1fae5;color:#047857;}
-.t-breakdown-row.active .t-bd-icon.med{background:#dbeafe;color:#1d4ed8;}
-.t-bd-icon.svc{background:#f1f1f1;color:#aaa;}
-.t-bd-icon.lab{background:#f1f1f1;color:#aaa;}
-.t-bd-icon.med{background:#f1f1f1;color:#aaa;}
-.t-bd-info{flex:1;min-width:0;}
-.t-bd-label{font-size:.84rem;font-weight:600;color:var(--navy);display:block;}
-.t-bd-count{font-size:.68rem;color:var(--ink-light);}
-.t-bd-amt{font-size:.9rem;font-weight:700;color:var(--navy);white-space:nowrap;}
-
-/* Bill table */
+.price-zero{color:var(--danger) !important;}
+.zero-badge{display:inline-block;margin-left:4px;background:#fee2e2;color:#b91c1c;border-radius:999px;padding:1px 7px;font-size:.6rem;font-weight:700;vertical-align:middle;}
 .itbl{width:100%;border-collapse:collapse;font-size:.85rem;}
 .itbl thead th{background:#f8fafc;color:var(--ink-light);font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:9px 14px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;}
 .itbl thead th.r{text-align:right;}.itbl thead th.c{text-align:center;}
@@ -714,56 +633,11 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .btn-del:hover{background:var(--danger);color:#fff;border-color:var(--danger);}
 .lock-i{color:var(--ink-light);font-size:.82rem;}
 .empty-row td{text-align:center;padding:28px;color:var(--ink-light);font-style:italic;font-size:.84rem;}
-
-/* ── TOTALS PANEL (sticky right column) ── */
-.totals-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;position:sticky;top:20px;}
-.totals-header{background:linear-gradient(135deg,var(--navy),#1e40af);padding:14px 20px;display:flex;align-items:center;gap:8px;}
-.totals-header h5{font-family:var(--ff-head);color:#fff;margin:0;font-size:1rem;}
-.totals-body{padding:20px;}
-
-.t-section{margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);}
-.t-section:last-of-type{border-bottom:none;margin-bottom:0;}
-.t-section-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink-light);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
-.t-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:.87rem;gap:8px;}
-.t-lbl{color:var(--ink-light);font-weight:500;}
-.t-val{font-weight:600;color:var(--ink);}
-.t-sub-row{display:flex;justify-content:space-between;padding:3px 0 3px 12px;font-size:.8rem;}
-.t-sub-lbl{color:var(--ink-light);}
-.t-sub-val{font-weight:500;}
-.t-divider{border:none;border-top:2px solid var(--border);margin:12px 0;}
-.t-grand-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f0fdf4;border-radius:10px;margin-top:10px;}
-.t-grand-lbl{font-size:1rem;font-weight:700;color:var(--navy);}
-.t-grand-val{font-size:1.3rem;font-weight:700;color:var(--success);}
-.t-discount-row{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#fff7f7;border-radius:8px;margin-bottom:8px;font-size:.86rem;}
-.t-discount-lbl{color:var(--danger);font-weight:600;}
-.t-discount-val{color:var(--danger);font-weight:700;}
-.t-zero{color:var(--ink-light);font-style:italic;font-size:.8rem;text-align:center;padding:8px 0;}
-
-/* Finalize button in panel */
-.btn-finalize-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:8px;padding:12px;background:var(--success);color:#fff;border:none;border-radius:10px;font-family:var(--ff-head);font-size:1rem;cursor:pointer;margin-top:14px;transition:background .15s,transform .1s;box-shadow:0 4px 14px rgba(5,150,105,.3);}
-.btn-finalize-panel:hover{background:#047857;transform:translateY(-1px);}
-.btn-viewbill-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:9px;background:#fffbeb;color:#92400e;border:1.5px solid #fde68a;border-radius:10px;font-family:var(--ff-body);font-size:.87rem;font-weight:700;text-decoration:none;margin-top:8px;transition:all .15s;}
-.btn-viewbill-panel:hover{background:#fef3c7;}
-.btn-reset-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:7px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:10px;font-family:var(--ff-body);font-size:.82rem;font-weight:600;text-decoration:none;margin-top:6px;transition:all .15s;}
-.btn-reset-panel:hover{border-color:var(--danger);color:var(--danger);}
-
-/* Item count badge */
 .item-count{background:rgba(255,255,255,.2);border-radius:999px;padding:2px 9px;font-size:.68rem;margin-left:auto;}
-
-/* Actions bottom */
-.actions-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;}
-.btn-back{padding:10px 20px;background:var(--card);color:var(--ink-light);border:1.5px solid var(--border);border-radius:9px;font-family:var(--ff-body);font-size:.87rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
-.btn-back:hover{border-color:var(--accent);color:var(--accent);background:#eff6ff;}
-
-/* Accordion-style add panels */
-.add-section{margin-bottom:12px;}
-.add-section:last-child{margin-bottom:0;}
-.add-sect-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-light);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
-
 @media(max-width:1100px){.billing-layout{grid-template-columns:360px 1fr;}}
-@media(max-width:900px){.billing-layout{grid-template-columns:1fr;}.totals-panel{position:static;}.af-qty-row{flex-direction:column;}.af-btn{width:100%;}}
+@media(max-width:900px){.billing-layout{grid-template-columns:1fr;}.af-qty-row{flex-direction:column;}.af-btn{width:100%;}}
 @media(max-width:768px){.cw{margin-left:0;padding:52px 14px 60px;}.pat-chips{display:none;}}
-@media(max-width:480px){.cw{padding:48px 10px 60px;}.actions-bar{flex-direction:column-reverse;}.btn-back{width:100%;justify-content:center;}.pat-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.cw{padding:48px 10px 60px;}.pat-grid{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
@@ -772,6 +646,9 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 
 <?php if (isset($_GET['success'])): ?>
 <div class="alert-ok"><i class="bi bi-check-circle-fill" style="font-size:1.3rem;"></i> Billing finalized successfully!</div>
+<?php endif; ?>
+<?php if (isset($_GET['err']) && $_GET['err']==='zero_total'): ?>
+<div class="alert-zero"><i class="bi bi-exclamation-triangle-fill" style="font-size:1.3rem;"></i> Cannot finalize — the grand total is ₱0.00. Please ensure at least one item has a price.</div>
 <?php endif; ?>
 
 <div class="page-head">
@@ -782,146 +659,113 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 <!-- Patient Info -->
 <div class="pat-card">
     <div class="pat-head">
-        <div class="pat-av"><?= strtoupper(substr(trim($patient['fname']),0,1)) ?></div>
+        <div class="pat-av"><?=strtoupper(substr(trim($patient['fname']),0,1))?></div>
         <div>
-            <div class="pat-fullname"><?= htmlspecialchars($full_name) ?></div>
-            <div class="pat-pid">Patient ID #<?= htmlspecialchars($patient_no) ?></div>
+            <div class="pat-fullname"><?=htmlspecialchars($full_name)?></div>
+            <div class="pat-pid">Patient ID #<?=htmlspecialchars($patient_no)?></div>
         </div>
         <div class="pat-chips">
-            <?php if ($is_senior): ?><span class="chip chip-sc"><i class="bi bi-person-check-fill"></i> Senior</span><?php endif; ?>
-            <?php if ($is_pwd):    ?><span class="chip chip-pwd"><i class="bi bi-accessibility"></i> PWD</span><?php endif; ?>
-            <span class="chip chip-g"><i class="bi bi-<?= strtolower($gender)==='female'?'gender-female':'gender-male' ?>"></i> <?= htmlspecialchars($gender) ?></span>
+            <?php if($is_senior):?><span class="chip chip-sc"><i class="bi bi-person-check-fill"></i> Senior</span><?php endif;?>
+            <?php if($is_pwd):?><span class="chip chip-pwd"><i class="bi bi-accessibility"></i> PWD</span><?php endif;?>
+            <span class="chip chip-g"><i class="bi bi-<?=strtolower($gender)==='female'?'gender-female':'gender-male'?>"></i> <?=htmlspecialchars($gender)?></span>
         </div>
     </div>
     <div class="pat-grid">
-        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-cake2"></i> Date of Birth</div><div class="gi-val"><?= htmlspecialchars($dob_display) ?></div></div>
-        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-hourglass-split"></i> Age</div><div class="gi-val"><?= $age>0?$age.' yrs old':'—' ?></div></div>
-        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-gender-ambiguous"></i> Gender</div><div class="gi-val"><?= htmlspecialchars($gender) ?></div></div>
-        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-telephone"></i> Contact</div><div class="gi-val"><?= htmlspecialchars($contact) ?></div></div>
-        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-geo-alt"></i> Address</div><div class="gi-val"><?= htmlspecialchars($address) ?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-cake2"></i> Date of Birth</div><div class="gi-val"><?=htmlspecialchars($dob_display)?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-hourglass-split"></i> Age</div><div class="gi-val"><?=$age>0?$age.' yrs old':'—'?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-gender-ambiguous"></i> Gender</div><div class="gi-val"><?=htmlspecialchars($gender)?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-telephone"></i> Contact</div><div class="gi-val"><?=htmlspecialchars($contact)?></div></div>
+        <div class="pat-gi"><div class="gi-lbl"><i class="bi bi-geo-alt"></i> Address</div><div class="gi-val"><?=htmlspecialchars($address)?></div></div>
     </div>
 </div>
 
-<?php if ($existing_bill): ?>
+<?php if($existing_bill):?>
 <div class="bill-banner">
     <i class="bi bi-exclamation-triangle-fill"></i>
     Existing <strong><?=$existing_bill['status']?></strong> bill (ID #<?=$existing_bill['billing_id']?> — ₱<?=number_format($existing_bill['grand_total'],2)?>). Finalizing will <strong>update</strong> it.
     <div class="bb-acts">
         <a href="patient_billing.php?patient_id=<?=$patient_id?>"><i class="bi bi-eye"></i> View</a>
-        <a href="billing_items.php?patient_id=<?=$patient_id?>&reset_cart=1"><i class="bi bi-arrow-clockwise"></i> Reload</a>
+        <a href="billing_items.php?patient_id=<?=$patient_id?>&reset_cart=1"><i class="bi bi-x-circle"></i> Clear Extras</a>
     </div>
 </div>
-<?php endif; ?>
+<?php endif;?>
 
-<?php if ($is_senior): ?>
+<?php if($is_senior):?>
 <div class="disc-bar sc"><i class="bi bi-person-check-fill" style="font-size:1.1rem;"></i> Senior Citizen (60+) — 20% discount applied automatically<span class="d-badge" style="background:#1d4ed8;">SC Discount</span></div>
-<?php else: ?>
+<?php else:?>
 <div class="disc-bar">
     <input type="checkbox" id="pwdChk" <?=$is_pwd?'checked':''?> onchange="window.location='billing_items.php?patient_id=<?=$patient_id?>&toggle_pwd='+(this.checked?1:0)">
     <label for="pwdChk" style="cursor:pointer;">Mark as PWD (applies 20% discount)</label>
-    <?php if ($is_pwd): ?><span class="d-badge">PWD Active</span><?php endif; ?>
+    <?php if($is_pwd):?><span class="d-badge">PWD Active</span><?php endif;?>
 </div>
-<?php endif; ?>
+<?php endif;?>
 
-<!-- ══════════════════════════════════════════════════
-     TWO-COLUMN LAYOUT  |  LEFT = Summary + Add Panels  |  RIGHT = Bill Table
-══════════════════════════════════════════════════ -->
 <div class="billing-layout">
 
-    <!-- ════════════════════════════════
-         LEFT COLUMN — Summary & Add Items
-    ════════════════════════════════ -->
+    <!-- LEFT: add forms -->
     <div class="billing-left">
 
-
-
-        <!-- ADD LABORATORY SERVICE -->
         <div class="add-card add-card-lab">
             <div class="add-card-header">
                 <div class="add-card-icon"><i class="bi bi-eyedropper-fill"></i></div>
-                <div>
-                    <div class="add-card-title">Add Laboratory Service</div>
-                    <div class="add-card-sub">From dl_services catalog</div>
-                </div>
+                <div><div class="add-card-title">Add Laboratory Service</div><div class="add-card-sub">From dl_services catalog</div></div>
             </div>
             <div class="add-card-body">
-                <?php if ($lab_services): ?>
+                <?php if($lab_services):?>
                 <form method="POST">
                     <div class="af-field">
                         <label class="af-label">Select Lab Service</label>
                         <select name="lab_service_id" class="af-select" required>
                             <option value="">— Choose a service —</option>
-                            <?php foreach ($lab_services as $ls): ?>
-                            <option value="<?=$ls['serviceID']?>">
-                                <?=htmlspecialchars($ls['serviceName'])?> — ₱<?=number_format($ls['price'],2)?>
-                            </option>
-                            <?php endforeach; ?>
+                            <?php foreach($lab_services as $ls):?>
+                            <option value="<?=$ls['serviceID']?>"><?=htmlspecialchars($ls['serviceName'])?> — ₱<?=number_format($ls['price'],2)?></option>
+                            <?php endforeach;?>
                         </select>
                     </div>
-                    <button type="submit" name="add_lab" class="af-btn af-btn-lab">
-                        <i class="bi bi-plus-circle-fill"></i> Add to Bill
-                    </button>
+                    <button type="submit" name="add_lab" class="af-btn af-btn-lab"><i class="bi bi-plus-circle-fill"></i> Add to Bill</button>
                 </form>
-                <?php else: ?>
-                <div class="af-empty"><i class="bi bi-info-circle"></i> No lab services found.</div>
-                <?php endif; ?>
+                <?php else:?><div class="af-empty"><i class="bi bi-info-circle"></i> No lab services found.</div><?php endif;?>
             </div>
         </div>
 
-        <!-- ADD EXTRA PROCEDURE -->
         <div class="add-card add-card-svc">
             <div class="add-card-header">
                 <div class="add-card-icon"><i class="bi bi-clipboard2-plus-fill"></i></div>
-                <div>
-                    <div class="add-card-title">Add Procedure / Service</div>
-                    <div class="add-card-sub">From active procedure list</div>
-                </div>
+                <div><div class="add-card-title">Add Procedure / Service</div><div class="add-card-sub">From active procedure list</div></div>
             </div>
             <div class="add-card-body">
-                <?php if ($procedures): ?>
+                <?php if($procedures):?>
                 <form method="POST">
                     <div class="af-field">
                         <label class="af-label">Select Procedure</label>
                         <select name="procedure_id" class="af-select" required>
                             <option value="">— Choose a procedure —</option>
-                            <?php foreach ($procedures as $p): ?>
-                            <option value="<?=$p['procedure_id']?>">
-                                <?=htmlspecialchars($p['procedure_name'])?> — ₱<?=number_format($p['price'],2)?>
-                            </option>
-                            <?php endforeach; ?>
+                            <?php foreach($procedures as $p):?>
+                            <option value="<?=$p['procedure_id']?>"><?=htmlspecialchars($p['procedure_name'])?> — ₱<?=number_format($p['price'],2)?></option>
+                            <?php endforeach;?>
                         </select>
                     </div>
-                    <button type="submit" name="add_service" class="af-btn af-btn-svc">
-                        <i class="bi bi-plus-circle-fill"></i> Add to Bill
-                    </button>
+                    <button type="submit" name="add_service" class="af-btn af-btn-svc"><i class="bi bi-plus-circle-fill"></i> Add to Bill</button>
                 </form>
-                <?php else: ?>
-                <div class="af-empty"><i class="bi bi-info-circle"></i> No active procedures found.</div>
-                <?php endif; ?>
+                <?php else:?><div class="af-empty"><i class="bi bi-info-circle"></i> No active procedures found.</div><?php endif;?>
             </div>
         </div>
 
-        <!-- ADD EXTRA MEDICINE -->
         <div class="add-card add-card-med">
             <div class="add-card-header">
                 <div class="add-card-icon"><i class="bi bi-capsule-fill"></i></div>
-                <div>
-                    <div class="add-card-title">Add Medicine</div>
-                    <div class="add-card-sub">From pharmacy inventory</div>
-                </div>
+                <div><div class="add-card-title">Add Medicine</div><div class="add-card-sub">From pharmacy inventory</div></div>
             </div>
             <div class="add-card-body">
-                <?php if ($medicines): ?>
+                <?php if($medicines):?>
                 <form method="POST">
                     <div class="af-field">
                         <label class="af-label">Select Medicine</label>
                         <select name="med_id" class="af-select" required>
                             <option value="">— Choose a medicine —</option>
-                            <?php foreach ($medicines as $m): ?>
-                            <option value="<?=$m['med_id']?>">
-                                <?=htmlspecialchars($m['med_name'])?><?=!empty($m['dosage'])?' ('.$m['dosage'].')':''?> — ₱<?=number_format($m['unit_price'],2)?>/unit
-                            </option>
-                            <?php endforeach; ?>
+                            <?php foreach($medicines as $m):?>
+                            <option value="<?=$m['med_id']?>"><?=htmlspecialchars($m['med_name'])?><?=!empty($m['dosage'])?' ('.$m['dosage'].')':''?> — ₱<?=number_format($m['unit_price'],2)?>/unit</option>
+                            <?php endforeach;?>
                         </select>
                     </div>
                     <div class="af-qty-row">
@@ -929,27 +773,20 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
                             <label class="af-label">Quantity</label>
                             <div class="qty-stepper">
                                 <button type="button" class="qty-btn" onclick="stepQty(this,-1)">−</button>
-                                <input type="number" name="qty" value="1" min="1" max="999" class="qty-input" id="medQtyInput">
+                                <input type="number" name="qty" value="1" min="1" max="999" class="qty-input">
                                 <button type="button" class="qty-btn" onclick="stepQty(this,1)">+</button>
                             </div>
                         </div>
-                        <button type="submit" name="add_medicine" class="af-btn af-btn-med" style="align-self:flex-end;">
-                            <i class="bi bi-plus-circle-fill"></i> Add to Bill
-                        </button>
+                        <button type="submit" name="add_medicine" class="af-btn af-btn-med" style="align-self:flex-end;"><i class="bi bi-plus-circle-fill"></i> Add</button>
                     </div>
                 </form>
-                <?php else: ?>
-                <div class="af-empty"><i class="bi bi-info-circle"></i> No medicines available.</div>
-                <?php endif; ?>
+                <?php else:?><div class="af-empty"><i class="bi bi-info-circle"></i> No medicines available.</div><?php endif;?>
             </div>
         </div>
 
     </div><!-- /.billing-left -->
 
-
-    <!-- ════════════════════════════════
-         RIGHT COLUMN — Bill Table
-    ════════════════════════════════ -->
+    <!-- RIGHT: bill table -->
     <div class="billing-right">
         <div class="bcard">
             <div class="bcard-head h-bill">
@@ -967,162 +804,147 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
                     </tr>
                 </thead>
                 <tbody>
-                <?php if (empty($cart)): ?>
-                <tr><td colspan="4" class="empty-row"><i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:.3;"></i>No billing items found for this patient.</td></tr>
-                <?php endif; ?>
 
-                <!-- SERVICES (DNM + added) -->
-                <?php if (!empty($cat_services)): ?>
+                <?php if(empty($cart)):?>
+                <tr><td colspan="4" class="empty-row"><i class="bi bi-inbox" style="font-size:1.4rem;display:block;margin-bottom:6px;opacity:.3;"></i>No billing items found for this patient.</td></tr>
+                <?php endif;?>
+
+                <!-- SERVICES -->
+                <?php if(!empty($cat_services)):?>
                 <tr class="sec-row s-svc">
-                    <td colspan="4">
-                        <i class="bi bi-clipboard2-pulse-fill"></i> Doctor / Nurse Procedures
-                        <span class="sec-total">₱<?=number_format($svc_total,2)?></span>
-                    </td>
+                    <td colspan="4"><i class="bi bi-clipboard2-pulse-fill"></i> Doctor / Nurse Procedures <span class="sec-total">₱<?=number_format($svc_total,2)?></span></td>
                 </tr>
-                <?php foreach ($cart as $idx => $item):
-                    if ($item['category']!=='service') continue;
-                    $is_x = $item['source']==='add_svc'; ?>
+                <?php foreach($cart as $idx=>$item):
+                    if($item['category']!=='service') continue;
+                    $is_x=($item['source']==='add_svc');?>
                 <tr class="<?=$is_x?'r-xsvc':'r-dnm'?>">
                     <td>
-                        <span class="tag <?=$is_x?'tag-xsvc':'tag-dnm'?>">
-                            <i class="bi <?=$is_x?'bi-plus-circle':'bi-clipboard2-pulse'?>"></i>
-                            <?=$is_x?'Added':'Procedure'?>
-                        </span>
+                        <span class="tag <?=$is_x?'tag-xsvc':'tag-dnm'?>"><i class="bi <?=$is_x?'bi-plus-circle':'bi-clipboard2-pulse'?>"></i> <?=$is_x?'Added':'Procedure'?></span>
                         <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
                     </td>
                     <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
-                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="r <?=$item['price']==0?'price-zero':''?>">₱<?=number_format($item['price'],2)?><?php if($item['price']==0):?><span class="zero-badge">No Price</span><?php endif;?></td>
                     <td class="c">
-                        <?php if ($is_x): ?>
-                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
-                        <?php else: ?><i class="bi bi-lock-fill lock-i" title="Auto-loaded"></i><?php endif; ?>
+                        <?php if($is_x): $ei=$idx-$auto_count;?>
+                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$ei?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
+                        <?php else:?><i class="bi bi-lock-fill lock-i" title="Auto-loaded"></i><?php endif;?>
                     </td>
                 </tr>
-                <?php endforeach; endif; ?>
+                <?php endforeach; endif;?>
 
                 <!-- LAB RESULTS -->
-                <?php if (!empty($cat_laboratory)): ?>
+                <?php if(!empty($cat_laboratory)):?>
                 <tr class="sec-row s-lab">
-                    <td colspan="4">
-                        <i class="bi bi-eyedropper-fill"></i> Laboratory Results
-                        <span class="sec-total">₱<?=number_format($lab_total,2)?></span>
-                    </td>
+                    <td colspan="4"><i class="bi bi-eyedropper-fill"></i> Laboratory Results <span class="sec-total">₱<?=number_format($lab_total,2)?></span></td>
                 </tr>
-                <?php foreach ($cart as $idx => $item):
-                    if ($item['category']!=='laboratory') continue;
-                    $is_x = $item['source']==='add_lab'; ?>
+                <?php foreach($cart as $idx=>$item):
+                    if($item['category']!=='laboratory') continue;
+                    $is_x=($item['source']==='add_lab');?>
                 <tr class="<?=$is_x?'r-xlab':'r-lab'?>">
                     <td>
-                        <span class="tag <?=$is_x?'tag-xlab':'tag-lab'?>">
-                            <i class="bi <?=$is_x?'bi-plus-circle':'bi-eyedropper'?>"></i>
-                            <?=$is_x?'Added':'Lab'?>
-                        </span>
+                        <span class="tag <?=$is_x?'tag-xlab':'tag-lab'?>"><i class="bi <?=$is_x?'bi-plus-circle':'bi-eyedropper'?>"></i> <?=$is_x?'Added':'Lab'?></span>
                         <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
                     </td>
                     <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
-                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="r <?=$item['price']==0?'price-zero':''?>">₱<?=number_format($item['price'],2)?><?php if($item['price']==0):?><span class="zero-badge">No Price</span><?php endif;?></td>
                     <td class="c">
-                        <?php if ($is_x): ?>
-                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
-                        <?php else: ?><i class="bi bi-lock-fill lock-i" title="Auto-loaded"></i><?php endif; ?>
+                        <?php if($is_x): $ei=$idx-$auto_count;?>
+                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$ei?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
+                        <?php else:?><i class="bi bi-lock-fill lock-i" title="Auto-loaded from lab results"></i><?php endif;?>
                     </td>
                 </tr>
-                <?php endforeach; endif; ?>
+                <?php endforeach; endif;?>
 
                 <!-- MEDICINES -->
-                <?php if (!empty($cat_medicines)): ?>
+                <?php if(!empty($cat_medicines)):?>
                 <tr class="sec-row s-med">
-                    <td colspan="4">
-                        <i class="bi bi-capsule-pill"></i> Medicines
-                        <span class="sec-total">₱<?=number_format($med_total,2)?></span>
-                    </td>
+                    <td colspan="4"><i class="bi bi-capsule-pill"></i> Medicines <span class="sec-total">₱<?=number_format($med_total,2)?></span></td>
                 </tr>
-                <?php foreach ($cart as $idx => $item):
-                    if ($item['category']!=='medicine') continue;
-                    $is_x = $item['source']==='add_med'; ?>
+                <?php foreach($cart as $idx=>$item):
+                    if($item['category']!=='medicine') continue;
+                    $is_x=($item['source']==='add_med');?>
                 <tr class="<?=$is_x?'r-xmed':'r-rx'?>">
                     <td>
-                        <span class="tag <?=$is_x?'tag-xmed':'tag-rx'?>">
-                            <i class="bi <?=$is_x?'bi-plus-circle':'bi-capsule'?>"></i>
-                            <?=$is_x?'Added':'Dispensed'?>
-                        </span>
+                        <span class="tag <?=$is_x?'tag-xmed':'tag-rx'?>"><i class="bi <?=$is_x?'bi-plus-circle':'bi-capsule'?>"></i> <?=$is_x?'Added':'Dispensed'?></span>
                         <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
                     </td>
                     <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
-                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="r <?=$item['price']==0?'price-zero':''?>">₱<?=number_format($item['price'],2)?><?php if($item['price']==0):?><span class="zero-badge">No Price</span><?php endif;?></td>
                     <td class="c">
-                        <?php if ($is_x): ?>
-                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
-                        <?php else: ?><i class="bi bi-lock-fill lock-i" title="Dispensed — locked"></i><?php endif; ?>
+                        <?php if($is_x): $ei=$idx-$auto_count;?>
+                        <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$ei?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
+                        <?php else:?><i class="bi bi-lock-fill lock-i" title="Dispensed — locked"></i><?php endif;?>
                     </td>
                 </tr>
-                <?php endforeach; endif; ?>
+                <?php endforeach; endif;?>
 
                 </tbody>
             </table>
             </div>
 
-            <!-- ── BILL FOOTER: Totals + Finalize ── -->
+            <!-- BILL FOOTER -->
             <div class="bill-footer">
-
-                <!-- Row 1: Subtotal / Discount / Grand Total -->
                 <div class="bf-totals-block">
                     <div class="bf-line">
                         <span class="bf-lbl">Subtotal</span>
                         <span class="bf-amount">₱<?=number_format($subtotal,2)?></span>
                     </div>
-                    <?php if ($discount > 0): ?>
+                    <?php if($discount>0):?>
                     <div class="bf-line bf-disc-line">
                         <span class="bf-lbl"><i class="bi bi-tag-fill"></i> <?=$is_senior?'Senior Citizen':'PWD'?> Discount (20%)</span>
                         <span class="bf-amount">−₱<?=number_format($discount,2)?></span>
                     </div>
-                    <?php endif; ?>
+                    <?php endif;?>
                     <div class="bf-divider"></div>
-                    <div class="bf-line bf-grand-line">
+                    <div class="bf-line" style="margin-top:2px;">
                         <span class="bf-grand-lbl">Grand Total</span>
-                        <span class="bf-grand-amt">₱<?=number_format($grand_total,2)?></span>
+                        <span class="bf-grand-amt <?=$grand_total<=0&&!empty($cart)?'zero':''?>">₱<?=number_format($grand_total,2)?></span>
                     </div>
+                    <?php if(!empty($cart)&&$grand_total<=0):?>
+                    <div style="margin-top:8px;padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:.8rem;color:#c2410c;display:flex;align-items:center;gap:6px;">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        All items are ₱0.00 — the service names in <code>dl_results</code> don't match any entry in <code>dl_services</code>. Add matching services with prices.
+                    </div>
+                    <?php endif;?>
                 </div>
-
-                <!-- Row 2: Action buttons — Back left, Finalize center, Reload right -->
                 <div class="bf-actions">
                     <div class="bf-act-left">
                         <a href="billing_items.php" class="bf-btn-back"><i class="bi bi-arrow-left"></i> Back</a>
                     </div>
                     <div class="bf-act-center">
-                        <?php if (!empty($cart)): ?>
+                        <?php if($can_finalize):?>
                         <button class="bf-btn-finalize" onclick="confirmFinalize()">
-                            <i class="bi bi-check-circle-fill"></i>
-                            <?=$existing_bill?'Update &amp; Finalize':'Finalize Billing'?>
+                            <i class="bi bi-check-circle-fill"></i> <?=$existing_bill?'Update &amp; Finalize':'Finalize Billing'?>
                         </button>
-                        <?php else: ?>
+                        <?php elseif(!empty($cart)&&$grand_total<=0):?>
+                        <button class="bf-btn-finalize-disabled" disabled><i class="bi bi-slash-circle"></i> Total is ₱0.00</button>
+                        <?php else:?>
                         <span class="bf-empty-note"><i class="bi bi-inbox"></i> No items to finalize</span>
-                        <?php endif; ?>
+                        <?php endif;?>
                     </div>
                     <div class="bf-act-right">
-                        <?php if ($existing_bill): ?>
+                        <?php if($existing_bill):?>
                         <a href="patient_billing.php?patient_id=<?=$patient_id?>" class="bf-btn-view"><i class="bi bi-eye"></i> View</a>
-                        <?php endif; ?>
-                        <a href="billing_items.php?patient_id=<?=$patient_id?>&reset_cart=1" class="bf-btn-reload" onclick="return confirm('Reload all items from database?')"><i class="bi bi-arrow-clockwise"></i> Reload</a>
+                        <?php endif;?>
+                        <a href="billing_items.php?patient_id=<?=$patient_id?>&reset_cart=1" class="bf-btn-reload" onclick="return confirm('Clear all manually-added extra items?')"><i class="bi bi-x-circle"></i> Clear Extras</a>
                     </div>
                 </div>
-
             </div>
 
         </div><!-- /.bcard -->
     </div><!-- /.billing-right -->
 
 </div><!-- /.billing-layout -->
+</div><!-- /.cw -->
 
-</div>
 <script>
-function stepQty(btn, delta) {
-    const input = btn.parentElement.querySelector('.qty-input');
-    let v = parseInt(input.value)||1;
-    v = Math.max(1, Math.min(999, v + delta));
-    input.value = v;
+function stepQty(btn,delta){
+    const inp=btn.parentElement.querySelector('.qty-input');
+    inp.value=Math.max(1,Math.min(999,(parseInt(inp.value)||1)+delta));
 }
 function confirmFinalize(){
+    const g=<?=(float)$grand_total?>;
+    if(g<=0){Swal.fire({icon:'warning',title:'Cannot Finalize',html:'Grand total is <strong>₱0.00</strong>.',confirmButtonColor:'#0b1d3a'});return;}
     Swal.fire({
         title:'<?=$existing_bill?"Update Bill?":"Finalize Bill?"?>',
         html:`<div style="text-align:left;font-size:.9rem;line-height:2;">
