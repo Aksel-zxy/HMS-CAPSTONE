@@ -770,6 +770,20 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                             },
                             options: {
                                 responsive: true,
+                                animations: {
+                                    x: {
+                                        type: 'number',
+                                        easing: 'linear',
+                                        duration: 1500,   // total animation time
+                                        from: NaN         // starts from the left side
+                                    },
+                                    y: {
+                                        type: 'number',
+                                        easing: 'easeOutQuart',
+                                        duration: 1500,
+                                        from: 0           // starts from bottom
+                                    }
+                                },
                                 plugins: {
                                     title: {
                                         display: true,
