@@ -164,6 +164,12 @@ function statusBadgeHtml(string $status): string {
     };
     return "<span class=\"status-badge {$key}\"><i class=\"bi {$icon}\" style=\"font-size:.62rem;\"></i> " . htmlspecialchars($status) . "</span>";
 }
+
+/* Remarks visible when current status is 'In Progress'
+   (so dropdown already shows both 'In Progress' and 'Completed') */
+function showRemarksForStatus(string $status): bool {
+    return $status === 'In Progress';
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -259,7 +265,7 @@ function statusBadgeHtml(string $status): string {
         .update-row select { min-width:130px; }
         .update-row input[type=text] { min-width:140px; flex:1; }
 
-        /* Hide remarks when not In Progress */
+        /* Remarks hidden for Open; visible for In Progress and Completed */
         .remarks-input { display:none; }
         .remarks-input.visible { display:block; }
 
@@ -292,7 +298,6 @@ function statusBadgeHtml(string $status): string {
         .req-card-actions input[type=text] { width:100%; font-size:.83rem; border:1px solid var(--gray-200); border-radius:7px; padding:.45rem .7rem; color:var(--gray-800); background:#fff; }
         .req-card-actions select:focus,
         .req-card-actions input[type=text]:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.1); }
-        /* Hide remarks in mobile cards when not In Progress */
         .req-card-actions .remarks-input { display:none; width:100%; }
         .req-card-actions .remarks-input.visible { display:block; }
         .btn-save-full { width:100%; display:flex; align-items:center; justify-content:center; gap:.4rem; font-size:.83rem; font-weight:600; padding:.5rem; border-radius:7px; background:var(--primary); color:#fff; border:none; cursor:pointer; transition:background .15s, opacity .15s; }
@@ -440,15 +445,15 @@ function statusBadgeHtml(string $status): string {
                             <tr>
                                 <th>Ticket No.</th><th>Equipment</th><th>Issue / Type</th>
                                 <th>Location</th><th>Priority</th><th>Status</th>
-                                <th style="min-width:320px;">Update</th>
+                                <th style="min-width:370px;">Update</th>
                             </tr>
                         </thead>
                         <tbody id="requestTableBody">
                         <?php if (empty($requests)): ?>
                             <tr><td colspan="7"><div class="empty-state"><i class="bi bi-inbox"></i><p>No repair requests found.</p></div></td></tr>
                         <?php else: foreach ($requests as $req):
-                            $opts = getStatusOptions($req['status']);
-                            $showRemarks = ($req['status'] === 'In Progress');
+                            $opts        = getStatusOptions($req['status']);
+                            $showRemarks = showRemarksForStatus($req['status']);
                         ?>
                             <tr data-id="<?= intval($req['id']) ?>">
                                 <td><span class="ticket-no"><?= htmlspecialchars($req['ticket_no'] ?? 'N/A') ?></span></td>
@@ -492,10 +497,10 @@ function statusBadgeHtml(string $status): string {
                     <?php if (empty($requests)): ?>
                         <div class="empty-state"><i class="bi bi-inbox"></i><p>No repair requests found.</p></div>
                     <?php else: foreach ($requests as $req):
-                        $opts       = getStatusOptions($req['status']);
-                        $statusKey  = strtolower(str_replace(' ', '-', $req['status']));
-                        $statusIcon = match($req['status']) { 'Open'=>'bi-circle-fill','In Progress'=>'bi-arrow-repeat',default=>'bi-check-circle-fill' };
-                        $showRemarks = ($req['status'] === 'In Progress');
+                        $opts        = getStatusOptions($req['status']);
+                        $statusKey   = strtolower(str_replace(' ', '-', $req['status']));
+                        $statusIcon  = match($req['status']) { 'Open'=>'bi-circle-fill','In Progress'=>'bi-arrow-repeat',default=>'bi-check-circle-fill' };
+                        $showRemarks = showRemarksForStatus($req['status']);
                     ?>
                         <div class="req-card" data-id="<?= intval($req['id']) ?>">
                             <div class="req-card-header">
@@ -697,11 +702,11 @@ function makeBadge(status) {
     return `<span class="status-badge ${key}"><i class="bi ${icons[status]||'bi-circle'}" style="font-size:.62rem;"></i> ${status}</span>`;
 }
 
-/* ── Toggle remarks visibility based on selected status ── */
+/* ── Show remarks for 'In Progress' AND 'Completed'; hide for 'Open' ── */
 function toggleRemarks(wrap, selectedStatus) {
     const remarksInput = wrap.querySelector('.remarks-input');
     if (!remarksInput) return;
-    if (selectedStatus === 'In Progress') {
+    if (selectedStatus === 'In Progress' || selectedStatus === 'Completed') {
         remarksInput.classList.add('visible');
     } else {
         remarksInput.classList.remove('visible');
@@ -761,11 +766,9 @@ document.addEventListener('click', function (e) {
                 document.getElementById('mobileCards').innerHTML = emptyHtml;
             }
         } else {
-            // Update status badge in desktop table
             const tr = document.querySelector(`#requestTableBody tr[data-id="${id}"]`);
             if (tr) tr.querySelector('.status-cell').innerHTML = makeBadge(newStatus);
 
-            // Update status badge in mobile card
             const card = document.querySelector(`#mobileCards .req-card[data-id="${id}"]`);
             if (card) {
                 const mb = card.querySelector('.mobile-status-badge');
@@ -777,7 +780,7 @@ document.addEventListener('click', function (e) {
                 }
             }
 
-            // Show/hide remarks after status change
+            /* Keep remarks visibility in sync after save */
             toggleRemarks(wrap, newStatus);
 
             if (oldStatus !== newStatus) {
