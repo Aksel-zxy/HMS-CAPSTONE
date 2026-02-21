@@ -117,15 +117,10 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
-        /* ═══════════════════════════════════════════
-           DESIGN TOKENS — aligned with inventory_sidebar.php
-        ═══════════════════════════════════════════ */
         :root {
-            /* Sidebar widths matching inventory_sidebar.php exactly */
-            --sidebar-w:    250px;  /* default */
-            --sidebar-w-md: 200px;  /* ≤ 768px */
-            --sidebar-w-xs: 0px;    /* ≤ 480px (overlay / hidden) */
-
+            --sidebar-w:    250px;
+            --sidebar-w-md: 200px;
+            --sidebar-w-xs: 0px;
             --accent:    #00acc1;
             --navy:      #0b1d3a;
             --surface:   #F5F6F7;
@@ -146,26 +141,19 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             background: var(--surface);
             color: var(--text);
             margin: 0;
-            /* Default: push right of 250px sidebar */
             margin-left: var(--sidebar-w);
             transition: margin-left 0.3s ease-in-out;
             min-height: 100vh;
             overflow-x: hidden;
         }
 
-        /* ═══════════════════════════════════════════
-           PAGE WRAPPER
-           top padding clears inventory_sidebar's top-navbar (≈ 60px)
-        ═══════════════════════════════════════════ */
         .page-wrap {
             padding: 70px 1.75rem 3rem 1.75rem;
             max-width: 1400px;
             margin: 0 auto;
         }
 
-        /* ═══════════════════════════════════════════
-           PAGE HEADER
-        ═══════════════════════════════════════════ */
+        /* ── PAGE HEADER ── */
         .page-header {
             display: flex;
             align-items: center;
@@ -173,6 +161,35 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             margin-bottom: 1.5rem;
             flex-wrap: wrap;
         }
+
+        /* ── BACK BUTTON ── */
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 16px;
+            background: var(--card);
+            color: var(--navy);
+            border: 1.5px solid var(--border);
+            border-radius: 9px;
+            font-size: .83rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background .18s, color .18s, border-color .18s, transform .18s;
+            box-shadow: var(--shadow);
+            flex-shrink: 0;
+            line-height: 1;
+        }
+        .btn-back:hover {
+            background: var(--navy);
+            color: #fff;
+            border-color: var(--navy);
+            transform: translateX(-2px);
+        }
+        .btn-back i { font-size: 1rem; }
+
         .page-header-icon {
             width: 46px; height: 46px;
             background: linear-gradient(135deg, var(--accent), #0088a3);
@@ -202,124 +219,63 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             box-shadow: var(--shadow);
         }
 
-        /* ═══════════════════════════════════════════
-           ALERTS
-        ═══════════════════════════════════════════ */
-        .alert {
-            border-radius: var(--radius);
-            font-size: .9rem;
-            border: none;
-            padding: .85rem 1.2rem;
-        }
+        /* ── ALERTS ── */
+        .alert { border-radius: var(--radius); font-size: .9rem; border: none; padding: .85rem 1.2rem; }
         .alert-success { background: #e6faf5; color: #0d6e52; border-left: 4px solid #00c9a7; }
         .alert-danger  { background: #fff0f3; color: #7a0020; border-left: 4px solid #ff4d6d; }
 
-        /* ═══════════════════════════════════════════
-           TABS
-        ═══════════════════════════════════════════ */
+        /* ── TABS ── */
         .nav-tabs {
             border-bottom: 2px solid var(--border);
-            gap: 4px;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            gap: 4px; flex-wrap: nowrap;
+            overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
         }
         .nav-tabs::-webkit-scrollbar { display: none; }
         .nav-tabs .nav-link {
-            border: none;
-            border-bottom: 3px solid transparent;
-            border-radius: 0;
-            color: var(--muted);
-            font-weight: 700;
-            font-size: .88rem;
-            padding: .7rem 1.1rem;
-            white-space: nowrap;
-            transition: color .2s, border-color .2s;
-            margin-bottom: -2px;
+            border: none; border-bottom: 3px solid transparent; border-radius: 0;
+            color: var(--muted); font-weight: 700; font-size: .88rem;
+            padding: .7rem 1.1rem; white-space: nowrap;
+            transition: color .2s, border-color .2s; margin-bottom: -2px;
         }
         .nav-tabs .nav-link:hover { color: var(--navy); }
-        .nav-tabs .nav-link.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
-            background: transparent;
-        }
+        .nav-tabs .nav-link.active { color: var(--accent); border-bottom-color: var(--accent); background: transparent; }
 
-        /* ═══════════════════════════════════════════
-           CARD
-        ═══════════════════════════════════════════ */
+        /* ── CARD ── */
         .pr-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            padding: 1.75rem;
-            margin-top: 1rem;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow);
+            padding: 1.75rem; margin-top: 1rem;
         }
 
-        /* ═══════════════════════════════════════════
-           INFO BOX
-        ═══════════════════════════════════════════ */
+        /* ── INFO BOX ── */
         .info-box {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-            background: #eef6ff;
-            border: 1px solid #c5d8ff;
-            border-radius: 10px;
-            padding: .9rem 1.2rem;
-            font-size: .88rem;
-            color: #1a4d8c;
-            margin-bottom: 1.5rem;
+            display: flex; flex-wrap: wrap; gap: 1rem;
+            background: #eef6ff; border: 1px solid #c5d8ff;
+            border-radius: 10px; padding: .9rem 1.2rem;
+            font-size: .88rem; color: #1a4d8c; margin-bottom: 1.5rem;
         }
         .info-box-item { display: flex; align-items: center; gap: .4rem; }
         .info-box-item strong { font-weight: 700; }
 
-        /* ═══════════════════════════════════════════
-           FORM CONTROLS
-        ═══════════════════════════════════════════ */
+        /* ── FORM CONTROLS ── */
         .form-control, .form-select {
-            border: 1.5px solid var(--border);
-            border-radius: 8px;
-            font-size: .85rem;
-            color: var(--text);
-            background: #fafcff;
-            min-height: 38px;
-            transition: border-color .2s, box-shadow .2s;
+            border: 1.5px solid var(--border); border-radius: 8px;
+            font-size: .85rem; color: var(--text); background: #fafcff;
+            min-height: 38px; transition: border-color .2s, box-shadow .2s;
         }
         .form-control:focus, .form-select:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(0,172,193,.12);
-            background: #fff;
-            outline: none;
+            border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,172,193,.12);
+            background: #fff; outline: none;
         }
         input[readonly].form-control { background: #f0f4fb; color: var(--muted); }
 
-        /* ═══════════════════════════════════════════
-           ITEMS TABLE
-        ═══════════════════════════════════════════ */
-        .items-table-wrap {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-        }
-        .items-table {
-            width: 100%;
-            min-width: 680px;
-            border-collapse: collapse;
-            font-size: .85rem;
-        }
+        /* ── ITEMS TABLE ── */
+        .items-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; border: 1px solid var(--border); }
+        .items-table { width: 100%; min-width: 680px; border-collapse: collapse; font-size: .85rem; }
         .items-table thead th {
-            background: var(--navy);
-            color: rgba(255,255,255,.8);
-            font-size: .7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .6px;
-            padding: .75rem 1rem;
-            white-space: nowrap;
-            text-align: center;
+            background: var(--navy); color: rgba(255,255,255,.8);
+            font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+            padding: .75rem 1rem; white-space: nowrap; text-align: center;
         }
         .items-table thead th:first-child { border-radius: 10px 0 0 0; }
         .items-table thead th:last-child  { border-radius: 0 10px 0 0; }
@@ -330,86 +286,40 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         .items-table tbody td:first-child,
         .items-table tbody td:nth-child(2) { text-align: left; }
 
-        /* ═══════════════════════════════════════════
-           BUTTONS
-        ═══════════════════════════════════════════ */
+        /* ── BUTTONS ── */
         .btn-add {
-            background: #eef6ff;
-            color: var(--accent);
-            border: 1.5px dashed var(--accent);
-            border-radius: 10px;
-            padding: .55rem 1.4rem;
-            font-size: .88rem;
-            font-weight: 700;
-            transition: all .2s;
-            cursor: pointer;
-            min-height: 40px;
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
+            background: #eef6ff; color: var(--accent);
+            border: 1.5px dashed var(--accent); border-radius: 10px;
+            padding: .55rem 1.4rem; font-size: .88rem; font-weight: 700;
+            transition: all .2s; cursor: pointer; min-height: 40px;
+            display: inline-flex; align-items: center; gap: .35rem;
         }
         .btn-add:hover { background: #d8eeff; }
+
         .btn-submit-pr {
             background: linear-gradient(135deg, var(--accent), #0088a3);
-            color: #fff;
-            border: none;
-            border-radius: 10px;
-            padding: .7rem 2.2rem;
-            font-size: .95rem;
-            font-weight: 700;
+            color: #fff; border: none; border-radius: 10px;
+            padding: .7rem 2.2rem; font-size: .95rem; font-weight: 700;
             box-shadow: 0 4px 14px rgba(0,172,193,.35);
-            transition: transform .2s, box-shadow .2s;
-            min-height: 44px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: .4rem;
+            transition: transform .2s, box-shadow .2s; min-height: 44px;
+            cursor: pointer; display: inline-flex; align-items: center; gap: .4rem;
         }
-        .btn-submit-pr:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 22px rgba(0,172,193,.45);
-            color: #fff;
-        }
+        .btn-submit-pr:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,172,193,.45); color: #fff; }
+
         .btn-remove-row {
-            background: #fff0f3;
-            border: 1.5px solid #ffb3c1;
-            color: #c0392b;
-            border-radius: 7px;
-            padding: 3px 9px;
-            font-size: .8rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all .15s;
-            line-height: 1.6;
-            min-height: 30px;
+            background: #fff0f3; border: 1.5px solid #ffb3c1; color: #c0392b;
+            border-radius: 7px; padding: 3px 9px; font-size: .8rem; font-weight: 700;
+            cursor: pointer; transition: all .15s; line-height: 1.6; min-height: 30px;
         }
         .btn-remove-row:hover { background: #ff4d6d; color: #fff; border-color: #ff4d6d; }
 
-        /* ═══════════════════════════════════════════
-           MY REQUESTS TABLE
-        ═══════════════════════════════════════════ */
-        .req-table-wrap {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-        }
-        .req-table {
-            width: 100%;
-            min-width: 500px;
-            border-collapse: collapse;
-            font-size: .87rem;
-        }
+        /* ── MY REQUESTS TABLE ── */
+        .req-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; border: 1px solid var(--border); }
+        .req-table { width: 100%; min-width: 500px; border-collapse: collapse; font-size: .87rem; }
         .req-table thead th {
-            background: var(--navy);
-            color: rgba(255,255,255,.8);
-            font-size: .7rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .6px;
-            padding: .8rem 1rem;
-            text-align: center;
-            white-space: nowrap;
+            background: var(--navy); color: rgba(255,255,255,.8);
+            font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+            padding: .8rem 1rem; text-align: center; white-space: nowrap;
         }
         .req-table thead th:first-child { border-radius: 10px 0 0 0; }
         .req-table thead th:last-child  { border-radius: 0 10px 0 0; }
@@ -418,129 +328,64 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
         .req-table tbody tr:last-child { border-bottom: none; }
         .req-table tbody td { padding: .8rem 1rem; vertical-align: middle; text-align: center; }
 
-        /* Mobile request cards */
         .req-mobile-list { display: none; }
-        .req-mobile-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 1rem;
-            margin-bottom: .65rem;
-            box-shadow: var(--shadow);
-        }
-        .rmc-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: .6rem;
-            gap: .5rem;
-            flex-wrap: wrap;
-        }
-        .rmc-id {
-            font-family: monospace;
-            font-size: .78rem;
-            font-weight: 700;
-            background: #f0f4fb;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 2px 8px;
-            color: var(--navy);
-        }
+        .req-mobile-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: .65rem; box-shadow: var(--shadow); }
+        .rmc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .6rem; gap: .5rem; flex-wrap: wrap; }
+        .rmc-id { font-family: monospace; font-size: .78rem; font-weight: 700; background: #f0f4fb; border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; color: var(--navy); }
         .rmc-row { display: flex; justify-content: space-between; font-size: .82rem; margin-bottom: .3rem; gap: .5rem; }
         .rmc-label { color: var(--muted); font-weight: 600; font-size: .7rem; text-transform: uppercase; }
         .rmc-val   { font-weight: 600; color: var(--text); }
 
-        /* Status badges */
         .badge-pending  { background:#fff8e6; color:#a05a00; border:1.5px solid #ffd700;  border-radius:999px; padding:3px 10px; font-size:.73rem; font-weight:700; white-space:nowrap; }
         .badge-approved { background:#e6faf5; color:#0d6e52; border:1.5px solid #5cd6b0;  border-radius:999px; padding:3px 10px; font-size:.73rem; font-weight:700; white-space:nowrap; }
         .badge-rejected { background:#fff0f3; color:#8b0020; border:1.5px solid #ff4d6d;  border-radius:999px; padding:3px 10px; font-size:.73rem; font-weight:700; white-space:nowrap; }
 
-        .btn-view {
-            background: #eef6ff;
-            color: var(--accent);
-            border: 1.5px solid #c5d8ff;
-            border-radius: 7px;
-            padding: 4px 12px;
-            font-size: .8rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all .15s;
-        }
+        .btn-view { background: #eef6ff; color: var(--accent); border: 1.5px solid #c5d8ff; border-radius: 7px; padding: 4px 12px; font-size: .8rem; font-weight: 700; cursor: pointer; transition: all .15s; }
         .btn-view:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-        /* Empty state */
         .empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); }
         .empty-state i { font-size: 2.5rem; margin-bottom: .75rem; opacity: .4; display: block; }
 
-        /* ═══════════════════════════════════════════
-           MODAL
-        ═══════════════════════════════════════════ */
+        /* ── MODAL ── */
         .modal-content { border-radius: var(--radius); border: none; box-shadow: var(--shadow-md); }
         .modal-header  { background: var(--navy); color: #fff; border-radius: var(--radius) var(--radius) 0 0; padding: 1rem 1.4rem; }
         .modal-header .modal-title { font-weight: 700; font-size: 1rem; }
         .modal-header .btn-close   { filter: invert(1); }
         .modal-table thead th { background: #f4f8ff; color: var(--navy); font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; }
 
-        /* iPhone safe area */
         @supports (padding: env(safe-area-inset-bottom)) {
             .page-wrap { padding-bottom: calc(3rem + env(safe-area-inset-bottom)); }
         }
 
-        /* ═══════════════════════════════════════════
-           RESPONSIVE — TABLET ≤ 991px
-           inventory_sidebar.php still shows at 250px
-        ═══════════════════════════════════════════ */
         @media (max-width: 991px) {
             .page-wrap { padding: 65px 1.25rem 2rem 1.25rem; }
             .pr-card { padding: 1.25rem; }
         }
-
-        /* ═══════════════════════════════════════════
-           RESPONSIVE — LARGE MOBILE ≤ 768px
-           inventory_sidebar.php sidebar shrinks to 200px
-        ═══════════════════════════════════════════ */
         @media (max-width: 768px) {
-            body { margin-left: var(--sidebar-w-md); }  /* 200px */
-
+            body { margin-left: var(--sidebar-w-md); }
             .page-wrap { padding: 62px 1rem 2rem 1rem; }
             .pr-card { padding: 1rem; }
             .page-header h2 { font-size: 1.15rem; }
             .page-header .date-chip { display: none; }
-
-            /* Swap table for mobile cards */
             .req-table-desktop { display: none !important; }
             .req-mobile-list   { display: block; }
-
-            /* Buttons full-width */
             .btn-submit-pr { width: 100%; justify-content: center; }
             .btn-add       { width: 100%; justify-content: center; }
-
-            /* Stack info box */
             .info-box { flex-direction: column; gap: .5rem; }
-
             .nav-tabs .nav-link { font-size: .84rem; padding: .65rem .85rem; }
         }
-
-        /* ═══════════════════════════════════════════
-           RESPONSIVE — SMALL MOBILE ≤ 480px
-           inventory_sidebar.php becomes full-width overlay
-           body margin-left must be 0
-        ═══════════════════════════════════════════ */
         @media (max-width: 480px) {
-            body { margin-left: 0; }  /* sidebar overlays, no margin needed */
-
+            body { margin-left: 0; }
             .page-wrap { padding: 58px .75rem 2rem .75rem; }
             .pr-card { padding: .85rem; }
             .page-header { gap: .5rem; }
             .page-header-icon { width: 38px; height: 38px; font-size: 1.1rem; border-radius: 10px; }
             .page-header h2 { font-size: 1.05rem; }
-
+            .btn-back span { display: none; } /* icon only on tiny screens */
             .nav-tabs .nav-link { font-size: .78rem; padding: .6rem .65rem; }
-
             .items-table { min-width: 580px; font-size: .8rem; }
             .items-table tbody td { padding: .5rem .6rem; }
             .form-control, .form-select { font-size: .82rem; min-height: 36px; }
-
             .info-box { font-size: .82rem; padding: .75rem 1rem; }
             .rmc-row { font-size: .79rem; }
         }
@@ -548,13 +393,20 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
 </head>
 <body>
 
-<!-- ── SIDEBAR (inventory_sidebar.php) ── -->
+<!-- SIDEBAR -->
 <?php include 'inventory_sidebar.php'; ?>
 
 <div class="page-wrap">
 
     <!-- PAGE HEADER -->
     <div class="page-header">
+
+        <!-- ← BACK BUTTON -->
+        <button class="btn-back" onclick="history.back()" title="Go back to previous page">
+            <i class="bi bi-arrow-left-circle-fill"></i>
+            <span>Back</span>
+        </button>
+
         <div class="page-header-icon"><i class="bi bi-cart3"></i></div>
         <h2>Purchase Requests</h2>
         <span class="date-chip"><i class="bi bi-calendar3 me-1"></i><?= $request_date ?></span>
@@ -592,11 +444,10 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
 
     <div class="tab-content">
 
-        <!-- ═══ TAB 1 — REQUEST FORM ═══ -->
+        <!-- TAB 1 — REQUEST FORM -->
         <div class="tab-pane fade show active" id="form" role="tabpanel">
             <div class="pr-card">
 
-                <!-- Info box -->
                 <div class="info-box">
                     <div class="info-box-item">
                         <i class="bi bi-building"></i>
@@ -616,7 +467,6 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
 
                 <form method="POST" id="requestForm">
-                    <!-- Items Table -->
                     <div class="items-table-wrap mb-3">
                         <table class="items-table">
                             <thead>
@@ -632,8 +482,8 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </thead>
                             <tbody id="itemBody">
                                 <tr>
-                                    <td><input type="text" name="items[0][name]" class="form-control form-control-sm" placeholder="Item name" required></td>
-                                    <td><input type="text" name="items[0][description]" class="form-control form-control-sm" placeholder="Optional"></td>
+                                    <td><input type="text"   name="items[0][name]"        class="form-control form-control-sm" placeholder="Item name" required></td>
+                                    <td><input type="text"   name="items[0][description]"  class="form-control form-control-sm" placeholder="Optional"></td>
                                     <td>
                                         <select name="items[0][unit]" class="form-select form-select-sm unit">
                                             <option value="pcs">Per Piece</option>
@@ -649,14 +499,12 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </table>
                     </div>
 
-                    <!-- Add Row -->
                     <div class="d-flex justify-content-center mb-4">
                         <button type="button" id="addRowBtn" class="btn-add">
                             <i class="bi bi-plus-circle"></i> Add Item
                         </button>
                     </div>
 
-                    <!-- Submit -->
                     <div class="d-flex justify-content-center">
                         <button type="submit" class="btn-submit-pr">
                             <i class="bi bi-send"></i> Submit Request
@@ -666,7 +514,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
         </div>
 
-        <!-- ═══ TAB 2 — MY REQUESTS ═══ -->
+        <!-- TAB 2 — MY REQUESTS -->
         <div class="tab-pane fade" id="my-requests" role="tabpanel">
             <div class="pr-card">
 
@@ -766,7 +614,7 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div><!-- end tab-content -->
 </div><!-- end page-wrap -->
 
-<!-- ═══ MODAL — View Items ═══ -->
+<!-- MODAL — View Items -->
 <div class="modal fade" id="viewItemsModal" tabindex="-1" aria-labelledby="viewItemsModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
@@ -802,46 +650,28 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-/* ═══════════════════════════════════════════════════════
-   SIDEBAR MARGIN SYNC
-   inventory_sidebar.php uses class="sidebar" (not an id).
-   Watches for class changes triggered by the sidebar's own JS.
-═══════════════════════════════════════════════════════ */
+/* ── SIDEBAR MARGIN SYNC ── */
 (function syncSidebarMargin() {
-    // inventory_sidebar.php wraps the nav in a <div class="sidebar">
     const sidebar = document.querySelector('.sidebar');
     if (!sidebar) return;
-
     function getWidth() {
-        if (window.innerWidth <= 480) return 0;   // sidebar overlays at this size
-        if (window.innerWidth <= 768) return 200;  // 200px breakpoint
-        return 250;                                 // 250px default
+        if (window.innerWidth <= 480) return 0;
+        if (window.innerWidth <= 768) return 200;
+        return 250;
     }
-
     function applyMargin() {
-        // If inventory_sidebar.php adds a "closed" class on toggle, handle it:
-        const isClosed = sidebar.classList.contains('closed') ||
-                         sidebar.style.display === 'none';
+        const isClosed = sidebar.classList.contains('closed') || sidebar.style.display === 'none';
         document.body.style.marginLeft = (isClosed ? 0 : getWidth()) + 'px';
     }
-
     applyMargin();
-
-    // Watch for sidebar class / style changes (toggle button)
-    new MutationObserver(applyMargin)
-        .observe(sidebar, { attributes: true, attributeFilter: ['class', 'style'] });
-
-    // Recalculate on resize (breakpoint changes)
+    new MutationObserver(applyMargin).observe(sidebar, { attributes: true, attributeFilter: ['class', 'style'] });
     window.addEventListener('resize', applyMargin);
 })();
 
-/* ═══════════════════════════════════════════════════════
-   ITEMS TABLE — Add / Remove / Calculate
-═══════════════════════════════════════════════════════ */
+/* ── ITEMS TABLE — Add / Remove / Calculate ── */
 let itemIndex = 1;
 const itemBody = document.getElementById('itemBody');
 
-// Add row
 document.getElementById('addRowBtn').addEventListener('click', () => {
     const template = itemBody.querySelector('tr').cloneNode(true);
     template.querySelectorAll('input, select').forEach(el => {
@@ -856,7 +686,6 @@ document.getElementById('addRowBtn').addEventListener('click', () => {
     itemIndex++;
 });
 
-// Remove row
 itemBody.addEventListener('click', e => {
     if (e.target.classList.contains('btn-remove')) {
         if (itemBody.querySelectorAll('tr').length > 1) {
@@ -867,7 +696,6 @@ itemBody.addEventListener('click', e => {
     }
 });
 
-// Recalculate on input
 itemBody.addEventListener('input', e => {
     const row = e.target.closest('tr');
     if (!row) return;
@@ -879,7 +707,6 @@ itemBody.addEventListener('input', e => {
     row.querySelector('.total-pcs').value = unit === 'box' ? qty * pcsPerBox : qty;
 });
 
-// Handle unit select change
 itemBody.addEventListener('change', e => {
     if (e.target.classList.contains('unit')) {
         const row    = e.target.closest('tr');
@@ -891,10 +718,8 @@ itemBody.addEventListener('change', e => {
     }
 });
 
-/* ═══════════════════════════════════════════════════════
-   VIEW ITEMS MODAL — AJAX
-═══════════════════════════════════════════════════════ */
-const viewModal   = new bootstrap.Modal(document.getElementById('viewItemsModal'));
+/* ── VIEW ITEMS MODAL — AJAX ── */
+const viewModal = new bootstrap.Modal(document.getElementById('viewItemsModal'));
 
 document.addEventListener('click', e => {
     const btn = e.target.closest('.btn-view-items');
@@ -951,9 +776,7 @@ document.addEventListener('click', e => {
         });
 });
 
-/* ═══════════════════════════════════════════════════════
-   AUTO-DISMISS SUCCESS ALERT (5 s)
-═══════════════════════════════════════════════════════ */
+/* ── AUTO-DISMISS SUCCESS ALERT ── */
 const successAlert = document.getElementById('successAlert');
 if (successAlert) {
     setTimeout(() => {
