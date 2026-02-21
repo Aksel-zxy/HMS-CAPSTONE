@@ -32,7 +32,7 @@ $sales = new Sales($conn);
 $period = $_GET['period'] ?? 'all';
 
 // Fetch data based on selected period
-$totalSales      = $sales->getTotalSales($period);
+$totalSales      = $sales->getTotalcashSales($period);
 $totalOrders     = $sales->getTotalOrders($period);
 $dispensedToday  = $sales->getDispensedToday();
 $totalStocks     = $sales->getTotalStocks();
@@ -43,7 +43,7 @@ $topProducts     = $sales->getTopProducts($period);
 $categoryLabels = [];
 $categoryValues = [];
 foreach ($categoryDataRaw as $cat) {
-    $categoryLabels[] = $cat['category'];
+    $categoryLabels[] = $cat['category'];   // "Prescription Sales", "OTC Sales"
     $categoryValues[] = floatval($cat['total']);
 }
 // -------------------- Sales Performance --------------------
@@ -192,6 +192,13 @@ $notifCount = $notif->notifCount;
                     <?php if ($pendingCount > 0): ?>
                         <span class="notif-badge"><?php echo $pendingCount; ?></span>
                     <?php endif; ?>
+                </a>
+            </li>
+
+            <li class="sidebar-item">
+                <a href="pharmacy_otc.php" class="sidebar-link position-relative">
+                    <i class="fa-solid fa-briefcase-medical"></i>
+                    <span style="font-size: 18px;">Over The Counter</span>
                 </a>
             </li>
 
@@ -418,7 +425,6 @@ $notifCount = $notif->notifCount;
                                     <thead>
                                         <tr>
                                             <th>Product Name</th>
-                                            <th>Category</th>
                                             <th>Quantity</th>
                                             <th>Total Price</th>
                                         </tr>
@@ -427,7 +433,6 @@ $notifCount = $notif->notifCount;
                                         <?php while ($row = $topProducts->fetch_assoc()): ?>
                                             <tr>
                                                 <td><?= $row['med_name'] ?></td>
-                                                <td><?= $row['category'] ?></td>
                                                 <td><?= $row['qty'] ?></td>
                                                 <td>₱<?= number_format($row['total'], 2) ?></td>
                                             </tr>

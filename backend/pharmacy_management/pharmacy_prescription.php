@@ -126,7 +126,12 @@ $notifCount = $notif->notifCount;
                 </a>
             </li>
 
-
+            <li class="sidebar-item">
+                <a href="pharmacy_otc.php" class="sidebar-link position-relative">
+                    <i class="fa-solid fa-briefcase-medical"></i>
+                    <span style="font-size: 18px;">Over The Counter</span>
+                </a>
+            </li>
 
             <li class="sidebar-item">
                 <a href="pharmacy_sales.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
