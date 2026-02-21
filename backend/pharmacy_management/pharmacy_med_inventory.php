@@ -424,10 +424,27 @@ $notifCount = $notif->notifCount;
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h2></h2>
 
-                        <div class="d-flex align-items-center w-100" style="max-width: 500px;">
+                        <div class="d-flex align-items-center w-100" style="max-width: 700px;">
+
+                            <!-- Category Filter -->
+                            <select id="categoryFilter" class="form-select me-2" style="max-width: 200px;">
+                                <option value="">All</option>
+                                <option value="Paracetamol">Paracetamol</option>
+                                <option value="Pain Killers">Pain Killers</option>
+                                <option value="Antibiotics">Antibiotics</option>
+                                <option value="Cough & Cold">Cough & Cold</option>
+                                <option value="Allergy Medicine">Allergy Medicine</option>
+                                <option value="Stomach Medicine">Stomach Medicine</option>
+                                <option value="Antifungal">Antifungal</option>
+                                <option value="Vitamins">Vitamins</option>
+                                <option value="First Aid">First Aid</option>
+                                <option value="Other">Other</option>
+                            </select>
+
                             <!-- Search bar -->
                             <input type="text" id="searchInput" class="form-control me-2"
                                 placeholder="Search medicine...">
+
                             <!-- Add Medicine button -->
                             <button type="button" class="btn btn-primary text-nowrap" data-bs-toggle="modal"
                                 data-bs-target="#medicineModal">
@@ -808,20 +825,31 @@ $notifCount = $notif->notifCount;
     </script>
     <script>
         const searchInput = document.getElementById("searchInput");
+        const categoryFilter = document.getElementById("categoryFilter");
 
         function filterInventoryTable() {
             const searchValue = searchInput.value.toLowerCase();
+            const selectedCategory = categoryFilter.value.toLowerCase();
 
             document.querySelectorAll("#medicineInventoryTable tbody tr").forEach(row => {
-                const medNameCell = row.querySelector("td:nth-child(2)"); // 2nd column = Medicine Name
-                if (!medNameCell) return;
+                const medName = row.querySelector("td:nth-child(2)")?.textContent.toLowerCase() || "";
+                const genericName = row.querySelector("td:nth-child(3)")?.textContent.toLowerCase() || "";
+                const brandName = row.querySelector("td:nth-child(4)")?.textContent.toLowerCase() || "";
+                const category = row.querySelector("td:nth-child(5)")?.textContent.toLowerCase() || "";
 
-                const medName = medNameCell.textContent.toLowerCase();
-                row.style.display = medName.includes(searchValue) ? "" : "none";
+                // Check if search matches
+                const matchesSearch = medName.includes(searchValue) || genericName.includes(searchValue) || brandName.includes(searchValue);
+
+                // Check if category matches (or show all if none selected)
+                const matchesCategory = selectedCategory === "" || category === selectedCategory;
+
+                row.style.display = matchesSearch && matchesCategory ? "" : "none";
             });
         }
 
+        // Trigger filter on search or category change
         searchInput.addEventListener("keyup", filterInventoryTable);
+        categoryFilter.addEventListener("change", filterInventoryTable);
     </script>
     <script>
         const conversionMap = {

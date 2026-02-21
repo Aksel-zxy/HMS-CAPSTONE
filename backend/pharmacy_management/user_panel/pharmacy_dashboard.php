@@ -3,8 +3,9 @@ include '../../../SQL/config.php';
 include '../classes/sales.php';
 require_once "../classes/notification.php";
 
+
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Pharmacist') {
-    header('Location: login.php');
+    header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
 }
 
@@ -13,7 +14,7 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// Fetch user details from database
+
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
@@ -26,28 +27,41 @@ if (!$user) {
     exit();
 }
 
-// Prepare an array to store sales data per year
 $salesData = [];
-
-// Get distinct years from dispensed_date
-$yearsQuery = mysqli_query($conn, "SELECT DISTINCT YEAR(dispensed_date) AS year FROM pharmacy_prescription_items ORDER BY year ASC");
+$yearsQuery = mysqli_query($conn, "
+    SELECT DISTINCT YEAR(date) AS year
+    FROM (
+        SELECT dispensed_date AS date FROM pharmacy_prescription_items
+        UNION ALL
+        SELECT sale_date AS date FROM pharmacy_sales
+    ) AS combined
+    ORDER BY year ASC
+");
 
 while ($yearRow = mysqli_fetch_assoc($yearsQuery)) {
     $year = $yearRow['year'];
-
-    // Initialize array for 12 months (Jan-Dec)
     $salesData[$year] = array_fill(0, 12, 0);
 
-    // Get total sales per month
     $salesQuery = mysqli_query($conn, "
-        SELECT MONTH(dispensed_date) AS month, SUM(total_price) AS total
-        FROM pharmacy_prescription_items
-        WHERE YEAR(dispensed_date) = $year
-        GROUP BY MONTH(dispensed_date)
+        SELECT MONTH(date) AS month, SUM(total) AS total
+        FROM (
+            SELECT pi.dispensed_date AS date, pi.total_price AS total
+            FROM pharmacy_prescription_items pi
+            JOIN pharmacy_prescription p ON pi.prescription_id = p.prescription_id
+            WHERE p.status='Dispensed' AND p.payment_type='cash'
+
+            UNION ALL
+
+            SELECT s.sale_date AS date, s.total_price AS total
+            FROM pharmacy_sales s
+            WHERE s.payment_method='cash'
+        ) AS combined
+        WHERE YEAR(date) = $year
+        GROUP BY MONTH(date)
     ");
 
     while ($row = mysqli_fetch_assoc($salesQuery)) {
-        $monthIndex = $row['month'] - 1; // 0-based index for JS
+        $monthIndex = $row['month'] - 1; // 0-based
         $salesData[$year][$monthIndex] = (float)$row['total'];
     }
 }
@@ -60,7 +74,7 @@ $sales = new Sales($conn);
 $period = $_GET['period'] ?? 'all';
 
 // Fetch data based on selected period
-$totalSales      = $sales->getTotalSales($period);
+$totalSales      = $sales->getTotalcashSales($period);
 $totalOrders     = $sales->getTotalOrders($period);
 $dispensedToday  = $sales->getDispensedToday();
 $totalStocks     = $sales->getTotalStocks();
@@ -147,67 +161,97 @@ $notif = new Notification($conn);
 $latestNotifications = $notif->load();
 $notifCount = $notif->notifCount;
 
-
+// Initialize counts
 $cashPayments = 0;
 $billingPayments = 0;
 
-$sql = "
-    SELECT payment_type, COUNT(*) AS total
-    FROM pharmacy_prescription
-    WHERE status = 'Dispensed'
+// Prescription + OTC combined
+$paymentQuery = "
+    SELECT payment_type, COUNT(*) AS count
+    FROM (
+        -- Prescription items
+        SELECT p.payment_type, pi.total_price
+        FROM pharmacy_prescription_items pi
+        JOIN pharmacy_prescription p ON pi.prescription_id = p.prescription_id
+        WHERE p.status = 'Dispensed'
+
+        UNION ALL
+
+        -- OTC sales (assume cash)
+        SELECT 'cash' AS payment_type, s.total_price
+        FROM pharmacy_sales s
+    ) AS combined
     GROUP BY payment_type
 ";
 
-$result = mysqli_query($conn, $sql);
+$result = $conn->query($paymentQuery);
 
-while ($row = mysqli_fetch_assoc($result)) {
+while ($row = $result->fetch_assoc()) {
     if ($row['payment_type'] === 'cash') {
-        $cashPayments = (int)$row['total'];
+        $cashPayments = (int)$row['count'];
     } elseif ($row['payment_type'] === 'post_discharged') {
-        $billingPayments = (int)$row['total'];
+        $billingPayments = (int)$row['count'];
     }
 }
+$weeklyRevenue = array_fill(0, 7, 0);
+$startOfWeek = date('Y-m-d', strtotime('last Sunday'));
+$endOfWeek = date('Y-m-d', strtotime('next Saturday'));
 
-// Weekly (Sun-Sat current week) and Monthly (Jan-Dec)
-$weeklyRevenue = array_fill(0, 7, 0); // Sun-Sat
-$monthlyRevenue = array_fill(0, 12, 0);
-
-// --- WEEKLY REVENUE (Sun-Sat this week) ---
-$startOfWeek = date('Y-m-d', strtotime('last Sunday')); // last Sunday
 $weeklyQuery = "
-    SELECT DAYOFWEEK(pi.dispensed_date) AS day_num, SUM(pi.total_price) AS total
-    FROM pharmacy_prescription_items pi
-    JOIN pharmacy_prescription p ON pi.prescription_id = p.prescription_id
-    WHERE p.status = 'Dispensed' AND pi.dispensed_date BETWEEN '$startOfWeek' AND DATE_ADD('$startOfWeek', INTERVAL 6 DAY)
-    GROUP BY DAYOFWEEK(pi.dispensed_date)
+    SELECT DAYOFWEEK(date) AS day_num, SUM(total) AS total
+    FROM (
+        SELECT pi.dispensed_date AS date, pi.total_price AS total
+        FROM pharmacy_prescription_items pi
+        JOIN pharmacy_prescription p ON pi.prescription_id = p.prescription_id
+        WHERE p.status = 'Dispensed' AND p.payment_type = 'cash'
+
+        UNION ALL
+
+        SELECT s.sale_date AS date, s.total_price AS total
+        FROM pharmacy_sales s
+        WHERE s.payment_method = 'cash'  -- corrected column name
+    ) AS combined
+    WHERE date BETWEEN '$startOfWeek' AND '$endOfWeek'
+    GROUP BY DAYOFWEEK(date)
 ";
 $result = $conn->query($weeklyQuery);
 $weekDays = [];
 while ($row = $result->fetch_assoc()) {
-    $weekDays[$row['day_num']] = (float)$row['total'];
-}
-for ($i = 1; $i <= 7; $i++) {
-    $weeklyRevenue[$i - 1] = isset($weekDays[$i]) ? $weekDays[$i] : 0;
+    $weekDays[(int)$row['day_num']] = (float)$row['total'];
 }
 
-// --- MONTHLY REVENUE (current year Jan-Dec) ---
+// Fill the array from Sun (1) to Sat (7)
+for ($i = 1; $i <= 7; $i++) {
+    $weeklyRevenue[$i - 1] = $weekDays[$i] ?? 0;
+}
+$monthlyRevenue = array_fill(0, 12, 0);
 $currentYear = date('Y');
+
 $monthlyQuery = "
-    SELECT MONTH(pi.dispensed_date) AS month_num, SUM(pi.total_price) AS total
-    FROM pharmacy_prescription_items pi
-    JOIN pharmacy_prescription p ON pi.prescription_id = p.prescription_id
-    WHERE p.status = 'Dispensed' AND YEAR(pi.dispensed_date) = $currentYear
-    GROUP BY MONTH(pi.dispensed_date)
+    SELECT MONTH(date) AS month_num, SUM(total) AS total
+    FROM (
+        SELECT pi.dispensed_date AS date, pi.total_price AS total
+        FROM pharmacy_prescription_items pi
+        JOIN pharmacy_prescription p ON pi.prescription_id = p.prescription_id
+        WHERE p.status = 'Dispensed' AND p.payment_type = 'cash'
+        UNION ALL
+        SELECT s.sale_date AS date, s.total_price AS total
+        FROM pharmacy_sales s
+        WHERE s.payment_method = 'cash'
+    ) AS combined
+    WHERE YEAR(date) = $currentYear
+    GROUP BY MONTH(date)
 ";
+
 $result = $conn->query($monthlyQuery);
 $months = [];
 while ($row = $result->fetch_assoc()) {
-    $months[$row['month_num']] = (float)$row['total'];
-}
-for ($i = 1; $i <= 12; $i++) {
-    $monthlyRevenue[$i - 1] = isset($months[$i]) ? $months[$i] : 0;
+    $months[(int)$row['month_num']] = (float)$row['total'];
 }
 
+for ($i = 1; $i <= 12; $i++) {
+    $monthlyRevenue[$i - 1] = $months[$i] ?? 0;
+}
 
 ?>
 
@@ -282,6 +326,13 @@ for ($i = 1; $i <= 12; $i++) {
                     <?php if ($pendingCount > 0): ?>
                         <span class="notif-badge"><?php echo $pendingCount; ?></span>
                     <?php endif; ?>
+                </a>
+            </li>
+
+            <li class="sidebar-item">
+                <a href="pharmacy_otc.php" class="sidebar-link position-relative">
+                    <i class="fa-solid fa-briefcase-medical"></i>
+                    <span style="font-size: 18px;">Over The Counter</span>
                 </a>
             </li>
 
