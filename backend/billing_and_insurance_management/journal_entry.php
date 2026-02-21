@@ -13,40 +13,88 @@ $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $like   = '%' . $conn->real_escape_string($search) . '%';
 
 /* ================================
-   FETCH PAYMENTS
+   FETCH PAYMENTS (Paid only, proper join)
 ================================ */
+$search_clause_pay = $search
+    ? "AND (
+        pi.fname LIKE '$like'
+        OR pi.lname LIKE '$like'
+        OR CONCAT(COALESCE(pi.fname,''),' ',COALESCE(pi.lname,'')) LIKE '$like'
+        OR pp.payment_method LIKE '$like'
+        OR pp.payment_id LIKE '$like'
+      )"
+    : "";
+
 $payments_sql = "
-SELECT
-    pp.payment_id, pp.amount, pp.payment_method, pp.paid_at, pp.remarks,
-    br.billing_id, br.patient_id,
-    pi.fname, pi.mname, pi.lname
-FROM paymongo_payments pp
-LEFT JOIN billing_records br ON pp.billing_id = br.billing_id
-LEFT JOIN patientinfo pi ON br.patient_id = pi.patient_id
-" . ($search ? "WHERE pi.fname LIKE '$like' OR pi.lname LIKE '$like' OR pp.payment_method LIKE '$like' OR pp.payment_id LIKE '$like'" : "") . "
-ORDER BY pp.paid_at DESC LIMIT $limit OFFSET $offset";
+    SELECT
+        pp.payment_id,
+        pp.amount,
+        pp.payment_method,
+        pp.paid_at,
+        pp.remarks,
+        br.billing_id,
+        br.patient_id,
+        br.transaction_id,
+        COALESCE(pi.fname, '')  AS fname,
+        COALESCE(pi.mname, '')  AS mname,
+        COALESCE(pi.lname, '')  AS lname
+    FROM paymongo_payments pp
+    INNER JOIN billing_records br
+        ON pp.billing_id = br.billing_id
+        AND br.status = 'Paid'
+    LEFT JOIN patientinfo pi
+        ON pi.patient_id = br.patient_id
+    WHERE 1=1 $search_clause_pay
+    ORDER BY pp.paid_at DESC
+    LIMIT $limit OFFSET $offset
+";
 
 $pay_res  = $conn->query($payments_sql);
 $payments = $pay_res ? $pay_res->fetch_all(MYSQLI_ASSOC) : [];
 
 /* ================================
-   FETCH RECEIPTS
+   FETCH RECEIPTS (Paid billing only, proper join)
 ================================ */
+$search_clause_rec = $search
+    ? "AND (
+        pi.fname LIKE '$like'
+        OR pi.lname LIKE '$like'
+        OR CONCAT(COALESCE(pi.fname,''),' ',COALESCE(pi.lname,'')) LIKE '$like'
+        OR pr.payment_method LIKE '$like'
+        OR pr.receipt_id LIKE '$like'
+      )"
+    : "";
+
 $receipts_sql = "
-SELECT
-    pr.receipt_id, pr.status, pr.payment_method, br.transaction_id,
-    pr.created_at AS receipt_created,
-    br.billing_id, br.patient_id, br.billing_date, br.grand_total, br.insurance_covered,
-    pi.fname, pi.mname, pi.lname
-FROM billing_records br
-INNER JOIN (
-    SELECT billing_id, MAX(receipt_id) AS latest_receipt_id
-    FROM patient_receipt GROUP BY billing_id
-) latest ON latest.billing_id = br.billing_id
-INNER JOIN patient_receipt pr ON pr.receipt_id = latest.latest_receipt_id
-LEFT JOIN patientinfo pi ON pi.patient_id = br.patient_id
-" . ($search ? "WHERE pi.fname LIKE '$like' OR pi.lname LIKE '$like' OR pr.payment_method LIKE '$like' OR pr.receipt_id LIKE '$like'" : "") . "
-ORDER BY br.billing_date DESC LIMIT $limit OFFSET $offset";
+    SELECT
+        pr.receipt_id,
+        pr.status,
+        pr.payment_method,
+        pr.created_at AS receipt_created,
+        br.billing_id,
+        br.patient_id,
+        br.billing_date,
+        br.grand_total,
+        br.insurance_covered,
+        br.transaction_id,
+        COALESCE(pi.fname, '')  AS fname,
+        COALESCE(pi.mname, '')  AS mname,
+        COALESCE(pi.lname, '')  AS lname
+    FROM billing_records br
+    INNER JOIN (
+        SELECT billing_id, MAX(receipt_id) AS latest_receipt_id
+        FROM patient_receipt
+        GROUP BY billing_id
+    ) latest ON latest.billing_id = br.billing_id
+    INNER JOIN patient_receipt pr
+        ON pr.receipt_id = latest.latest_receipt_id
+    LEFT JOIN patientinfo pi
+        ON pi.patient_id = br.patient_id
+    WHERE br.status = 'Paid'
+    $search_clause_rec
+    ORDER BY br.billing_date DESC
+    LIMIT $limit OFFSET $offset
+";
 
 $rec_res  = $conn->query($receipts_sql);
 $receipts = $rec_res ? $rec_res->fetch_all(MYSQLI_ASSOC) : [];
@@ -54,27 +102,26 @@ $receipts = $rec_res ? $rec_res->fetch_all(MYSQLI_ASSOC) : [];
 /* ================================
    TOTALS / STATS
 ================================ */
-$total_payment_amount  = 0;
-$total_receipt_amount  = 0;
-foreach ($payments as $p) $total_payment_amount += (float)$p['amount'];
-foreach ($receipts as $r) $total_receipt_amount += (float)$r['grand_total'];
-$total_entries = count($payments) + count($receipts);
+$total_payment_amount = array_sum(array_column($payments, 'amount'));
+$total_receipt_amount = array_sum(array_column($receipts, 'grand_total'));
+$total_entries        = count($payments) + count($receipts);
 
 /* ================================
    PAGINATION
 ================================ */
-$count_pay = $pay_res ? $pay_res->num_rows : 0;
-$count_rec = $rec_res ? $rec_res->num_rows : 0;
+$count_pay   = $pay_res  ? $pay_res->num_rows  : 0;
+$count_rec   = $rec_res  ? $rec_res->num_rows  : 0;
 $total_pages = max(1, ceil(($count_pay + $count_rec) / $limit));
-$total_pages = max($page, $total_pages); // ensure current page is valid
+$total_pages = max($page, $total_pages);
 
 /* ================================
-   HELPER
+   HELPER — build full name safely
 ================================ */
-function getPatientName($fname, $mname, $lname, $patient_id = null) {
-    $full = trim($fname . ' ' . $mname . ' ' . $lname);
-    if (!empty(trim($full))) return $full;
-    return $patient_id ? "Unknown (ID: {$patient_id})" : "Unknown Patient";
+function getPatientName(string $fname, string $mname, string $lname, $patient_id = null): string {
+    $parts = array_filter([trim($fname), trim($mname), trim($lname)]);
+    $full  = implode(' ', $parts);
+    if ($full !== '') return $full;
+    return $patient_id ? "Patient #$patient_id" : 'Unknown Patient';
 }
 ?>
 <!DOCTYPE html>
@@ -285,7 +332,7 @@ body {
   display: flex; align-items: center; justify-content: center;
 }
 .pat-name { font-weight: 600; color: var(--navy); font-size: .88rem; }
-.pat-method { font-size: .73rem; color: var(--ink-light); margin-top: 1px; }
+.pat-sub  { font-size: .73rem; color: var(--ink-light); margin-top: 1px; }
 
 /* Debit / Credit cells */
 .debit-cell {
@@ -305,10 +352,14 @@ body {
 .amount-val { font-weight: 700; color: var(--navy); font-size: .92rem; }
 
 /* Date */
-.date-val  { font-size: .82rem; color: var(--ink-light); }
+.date-val  { font-size: .82rem; color: var(--ink); font-weight: 500; }
 .date-time { font-size: .72rem; color: var(--ink-light); opacity: .7; }
 
 /* Status badge */
+.badge-paid   { background: #d1fae5; color: #065f46; border-radius: 999px;
+                padding: 3px 10px; font-size: .71rem; font-weight: 700; }
+.badge-pending { background: #fef3c7; color: #92400e; border-radius: 999px;
+                padding: 3px 10px; font-size: .71rem; font-weight: 700; }
 .badge-posted { background: #d1fae5; color: #065f46; border-radius: 999px;
                 padding: 3px 10px; font-size: .71rem; font-weight: 700; }
 .badge-draft  { background: #fef3c7; color: #92400e; border-radius: 999px;
@@ -395,11 +446,19 @@ body {
 .src-payment { background: #ede9fe; color: #5b21b6; }
 .src-receipt  { background: #dbeafe; color: #1d4ed8; }
 
+/* Method tag */
+.method-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #f1f5f9; border: 1px solid var(--border);
+  border-radius: 6px; padding: 2px 8px;
+  font-size: .75rem; font-weight: 600; color: var(--ink-light);
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .cw { margin-left: var(--sidebar-w-sm); padding: 60px 14px 50px; }
   .cw.sidebar-collapsed { margin-left: 0; }
-  .table-card  { display: none; }
+  .table-card   { display: none; }
   .mobile-cards { display: block; }
   .search-card  { padding: 14px; }
   .page-head h1 { font-size: 1.3rem; }
@@ -430,7 +489,7 @@ body {
     <div class="page-head-icon"><i class="bi bi-journal-bookmark-fill"></i></div>
     <div>
       <h1>Journal Entry</h1>
-      <p>Payment transactions recorded in the billing system</p>
+      <p>Paid payment transactions recorded in the billing system</p>
     </div>
     <div style="margin-left:auto;">
       <span style="font-size:.82rem;color:var(--ink-light);">
@@ -494,6 +553,7 @@ body {
     </span>
   </div>
 
+  <!-- Desktop Table -->
   <div class="table-card">
     <div class="table-card-header">
       <i class="bi bi-table"></i> Payments Ledger
@@ -514,7 +574,7 @@ body {
         <tbody>
           <?php foreach ($payments as $p):
             $full_name = getPatientName($p['fname'], $p['mname'], $p['lname'], $p['patient_id']);
-            $initials  = strtoupper(substr($full_name, 0, 1));
+            $initials  = strtoupper(substr(trim($p['fname'] ?: $full_name), 0, 1));
           ?>
           <tr>
             <td>
@@ -526,7 +586,12 @@ body {
                 <div class="pat-avatar"><?= $initials ?></div>
                 <div>
                   <div class="pat-name"><?= htmlspecialchars($full_name) ?></div>
-                  <div class="pat-method"><?= htmlspecialchars($p['payment_method']) ?></div>
+                  <div class="pat-sub">
+                    <span class="method-tag">
+                      <i class="bi bi-credit-card"></i>
+                      <?= htmlspecialchars($p['payment_method']) ?>
+                    </span>
+                  </div>
                 </div>
               </div>
             </td>
@@ -555,7 +620,7 @@ body {
   <div class="mobile-cards">
     <?php foreach ($payments as $p):
       $full_name = getPatientName($p['fname'], $p['mname'], $p['lname'], $p['patient_id']);
-      $initials  = strtoupper(substr($full_name, 0, 1));
+      $initials  = strtoupper(substr(trim($p['fname'] ?: $full_name), 0, 1));
     ?>
     <div class="m-entry-card">
       <div class="m-entry-head">
@@ -604,6 +669,7 @@ body {
     </span>
   </div>
 
+  <!-- Desktop Table -->
   <div class="table-card">
     <div class="table-card-header">
       <i class="bi bi-table"></i> Receipts Ledger
@@ -630,7 +696,7 @@ body {
           <?php else: ?>
           <?php foreach ($receipts as $r):
             $full_name = getPatientName($r['fname'], $r['mname'], $r['lname'], $r['patient_id']);
-            $initials  = strtoupper(substr($full_name, 0, 1));
+            $initials  = strtoupper(substr(trim($r['fname'] ?: $full_name), 0, 1));
             $is_posted = strtolower($r['status']) === 'posted';
           ?>
           <tr>
@@ -643,7 +709,12 @@ body {
                 <div class="pat-avatar"><?= $initials ?></div>
                 <div>
                   <div class="pat-name"><?= htmlspecialchars($full_name) ?></div>
-                  <div class="pat-method"><?= htmlspecialchars($r['payment_method'] ?: 'Unpaid') ?></div>
+                  <div class="pat-sub">
+                    <span class="method-tag">
+                      <i class="bi bi-credit-card"></i>
+                      <?= htmlspecialchars($r['payment_method'] ?: 'Unpaid') ?>
+                    </span>
+                  </div>
                 </div>
               </div>
             </td>
@@ -656,7 +727,7 @@ body {
               </span>
             </td>
             <td>
-              <span class="ref-mono" title="<?= $r['receipt_id'] ?>">#<?= $r['receipt_id'] ?></span>
+              <span class="ref-mono" title="Receipt #<?= $r['receipt_id'] ?>">#<?= $r['receipt_id'] ?></span>
             </td>
             <td class="td-action">
               <a href="journal_entry_line.php?receipt_id=<?= urlencode($r['receipt_id']) ?>"
@@ -676,7 +747,7 @@ body {
   <div class="mobile-cards">
     <?php foreach ($receipts as $r):
       $full_name = getPatientName($r['fname'], $r['mname'], $r['lname'], $r['patient_id']);
-      $initials  = strtoupper(substr($full_name, 0, 1));
+      $initials  = strtoupper(substr(trim($r['fname'] ?: $full_name), 0, 1));
       $is_posted = strtolower($r['status']) === 'posted';
     ?>
     <div class="m-entry-card">
@@ -725,12 +796,12 @@ body {
   </div>
   <?php endif; ?>
 
-  <!-- Empty state (both empty) -->
+  <!-- Empty state -->
   <?php if (empty($payments) && empty($receipts)): ?>
   <div class="table-card">
     <div style="text-align:center;padding:56px 16px;color:var(--ink-light);">
       <i class="bi bi-inbox" style="font-size:2.2rem;display:block;margin-bottom:10px;opacity:.3;"></i>
-      <?= $search ? 'No entries match your search.' : 'No journal entries found.' ?>
+      <?= $search ? 'No entries match your search.' : 'No paid journal entries found.' ?>
     </div>
   </div>
   <?php endif; ?>
