@@ -345,8 +345,6 @@ body {
                     }
                 ?></span>
             </div>
-            <a href="leave_request.php">Leave Request</a>
-            <a href="payslip_viewing.php">Payslip Viewing</a>
             <a href="../logout.php" class="logout-link"
                onclick="return confirm('Are you sure you want to log out?');">
                Logout
