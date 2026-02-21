@@ -1,177 +1,184 @@
 <?php
 include '../../SQL/config.php';
 
+// Ensure variables have safe defaults in case earlier logic didn't run
+if (!isset($statusFilter))   $statusFilter   = strtolower(trim($_GET['status'] ?? 'pending'));
+if (!isset($searchDept))     $searchDept     = trim($_GET['search_dept'] ?? '');
+if (!isset($errorMessage))   $errorMessage   = '';
+if (!isset($successMessage)) $successMessage = '';
+if (!isset($requests))       $requests       = [];
+
+/* =====================================================
+   SAFE DEFAULTS (PREVENT UNDEFINED ERRORS)
+=====================================================*/
+$statusFilter = strtolower(trim($_GET['status'] ?? 'pending'));
+$searchDept   = trim($_GET['search_dept'] ?? '');
+$requests     = [];
+$counts       = [];
+$errorMessage = '';
+$successMessage = '';
+
 /* =====================================================
    HANDLE ACTIONS (Approve / Reject / Purchase)
-   FIX: MySQL ENUM uses lowercase — match exactly.
-   All status writes use lowercase; reads normalised with strtolower().
 =====================================================*/
-if (isset($_POST['action'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
-    $request_id = (int)$_POST['id'];
+    $request_id = (int)($_POST['id'] ?? 0);
 
-    $stmt = $pdo->prepare("SELECT * FROM department_request WHERE id=? LIMIT 1");
-    $stmt->execute([$request_id]);
-    $request = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($request_id > 0) {
 
-    if (!$request) {
-        header("Location: department_request.php");
-        exit;
+        $stmt = $pdo->prepare("SELECT * FROM department_request WHERE id=? LIMIT 1");
+        $stmt->execute([$request_id]);
+        $request = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($request) {
+
+            $currentStatus = strtolower(trim($request['status'] ?? ''));
+
+            $stmtItems = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
+            $stmtItems->execute([$request_id]);
+            $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC) ?? [];
+
+            /* ================= APPROVE ================= */
+            if ($_POST['action'] === 'approve' && $currentStatus === 'pending') {
+
+                $approved_quantities = $_POST['approved_quantity'] ?? [];
+
+                foreach ($items as $item) {
+                    $idx = $item['id'];
+                    $approved = isset($approved_quantities[$idx]) ? (int)$approved_quantities[$idx] : 0;
+
+                    if ($approved < 0) $approved = 0;
+                    if ($approved > $item['quantity']) $approved = $item['quantity'];
+
+                    $stmtUpdate = $pdo->prepare("UPDATE department_request_items SET approved_quantity=? WHERE id=?");
+                    $stmtUpdate->execute([$approved, $idx]);
+                }
+
+                $stmtTotal = $pdo->prepare("SELECT SUM(approved_quantity) FROM department_request_items WHERE request_id=?");
+                $stmtTotal->execute([$request_id]);
+                $totalApproved = (int)($stmtTotal->fetchColumn() ?? 0);
+
+                if ($totalApproved <= 0) {
+                    header("Location: department_request.php?status=pending&error=no_approved");
+                    exit;
+                }
+
+                $stmtUpdateRequest = $pdo->prepare("UPDATE department_request SET status=?, total_approved_items=? WHERE id=?");
+                $stmtUpdateRequest->execute(['approved', $totalApproved, $request_id]);
+
+                header("Location: department_request.php?status=approved&success=approved");
+                exit;
+            }
+
+            /* ================= REJECT ================= */
+            if ($_POST['action'] === 'reject' && $currentStatus === 'pending') {
+
+                $stmt = $pdo->prepare("UPDATE department_request SET status=? WHERE id=?");
+                $stmt->execute(['rejected', $request_id]);
+
+                header("Location: department_request.php?status=rejected&success=rejected");
+                exit;
+            }
+
+            /* ================= PURCHASE ================= */
+            if ($_POST['action'] === 'purchase' && $currentStatus === 'approved') {
+
+                $prices       = $_POST['price'] ?? [];
+                $units        = $_POST['unit'] ?? [];
+                $pcsArr       = $_POST['pcs_per_box'] ?? [];
+                $payment_type = $_POST['payment_type'] ?? 'Direct';
+
+                foreach ($items as $item) {
+
+                    $item_id = $item['id'];
+                    $approved_qty = (int)($item['approved_quantity'] ?? 0);
+                    if ($approved_qty <= 0) continue;
+
+                    $unit = $units[$item_id] ?? 'pcs';
+                    $pcs  = (int)($pcsArr[$item_id] ?? 1);
+                    $price = (float)($prices[$item_id] ?? 0);
+                    $total = $price * $approved_qty;
+
+                    $stmtUpdate = $pdo->prepare("
+                        UPDATE department_request_items
+                        SET price=?, total_price=?, unit=?, pcs_per_box=?
+                        WHERE id=?
+                    ");
+                    $stmtUpdate->execute([$price, $total, $unit, $pcs, $item_id]);
+                }
+
+                $stmt = $pdo->prepare("
+                    UPDATE department_request
+                    SET status=?, purchased_at=NOW(), payment_type=?
+                    WHERE id=?
+                ");
+                $stmt->execute(['purchased', $payment_type, $request_id]);
+
+                header("Location: department_request.php?status=purchased&success=purchased");
+                exit;
+            }
+        }
     }
 
-    // Normalise to lowercase so comparisons are case-insensitive
-    $currentStatus = strtolower(trim($request['status']));
-
-    $stmtItems = $pdo->prepare("SELECT * FROM department_request_items WHERE request_id=? ORDER BY id ASC");
-    $stmtItems->execute([$request_id]);
-    $items = $stmtItems->fetchAll(PDO::FETCH_ASSOC);
-
-    /* ================= APPROVE ================= */
-    if ($_POST['action'] === 'approve' && $currentStatus === 'pending') {
-
-        $approved_quantities = $_POST['approved_quantity'] ?? [];
-
-        foreach ($items as $item) {
-            $idx      = $item['id'];
-            $approved = isset($approved_quantities[$idx]) ? (int)$approved_quantities[$idx] : 0;
-
-            if ($approved < 0) $approved = 0;
-            if ($approved > $item['quantity']) $approved = $item['quantity'];
-
-            $stmtUpdate = $pdo->prepare("UPDATE department_request_items SET approved_quantity=? WHERE id=?");
-            $stmtUpdate->execute([$approved, $idx]);
-        }
-
-        $stmtTotal = $pdo->prepare("SELECT SUM(approved_quantity) FROM department_request_items WHERE request_id=?");
-        $stmtTotal->execute([$request_id]);
-        $totalApproved = $stmtTotal->fetchColumn() ?: 0;
-
-        if ($totalApproved <= 0) {
-            header("Location: department_request.php?status=pending&error=no_approved");
-            exit;
-        }
-
-        // FIX: write lowercase 'approved' to match ENUM
-        $stmtUpdateRequest = $pdo->prepare("UPDATE department_request SET status=?, total_approved_items=? WHERE id=?");
-        $stmtUpdateRequest->execute(['approved', $totalApproved, $request_id]);
-
-        header("Location: department_request.php?status=approved&success=approved");
-        exit;
-    }
-
-    /* ================= REJECT ================= */
-    if ($_POST['action'] === 'reject' && $currentStatus === 'pending') {
-
-        // FIX: write lowercase 'rejected'
-        $stmt = $pdo->prepare("UPDATE department_request SET status=? WHERE id=?");
-        $stmt->execute(['rejected', $request_id]);
-
-        header("Location: department_request.php?status=rejected&success=rejected");
-        exit;
-    }
-
-    /* ================= PURCHASE ================= */
-    if ($_POST['action'] === 'purchase' && $currentStatus === 'approved') {
-
-        $stmtCheck = $pdo->prepare("SELECT SUM(approved_quantity) FROM department_request_items WHERE request_id=?");
-        $stmtCheck->execute([$request_id]);
-        $totalApproved = $stmtCheck->fetchColumn() ?: 0;
-
-        if ($totalApproved <= 0) {
-            header("Location: department_request.php?status=approved&error=no_approved_purchase");
-            exit;
-        }
-
-        $prices          = $_POST['price']       ?? [];
-        $units           = $_POST['unit']        ?? [];
-        $pcs_per_box_arr = $_POST['pcs_per_box'] ?? [];
-        $payment_type    = $_POST['payment_type'] ?? 'Direct';
-
-        foreach ($items as $item) {
-
-            $item_id      = $item['id'];
-            $approved_qty = $item['approved_quantity'] ?? 0;
-            if ($approved_qty <= 0) continue;
-
-            $unit_type   = $units[$item_id]       ?? $item['unit']        ?? 'pcs';
-            $pcs_per_box = intval($pcs_per_box_arr[$item_id] ?? $item['pcs_per_box'] ?? 1);
-            $price       = floatval($prices[$item_id] ?? 0);
-            $total_price = $price * $approved_qty;
-
-            $stmtUpdatePrice = $pdo->prepare("
-                UPDATE department_request_items
-                SET price=?, total_price=?, unit=?, pcs_per_box=?
-                WHERE id=?
-            ");
-            $stmtUpdatePrice->execute([
-                $price,
-                $total_price,
-                ucfirst(strtolower($unit_type)),
-                $pcs_per_box,
-                $item_id
-            ]);
-        }
-
-        // FIX: write lowercase 'purchased'
-        $stmt = $pdo->prepare("
-            UPDATE department_request
-            SET status=?, purchased_at=NOW(), payment_type=?
-            WHERE id=?
-        ");
-        $stmt->execute(['purchased', $payment_type, $request_id]);
-
-        header("Location: department_request.php?status=purchased&success=purchased");
-        exit;
-    }
-
-    header("Location: department_request.php?status=" . urlencode($currentStatus));
+    header("Location: department_request.php");
     exit;
 }
 
 /* =====================================================
-   PAGE LOAD — fetch counts & filtered list
-   All status comparisons use lowercase.
+   LOAD STATUS COUNTS
 =====================================================*/
+try {
+    $countsRaw = $pdo->query("
+        SELECT LOWER(status) AS s, COUNT(*) AS cnt
+        FROM department_request
+        GROUP BY LOWER(status)
+    ")->fetchAll(PDO::FETCH_ASSOC) ?? [];
 
-// Normalise URL param — default to 'pending'
-$statusFilter = strtolower(trim($_GET['status'] ?? 'pending'));
-$searchDept   = trim($_GET['search_dept'] ?? '');
+    foreach ($countsRaw as $c) {
+        $counts[ucfirst($c['s'])] = $c['cnt'];
+    }
+} catch (Exception $e) {
+    $counts = [];
+}
 
-// Alert messages
+/* =====================================================
+   FETCH FILTERED REQUESTS
+=====================================================*/
+try {
+    $params = [$statusFilter];
+    $sql = "SELECT * FROM department_request WHERE LOWER(status)=?";
+
+    if (!empty($searchDept)) {
+        $sql .= " AND department LIKE ?";
+        $params[] = "%$searchDept%";
+    }
+
+    $sql .= " ORDER BY created_at DESC";
+
+    $stmtR = $pdo->prepare($sql);
+    $stmtR->execute($params);
+    $requests = $stmtR->fetchAll(PDO::FETCH_ASSOC) ?? [];
+
+} catch (Exception $e) {
+    $requests = [];
+}
+
+/* =====================================================
+   ALERT MESSAGES
+=====================================================*/
 $errorMessages = [
-    'no_approved'          => 'Please set at least one approved quantity greater than zero.',
-    'no_approved_purchase' => 'No approved items found for this request.',
+    'no_approved' => 'Please set at least one approved quantity greater than zero.',
 ];
+
 $successMessages = [
     'approved'  => 'Request approved successfully.',
     'rejected'  => 'Request rejected successfully.',
     'purchased' => 'Purchase order confirmed successfully.',
 ];
-$errorMessage   = $errorMessages[$_GET['error']   ?? ''] ?? '';
+
+$errorMessage   = $errorMessages[$_GET['error'] ?? ''] ?? '';
 $successMessage = $successMessages[$_GET['success'] ?? ''] ?? '';
-
-// Count per status (case-insensitive via LOWER())
-$countsRaw = $pdo->query("
-    SELECT LOWER(status) AS s, COUNT(*) AS cnt
-    FROM department_request
-    GROUP BY LOWER(status)
-")->fetchAll(PDO::FETCH_ASSOC);
-
-$counts = [];
-foreach ($countsRaw as $c) $counts[ucfirst($c['s'])] = $c['cnt'];
-
-// Fetch requests for selected status
-$params = [strtolower($statusFilter)];
-$sql    = "SELECT * FROM department_request WHERE LOWER(status)=?";
-if ($searchDept !== '') {
-    $sql    .= " AND department LIKE ?";
-    $params[] = '%' . $searchDept . '%';
-}
-$sql .= " ORDER BY created_at DESC";
-
-$stmtR    = $pdo->prepare($sql);
-$stmtR->execute($params);
-$requests = $stmtR->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -613,13 +620,13 @@ body {
     <?php if ($errorMessage): ?>
     <div class="alert-custom alert-danger-custom">
         <i class="bi bi-exclamation-triangle-fill"></i>
-        <span><?= htmlspecialchars($errorMessage) ?></span>
+        <span><?= htmlspecialchars((string)($errorMessage ?? '')) ?></span>
     </div>
     <?php endif; ?>
     <?php if ($successMessage): ?>
     <div class="alert-custom alert-success-custom">
         <i class="bi bi-check-circle-fill"></i>
-        <span><?= htmlspecialchars($successMessage) ?></span>
+        <span><?= htmlspecialchars((string)($successMessage ?? '')) ?></span>
     </div>
     <?php endif; ?>
 
@@ -652,11 +659,11 @@ body {
                 <i class="bi bi-table" style="color:var(--primary);"></i>
                 Request List
                 <span style="font-size:.75rem;font-weight:600;color:var(--gray-400);">
-                    — <?= ucfirst($statusFilter) ?> (<?= count($requests) ?>)
+                    — <?= ucfirst((string)($statusFilter ?? '')) ?> (<?= is_countable($requests) ? count($requests) : 0 ?>)
                 </span>
             </div>
             <form method="get" class="filter-bar">
-                <input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter) ?>">
+                <input type="hidden" name="status" value="<?= htmlspecialchars((string)($statusFilter ?? '')) ?>">
                 <input type="text" name="search_dept" class="form-control"
                        placeholder="Search department…"
                        value="<?= htmlspecialchars($searchDept) ?>"
@@ -670,7 +677,7 @@ body {
         <?php if (empty($requests)): ?>
             <div class="empty-state">
                 <i class="bi bi-inbox"></i>
-                <p>No <?= htmlspecialchars($statusFilter) ?> requests found.</p>
+                <p>No <?= htmlspecialchars((string)($statusFilter ?? '')) ?> requests found.</p>
             </div>
         <?php else: ?>
         <table class="data-table">
@@ -739,11 +746,11 @@ body {
                     <!-- Pass lowercase status to JS for consistent comparison -->
                     <button class="btn-view view-items-btn"
                         data-id="<?= $r['id'] ?>"
-                        data-dept="<?= htmlspecialchars($r['department']) ?>"
-                        data-status="<?= $statusRaw ?>"
-                        data-purchased="<?= htmlspecialchars($r['purchased_at'] ?? '') ?>"
-                        data-paymenttype="<?= htmlspecialchars($r['payment_type'] ?? '') ?>"
-                        data-items='<?= htmlspecialchars(json_encode($itemsArr, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>'>
+                        data-dept="<?= htmlspecialchars((string)($r['department'] ?? '')) ?>"
+                        data-status="<?= htmlspecialchars((string)($statusRaw ?? '')) ?>"
+                        data-purchased="<?= htmlspecialchars((string)($r['purchased_at'] ?? '')) ?>"
+                        data-paymenttype="<?= htmlspecialchars((string)($r['payment_type'] ?? '')) ?>"
+                        data-items='<?= htmlspecialchars((string)json_encode($itemsArr, JSON_UNESCAPED_UNICODE), ENT_QUOTES, "UTF-8") ?>'>
                         <i class="bi bi-eye"></i> View
                     </button>
                 </td>
