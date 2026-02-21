@@ -5,7 +5,7 @@ require_once "../classes/notification.php";
 
 
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Pharmacist') {
-    header('Location: login.php');
+    header('Location: ' . BASE_URL . 'backend/login.php');
     exit();
 }
 
@@ -14,7 +14,7 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// Fetch user details from database
+
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
@@ -33,7 +33,7 @@ $sales = new Sales($conn);
 $period = $_GET['period'] ?? 'all';
 
 // Fetch data based on selected period
-$totalSales      = $sales->getTotalSales($period);
+$totalSales      = $sales->getTotalcashSales($period);
 $totalOrders     = $sales->getTotalOrders($period);
 $dispensedToday  = $sales->getDispensedToday();
 $totalStocks     = $sales->getTotalStocks();
@@ -44,7 +44,7 @@ $topProducts     = $sales->getTopProducts($period);
 $categoryLabels = [];
 $categoryValues = [];
 foreach ($categoryDataRaw as $cat) {
-    $categoryLabels[] = $cat['category'];
+    $categoryLabels[] = $cat['category'];   // "Prescription Sales", "OTC Sales"
     $categoryValues[] = floatval($cat['total']);
 }
 // -------------------- Sales Performance --------------------
@@ -197,6 +197,13 @@ $notifCount = $notif->notifCount;
             </li>
 
             <li class="sidebar-item">
+                <a href="pharmacy_otc.php" class="sidebar-link position-relative">
+                    <i class="fa-solid fa-briefcase-medical"></i>
+                    <span style="font-size: 18px;">Over The Counter</span>
+                </a>
+            </li>
+
+            <li class="sidebar-item">
                 <a href="pharmacy_sales.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-chart-line" viewBox="0 0 16 16">
@@ -310,7 +317,7 @@ $notifCount = $notif->notifCount;
                             </button>
                             <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
                                 <li><span>Welcome <strong><?php echo $user['last_name']; ?></strong>!</span></li>
-                                <li><a class="dropdown-item" href="../../logout.php">Logout</a></li>
+                                <li><a class="dropdown-item" href="../logout.php">Logout</a></li>
                             </ul>
                         </div>
                     </div>
@@ -413,7 +420,6 @@ $notifCount = $notif->notifCount;
                                     <thead>
                                         <tr>
                                             <th>Product Name</th>
-                                            <th>Category</th>
                                             <th>Quantity</th>
                                             <th>Total Price</th>
                                         </tr>
@@ -422,7 +428,6 @@ $notifCount = $notif->notifCount;
                                         <?php while ($row = $topProducts->fetch_assoc()): ?>
                                             <tr>
                                                 <td><?= $row['med_name'] ?></td>
-                                                <td><?= $row['category'] ?></td>
                                                 <td><?= $row['qty'] ?></td>
                                                 <td>₱<?= number_format($row['total'], 2) ?></td>
                                             </tr>
