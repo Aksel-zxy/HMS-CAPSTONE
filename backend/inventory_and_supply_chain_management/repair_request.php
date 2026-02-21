@@ -750,7 +750,7 @@ $departments = $dept_stmt->fetchAll(PDO::FETCH_COLUMN);
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
             <div>
                 <div class="hero-icon"><i class="bi bi-tools"></i></div>
-                <h1>Repair Request System</h1>
+                <h1>Repair Request</h1>
                 <p>Submit and track equipment &amp; network repair requests across hospital departments.</p>
             </div>
             <div class="d-flex flex-column align-items-end gap-2">
