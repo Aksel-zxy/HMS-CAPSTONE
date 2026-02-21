@@ -22,6 +22,32 @@ if (!$user) {
     exit();
 }
 
+$GEMINI_API_KEY = getenv('GERALD_KEY') ?? '';
+
+function getGeminiSummary($apiKey, $prompt) {
+    if (empty($apiKey)) return "This report presents the number of tests recorded per laboratory service category during the reporting period. It helps monitor testing trends, resource allocation, and overall laboratory performance.";
+
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" . $apiKey;
+    $data = [ "contents" => [ [ "parts" => [ ["text" => $prompt] ] ] ] ];
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+
+    $response = curl_exec($ch);
+    if (curl_errno($ch)) return "This report presents the number of tests recorded per laboratory service category during the reporting period. It helps monitor testing trends, resource allocation, and overall laboratory performance.";
+    curl_close($ch);
+
+    $decoded = json_decode($response, true);
+    if (isset($decoded['candidates'][0]['content']['parts'][0]['text'])) {
+        return str_replace(['*', '#'], '', $decoded['candidates'][0]['content']['parts'][0]['text']);
+    }
+    return "This report presents the number of tests recorded per laboratory service category during the reporting period. It helps monitor testing trends, resource allocation, and overall laboratory performance.";
+}
+
 $selected_month = isset($_GET['month']) ? (int)$_GET['month'] : date('m');
 $selected_year = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
 $month_name = date("F", mktime(0, 0, 0, $selected_month, 10));
@@ -125,6 +151,24 @@ if ($res_all_tests) {
     }
 }
 
+$test_stats_text = "";
+if (!empty($all_tests)) {
+    foreach($all_tests as $t) {
+        $test_stats_text .= "- " . $t['serviceName'] . ": " . $t['total'] . " tests\n";
+    }
+} else {
+    $test_stats_text = "No tests recorded.";
+}
+
+$prompt = "Act as a professional Laboratory Manager. Write a short, professional summary (max 3 sentences) for this month's laboratory operations based on the following data:\n" .
+    "Total Patients: " . number_format($total_patients) . "\n" .
+    "Average Turnaround Time: $avg_turnaround hours\n" .
+    "Equipment Health: $equipment_health%\n" .
+    "Test Statistics:\n$test_stats_text\n\n" .
+    "Instructions: Make it professional, highlight key performance indicators, and mention any trends or areas of note. Do not use asterisks or formatting, just plain text.";
+
+$ai_summary = getGeminiSummary($GEMINI_API_KEY, $prompt);
+
 if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
     header('Content-Type: application/json');
     echo json_encode([
@@ -138,7 +182,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
         'all_tests' => $all_tests,
         'total_all_tests' => $total_all_tests,
         'month_name' => $month_name,
-        'selected_year' => $selected_year
+        'selected_year' => $selected_year,
+        'ai_summary' => $ai_summary
     ]);
     exit();
 }
@@ -533,8 +578,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
                     <div class="print-line"></div>
                     
                     <div class="print-section-title">SUMMARY</div>
-                    <p class="print-summary-text">
-                        This report presents the number of tests recorded per laboratory service category during the reporting period. It helps monitor testing trends, resource allocation, and overall laboratory performance.
+                    <p class="print-summary-text" id="valPrintSummary">
+                        <?php echo htmlspecialchars($ai_summary); ?>
                     </p>
                     
                     <div class="print-line"></div>
@@ -671,6 +716,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
 
                     
                     document.getElementById('valPrintPeriod').innerText = `${data.month_name} ${data.selected_year}`;
+
+                    if (data.ai_summary) {
+                        document.getElementById('valPrintSummary').innerText = data.ai_summary;
+                    }
 
                     
                     if (window.initCharts) {
