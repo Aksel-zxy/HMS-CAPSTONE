@@ -22,18 +22,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'alloc
         $inv = $s->fetch(PDO::FETCH_ASSOC);
 
         if ($inv && $qty <= $inv['quantity']) {
-            $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE item_id = ?")->execute([$qty, $item_id]);
+            try {
+                $pdo->beginTransaction();
 
-            $s2 = $pdo->prepare("SELECT id FROM department_assets WHERE item_id = ? AND department = ?");
-            $s2->execute([$item_id, $dept]);
-            $existing = $s2->fetch(PDO::FETCH_ASSOC);
+                $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE item_id = ?")
+                    ->execute([$qty, $item_id]);
 
-            if ($existing) {
-                $pdo->prepare("UPDATE department_assets SET quantity = quantity + ? WHERE id = ?")->execute([$qty, $existing['id']]);
-            } else {
-                $pdo->prepare("INSERT INTO department_assets (item_id, department, quantity) VALUES (?, ?, ?)")->execute([$item_id, $dept, $qty]);
+                $s2 = $pdo->prepare("SELECT id FROM department_assets WHERE item_id = ? AND department = ?");
+                $s2->execute([$item_id, $dept]);
+                $existing = $s2->fetch(PDO::FETCH_ASSOC);
+
+                if ($existing) {
+                    $pdo->prepare("UPDATE department_assets SET quantity = quantity + ? WHERE id = ?")
+                        ->execute([$qty, $existing['id']]);
+                } else {
+                    $pdo->prepare("INSERT INTO department_assets (item_id, department, quantity) VALUES (?, ?, ?)")
+                        ->execute([$item_id, $dept, $qty]);
+                }
+
+                $pdo->commit();
+                $success_msg = "Successfully allocated {$qty}x " . htmlspecialchars($inv['item_name']) . " to " . htmlspecialchars($dept) . ".";
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error_msg = "Database error: " . $e->getMessage();
             }
-            $success_msg = "Successfully allocated {$qty}x " . htmlspecialchars($inv['item_name']) . " to " . htmlspecialchars($dept) . ".";
         } else {
             $error_msg = "Insufficient stock in main inventory.";
         }
@@ -57,18 +69,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'trans
         $src = $s->fetch(PDO::FETCH_ASSOC);
 
         if ($src && $qty <= $src['quantity']) {
-            $pdo->prepare("UPDATE department_assets SET quantity = quantity - ? WHERE id = ?")->execute([$qty, $src['id']]);
+            try {
+                $pdo->beginTransaction();
 
-            $s2 = $pdo->prepare("SELECT id FROM department_assets WHERE item_id = ? AND department = ?");
-            $s2->execute([$item_id, $dest_dept]);
-            $dst = $s2->fetch(PDO::FETCH_ASSOC);
+                $pdo->prepare("UPDATE department_assets SET quantity = quantity - ? WHERE id = ?")
+                    ->execute([$qty, $src['id']]);
 
-            if ($dst) {
-                $pdo->prepare("UPDATE department_assets SET quantity = quantity + ? WHERE id = ?")->execute([$qty, $dst['id']]);
-            } else {
-                $pdo->prepare("INSERT INTO department_assets (item_id, department, quantity) VALUES (?, ?, ?)")->execute([$item_id, $dest_dept, $qty]);
+                $s2 = $pdo->prepare("SELECT id FROM department_assets WHERE item_id = ? AND department = ?");
+                $s2->execute([$item_id, $dest_dept]);
+                $dst = $s2->fetch(PDO::FETCH_ASSOC);
+
+                if ($dst) {
+                    $pdo->prepare("UPDATE department_assets SET quantity = quantity + ? WHERE id = ?")
+                        ->execute([$qty, $dst['id']]);
+                } else {
+                    $pdo->prepare("INSERT INTO department_assets (item_id, department, quantity) VALUES (?, ?, ?)")
+                        ->execute([$item_id, $dest_dept, $qty]);
+                }
+
+                $pdo->commit();
+                $success_msg = "Transfer successful.";
+            } catch (Exception $e) {
+                $pdo->rollBack();
+                $error_msg = "Database error: " . $e->getMessage();
             }
-            $success_msg = "Transfer successful.";
         } else {
             $error_msg = "Insufficient quantity in source department.";
         }
@@ -82,26 +106,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dispo
     $location    = trim($_POST['location']);
 
     if ($dispose_qty > 0) {
-        if ($location === 'Main Storage') {
-            $s = $pdo->prepare("SELECT quantity FROM inventory WHERE item_id = ?");
-            $s->execute([$item_id]);
-            $inv = $s->fetch(PDO::FETCH_ASSOC);
-            if ($inv && $dispose_qty <= $inv['quantity']) {
-                $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE item_id = ?")->execute([$dispose_qty, $item_id]);
-                $success_msg = "Asset disposed from Main Storage.";
+        try {
+            if ($location === 'Main Storage') {
+                $s = $pdo->prepare("SELECT quantity FROM inventory WHERE item_id = ?");
+                $s->execute([$item_id]);
+                $inv = $s->fetch(PDO::FETCH_ASSOC);
+                if ($inv && $dispose_qty <= $inv['quantity']) {
+                    $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE item_id = ?")
+                        ->execute([$dispose_qty, $item_id]);
+                    $success_msg = "Asset disposed from Main Storage.";
+                } else {
+                    $error_msg = "Insufficient quantity.";
+                }
             } else {
-                $error_msg = "Insufficient quantity.";
+                $s = $pdo->prepare("SELECT * FROM department_assets WHERE item_id = ? AND department = ?");
+                $s->execute([$item_id, $location]);
+                $di = $s->fetch(PDO::FETCH_ASSOC);
+                if ($di && $dispose_qty <= $di['quantity']) {
+                    $pdo->prepare("UPDATE department_assets SET quantity = quantity - ? WHERE id = ?")
+                        ->execute([$dispose_qty, $di['id']]);
+                    $success_msg = "Asset disposed from " . htmlspecialchars($location) . ".";
+                } else {
+                    $error_msg = "Insufficient quantity.";
+                }
             }
-        } else {
-            $s = $pdo->prepare("SELECT * FROM department_assets WHERE item_id = ? AND department = ?");
-            $s->execute([$item_id, $location]);
-            $di = $s->fetch(PDO::FETCH_ASSOC);
-            if ($di && $dispose_qty <= $di['quantity']) {
-                $pdo->prepare("UPDATE department_assets SET quantity = quantity - ? WHERE id = ?")->execute([$dispose_qty, $di['id']]);
-                $success_msg = "Asset disposed from " . htmlspecialchars($location) . ".";
-            } else {
-                $error_msg = "Insufficient quantity.";
-            }
+        } catch (Exception $e) {
+            $error_msg = "Database error: " . $e->getMessage();
         }
     }
 }
@@ -421,10 +451,10 @@ $main_inv_js = array_map(fn($m) => ['item_id' => $m['item_id'], 'name' => $m['it
 
     <!-- Alerts -->
     <?php if ($success_msg): ?>
-        <div class="alert alert-success">✅ <?= $success_msg ?></div>
+        <div class="alert alert-success">✅ <?= htmlspecialchars($success_msg) ?></div>
     <?php endif; ?>
     <?php if ($error_msg): ?>
-        <div class="alert alert-danger">⚠️ <?= $error_msg ?></div>
+        <div class="alert alert-danger">⚠️ <?= htmlspecialchars($error_msg) ?></div>
     <?php endif; ?>
 
     <!-- Stats -->
