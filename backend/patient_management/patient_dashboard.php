@@ -215,53 +215,45 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
                     </span>
                 </div>
 
-                <div class="row g-3 flex-nowrap overflow-auto justify-content-center">
+                <div class="stats-grid">
 
-                    <div class="col-10 col-sm-6 col-md-2">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h6 class="card-title">Inpatients</h6>
-                                <p class="card-text fs-4"><?php echo $inpatients; ?></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-10 col-sm-6 col-md-2">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h6 class="card-title">Outpatients</h6>
-                                <p class="card-text fs-4"><?php echo $outpatients; ?></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-10 col-sm-6 col-md-2">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h6 class="card-title">Total Patients</h6>
-                                <p class="card-text fs-4"><?php echo $totalPatients; ?></p>
-                            </div>
+                    <div class="card text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title">Inpatients</h6>
+                            <p class="card-text fs-4"><?php echo $inpatients; ?></p>
                         </div>
                     </div>
 
 
-                    <div class="col-10 col-sm-6 col-md-2">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h6 class="card-title">Available Beds</h6>
-                                <p class="card-text fs-4"><?php echo $beds; ?></p>
-                            </div>
+                    <div class="card text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title">Outpatients</h6>
+                            <p class="card-text fs-4"><?php echo $outpatients; ?></p>
                         </div>
                     </div>
 
-                    <div class="col-10 col-sm-6 col-md-2">
-                        <div class="card text-center">
-                            <div class="card-body">
-                                <h6 class="card-title">Today's Appointments</h6>
-                                <p class="card-text fs-4"><?php echo $appointments; ?></p>
-                            </div>
+                    <div class="card text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title">Total Patients</h6>
+                            <p class="card-text fs-4"><?php echo $totalPatients; ?></p>
                         </div>
                     </div>
+
+                    <div class="card text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title">Available Beds</h6>
+                            <p class="card-text fs-4"><?php echo $beds; ?></p>
+                        </div>
+                    </div>
+
+                     <div class="card text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title">Today's Appointments<</h6>
+                            <p class="card-text fs-4"><?php echo $appointments; ?></p>
+                        </div>
+                    </div>
+
+                    
                 </div>
 
             </div>
@@ -300,48 +292,53 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
                         </div>
                     </div>
 
-                    <div class="card w-25">
-                        <div class="card-body">
-                            <h5 class="card-title text-center pb-3">Quick Actions</h5>
+                   <div class="col-12 col-lg-3">
+    <div class="card h-100">
+        <div class="card-body">
+            <h5 class="card-title text-center pb-3">Quick Actions</h5>
 
-                            <input type="text" id="patientSearch" class="form-control mb-3"
-                                placeholder="Search patient...">
-                            <div id="searchResults" class="list-group position-absolute" style="z-index:1000;"></div>
+            <!-- Search -->
+            <div class="position-relative mb-3">
+                <input type="text" id="patientSearch" class="form-control"
+                    placeholder="Search patient...">
+                <div id="searchResults"
+                    class="list-group w-100 position-absolute"
+                    style="z-index:1000;"></div>
+            </div>
 
+            <!-- Buttons -->
+            <div class="d-grid gap-3">
 
-                            <div class="d-flex justify-content-evenly mb-2">
-                                <button type="button" class="btn btn-primary btn-l rounded-3" id="Boton"
-                                    data-bs-toggle="modal" data-bs-target="#addPatientModal" style="fontsize: 50px;">
-                                    <span class="fs-5"><i class="fa-solid fa-plus me-2"></i> Add Patient</span>
-                                </button>
+                <button type="button"
+                    class="btn btn-primary btn-lg w-100 rounded-3"
+                    data-bs-toggle="modal"
+                    data-bs-target="#addPatientModal">
+                    Add Patient
+                </button>
 
-                            </div>
-                            <?php include 'icreate.php'; // This includes the modal code ?>
+                <button type="button"
+                    class="btn btn-primary btn-lg w-100 rounded-3"
+                    data-bs-toggle="modal"
+                    data-bs-target="#moveModal">
+                    Move Patient
+                </button>
 
-                            <div class="container mx-1 justify-content-evenly d-flex">
-                                <button type="button" class="btn btn-primary btn-l rounded-3" data-bs-toggle="modal"
-                                    data-bs-target="#moveModal">
-                                    <span class="fs-5"><i class="fa-solid fa-arrows-up-down-left-right me-2"></i>
-                                        Move Patient</span>
-                                </button>
-                            </div>
-                            <?php include 'move.php'; ?>
+                <button type="button"
+                    class="btn btn-primary btn-lg w-100 rounded-3"
+                    data-bs-toggle="modal"
+                    data-bs-target="#appointmentModal">
+                    Add Appointment
+                </button>
 
-                            <div class="container mt-3 mb-3 justify-content-evenly d-flex">
-                                <button type="button" class="btn btn-primary btn-l rounded-3" data-bs-toggle="modal"
-                                    data-bs-target="#appointmentModal">
-                                    <span class="fs-5"><i class="fa-solid fa-plus me-2"></i> Add Appointment</span>
-                                </button>
-                            </div>
-                            <?php include 'pcreate.php'; ?>
+            </div>
 
+            <?php include 'icreate.php'; ?>
+            <?php include 'move.php'; ?>
+            <?php include 'pcreate.php'; ?>
 
-                        </div>
-
-
-
-
-                    </div>
+        </div>
+    </div>
+</div>
                 </div>
             </div>
         </div>
