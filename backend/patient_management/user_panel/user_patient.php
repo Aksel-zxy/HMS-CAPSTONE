@@ -173,113 +173,101 @@ try {
                 <div class="border-bottom border-2 pb-3">
                     <h3>Records</h3>
                 </div>
-                <div class="mt-4 border-3 border-bottom mb-4">
-                    <div class="card  mb-3" style="width: 100%;">
-                        <div class="card-body w-100">
-                            <h5 class="card-title text-primary mb-3">Patient Information</h5>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <p class="fs-6"><strong>Patient ID:</strong>
-                                        <?= htmlspecialchars($patient['patient_id']) ?></p>
-                                    <p class="fs-6"><strong>Name:</strong>
-                                        <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
-                                    </p>
-                                    <p class="fs-6"><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
-                                    <p class="fs-6"><strong>Room:</strong>
-                                        <?= htmlspecialchars($patient['room_number'] ?? 'Not Assigned') ?>
-                                    </p>
-                                </div>
-                                <div class="col-md-6 text-md-start text-end">
-                                    <p class="fs-6"><strong>Contact:</strong>
-                                        <?= htmlspecialchars($patient['phone_number']) ?></p>
-                                    <p class="fs-6"><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?>
-                                    </p>
-                                    <p class="fs-6"><strong>Attending Doctor:</strong>
-                                        <?= htmlspecialchars($patient['doctor_name'] ?? 'Not Assigned') ?>
-                                    </p>
+                <div class="mt-4 border-bottom mb-4">
 
-                                </div>
-
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row g-3">
-                        <!-- CBC Card -->
-                        <div class="col-md-3 col-sm-6">
-                            <div class="card shadow h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title text-primary">CBC</h5>
-                                    <p><strong>Test Type:</strong> <?= htmlspecialchars($wtf['cbc_test'] ?? 'N/A') ?>
-                                    </p>
-                                    <p><strong>WBC:</strong> <?= htmlspecialchars($wtf['wbc'] ?? 'N/A') ?></p>
-                                    <p><strong>RBC:</strong> <?= htmlspecialchars($wtf['rbc'] ?? 'N/A') ?></p>
-                                    <p><strong>Hemoglobin:</strong> <?= htmlspecialchars($wtf['hemoglobin'] ?? 'N/A') ?>
-                                    </p>
-                                    <p><strong>Platelets:</strong> <?= htmlspecialchars($wtf['platelets'] ?? 'N/A') ?>
-                                    </p>
-                                    <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['cbc_remarks'] ?? 'N/A') ?>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- CT Scan Card -->
-                        <div class="col-md-3 col-sm-6">
-                            <div class="card shadow h-100">
-                                <div class="card-body text-center">
-                                    <h5 class="card-title text-primary">CT Scan</h5>
-                                    <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['ct_findings'] ?? 'N/A') ?>
-                                    </p>
-                                    <?php if (!empty($wtf['ct_image'])): ?>
-                                    <a href="../view_image.php?type=ct&patient_id=<?= $wtf['patient_id'] ?>"
-                                        class="btn btn-secondary btn-sm mt-2" target="_blank">View CT Scan Image</a>
-                                    <?php else: ?>
-                                    <p class="text-muted"><em>No CT Scan image</em></p>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- MRI Card -->
-                        <div class="col-md-3 col-sm-6">
-                            <div class="card shadow h-100">
-                                <div class="card-body text-center">
-                                    <h5 class="card-title text-primary">MRI</h5>
-                                    <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['mri_findings'] ?? 'N/A') ?>
-                                    </p>
-                                    <p><strong>Impression:</strong>
-                                        <?= htmlspecialchars($wtf['mri_impression'] ?? 'N/A') ?></p>
-                                    <?php if (!empty($wtf['mri_image'])): ?>
-                                    <a href="../view_image.php?type=mri&patient_id=<?= $wtf['patient_id'] ?>"
-                                        class="btn btn-secondary btn-sm mt-2" target="_blank">View MRI Image</a>
-                                    <?php else: ?>
-                                    <p class="text-muted"><em>No MRI image</em></p>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- X-Ray Card -->
-                        <div class="col-md-3 col-sm-6">
-                            <div class="card shadow h-100">
-                                <div class="card-body text-center">
-                                    <h5 class="card-title text-primary">X-Ray</h5>
-                                    <p><strong>Findings:</strong>
-                                        <?= htmlspecialchars($wtf['xray_findings'] ?? 'N/A') ?></p>
-                                    <p><strong>Impression:</strong>
-                                        <?= htmlspecialchars($wtf['xray_impression'] ?? 'N/A') ?></p>
-                                    <?php if (!empty($wtf['xray_image'])): ?>
-                                    <a href="../view_image.php?type=xray&patient_id=<?= $wtf['patient_id'] ?>"
-                                        class="btn btn-secondary btn-sm mt-2" target="_blank">View X-Ray Image</a>
-                                    <?php else: ?>
-                                    <p class="text-muted"><em>No X-Ray image</em></p>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+    <!-- Patient Info Card -->
+    <div class="card mb-3 w-100">
+        <div class="card-body">
+            <h5 class="card-title text-primary mb-3">Patient Information</h5>
+            <div class="row">
+                <div class="col-12 col-md-6 mb-2 mb-md-0">
+                    <p class="fs-6"><strong>Patient ID:</strong> <?= htmlspecialchars($patient['patient_id']) ?></p>
+                    <p class="fs-6"><strong>Name:</strong> <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?></p>
+                    <p class="fs-6"><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
+                    <p class="fs-6"><strong>Room:</strong> <?= htmlspecialchars($patient['room_number'] ?? 'Not Assigned') ?></p>
                 </div>
+                <div class="col-12 col-md-6 text-md-start text-end">
+                    <p class="fs-6"><strong>Contact:</strong> <?= htmlspecialchars($patient['phone_number']) ?></p>
+                    <p class="fs-6"><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?></p>
+                    <p class="fs-6"><strong>Attending Doctor:</strong> <?= htmlspecialchars($patient['doctor_name'] ?? 'Not Assigned') ?></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Cards Row -->
+    <!-- Test Cards Wrapper -->
+<div class="d-flex flex-wrap gap-3 justify-content-center mt-4">
+
+    <!-- CBC Card -->
+    <div class="card flex-fill text-center shadow-sm min-w-200">
+        <div class="card-body">
+            <h5 class="card-title text-primary">CBC</h5>
+            <p><strong>Test Type:</strong> <?= htmlspecialchars($wtf['cbc_test'] ?? 'N/A') ?></p>
+            <p><strong>WBC:</strong> <?= htmlspecialchars($wtf['wbc'] ?? 'N/A') ?></p>
+            <p><strong>RBC:</strong> <?= htmlspecialchars($wtf['rbc'] ?? 'N/A') ?></p>
+            <p><strong>Hemoglobin:</strong> <?= htmlspecialchars($wtf['hemoglobin'] ?? 'N/A') ?></p>
+            <p><strong>Platelets:</strong> <?= htmlspecialchars($wtf['platelets'] ?? 'N/A') ?></p>
+            <p><strong>Remarks:</strong> <?= htmlspecialchars($wtf['cbc_remarks'] ?? 'N/A') ?></p>
+        </div>
+    </div>
+
+    <!-- CT Scan Card -->
+    <div class="card flex-fill text-center shadow-sm min-w-200">
+        <div class="card-body">
+            <h5 class="card-title text-primary">CT Scan</h5>
+            <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['ct_findings'] ?? 'N/A') ?></p>
+            <?php if (!empty($wtf['ct_image'])): ?>
+            <a href="../view_image.php?type=ct&patient_id=<?= $wtf['patient_id'] ?>" class="btn btn-secondary btn-sm mt-2 w-100" target="_blank">View CT Scan Image</a>
+            <?php else: ?>
+            <p class="text-muted"><em>No CT Scan image</em></p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- MRI Card -->
+    <div class="card flex-fill text-center shadow-sm min-w-200">
+        <div class="card-body">
+            <h5 class="card-title text-primary">MRI</h5>
+            <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['mri_findings'] ?? 'N/A') ?></p>
+            <p><strong>Impression:</strong> <?= htmlspecialchars($wtf['mri_impression'] ?? 'N/A') ?></p>
+            <?php if (!empty($wtf['mri_image'])): ?>
+            <a href="../view_image.php?type=mri&patient_id=<?= $wtf['patient_id'] ?>" class="btn btn-secondary btn-sm mt-2 w-100" target="_blank">View MRI Image</a>
+            <?php else: ?>
+            <p class="text-muted"><em>No MRI image</em></p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- X-Ray Card -->
+    <div class="card flex-fill text-center shadow-sm min-w-200">
+        <div class="card-body">
+            <h5 class="card-title text-primary">X-Ray</h5>
+            <p><strong>Findings:</strong> <?= htmlspecialchars($wtf['xray_findings'] ?? 'N/A') ?></p>
+            <p><strong>Impression:</strong> <?= htmlspecialchars($wtf['xray_impression'] ?? 'N/A') ?></p>
+            <?php if (!empty($wtf['xray_image'])): ?>
+            <a href="../view_image.php?type=xray&patient_id=<?= $wtf['patient_id'] ?>" class="btn btn-secondary btn-sm mt-2 w-100" target="_blank">View X-Ray Image</a>
+            <?php else: ?>
+            <p class="text-muted"><em>No X-Ray image</em></p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+</div>
+
+<style>
+/* Minimum width for cards so they resize nicely */
+.min-w-200 {
+    min-width: 220px;  /* Adjust to your preference */
+    flex: 1 1 220px;   /* Flex-grow, shrink, and base width */
+}
+
+/* Make buttons full width and wrap text if needed */
+.card a.btn {
+    white-space: normal;
+    word-wrap: break-word;
+}
+</style>
 
                 <!-- MEDICAL Table -->
                 <div class="mt-4 border-3 border-bottom">
