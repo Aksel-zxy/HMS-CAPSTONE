@@ -10,11 +10,12 @@ $payment_id = $_GET['payment_id']        ?? null;
 $receipt_id = isset($_GET['receipt_id']) ? intval($_GET['receipt_id']) : null;
 
 $payment      = null;
+$receipt      = null;
 $entry        = null;
 $lines        = [];
 $total_debit  = 0;
 $total_credit = 0;
-$paid_at      = null;
+$payment_date = null;
 $page_title   = 'Journal Entry Details';
 
 /* ── Load by entry_id ── */
@@ -37,14 +38,23 @@ if ($entry_id > 0) {
         $total_debit  += floatval($line['debit']  ?? 0);
         $total_credit += floatval($line['credit'] ?? 0);
     }
-    $page_title = 'Journal Entry #' . $entry_id;
+    $payment_date = $entry['entry_date'] ?? null;
+    $page_title   = 'Journal Entry #' . $entry_id;
 
 /* ── Load by payment_id ── */
 } elseif ($payment_id) {
+    // Fetch payment + billing_records (for payment_date) + patientinfo
     $stmt = $conn->prepare("
-        SELECT pp.*, pi.fname, pi.mname, pi.lname
+        SELECT
+            pp.*,
+            br.payment_date,
+            br.billing_date,
+            COALESCE(pi.fname, '') AS fname,
+            COALESCE(pi.mname, '') AS mname,
+            COALESCE(pi.lname, '') AS lname
         FROM paymongo_payments pp
-        LEFT JOIN patientinfo pi ON pp.patient_id = pi.patient_id
+        LEFT JOIN billing_records br ON pp.billing_id = br.billing_id
+        LEFT JOIN patientinfo pi ON br.patient_id = pi.patient_id
         WHERE pp.payment_id = ?
     ");
     $stmt->bind_param("s", $payment_id);
@@ -54,9 +64,13 @@ if ($entry_id > 0) {
 
     if (!$payment) { header("Location: journal_entry.php"); exit; }
 
-    $full_name   = trim($payment['fname'] . ' ' . $payment['mname'] . ' ' . $payment['lname']);
-    $amount      = floatval($payment['amount']);
-    $paid_at     = $payment['paid_at'] ?? null;
+    $parts     = array_filter([trim($payment['fname']), trim($payment['mname']), trim($payment['lname'])]);
+    $full_name = implode(' ', $parts) ?: 'Unknown Patient';
+    $amount    = floatval($payment['amount']);
+
+    // Use payment_date from billing_records; fall back to billing_date, then paid_at
+    $payment_date = $payment['payment_date'] ?? $payment['billing_date'] ?? $payment['paid_at'] ?? null;
+
     $description = "Payment received from {$full_name}\nMethod: {$payment['payment_method']}\nRemarks: " . ($payment['remarks'] ?? '—');
 
     $lines[] = ['account_name' => 'Cash / Bank',        'debit' => $amount,  'credit' => 0,       'description' => $description];
@@ -68,8 +82,16 @@ if ($entry_id > 0) {
 /* ── Load by receipt_id ── */
 } elseif ($receipt_id) {
     $stmt = $conn->prepare("
-        SELECT pr.*, br.grand_total, br.billing_date, br.transaction_id, br.insurance_covered,
-               pi.fname, pi.mname, pi.lname
+        SELECT
+            pr.*,
+            br.grand_total,
+            br.billing_date,
+            br.payment_date,
+            br.transaction_id,
+            br.insurance_covered,
+            COALESCE(pi.fname, '') AS fname,
+            COALESCE(pi.mname, '') AS mname,
+            COALESCE(pi.lname, '') AS lname
         FROM patient_receipt pr
         LEFT JOIN billing_records br ON pr.billing_id = br.billing_id
         LEFT JOIN patientinfo pi ON pi.patient_id = br.patient_id
@@ -82,11 +104,14 @@ if ($entry_id > 0) {
 
     if (!$receipt) { header("Location: journal_entry.php"); exit; }
 
-    $full_name = trim($receipt['fname'] . ' ' . $receipt['mname'] . ' ' . $receipt['lname']);
+    $parts     = array_filter([trim($receipt['fname']), trim($receipt['mname']), trim($receipt['lname'])]);
+    $full_name = implode(' ', $parts) ?: 'Unknown Patient';
     $amount    = floatval($receipt['grand_total'] ?? 0);
     $ins       = floatval($receipt['insurance_covered'] ?? 0);
-    $paid_at   = $receipt['created_at'] ?? null;
     $method    = $receipt['payment_method'] ?? 'N/A';
+
+    // Use payment_date from billing_records; fall back to billing_date, then receipt created_at
+    $payment_date = $receipt['payment_date'] ?? $receipt['billing_date'] ?? $receipt['created_at'] ?? null;
 
     $lines[] = ['account_name' => 'Cash / Bank',        'debit' => $amount,  'credit' => 0,       'description' => "Receipt for {$full_name}\nMethod: {$method}"];
     $lines[] = ['account_name' => 'Patient Receivable', 'debit' => 0,        'credit' => $amount, 'description' => 'Settlement of billing record'];
@@ -227,7 +252,6 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px 24px;
 }
-.meta-field {}
 .meta-label {
   font-size: .69rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: .6px;
@@ -239,7 +263,7 @@ body {
 }
 .meta-value.muted { color: var(--ink-light); font-weight: 500; }
 
-/* Status badge */
+/* Status badges */
 .badge-posted   { background: #d1fae5; color: #065f46; border-radius: 999px; padding: 3px 12px; font-size: .72rem; font-weight: 700; }
 .badge-draft    { background: #fef3c7; color: #92400e; border-radius: 999px; padding: 3px 12px; font-size: .72rem; font-weight: 700; }
 .badge-balanced { background: #d1fae5; color: #065f46; border-radius: 999px; padding: 3px 12px; font-size: .72rem; font-weight: 700; }
@@ -290,42 +314,35 @@ body {
   display: flex; align-items: center; justify-content: center;
   font-size: .82rem; font-weight: 700; color: #fff;
 }
-.acct-icon.debit-icon  { background: linear-gradient(135deg, #059669, #34d399); }
-.acct-icon.credit-icon { background: linear-gradient(135deg, #dc2626, #f87171); }
+.acct-icon.debit-icon   { background: linear-gradient(135deg, #059669, #34d399); }
+.acct-icon.credit-icon  { background: linear-gradient(135deg, #dc2626, #f87171); }
 .acct-icon.neutral-icon { background: linear-gradient(135deg, #2563eb, #60a5fa); }
 
-.acct-name { font-weight: 700; color: var(--navy); font-size: .9rem; }
-
-/* Debit/credit amounts */
+.acct-name  { font-weight: 700; color: var(--navy); font-size: .9rem; }
 .debit-amt  { font-weight: 700; color: #059669; font-size: .92rem; }
 .credit-amt { font-weight: 700; color: #dc2626; font-size: .92rem; }
 .empty-amt  { color: var(--border); font-size: .82rem; }
+.desc-text  { font-size: .8rem; color: var(--ink-light); white-space: pre-line; line-height: 1.5; }
 
-/* Description */
-.desc-text {
-  font-size: .8rem; color: var(--ink-light);
-  white-space: pre-line; line-height: 1.5;
-}
-
-/* Tfoot totals */
+/* Tfoot */
 .entry-table tfoot tr { background: #f8fafc; }
 .entry-table tfoot td {
   padding: 12px 16px;
   border-top: 2px solid var(--border);
-  font-weight: 700; font-size: .9rem;
-  color: var(--navy);
+  font-weight: 700; font-size: .9rem; color: var(--navy);
 }
 .entry-table tfoot td.td-num { text-align: right; }
-.entry-table tfoot td.total-label { color: var(--ink-light); font-size: .72rem;
-  text-transform: uppercase; letter-spacing: .6px; }
+.entry-table tfoot td.total-label {
+  color: var(--ink-light); font-size: .72rem;
+  text-transform: uppercase; letter-spacing: .6px;
+}
 
 /* Balance bar */
 .balance-bar {
   display: flex; align-items: center; gap: 12px;
   padding: 14px 20px;
   border-top: 1px solid var(--border);
-  background: #f8fafc;
-  flex-wrap: wrap;
+  background: #f8fafc; flex-wrap: wrap;
 }
 .balance-icon { font-size: 1.1rem; }
 .balance-text { font-size: .85rem; font-weight: 600; }
@@ -354,7 +371,7 @@ body {
          text-transform: uppercase; letter-spacing: .5px; flex-shrink: 0; }
 .m-val { font-weight: 500; color: var(--ink); text-align: right; }
 
-/* Totals summary card */
+/* Totals summary */
 .totals-summary {
   background: var(--card);
   border: 1px solid var(--border);
@@ -366,10 +383,7 @@ body {
   justify-content: flex-end; align-items: center;
 }
 .totals-item { text-align: right; }
-.totals-item-label {
-  font-size: .69rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .6px; color: var(--ink-light);
-}
+.totals-item-label { font-size: .69rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--ink-light); }
 .totals-item-val { font-size: 1.2rem; font-weight: 700; color: var(--navy); margin-top: 2px; }
 .totals-item-val.debit-color  { color: #059669; }
 .totals-item-val.credit-color { color: #dc2626; }
@@ -377,47 +391,13 @@ body {
 
 /* ── Print styles ── */
 @media print {
-  /* Hide absolutely everything except the content wrapper */
   body > *:not(.cw) { display: none !important; }
-
-  /* Also catch sidebar rendered inside body directly */
-  #mySidebar,
-  .billing-sidebar,
-  .sidebar,
-  nav,
-  aside,
-  [id*="sidebar"],
-  [class*="sidebar"],
-  #sidebarToggle,
-  .head-actions,
-  .no-print,
-  .btn-back,
-  .btn-print,
-  .mobile-lines { display: none !important; }
-
-  /* Reset content wrapper so it fills the page */
-  .cw {
-    margin-left: 0 !important;
-    padding: 20px !important;
-    max-width: 100% !important;
-    width: 100% !important;
-  }
-
-  /* Clean card styles for paper */
-  .meta-card,
-  .entry-card {
-    box-shadow: none !important;
-    border: 1px solid #ccc !important;
-    break-inside: avoid;
-  }
-
-  .meta-card-header,
-  .entry-card-header {
-    background: #0b1d3a !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
+  #mySidebar, .billing-sidebar, .sidebar, nav, aside,
+  [id*="sidebar"], [class*="sidebar"], #sidebarToggle,
+  .head-actions, .no-print, .btn-back, .btn-print, .mobile-lines { display: none !important; }
+  .cw { margin-left: 0 !important; padding: 20px !important; max-width: 100% !important; width: 100% !important; }
+  .meta-card, .entry-card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
+  .meta-card-header, .entry-card-header { background: #0b1d3a !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: white !important; }
   .entry-table { font-size: 12px; }
   h1 { font-size: 1.3rem !important; }
@@ -427,20 +407,18 @@ body {
 @media (max-width: 768px) {
   .cw { margin-left: var(--sidebar-w-sm); padding: 60px 14px 50px; }
   .cw.sidebar-collapsed { margin-left: 0; }
-  .entry-card > div:first-of-type { display: none; } /* hide desktop table */
+  .entry-card > div:first-of-type { display: none; }
   .mobile-lines { display: block; }
   .meta-card-body { grid-template-columns: 1fr 1fr; }
   .head-actions { margin-left: 0; width: 100%; }
   .btn-back, .btn-print { width: 100%; justify-content: center; }
   .totals-summary { justify-content: center; }
 }
-
 @media (max-width: 480px) {
   .cw { margin-left: 0 !important; padding: 56px 10px 40px; }
   .meta-card-body { grid-template-columns: 1fr; gap: 12px; }
   .page-head-icon { width: 44px; height: 44px; font-size: 1.2rem; border-radius: 11px; }
 }
-
 @supports (padding: env(safe-area-inset-bottom)) {
   .cw { padding-bottom: calc(60px + env(safe-area-inset-bottom)); }
 }
@@ -475,22 +453,35 @@ body {
       <i class="bi bi-info-circle"></i> Entry Information
     </div>
     <div class="meta-card-body">
+
+      <!-- Payment Date (from billing_records.payment_date) -->
       <div class="meta-field">
-        <div class="meta-label">Date</div>
+        <div class="meta-label">Payment Date</div>
         <div class="meta-value">
-          <i class="bi bi-calendar3" style="opacity:.5;font-size:.85rem;"></i>
+          <i class="bi bi-calendar-check" style="opacity:.5;font-size:.85rem;"></i>
           <?php
-            $dt = $entry['entry_date'] ?? $paid_at ?? $receipt['created_at'] ?? null;
-            echo $dt ? date('F d, Y h:i A', strtotime($dt)) : '—';
+            if ($payment_date && $payment_date !== '0000-00-00 00:00:00') {
+                echo date('F d, Y h:i A', strtotime($payment_date));
+            } else {
+                echo '<span style="color:var(--ink-light);font-weight:400;">Not yet paid</span>';
+            }
           ?>
         </div>
       </div>
+
+      <!-- Reference -->
       <div class="meta-field">
         <div class="meta-label">Reference</div>
         <div class="meta-value" style="font-family:monospace;font-size:.85rem;">
-          <?= htmlspecialchars($entry['reference'] ?? $payment['payment_id'] ?? ('#' . ($receipt_id ?? '—'))) ?>
+          <?= htmlspecialchars(
+              $entry['reference']
+              ?? $payment['payment_id']
+              ?? ('#' . ($receipt_id ?? '—'))
+          ) ?>
         </div>
       </div>
+
+      <!-- Status -->
       <div class="meta-field">
         <div class="meta-label">Status</div>
         <div class="meta-value">
@@ -500,12 +491,16 @@ body {
           </span>
         </div>
       </div>
+
+      <!-- Module -->
       <div class="meta-field">
         <div class="meta-label">Module</div>
         <div class="meta-value muted">
           <?= htmlspecialchars(ucfirst($entry['module'] ?? 'Billing')) ?>
         </div>
       </div>
+
+      <!-- Created By -->
       <div class="meta-field">
         <div class="meta-label">Created By</div>
         <div class="meta-value muted">
@@ -513,6 +508,8 @@ body {
           <?= htmlspecialchars($entry['created_by'] ?? 'System') ?>
         </div>
       </div>
+
+      <!-- Balance -->
       <div class="meta-field">
         <div class="meta-label">Balance</div>
         <div class="meta-value">
@@ -522,6 +519,7 @@ body {
           </span>
         </div>
       </div>
+
     </div>
   </div>
 
@@ -534,7 +532,6 @@ body {
       </span>
     </div>
 
-    <!-- Desktop -->
     <div style="overflow-x:auto;">
       <table class="entry-table">
         <thead>
@@ -686,7 +683,6 @@ body {
 </div><!-- /cw -->
 
 <script>
-/* ── Sidebar sync ── */
 (function () {
     const sidebar = document.getElementById('mySidebar');
     const cw      = document.getElementById('mainCw');

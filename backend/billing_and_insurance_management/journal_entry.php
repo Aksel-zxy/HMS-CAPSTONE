@@ -35,6 +35,7 @@ $payments_sql = "
         br.billing_id,
         br.patient_id,
         br.transaction_id,
+        br.billing_date,
         COALESCE(pi.fname, '')  AS fname,
         COALESCE(pi.mname, '')  AS mname,
         COALESCE(pi.lname, '')  AS lname
@@ -578,8 +579,8 @@ body {
           ?>
           <tr>
             <td>
-              <div class="date-val"><?= date('M d, Y', strtotime($p['paid_at'])) ?></div>
-              <div class="date-time"><?= date('h:i A', strtotime($p['paid_at'])) ?></div>
+              <div class="date-val"><?= date('M d, Y', strtotime($p['billing_date'])) ?></div>
+              <div class="date-time"><?= date('h:i A', strtotime($p['billing_date'])) ?></div>
             </td>
             <td>
               <div class="pat-cell">
@@ -635,7 +636,7 @@ body {
       </div>
       <div class="m-entry-row">
         <span class="m-lbl">Date</span>
-        <span class="m-val"><?= date('M d, Y h:i A', strtotime($p['paid_at'])) ?></span>
+        <span class="m-val"><?= date('M d, Y h:i A', strtotime($p['billing_date'])) ?></span>
       </div>
       <div class="m-entry-row">
         <span class="m-lbl">Debit</span>
@@ -701,8 +702,8 @@ body {
           ?>
           <tr>
             <td>
-              <div class="date-val"><?= date('M d, Y', strtotime($r['receipt_created'])) ?></div>
-              <div class="date-time"><?= date('h:i A', strtotime($r['receipt_created'])) ?></div>
+              <div class="date-val"><?= date('M d, Y', strtotime($r['billing_date'])) ?></div>
+              <div class="date-time"><?= date('h:i A', strtotime($r['billing_date'])) ?></div>
             </td>
             <td>
               <div class="pat-cell">
@@ -763,7 +764,7 @@ body {
       </div>
       <div class="m-entry-row">
         <span class="m-lbl">Date</span>
-        <span class="m-val"><?= date('M d, Y', strtotime($r['receipt_created'])) ?></span>
+        <span class="m-val"><?= date('M d, Y', strtotime($r['billing_date'])) ?></span>
       </div>
       <div class="m-entry-row">
         <span class="m-lbl">Debit</span>
