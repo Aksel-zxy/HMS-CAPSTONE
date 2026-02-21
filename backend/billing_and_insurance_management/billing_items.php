@@ -167,37 +167,76 @@ $existing_bill = $stmt->get_result()->fetch_assoc();
 
 /* =========================================================
    INITIALIZE SESSION CART
+   Always re-initialize to pick up fresh DB data on every load.
 ========================================================= */
 if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $_SESSION['billing_cart'][$patient_id] = [];
 
-    $stmt = $conn->prepare("
-        SELECT
-            dr.resultID,
-            dr.resultDate,
-            COALESCE(svc.serviceName, dr.result, 'Laboratory Service') AS serviceName,
-            COALESCE(svc.price, 0) AS price
-        FROM dl_results dr
-        LEFT JOIN dl_services svc ON svc.serviceName = dr.result
-        WHERE dr.patientID = ?
-          AND dr.status    = 'Completed'
-        ORDER BY dr.resultDate ASC
-    ");
-    $stmt->bind_param("i", $patient_id);
-    $stmt->execute();
-    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
-        $_SESSION['billing_cart'][$patient_id][] = [
-            'cart_key'    => 'LAB-'.$row['resultID'],
-            'ref_id'      => $row['resultID'],
-            'med_id'      => null,
-            'serviceName' => $row['serviceName'],
-            'description' => 'Lab Result — '.date('M d, Y', strtotime($row['resultDate'])),
-            'price'       => (float)$row['price'],
-            'source'      => 'lab',
-            'category'    => 'laboratory',
-        ];
-    }
+    /* -------------------------------------------------------
+       LAB RESULTS
+       - Always display dl_results.result as the service name
+       - Price lookup: exact match first, then LIKE keyword match
+         so "X-Ray (Chest)" gets ₱800, "MRI (Brain)" tries "MRI%"
+    ------------------------------------------------------- */
+    $lab_stmt = $conn->prepare(
+        "SELECT resultID, resultDate, result AS serviceName
+          FROM dl_results
+          WHERE patientID = ? AND status = 'Completed'
+          ORDER BY resultDate ASC"
+    );
+    if ($lab_stmt) {
+        $lab_stmt->bind_param("i", $patient_id);
+        $lab_stmt->execute();
+        $lab_rows = $lab_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
+        /* Load all services into memory for matching */
+        $svc_map = [];
+        $svc_res = $conn->query("SELECT serviceID, serviceName, price FROM dl_services ORDER BY serviceID");
+        if ($svc_res) {
+            while ($sv = $svc_res->fetch_assoc()) {
+                $svc_map[strtolower(trim($sv['serviceName']))] = (float)$sv['price'];
+            }
+        }
+
+        foreach ($lab_rows as $row) {
+            $sname = trim($row['serviceName']);
+            $price = 0.0;
+            $key   = strtolower($sname);
+
+            /* 1) Exact match */
+            if (isset($svc_map[$key])) {
+                $price = $svc_map[$key];
+            }
+
+            /* 2) Keyword match: strip parenthetical, use first word */
+            if ($price == 0 && $sname !== '') {
+                $keyword = strtolower(trim(preg_replace('/\s*\(.*?\)/', '', $sname)));
+                $keyword = trim(strtok($keyword, ' ')); /* first word only */
+                if (strlen($keyword) >= 2) {
+                    foreach ($svc_map as $svc_name_lc => $svc_price) {
+                        if (strpos($svc_name_lc, $keyword) !== false) {
+                            $price = $svc_price;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            $_SESSION['billing_cart'][$patient_id][] = [
+                'cart_key'    => 'LAB-' . $row['resultID'],
+                'ref_id'      => $row['resultID'],
+                'med_id'      => null,
+                'serviceName' => $sname ?: 'Laboratory Service',
+                'description' => 'Lab Result — ' . date('M d, Y', strtotime($row['resultDate'])),
+                'price'       => $price,
+                'source'      => 'lab',
+                'category'    => 'laboratory',
+            ];
+        }
+    }
+    /* -------------------------------------------------------
+       DNM / PROCEDURE RECORDS
+    ------------------------------------------------------- */
     $dnm_query = "
         SELECT
             dnmr.record_id,
@@ -219,19 +258,34 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
         $stmt->bind_param("i", $patient_id);
         $stmt->execute();
         foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+            /* If dnm_records.amount is 0, try price from dnm_procedure_list */
+            $dnm_price = (float)$row['amount'];
+            if ($dnm_price == 0 && !empty($row['procedure_name'])) {
+                $ps = $conn->prepare("SELECT price FROM dnm_procedure_list WHERE LOWER(TRIM(procedure_name)) = LOWER(TRIM(?)) AND status='Active' LIMIT 1");
+                if ($ps) {
+                    $ps->bind_param("s", $row['procedure_name']);
+                    $ps->execute();
+                    $pr = $ps->get_result()->fetch_assoc();
+                    if ($pr) $dnm_price = (float)$pr['price'];
+                }
+            }
+
             $_SESSION['billing_cart'][$patient_id][] = [
                 'cart_key'    => 'DNM-'.$row['record_id'],
                 'ref_id'      => $row['record_id'],
                 'med_id'      => null,
                 'serviceName' => $row['procedure_name'],
                 'description' => 'Procedure — '.date('M d, Y', strtotime($row['created_at'])),
-                'price'       => (float)$row['amount'],
+                'price'       => $dnm_price,
                 'source'      => 'dnm',
                 'category'    => 'service',
             ];
         }
     }
 
+    /* -------------------------------------------------------
+       PHARMACY / DISPENSED MEDICINES
+    ------------------------------------------------------- */
     $stmt = $conn->prepare("
         SELECT
             ppi.item_id,
@@ -242,7 +296,8 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
             ppi.unit_price,
             ppi.total_price,
             pi2.med_name,
-            pi2.dosage              AS inv_dosage
+            pi2.dosage              AS inv_dosage,
+            pi2.unit_price          AS inv_unit_price
         FROM pharmacy_prescription pp
         JOIN pharmacy_prescription_items ppi ON ppi.prescription_id = pp.prescription_id
         JOIN pharmacy_inventory          pi2 ON pi2.med_id          = ppi.med_id
@@ -256,13 +311,22 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $stmt->execute();
     foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
         $dose = trim(($row['rx_dosage'] ?? $row['inv_dosage'] ?? '').' '.($row['frequency'] ?? ''));
+
+        /* Use total_price; if 0 compute from unit_price × qty */
+        $rx_total = (float)$row['total_price'];
+        if ($rx_total == 0) {
+            $unit = (float)($row['unit_price'] ?: $row['inv_unit_price'] ?: 0);
+            $qty  = (int)($row['quantity_dispensed'] ?: 1);
+            $rx_total = round($unit * $qty, 2);
+        }
+
         $_SESSION['billing_cart'][$patient_id][] = [
             'cart_key'    => 'RX-'.$row['item_id'],
             'ref_id'      => $row['item_id'],
             'med_id'      => $row['med_id'],
             'serviceName' => $row['med_name'].($dose ? ' ('.$dose.')' : ''),
-            'description' => 'Dispensed — Qty: '.$row['quantity_dispensed'].' × ₱'.number_format($row['unit_price'],2),
-            'price'       => (float)$row['total_price'],
+            'description' => 'Dispensed — Qty: '.$row['quantity_dispensed'].' × ₱'.number_format((float)($row['unit_price'] ?: $row['inv_unit_price']),2),
+            'price'       => $rx_total,
             'source'      => 'rx',
             'category'    => 'medicine',
         ];
@@ -554,8 +618,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .gi-val{font-size:.9rem;font-weight:600;color:var(--navy);}
 
 .alert-ok{background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-weight:600;color:var(--success);margin-bottom:16px;}
-
-/* Zero total warning banner */
 .alert-zero{background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-weight:600;color:#c2410c;margin-bottom:16px;}
 
 .bill-banner{display:flex;align-items:center;gap:10px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:12px 18px;margin-bottom:16px;font-size:.87rem;font-weight:600;color:#92400e;flex-wrap:wrap;}
@@ -607,7 +669,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .af-btn-med{background:var(--accent);color:#fff;box-shadow:0 3px 10px rgba(37,99,235,.25);}
 .af-btn-med:hover{background:#1d4ed8;transform:translateY(-1px);}
 
-/* ── BILL FOOTER ── */
 .bill-footer{border-top:2px solid var(--border);background:#fafbfc;}
 .bf-totals-block{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
 .bf-line{display:flex;justify-content:space-between;align-items:center;}
@@ -619,7 +680,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .bf-grand-line{margin-top:2px;}
 .bf-grand-lbl{font-size:1.05rem;font-weight:800;color:var(--navy);}
 .bf-grand-amt{font-size:1.25rem;font-weight:800;color:var(--success);}
-/* Zero total highlight */
 .bf-grand-amt.zero{color:var(--danger);}
 
 .bf-actions{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:14px 20px;gap:12px;}
@@ -628,11 +688,8 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .bf-act-right{display:flex;justify-content:flex-end;gap:8px;}
 .bf-empty-note{color:var(--ink-light);font-size:.82rem;font-style:italic;}
 
-/* Active finalize button */
 .bf-btn-finalize{display:inline-flex;align-items:center;gap:8px;padding:11px 28px;background:var(--success);color:#fff;border:none;border-radius:10px;font-family:var(--ff-head);font-size:.95rem;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(5,150,105,.3);transition:all .15s;white-space:nowrap;}
 .bf-btn-finalize:hover{background:#047857;transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,.35);}
-
-/* Disabled finalize button (zero total) */
 .bf-btn-finalize-disabled{display:inline-flex;align-items:center;gap:8px;padding:11px 28px;background:#e2e8f0;color:#94a3b8;border:none;border-radius:10px;font-family:var(--ff-head);font-size:.95rem;font-weight:700;cursor:not-allowed;white-space:nowrap;box-shadow:none;}
 
 .bf-btn-back{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
@@ -651,6 +708,10 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .qty-input::-webkit-inner-spin-button,.qty-input::-webkit-outer-spin-button{-webkit-appearance:none;}
 
 .af-empty{color:var(--ink-light);font-size:.84rem;font-style:italic;text-align:center;padding:10px 0;}
+
+/* ── Item price badge (highlights ₱0.00 items) ── */
+.price-zero{color:var(--danger) !important;font-weight:700;}
+.zero-badge{display:inline-block;margin-left:4px;background:#fee2e2;color:#b91c1c;border-radius:999px;padding:1px 7px;font-size:.6rem;font-weight:700;vertical-align:middle;}
 
 .itbl{width:100%;border-collapse:collapse;font-size:.85rem;}
 .itbl thead th{background:#f8fafc;color:var(--ink-light);font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:9px 14px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;}
@@ -914,7 +975,10 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
                         <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
                     </td>
                     <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
-                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="r <?=$item['price']==0?'price-zero':''?>">
+                        ₱<?=number_format($item['price'],2)?>
+                        <?php if($item['price']==0): ?><span class="zero-badge">No Price</span><?php endif; ?>
+                    </td>
                     <td class="c">
                         <?php if ($is_x): ?>
                         <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
@@ -943,7 +1007,10 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
                         <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
                     </td>
                     <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
-                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="r <?=$item['price']==0?'price-zero':''?>">
+                        ₱<?=number_format($item['price'],2)?>
+                        <?php if($item['price']==0): ?><span class="zero-badge">No Price</span><?php endif; ?>
+                    </td>
                     <td class="c">
                         <?php if ($is_x): ?>
                         <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
@@ -972,7 +1039,10 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
                         <div class="item-name"><?=htmlspecialchars($item['serviceName'])?></div>
                     </td>
                     <td><div class="item-desc"><?=htmlspecialchars($item['description'])?></div></td>
-                    <td class="r">₱<?=number_format($item['price'],2)?></td>
+                    <td class="r <?=$item['price']==0?'price-zero':''?>">
+                        ₱<?=number_format($item['price'],2)?>
+                        <?php if($item['price']==0): ?><span class="zero-badge">No Price</span><?php endif; ?>
+                    </td>
                     <td class="c">
                         <?php if ($is_x): ?>
                         <a href="billing_items.php?patient_id=<?=$patient_id?>&delete=<?=$idx?>" class="btn-del" onclick="return confirm('Remove this item?')"><i class="bi bi-trash3"></i> Remove</a>
@@ -988,7 +1058,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
             <!-- ── BILL FOOTER ── -->
             <div class="bill-footer">
 
-                <!-- Totals -->
                 <div class="bf-totals-block">
                     <div class="bf-line">
                         <span class="bf-lbl">Subtotal</span>
@@ -1010,12 +1079,11 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
                     <?php if (!empty($cart) && $grand_total <= 0): ?>
                     <div style="margin-top:8px;padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:.8rem;color:#c2410c;display:flex;align-items:center;gap:6px;">
                         <i class="bi bi-exclamation-triangle-fill"></i>
-                        All items have ₱0.00 prices. Update item prices before finalizing.
+                        All items show ₱0.00. This usually means the service names in <code>dl_results</code> don't match <code>dl_services</code>, or prices are missing. Check your database records.
                     </div>
                     <?php endif; ?>
                 </div>
 
-                <!-- Action buttons -->
                 <div class="bf-actions">
                     <div class="bf-act-left">
                         <a href="billing_items.php" class="bf-btn-back"><i class="bi bi-arrow-left"></i> Back</a>
@@ -1060,8 +1128,6 @@ function stepQty(btn, delta) {
 }
 
 function confirmFinalize() {
-    // Server-side guard: $can_finalize is already false if grand_total <= 0,
-    // so this JS guard is an extra safety net.
     const grandTotal = <?= $grand_total ?>;
     if (grandTotal <= 0) {
         Swal.fire({
