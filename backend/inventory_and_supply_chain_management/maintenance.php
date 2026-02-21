@@ -102,6 +102,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 /* =====================================================
    DATA FETCH
 =====================================================*/
+
+/*
+ * ── ALL inventory items, grouped by item_type for the schedule dropdown.
+ *    Changed from: WHERE item_type = 'Diagnostic Equipment'
+ *    to: all items, ordered by type then name so the <optgroup> grouping works.
+ */
 $stmt = $pdo->prepare("
     SELECT MIN(id) AS id, item_name, item_type
     FROM inventory
@@ -163,12 +169,6 @@ function statusBadgeHtml(string $status): string {
         default       => 'bi-check-circle-fill',
     };
     return "<span class=\"status-badge {$key}\"><i class=\"bi {$icon}\" style=\"font-size:.62rem;\"></i> " . htmlspecialchars($status) . "</span>";
-}
-
-/* Remarks visible when current status is 'In Progress'
-   (so dropdown already shows both 'In Progress' and 'Completed') */
-function showRemarksForStatus(string $status): bool {
-    return $status === 'In Progress';
 }
 ?>
 <!DOCTYPE html>
@@ -265,10 +265,6 @@ function showRemarksForStatus(string $status): bool {
         .update-row select { min-width:130px; }
         .update-row input[type=text] { min-width:140px; flex:1; }
 
-        /* Remarks hidden for Open; visible for In Progress and Completed */
-        .remarks-input { display:none; }
-        .remarks-input.visible { display:block; }
-
         .btn-save {
             display:inline-flex; align-items:center; gap:.3rem;
             font-size:.8rem; font-weight:600; padding:.32rem .85rem;
@@ -298,8 +294,6 @@ function showRemarksForStatus(string $status): bool {
         .req-card-actions input[type=text] { width:100%; font-size:.83rem; border:1px solid var(--gray-200); border-radius:7px; padding:.45rem .7rem; color:var(--gray-800); background:#fff; }
         .req-card-actions select:focus,
         .req-card-actions input[type=text]:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.1); }
-        .req-card-actions .remarks-input { display:none; width:100%; }
-        .req-card-actions .remarks-input.visible { display:block; }
         .btn-save-full { width:100%; display:flex; align-items:center; justify-content:center; gap:.4rem; font-size:.83rem; font-weight:600; padding:.5rem; border-radius:7px; background:var(--primary); color:#fff; border:none; cursor:pointer; transition:background .15s, opacity .15s; }
         .btn-save-full:hover    { background:#1d4ed8; }
         .btn-save-full:disabled { opacity:.55; cursor:not-allowed; }
@@ -452,8 +446,7 @@ function showRemarksForStatus(string $status): bool {
                         <?php if (empty($requests)): ?>
                             <tr><td colspan="7"><div class="empty-state"><i class="bi bi-inbox"></i><p>No repair requests found.</p></div></td></tr>
                         <?php else: foreach ($requests as $req):
-                            $opts        = getStatusOptions($req['status']);
-                            $showRemarks = showRemarksForStatus($req['status']);
+                            $opts = getStatusOptions($req['status']);
                         ?>
                             <tr data-id="<?= intval($req['id']) ?>">
                                 <td><span class="ticket-no"><?= htmlspecialchars($req['ticket_no'] ?? 'N/A') ?></span></td>
@@ -478,7 +471,7 @@ function showRemarksForStatus(string $status): bool {
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
-                                        <input type="text" class="remarks-input <?= $showRemarks ? 'visible' : '' ?>"
+                                        <input type="text" class="remarks-input"
                                                placeholder="Add remarks…"
                                                value="<?= htmlspecialchars($req['remarks'] ?? '') ?>">
                                         <button type="button" class="btn-save btn-update">
@@ -497,10 +490,9 @@ function showRemarksForStatus(string $status): bool {
                     <?php if (empty($requests)): ?>
                         <div class="empty-state"><i class="bi bi-inbox"></i><p>No repair requests found.</p></div>
                     <?php else: foreach ($requests as $req):
-                        $opts        = getStatusOptions($req['status']);
-                        $statusKey   = strtolower(str_replace(' ', '-', $req['status']));
-                        $statusIcon  = match($req['status']) { 'Open'=>'bi-circle-fill','In Progress'=>'bi-arrow-repeat',default=>'bi-check-circle-fill' };
-                        $showRemarks = showRemarksForStatus($req['status']);
+                        $opts      = getStatusOptions($req['status']);
+                        $statusKey = strtolower(str_replace(' ', '-', $req['status']));
+                        $statusIcon = match($req['status']) { 'Open'=>'bi-circle-fill','In Progress'=>'bi-arrow-repeat',default=>'bi-check-circle-fill' };
                     ?>
                         <div class="req-card" data-id="<?= intval($req['id']) ?>">
                             <div class="req-card-header">
@@ -533,7 +525,7 @@ function showRemarksForStatus(string $status): bool {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <input type="text" class="remarks-input <?= $showRemarks ? 'visible' : '' ?>"
+                                <input type="text" class="remarks-input"
                                        placeholder="Add remarks…"
                                        value="<?= htmlspecialchars($req['remarks'] ?? '') ?>">
                                 <button type="button" class="btn-save-full btn-update">
@@ -563,11 +555,19 @@ function showRemarksForStatus(string $status): bool {
                                     <select name="inventory_id" class="form-select form-select-sm" required>
                                         <option value="" disabled selected>— Select item from inventory —</option>
                                         <?php
+                                        /*
+                                         * Build <optgroup> sections per item_type so the dropdown
+                                         * is easy to navigate even with many inventory items.
+                                         * Items already scheduled are shown as disabled.
+                                         */
                                         $scheduled_ids = array_column($schedules, 'inventory_id');
+
+                                        // Group by item_type
                                         $grouped = [];
                                         foreach ($equipment as $eq) {
                                             $grouped[$eq['item_type']][] = $eq;
                                         }
+
                                         foreach ($grouped as $type => $items):
                                         ?>
                                             <optgroup label="<?= htmlspecialchars($type) ?>">
@@ -702,26 +702,6 @@ function makeBadge(status) {
     return `<span class="status-badge ${key}"><i class="bi ${icons[status]||'bi-circle'}" style="font-size:.62rem;"></i> ${status}</span>`;
 }
 
-/* ── Show remarks for 'In Progress' AND 'Completed'; hide for 'Open' ── */
-function toggleRemarks(wrap, selectedStatus) {
-    const remarksInput = wrap.querySelector('.remarks-input');
-    if (!remarksInput) return;
-    if (selectedStatus === 'In Progress' || selectedStatus === 'Completed') {
-        remarksInput.classList.add('visible');
-    } else {
-        remarksInput.classList.remove('visible');
-    }
-}
-
-/* ── Listen for status dropdown changes to show/hide remarks ── */
-document.addEventListener('change', function (e) {
-    const select = e.target.closest('.status-select');
-    if (!select) return;
-    const wrap = select.closest('[data-id]');
-    if (!wrap) return;
-    toggleRemarks(wrap, select.value);
-});
-
 /* ── AJAX UPDATE ── */
 document.addEventListener('click', function (e) {
     const btn = e.target.closest('.btn-update');
@@ -731,8 +711,7 @@ document.addEventListener('click', function (e) {
     const id        = wrap.dataset.id;
     const oldStatus = wrap.dataset.current;
     const newStatus = wrap.querySelector('.status-select').value;
-    const remarksEl = wrap.querySelector('.remarks-input');
-    const remarks   = remarksEl ? remarksEl.value.trim() : '';
+    const remarks   = wrap.querySelector('.remarks-input').value.trim();
 
     btn.disabled = true;
     const origHtml = btn.innerHTML;
@@ -779,9 +758,6 @@ document.addEventListener('click', function (e) {
                     mb.innerHTML = `<i class="bi ${icon}" style="font-size:.6rem;"></i> ${newStatus}`;
                 }
             }
-
-            /* Keep remarks visibility in sync after save */
-            toggleRemarks(wrap, newStatus);
 
             if (oldStatus !== newStatus) {
                 if (oldStatus === 'Open')        adjustStat('statOpen', -1);
