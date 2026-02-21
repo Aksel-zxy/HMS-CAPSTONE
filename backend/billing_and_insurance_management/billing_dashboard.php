@@ -59,20 +59,22 @@ while ($row = $m_result->fetch_assoc()) $monthly[] = $row;
    DESIGN TOKENS
 ══════════════════════════════════════*/
 :root {
-    --bg:           #f1f3f8;
+    --bg:           #f0f2f7;
     --surface:      #ffffff;
     --surface-2:    #f8f9fc;
     --surface-3:    #f0f2f7;
     --border:       #e3e7f0;
+    --border-light: #eef0f7;
 
     --text-1:       #0d1117;
     --text-2:       #4b5675;
     --text-3:       #8b93ad;
+    --text-4:       #b8bece;
 
     --blue:         #1b56f5;
     --blue-light:   #edf1ff;
     --blue-dark:    #1040d8;
-    --blue-glow:    rgba(27,86,245,.15);
+    --blue-glow:    rgba(27,86,245,.14);
 
     --green:        #0d9f6b;
     --green-light:  #e6faf3;
@@ -98,13 +100,14 @@ while ($row = $m_result->fetch_assoc()) $monthly[] = $row;
     --radius-xs:    4px;
     --radius-sm:    8px;
     --radius:       12px;
-    --radius-lg:    18px;
+    --radius-lg:    16px;
+    --radius-xl:    20px;
 
-    --shadow-xs:    0 1px 2px rgba(0,0,0,.05);
+    --shadow-xs:    0 1px 3px rgba(0,0,0,.05);
     --shadow-sm:    0 2px 8px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04);
     --shadow:       0 4px 20px rgba(0,0,0,.07), 0 2px 8px rgba(0,0,0,.04);
-    --shadow-lg:    0 16px 48px rgba(0,0,0,.12), 0 6px 16px rgba(0,0,0,.06);
-    --shadow-blue:  0 8px 24px rgba(27,86,245,.2);
+    --shadow-lg:    0 16px 48px rgba(0,0,0,.10), 0 6px 16px rgba(0,0,0,.05);
+    --shadow-blue:  0 6px 20px rgba(27,86,245,.22);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -126,41 +129,49 @@ body {
 .main-content {
     margin-left: var(--sidebar-w);
     min-height: 100vh;
-    padding: 32px 36px 64px;
+    padding: 28px 32px 64px;
 }
 
 /* ══ PAGE HEADER ══ */
 .page-header {
-    display: flex; align-items: flex-end;
+    display: flex; align-items: center;
     justify-content: space-between; flex-wrap: wrap;
-    gap: 16px; margin-bottom: 30px;
+    gap: 16px; margin-bottom: 28px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 24px;
+    box-shadow: var(--shadow-xs);
 }
-.ph-left { display: flex; align-items: center; gap: 16px; }
+.ph-left { display: flex; align-items: center; gap: 14px; }
 .ph-icon-wrap {
-    width: 52px; height: 52px;
-    background: linear-gradient(135deg, var(--blue) 0%, #5b87ff 100%);
+    width: 46px; height: 46px;
+    background: linear-gradient(135deg, var(--blue) 0%, #4d7fff 100%);
     border-radius: var(--radius); box-shadow: var(--shadow-blue);
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.ph-icon-wrap i { font-size: 22px; color: #fff; }
+.ph-icon-wrap i { font-size: 20px; color: #fff; }
 .ph-eyebrow {
-    font-size: 10.5px; font-weight: 700; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--blue); margin-bottom: 3px;
+    font-size: 10px; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--blue); margin-bottom: 2px;
 }
-.ph-title { font-size: 22px; font-weight: 800; color: var(--text-1); letter-spacing: -.4px; }
-.ph-sub   { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
-.ph-right { text-align: right; }
-.ph-date  { font-size: 12px; color: var(--text-3); line-height: 1.4; }
-.ph-date strong { display: block; font-size: 13.5px; font-weight: 700; color: var(--text-2); }
-.ph-user {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: var(--surface); border: 1.5px solid var(--border);
-    border-radius: 20px; padding: 6px 14px 6px 6px;
-    font-size: 12.5px; font-weight: 600; color: var(--text-2);
-    box-shadow: var(--shadow-xs); margin-bottom: 8px;
+.ph-title { font-size: 18px; font-weight: 800; color: var(--text-1); letter-spacing: -.3px; line-height: 1.2; }
+.ph-sub   { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+.ph-right { display: flex; align-items: center; gap: 14px; }
+.ph-datebadge {
+    background: var(--surface-2); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 8px 14px; text-align: right;
+}
+.ph-datebadge .date-day { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .08em; }
+.ph-datebadge .date-full { font-size: 13px; font-weight: 700; color: var(--text-1); }
+.ph-user-chip {
+    display: inline-flex; align-items: center; gap: 9px;
+    background: var(--blue-light); border: 1.5px solid rgba(27,86,245,.15);
+    border-radius: 40px; padding: 7px 14px 7px 7px;
+    font-size: 12px; font-weight: 700; color: var(--blue);
 }
 .ph-avatar {
-    width: 26px; height: 26px; border-radius: 50%;
+    width: 28px; height: 28px; border-radius: 50%;
     background: var(--blue); color: #fff;
     font-size: 11px; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
@@ -170,23 +181,25 @@ body {
 .kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 26px;
+    gap: 14px;
+    margin-bottom: 24px;
 }
 .kpi-card {
     background: var(--surface);
     border: 1.5px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px 22px;
+    border-radius: var(--radius-lg);
+    padding: 20px 22px 18px;
     position: relative; overflow: hidden;
     box-shadow: var(--shadow-xs);
     transition: box-shadow .2s, transform .2s;
 }
 .kpi-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+
+/* accent bar left side */
 .kpi-card::before {
     content: ''; position: absolute;
-    top: 0; left: 0; right: 0; height: 3px;
-    border-radius: var(--radius) var(--radius) 0 0;
+    top: 0; left: 0; bottom: 0; width: 3px;
+    border-radius: var(--radius-lg) 0 0 var(--radius-lg);
 }
 .kc-blue::before   { background: var(--blue); }
 .kc-green::before  { background: var(--green); }
@@ -194,11 +207,11 @@ body {
 .kc-red::before    { background: var(--red); }
 
 .kpi-top {
-    display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+    display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px;
 }
 .kpi-icon {
-    width: 40px; height: 40px; border-radius: var(--radius-sm);
-    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    width: 38px; height: 38px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
 }
 .kc-blue  .kpi-icon { background: var(--blue-light);  color: var(--blue);  }
 .kc-green .kpi-icon { background: var(--green-light); color: var(--green); }
@@ -206,7 +219,7 @@ body {
 .kc-red   .kpi-icon { background: var(--red-light);   color: var(--red);   }
 
 .kpi-badge {
-    font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; letter-spacing: .05em; text-transform: uppercase;
 }
 .kc-blue  .kpi-badge { background: var(--blue-light);  color: var(--blue);  }
 .kc-green .kpi-badge { background: var(--green-light); color: var(--green); }
@@ -215,7 +228,7 @@ body {
 
 .kpi-number {
     font-family: 'DM Mono', monospace;
-    font-size: 28px; font-weight: 700; line-height: 1; margin-bottom: 5px;
+    font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 5px;
 }
 .kc-blue  .kpi-number { color: var(--blue);  }
 .kc-green .kpi-number { color: var(--green); }
@@ -223,145 +236,182 @@ body {
 .kc-red   .kpi-number { color: var(--red);   }
 
 .kpi-label {
-    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    font-size: 10.5px; font-weight: 600; text-transform: uppercase;
     letter-spacing: .07em; color: var(--text-3);
 }
+.kpi-divider { height: 1px; background: var(--border-light); margin: 14px 0 10px; }
+.kpi-footer { font-size: 11px; color: var(--text-4); display: flex; align-items: center; gap: 5px; }
 
 /* ══ SECTION TITLE ══ */
 .section-title {
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .1em; color: var(--text-3);
-    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .12em; color: var(--text-3);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
 }
 .section-title::after { content:''; flex:1; height:1px; background:var(--border); }
 
 /* ══ CHART GRID ══ */
-.chart-grid-3 {
+.chart-grid-main {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 18px;
-    margin-bottom: 26px;
+    gap: 16px;
+    margin-bottom: 22px;
+    align-items: start;
 }
 .chart-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 18px;
-    margin-bottom: 26px;
+    gap: 16px;
+    margin-bottom: 22px;
 }
 .chart-card {
     background: var(--surface);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-xs);
     overflow: hidden;
+    transition: box-shadow .2s;
 }
-.chart-card.span-2 { grid-column: span 2; }
+.chart-card:hover { box-shadow: var(--shadow-sm); }
+.chart-card.col-span-2 { grid-column: span 2; }
 
 .chart-card-hdr {
-    padding: 16px 22px 13px;
+    padding: 14px 20px 12px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
-    background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
 }
 .chart-card-title {
-    font-size: 13.5px; font-weight: 700; color: var(--text-1);
-    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 700; color: var(--text-1);
+    display: flex; align-items: center; gap: 7px;
 }
-.chart-card-sub { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
+.chart-card-title i { font-size: 14px; }
+.chart-card-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
 .legend-dot {
     width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px;
 }
-.chart-card-body { padding: 20px 22px; }
+.chart-hdr-badge {
+    font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+    background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border);
+    letter-spacing: .04em; text-transform: uppercase;
+}
+.chart-card-body { padding: 18px 20px; }
+
+/* ══ PAID VS UNPAID CARD — tighter layout ══ */
+.status-card-body {
+    padding: 16px 20px 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+}
+.status-chart-wrap {
+    width: 140px; height: 140px; position: relative;
+}
+.status-center-label {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none;
+}
+.status-center-pct { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 700; color: var(--green); line-height: 1; }
+.status-center-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); margin-top: 3px; }
+.status-legend { display: flex; gap: 16px; margin-top: 16px; }
+.sl-item { display: flex; align-items: center; gap: 6px; }
+.sl-dot { width: 9px; height: 9px; border-radius: 50%; }
+.sl-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
+.sl-value { font-size: 10.5px; color: var(--text-3); margin-left: 3px; }
+.status-divider { width: 100%; height: 1px; background: var(--border); margin: 14px 0 10px; }
+.status-stat-row { display: flex; justify-content: space-between; width: 100%; gap: 10px; }
+.ss-item { flex: 1; text-align: center; }
+.ss-num { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 700; }
+.ss-lbl { font-size: 10px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
 
 /* ══ TABLE PANEL ══ */
 .panel {
     background: var(--surface);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-xs);
     overflow: hidden;
-    margin-bottom: 26px;
+    margin-bottom: 24px;
 }
 .panel-hdr {
-    padding: 16px 24px;
+    padding: 14px 22px;
     border-bottom: 1.5px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
-    background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%);
 }
 .panel-title {
-    font-size: 14px; font-weight: 700; color: var(--text-1);
+    font-size: 13.5px; font-weight: 700; color: var(--text-1);
     display: flex; align-items: center; gap: 8px;
 }
 .panel-title i { color: var(--blue); }
 .panel-count {
-    font-size: 12px; background: var(--blue-light); color: var(--blue);
-    border-radius: 20px; padding: 2px 10px; font-weight: 600;
+    font-size: 11px; background: var(--blue-light); color: var(--blue);
+    border-radius: 20px; padding: 3px 11px; font-weight: 700; letter-spacing: .04em;
 }
 
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table thead th {
-    background: var(--surface-2); padding: 11px 20px;
-    font-size: 10.5px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--text-3);
+    background: var(--surface-2); padding: 10px 20px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--text-3);
     border-bottom: 1.5px solid var(--border); white-space: nowrap; text-align: left;
 }
 .data-table tbody tr {
-    border-bottom: 1px solid var(--border); transition: background .14s;
-    animation: rowIn .22s ease both;
+    border-bottom: 1px solid var(--border-light); transition: background .12s;
+    animation: rowIn .2s ease both;
 }
 .data-table tbody tr:last-child { border-bottom: none; }
 .data-table tbody tr:hover { background: #f6f8ff; }
-@keyframes rowIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+@keyframes rowIn { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
 <?php foreach(range(1,10) as $i): ?>
-.data-table tbody tr:nth-child(<?= $i ?>) { animation-delay: <?= ($i-1)*0.04 ?>s; }
+.data-table tbody tr:nth-child(<?= $i ?>) { animation-delay: <?= ($i-1)*0.035 ?>s; }
 <?php endforeach; ?>
-.data-table td { padding: 13px 20px; color: var(--text-2); vertical-align: middle; font-size: 13px; }
+.data-table td { padding: 12px 20px; color: var(--text-2); vertical-align: middle; font-size: 12.5px; }
 
 .id-chip {
-    font-family: 'DM Mono', monospace; font-size: 11.5px; font-weight: 500;
-    background: var(--surface-3); border: 1px solid var(--border);
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+    background: var(--surface-2); border: 1px solid var(--border);
     border-radius: var(--radius-xs); padding: 3px 8px; color: var(--text-2);
     display: inline-block;
 }
 .patient-chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-size: 12px; font-weight: 600; color: var(--text-2);
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 600; color: var(--text-1);
 }
 .patient-avatar {
-    width: 24px; height: 24px; border-radius: 50%;
+    width: 26px; height: 26px; border-radius: 50%;
     background: var(--indigo-light); color: var(--indigo);
     font-size: 10px; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid var(--indigo-border);
 }
 .amount-mono {
     font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-1);
 }
 .method-tag {
     display: inline-flex; align-items: center; gap: 5px;
-    background: var(--surface-3); border: 1px solid var(--border);
-    border-radius: 20px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; color: var(--text-2);
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; color: var(--text-2);
 }
+.method-tag i { font-size: 10px; color: var(--text-3); }
 .status-pill {
     display: inline-flex; align-items: center; gap: 4px;
-    padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 700;
-    letter-spacing: .04em; text-transform: uppercase; border: 1px solid;
+    padding: 4px 10px; border-radius: 20px; font-size: 10.5px; font-weight: 700;
+    letter-spacing: .05em; text-transform: uppercase; border: 1px solid;
 }
 .sp-paid   { background: var(--green-light); border-color: var(--green-border); color: var(--green); }
 .sp-unpaid { background: var(--amber-light); border-color: var(--amber-border); color: var(--amber); }
 .sp-other  { background: var(--red-light);   border-color: var(--red-border);   color: var(--red);   }
-.date-mono { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text-3); }
+.date-mono { font-family: 'DM Mono', monospace; font-size: 11.5px; color: var(--text-3); }
 
 /* ══ PAYMENT METHOD BREAKDOWN ══ */
-.pm-list { display: flex; flex-direction: column; gap: 12px; padding: 4px 0; }
-.pm-row { display: flex; align-items: center; gap: 10px; }
-.pm-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.pm-name { font-size: 13px; font-weight: 600; color: var(--text-2); flex: 1; }
-.pm-count { font-size: 11.5px; color: var(--text-3); margin-right: 8px; }
-.pm-amount { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-1); }
+.pm-list { display: flex; flex-direction: column; gap: 14px; }
+.pm-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.pm-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.pm-name { font-size: 12.5px; font-weight: 600; color: var(--text-1); flex: 1; }
+.pm-count { font-size: 11px; color: var(--text-3); margin-right: 6px; white-space: nowrap; }
+.pm-amount { font-family: 'DM Mono', monospace; font-size: 12.5px; font-weight: 700; color: var(--text-1); white-space: nowrap; }
 .pm-bar-track {
-    height: 4px; background: var(--border); border-radius: 99px; overflow: hidden; flex: 2;
+    height: 5px; background: var(--border); border-radius: 99px; overflow: hidden;
 }
-.pm-bar-fill { height: 100%; border-radius: 99px; }
+.pm-bar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
 
 /* ══ SIDEBAR MOBILE TOGGLE ══ */
 .sidebar-toggle {
@@ -380,25 +430,25 @@ body {
 
 /* ══ RESPONSIVE ══ */
 @media (max-width: 1280px) {
-    .chart-grid-3 { grid-template-columns: 1fr 1fr; }
-    .chart-card.span-2 { grid-column: span 1; }
+    .chart-grid-main { grid-template-columns: 1fr 1fr; }
+    .chart-card.col-span-2 { grid-column: span 1; }
 }
 @media (max-width: 1024px) {
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
-    .main-content { margin-left: 0; padding: 16px 16px 48px; }
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .chart-grid-3, .chart-grid-2 { grid-template-columns: 1fr; }
-    .chart-card.span-2 { grid-column: span 1; }
-    .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-    .ph-right { text-align: left; }
+    .main-content { margin-left: 0; padding: 14px 14px 48px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .chart-grid-main, .chart-grid-2 { grid-template-columns: 1fr; }
+    .chart-card.col-span-2 { grid-column: span 1; }
+    .page-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .ph-right { width: 100%; }
     .data-table thead th:nth-child(4),
     .data-table tbody td:nth-child(4) { display: none; }
     .kpi-number { font-size: 22px; }
 }
 @media (max-width: 480px) {
-    .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
     .kpi-card { padding: 14px 14px; }
     .kpi-number { font-size: 20px; }
     .data-table thead th:nth-child(2),
@@ -419,15 +469,19 @@ body {
             <button class="sidebar-toggle" onclick="openSidebar()"><i class="bi bi-list"></i> Menu</button>
             <div class="ph-icon-wrap"><i class="bi bi-receipt-cutoff"></i></div>
             <div>
-                <div class="ph-eyebrow">Hospital Billing</div>
+                <div class="ph-eyebrow">Hospital Billing System</div>
                 <div class="ph-title">Billing Dashboard</div>
                 <div class="ph-sub">Financial overview, payment tracking &amp; recent activity</div>
             </div>
         </div>
         <div class="ph-right">
-            <div class="ph-date">
-                <span>Today</span>
-                <strong><?= date('F d, Y') ?></strong>
+            <div class="ph-datebadge">
+                <div class="date-day">Today</div>
+                <div class="date-full"><?= date('F d, Y') ?></div>
+            </div>
+            <div class="ph-user-chip">
+                <div class="ph-avatar"><?= strtoupper(substr($user['username'] ?? 'U', 0, 1)) ?></div>
+                <?= htmlspecialchars($user['username'] ?? 'User') ?>
             </div>
         </div>
     </div>
@@ -442,6 +496,8 @@ body {
             </div>
             <div class="kpi-number"><?= number_format($total_patients) ?></div>
             <div class="kpi-label">Total Patients Billed</div>
+            <div class="kpi-divider"></div>
+            <div class="kpi-footer"><i class="bi bi-people" style="color:var(--blue);"></i> Unique patients on record</div>
         </div>
 
         <div class="kpi-card kc-teal">
@@ -451,6 +507,8 @@ body {
             </div>
             <div class="kpi-number"><?= number_format($total_receipts) ?></div>
             <div class="kpi-label">Total Receipts Issued</div>
+            <div class="kpi-divider"></div>
+            <div class="kpi-footer"><i class="bi bi-receipt" style="color:var(--teal);"></i> All billing transactions</div>
         </div>
 
         <div class="kpi-card kc-green">
@@ -458,8 +516,10 @@ body {
                 <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
                 <span class="kpi-badge">Collected</span>
             </div>
-            <div class="kpi-number" style="font-size:20px;">₱<?= number_format($total_paid, 0) ?></div>
+            <div class="kpi-number" style="font-size:19px;">₱<?= number_format($total_paid, 0) ?></div>
             <div class="kpi-label">Total Amount Paid</div>
+            <div class="kpi-divider"></div>
+            <div class="kpi-footer"><i class="bi bi-arrow-down-circle" style="color:var(--green);"></i> Successfully collected</div>
         </div>
 
         <div class="kpi-card kc-red">
@@ -467,8 +527,10 @@ body {
                 <div class="kpi-icon"><i class="bi bi-exclamation-circle-fill"></i></div>
                 <span class="kpi-badge">Outstanding</span>
             </div>
-            <div class="kpi-number" style="font-size:20px;">₱<?= number_format($total_unpaid, 0) ?></div>
+            <div class="kpi-number" style="font-size:19px;">₱<?= number_format($total_unpaid, 0) ?></div>
             <div class="kpi-label">Unpaid / Outstanding</div>
+            <div class="kpi-divider"></div>
+            <div class="kpi-footer"><i class="bi bi-clock-history" style="color:var(--red);"></i> Pending collection</div>
         </div>
 
     </div>
@@ -478,10 +540,10 @@ body {
         <i class="bi bi-bar-chart-fill" style="color:var(--blue);"></i> Revenue Analysis
     </div>
 
-    <div class="chart-grid-3">
+    <div class="chart-grid-main">
 
         <!-- Monthly Revenue Trend (spans 2 cols) -->
-        <div class="chart-card span-2">
+        <div class="chart-card col-span-2">
             <div class="chart-card-hdr">
                 <div>
                     <div class="chart-card-title">
@@ -490,16 +552,14 @@ body {
                     </div>
                     <div class="chart-card-sub">Last 6 months — total billed amounts</div>
                 </div>
-                <span style="font-size:11px;color:var(--text-3);font-weight:600;">
-                    <span class="legend-dot" style="background:var(--blue);"></span>Revenue
-                </span>
+                <span class="chart-hdr-badge"><span class="legend-dot" style="background:var(--blue);"></span>Revenue</span>
             </div>
             <div class="chart-card-body">
-                <canvas id="monthlyChart" height="180"></canvas>
+                <canvas id="monthlyChart" height="160"></canvas>
             </div>
         </div>
 
-        <!-- Paid vs Unpaid Doughnut -->
+        <!-- Paid vs Unpaid Doughnut — compact -->
         <div class="chart-card">
             <div class="chart-card-hdr">
                 <div>
@@ -507,18 +567,46 @@ body {
                         <i class="bi bi-pie-chart-fill" style="color:var(--green);"></i>
                         Paid vs Unpaid
                     </div>
-                    <div class="chart-card-sub">Collection rate</div>
+                    <div class="chart-card-sub">Collection overview</div>
                 </div>
             </div>
-            <div class="chart-card-body" style="display:flex;flex-direction:column;align-items:center;">
-                <canvas id="statusChart" height="190" style="max-width:220px;"></canvas>
-                <?php
-                $total_billing = $total_paid + $total_unpaid;
-                $collection_rate = $total_billing > 0 ? round(($total_paid / $total_billing) * 100, 1) : 0;
-                ?>
-                <div style="margin-top:14px;text-align:center;">
-                    <div style="font-size:24px;font-weight:800;font-family:'DM Mono',monospace;color:var(--green);"><?= $collection_rate ?>%</div>
-                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);">Collection Rate</div>
+            <div class="status-card-body">
+                <!-- Fixed-size canvas wrapper -->
+                <div class="status-chart-wrap">
+                    <canvas id="statusChart" style="width:140px;height:140px;"></canvas>
+                    <?php
+                    $total_billing   = $total_paid + $total_unpaid;
+                    $collection_rate = $total_billing > 0 ? round(($total_paid / $total_billing) * 100, 1) : 0;
+                    ?>
+                    <div class="status-center-label">
+                        <div class="status-center-pct"><?= $collection_rate ?>%</div>
+                        <div class="status-center-lbl">Collected</div>
+                    </div>
+                </div>
+
+                <div class="status-legend">
+                    <div class="sl-item">
+                        <div class="sl-dot" style="background:var(--green);"></div>
+                        <span class="sl-label">Paid</span>
+                    </div>
+                    <div class="sl-item">
+                        <div class="sl-dot" style="background:var(--red);"></div>
+                        <span class="sl-label">Unpaid</span>
+                    </div>
+                </div>
+
+                <div class="status-divider"></div>
+
+                <div class="status-stat-row">
+                    <div class="ss-item">
+                        <div class="ss-num" style="color:var(--green);">₱<?= number_format($total_paid/1000, 1) ?>K</div>
+                        <div class="ss-lbl">Paid</div>
+                    </div>
+                    <div style="width:1px;background:var(--border);"></div>
+                    <div class="ss-item">
+                        <div class="ss-num" style="color:var(--red);">₱<?= number_format($total_unpaid/1000, 1) ?>K</div>
+                        <div class="ss-lbl">Unpaid</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -539,8 +627,10 @@ body {
                     <div class="chart-card-sub">Share of total collected</div>
                 </div>
             </div>
-            <div class="chart-card-body">
-                <canvas id="paymentChart" height="220"></canvas>
+            <div class="chart-card-body" style="display:flex;justify-content:center;align-items:center;">
+                <div style="width:100%;max-width:260px;">
+                    <canvas id="paymentChart"></canvas>
+                </div>
             </div>
         </div>
 
@@ -552,7 +642,7 @@ body {
                         <i class="bi bi-list-ul" style="color:var(--teal);"></i>
                         Payment Methods Breakdown
                     </div>
-                    <div class="chart-card-sub">Transactions and revenue per method</div>
+                    <div class="chart-card-sub">Transactions &amp; revenue per method</div>
                 </div>
             </div>
             <div class="chart-card-body">
@@ -567,7 +657,7 @@ body {
                     $pct   = round(($pm['total'] / $pm_max) * 100);
                 ?>
                     <div>
-                        <div class="pm-row" style="margin-bottom:6px;">
+                        <div class="pm-row">
                             <span class="pm-dot" style="background:<?= $color ?>;"></span>
                             <span class="pm-name"><?= htmlspecialchars($pm['payment_method']) ?></span>
                             <span class="pm-count"><?= $pm['count'] ?> tx</span>
@@ -656,9 +746,9 @@ function closeSidebar() { document.getElementById('mainSidebar').classList.remov
 
 /* ── Chart Defaults ── */
 Chart.defaults.font.family = "'Sora', sans-serif";
-Chart.defaults.font.size   = 12;
+Chart.defaults.font.size   = 11.5;
 Chart.defaults.color       = '#8b93ad';
-const gridColor = 'rgba(227,231,240,0.7)';
+const gridColor = 'rgba(227,231,240,0.65)';
 
 const pmLabels = <?= json_encode(array_column($payment_methods, 'payment_method')) ?>;
 const pmValues = <?= json_encode(array_map(fn($p) => floatval($p['total']), $payment_methods)) ?>;
@@ -676,14 +766,14 @@ new Chart(document.getElementById('monthlyChart'), {
             label: 'Revenue',
             data: monthlyValues,
             borderColor: '#1b56f5',
-            backgroundColor: 'rgba(27,86,245,0.08)',
+            backgroundColor: 'rgba(27,86,245,0.07)',
             borderWidth: 2.5,
             pointBackgroundColor: '#1b56f5',
             pointBorderColor: '#fff',
-            pointBorderWidth: 2,
+            pointBorderWidth: 2.5,
             pointRadius: 5,
             pointHoverRadius: 7,
-            tension: 0.4,
+            tension: 0.42,
             fill: true,
         }]
     },
@@ -693,8 +783,8 @@ new Chart(document.getElementById('monthlyChart'), {
             legend: { display: false },
             tooltip: {
                 backgroundColor: '#0d1117', titleColor: '#fff', bodyColor: '#8b93ad',
-                padding: 12, cornerRadius: 8,
-                callbacks: { label: ctx => ' ₱' + ctx.parsed.y.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
+                padding: 12, cornerRadius: 8, borderColor: 'rgba(255,255,255,.06)', borderWidth: 1,
+                callbacks: { label: ctx => '  ₱' + ctx.parsed.y.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
             }
         },
         scales: {
@@ -719,23 +809,25 @@ new Chart(document.getElementById('paymentChart'), {
             backgroundColor: pmColors,
             borderColor: '#fff',
             borderWidth: 2.5,
+            hoverOffset: 5,
         }]
     },
     options: {
         responsive: true,
         plugins: {
-            legend: { position: 'bottom', labels: { padding: 16, font: { size: 12, weight: '600' } } },
+            legend: { position: 'bottom', labels: { padding: 14, font: { size: 11.5, weight: '600' }, boxWidth: 10, boxHeight: 10 } },
             tooltip: {
                 backgroundColor: '#0d1117', titleColor: '#fff', bodyColor: '#8b93ad',
                 padding: 12, cornerRadius: 8,
-                callbacks: { label: ctx => ' ₱' + ctx.parsed.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
+                callbacks: { label: ctx => '  ₱' + ctx.parsed.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
             }
         }
     }
 });
 
-/* ── Paid vs Unpaid Doughnut ── */
-new Chart(document.getElementById('statusChart'), {
+/* ── Paid vs Unpaid Doughnut — fixed size 140×140 ── */
+const statusCtx = document.getElementById('statusChart');
+new Chart(statusCtx, {
     type: 'doughnut',
     data: {
         labels: ['Paid', 'Unpaid'],
@@ -743,18 +835,18 @@ new Chart(document.getElementById('statusChart'), {
             data: [<?= floatval($total_paid) ?>, <?= floatval($total_unpaid) ?>],
             backgroundColor: ['#0d9f6b', '#e12b2b'],
             borderColor: '#fff', borderWidth: 3,
-            hoverOffset: 6,
+            hoverOffset: 4,
         }]
     },
     options: {
-        responsive: true,
-        cutout: '68%',
+        responsive: false,   /* fixed size — no stretching */
+        cutout: '70%',
         plugins: {
-            legend: { position: 'bottom', labels: { padding: 14, font: { size: 12, weight: '600' } } },
+            legend: { display: false },
             tooltip: {
                 backgroundColor: '#0d1117', titleColor: '#fff', bodyColor: '#8b93ad',
-                padding: 12, cornerRadius: 8,
-                callbacks: { label: ctx => ' ₱' + ctx.parsed.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
+                padding: 10, cornerRadius: 8,
+                callbacks: { label: ctx => '  ₱' + ctx.parsed.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
             }
         }
     }
