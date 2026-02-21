@@ -44,6 +44,10 @@ class Nurse {
     }
 
     public function addNurse($data) {
+        if (isset($data['nurseSpecialization']) && $data['nurseSpecialization'] === "Others" && !empty($data['other_specialization'])) {
+            $data['nurseSpecialization'] = $data['other_specialization'];
+        }
+
         $sql = "INSERT INTO hr_employees (
             employee_id, username, password, first_name, middle_name, last_name, suffix_name,
             gender, date_of_birth, contact_number, email, citizenship, house_no, barangay, city,
