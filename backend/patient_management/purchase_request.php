@@ -1,8 +1,6 @@
 <?php
 include '../../SQL/config.php';
 include 'class/logs.php';
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
 
 
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
@@ -26,7 +24,6 @@ if (!$user) {
 echo "No user found.";
 exit();
 }
-
 
 
 
@@ -68,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $success = "Purchase request successfully submitted!";
         logAction($conn, $_SESSION['user_id'], 'USER_REQUESTED_PURCHASE');
+
     } catch (Exception $e) {
         $error = $e->getMessage();
     }
@@ -390,7 +388,6 @@ if (!$user) {
                                     </div>
                                     <div class="text-center mt-4">
                                         <button type="submit" class="btn btn-primary btn-lg">Submit Request</button>
-
                                     </div>
                                 </form>
                             </div>

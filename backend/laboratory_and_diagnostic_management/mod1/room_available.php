@@ -26,7 +26,7 @@ $roomTypes = [
     'laboratory'   => 'CBC Laboratory',
     'X-Ray' => 'X-Ray',
     'MRI'   => 'MRI',
-    'CT'    => 'CT Scan'
+    'CT Scan'    => 'CT Scan'
 ];
 
 $roomAvailability = [];
