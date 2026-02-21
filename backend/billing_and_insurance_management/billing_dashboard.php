@@ -42,6 +42,23 @@ $m_result = $conn->query("
     ORDER BY month_key ASC
 ");
 while ($row = $m_result->fetch_assoc()) $monthly[] = $row;
+
+// --- Daily Revenue (last 7 days for 2nd bar chart) ---
+$daily = [];
+$d_result = $conn->query("
+    SELECT DATE_FORMAT(created_at,'%a %d') AS day_label,
+           DATE(created_at) AS day_key,
+           SUM(grand_total) AS total,
+           COUNT(*) AS count
+    FROM patient_receipt
+    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    GROUP BY day_key, day_label
+    ORDER BY day_key ASC
+");
+while ($row = $d_result->fetch_assoc()) $daily[] = $row;
+
+$total_billing   = $total_paid + $total_unpaid;
+$collection_rate = $total_billing > 0 ? round(($total_paid / $total_billing) * 100, 1) : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -164,25 +181,13 @@ body {
 }
 .ph-datebadge .date-day { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .08em; }
 .ph-datebadge .date-full { font-size: 13px; font-weight: 700; color: var(--text-1); }
-.ph-user-chip {
-    display: inline-flex; align-items: center; gap: 9px;
-    background: var(--blue-light); border: 1.5px solid rgba(27,86,245,.15);
-    border-radius: 40px; padding: 7px 14px 7px 7px;
-    font-size: 12px; font-weight: 700; color: var(--blue);
-}
-.ph-avatar {
-    width: 28px; height: 28px; border-radius: 50%;
-    background: var(--blue); color: #fff;
-    font-size: 11px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-}
 
 /* ══ KPI CARDS ══ */
 .kpi-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 14px;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
 }
 .kpi-card {
     background: var(--surface);
@@ -194,8 +199,6 @@ body {
     transition: box-shadow .2s, transform .2s;
 }
 .kpi-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
-
-/* accent bar left side */
 .kpi-card::before {
     content: ''; position: absolute;
     top: 0; left: 0; bottom: 0; width: 3px;
@@ -205,7 +208,6 @@ body {
 .kc-green::before  { background: var(--green); }
 .kc-teal::before   { background: var(--teal); }
 .kc-red::before    { background: var(--red); }
-
 .kpi-top {
     display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px;
 }
@@ -217,15 +219,14 @@ body {
 .kc-green .kpi-icon { background: var(--green-light); color: var(--green); }
 .kc-teal  .kpi-icon { background: var(--teal-light);  color: var(--teal);  }
 .kc-red   .kpi-icon { background: var(--red-light);   color: var(--red);   }
-
 .kpi-badge {
-    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px; letter-spacing: .05em; text-transform: uppercase;
+    font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 20px;
+    letter-spacing: .05em; text-transform: uppercase;
 }
 .kc-blue  .kpi-badge { background: var(--blue-light);  color: var(--blue);  }
 .kc-green .kpi-badge { background: var(--green-light); color: var(--green); }
 .kc-teal  .kpi-badge { background: var(--teal-light);  color: var(--teal);  }
 .kc-red   .kpi-badge { background: var(--red-light);   color: var(--red);   }
-
 .kpi-number {
     font-family: 'DM Mono', monospace;
     font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 5px;
@@ -234,7 +235,6 @@ body {
 .kc-green .kpi-number { color: var(--green); }
 .kc-teal  .kpi-number { color: var(--teal);  }
 .kc-red   .kpi-number { color: var(--red);   }
-
 .kpi-label {
     font-size: 10.5px; font-weight: 600; text-transform: uppercase;
     letter-spacing: .07em; color: var(--text-3);
@@ -246,81 +246,137 @@ body {
 .section-title {
     font-size: 10.5px; font-weight: 700; text-transform: uppercase;
     letter-spacing: .12em; color: var(--text-3);
-    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
 }
 .section-title::after { content:''; flex:1; height:1px; background:var(--border); }
 
-/* ══ CHART GRID ══ */
-.chart-grid-main {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 16px;
-    margin-bottom: 22px;
-    align-items: start;
-}
-.chart-grid-2 {
+/* ══════════════════════════════════════
+   CHART CARDS — unified, equal-height
+══════════════════════════════════════*/
+
+/* Both chart rows use the same 2-column grid */
+.charts-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 16px;
-    margin-bottom: 22px;
+    margin-bottom: 20px;
+    /* Each card in the same row will stretch to the tallest sibling */
+    align-items: stretch;
 }
+
 .chart-card {
     background: var(--surface);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xs);
     overflow: hidden;
-    transition: box-shadow .2s;
+    display: flex;
+    flex-direction: column;   /* header + body stack vertically */
+    transition: box-shadow .2s, transform .18s;
 }
-.chart-card:hover { box-shadow: var(--shadow-sm); }
-.chart-card.col-span-2 { grid-column: span 2; }
+.chart-card:hover { box-shadow: var(--shadow-sm); transform: translateY(-2px); }
 
 .chart-card-hdr {
-    padding: 14px 20px 12px;
+    padding: 16px 22px 14px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;             /* never squish the header */
 }
 .chart-card-title {
-    font-size: 13px; font-weight: 700; color: var(--text-1);
-    display: flex; align-items: center; gap: 7px;
+    font-size: 13.5px; font-weight: 700; color: var(--text-1);
+    display: flex; align-items: center; gap: 8px;
 }
-.chart-card-title i { font-size: 14px; }
-.chart-card-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-.legend-dot {
-    width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px;
-}
+.chart-card-title i { font-size: 15px; }
+.chart-card-sub { font-size: 11.5px; color: var(--text-3); margin-top: 3px; }
 .chart-hdr-badge {
-    font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
-    background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border);
-    letter-spacing: .04em; text-transform: uppercase;
+    font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+    background: var(--surface-2); color: var(--text-3);
+    border: 1px solid var(--border); letter-spacing: .04em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 5px;
 }
-.chart-card-body { padding: 18px 20px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
-/* ══ PAID VS UNPAID CARD — tighter layout ══ */
-.status-card-body {
-    padding: 16px 20px 18px;
-    display: flex; flex-direction: column; align-items: center; gap: 0;
+/* Chart body fills remaining card height */
+.chart-card-body {
+    padding: 20px 22px;
+    flex: 1;                    /* stretches to fill card */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
-.status-chart-wrap {
-    width: 140px; height: 140px; position: relative;
+
+/* Canvas fills its parent completely */
+.chart-card-body canvas {
+    width: 100% !important;
 }
-.status-center-label {
+
+/* ── PIE CARD specific ── */
+.pie-card-body {
+    padding: 22px 22px 18px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+}
+
+/* Doughnut with centered label */
+.donut-wrap {
+    position: relative;
+    width: 190px;
+    height: 190px;
+    flex-shrink: 0;
+}
+.donut-center {
     position: absolute; inset: 0;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
     pointer-events: none;
 }
-.status-center-pct { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 700; color: var(--green); line-height: 1; }
-.status-center-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); margin-top: 3px; }
-.status-legend { display: flex; gap: 16px; margin-top: 16px; }
-.sl-item { display: flex; align-items: center; gap: 6px; }
-.sl-dot { width: 9px; height: 9px; border-radius: 50%; }
-.sl-label { font-size: 11px; font-weight: 600; color: var(--text-2); }
-.sl-value { font-size: 10.5px; color: var(--text-3); margin-left: 3px; }
-.status-divider { width: 100%; height: 1px; background: var(--border); margin: 14px 0 10px; }
-.status-stat-row { display: flex; justify-content: space-between; width: 100%; gap: 10px; }
-.ss-item { flex: 1; text-align: center; }
-.ss-num { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 700; }
-.ss-lbl { font-size: 10px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+.donut-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 24px; font-weight: 700; color: var(--green); line-height: 1;
+}
+.donut-lbl {
+    font-size: 9px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .1em; color: var(--text-3); margin-top: 4px;
+}
+
+/* Shared legend */
+.chart-legend {
+    display: flex; flex-wrap: wrap;
+    justify-content: center; gap: 10px 20px;
+    margin-top: 18px;
+}
+.cl-item { display: flex; align-items: center; gap: 7px; }
+.cl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.cl-label { font-size: 11.5px; font-weight: 600; color: var(--text-2); }
+.cl-value { font-size: 10.5px; color: var(--text-3); margin-left: 2px; }
+
+/* Stat row under doughnut */
+.donut-stat-divider { width: 100%; height: 1px; background: var(--border); margin: 16px 0 12px; }
+.donut-stat-row {
+    display: flex; justify-content: space-between; width: 100%; gap: 12px;
+}
+.ds-item { flex: 1; text-align: center; }
+.ds-num { font-family: 'DM Mono', monospace; font-size: 15px; font-weight: 700; }
+.ds-lbl { font-size: 10px; color: var(--text-3); font-weight: 600; text-transform: uppercase;
+          letter-spacing: .06em; margin-top: 3px; }
+.ds-divider { width: 1px; background: var(--border); align-self: stretch; }
+
+/* ── Payment Method breakdown bar card ── */
+.pm-list { display: flex; flex-direction: column; gap: 16px; }
+.pm-item { display: flex; flex-direction: column; gap: 6px; }
+.pm-item-top { display: flex; align-items: center; gap: 9px; }
+.pm-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.pm-name { font-size: 12.5px; font-weight: 600; color: var(--text-1); flex: 1; min-width: 0;
+           overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-count { font-size: 11px; color: var(--text-3); margin-right: 4px; white-space: nowrap; }
+.pm-amount { font-family: 'DM Mono', monospace; font-size: 12.5px; font-weight: 700;
+             color: var(--text-1); white-space: nowrap; }
+.pm-bar-track { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.pm-bar-fill { height: 100%; border-radius: 99px; transition: width .8s cubic-bezier(.22,1,.36,1); }
 
 /* ══ TABLE PANEL ══ */
 .panel {
@@ -345,7 +401,6 @@ body {
     font-size: 11px; background: var(--blue-light); color: var(--blue);
     border-radius: 20px; padding: 3px 11px; font-weight: 700; letter-spacing: .04em;
 }
-
 .data-table { width: 100%; border-collapse: collapse; }
 .data-table thead th {
     background: var(--surface-2); padding: 10px 20px;
@@ -359,22 +414,20 @@ body {
 }
 .data-table tbody tr:last-child { border-bottom: none; }
 .data-table tbody tr:hover { background: #f6f8ff; }
-@keyframes rowIn { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
+@keyframes rowIn {
+    from { opacity:0; transform:translateY(3px); }
+    to   { opacity:1; transform:none; }
+}
 <?php foreach(range(1,10) as $i): ?>
 .data-table tbody tr:nth-child(<?= $i ?>) { animation-delay: <?= ($i-1)*0.035 ?>s; }
 <?php endforeach; ?>
 .data-table td { padding: 12px 20px; color: var(--text-2); vertical-align: middle; font-size: 12.5px; }
-
 .id-chip {
     font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
     background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: var(--radius-xs); padding: 3px 8px; color: var(--text-2);
-    display: inline-block;
+    border-radius: var(--radius-xs); padding: 3px 8px; color: var(--text-2); display: inline-block;
 }
-.patient-chip {
-    display: inline-flex; align-items: center; gap: 7px;
-    font-size: 12px; font-weight: 600; color: var(--text-1);
-}
+.patient-chip { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-1); }
 .patient-avatar {
     width: 26px; height: 26px; border-radius: 50%;
     background: var(--indigo-light); color: var(--indigo);
@@ -382,9 +435,7 @@ body {
     display: flex; align-items: center; justify-content: center;
     border: 1.5px solid var(--indigo-border);
 }
-.amount-mono {
-    font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-1);
-}
+.amount-mono { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-1); }
 .method-tag {
     display: inline-flex; align-items: center; gap: 5px;
     background: var(--surface-2); border: 1px solid var(--border);
@@ -401,19 +452,7 @@ body {
 .sp-other  { background: var(--red-light);   border-color: var(--red-border);   color: var(--red);   }
 .date-mono { font-family: 'DM Mono', monospace; font-size: 11.5px; color: var(--text-3); }
 
-/* ══ PAYMENT METHOD BREAKDOWN ══ */
-.pm-list { display: flex; flex-direction: column; gap: 14px; }
-.pm-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.pm-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.pm-name { font-size: 12.5px; font-weight: 600; color: var(--text-1); flex: 1; }
-.pm-count { font-size: 11px; color: var(--text-3); margin-right: 6px; white-space: nowrap; }
-.pm-amount { font-family: 'DM Mono', monospace; font-size: 12.5px; font-weight: 700; color: var(--text-1); white-space: nowrap; }
-.pm-bar-track {
-    height: 5px; background: var(--border); border-radius: 99px; overflow: hidden;
-}
-.pm-bar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
-
-/* ══ SIDEBAR MOBILE TOGGLE ══ */
+/* ══ SIDEBAR MOBILE ══ */
 .sidebar-toggle {
     display: none; background: var(--surface); color: var(--text-2);
     border: 1.5px solid var(--border); border-radius: var(--radius-sm);
@@ -429,18 +468,13 @@ body {
 .sidebar-overlay.show { display: block; }
 
 /* ══ RESPONSIVE ══ */
-@media (max-width: 1280px) {
-    .chart-grid-main { grid-template-columns: 1fr 1fr; }
-    .chart-card.col-span-2 { grid-column: span 1; }
-}
 @media (max-width: 1024px) {
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
     .main-content { margin-left: 0; padding: 14px 14px 48px; }
     .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .chart-grid-main, .chart-grid-2 { grid-template-columns: 1fr; }
-    .chart-card.col-span-2 { grid-column: span 1; }
+    .charts-row { grid-template-columns: 1fr; }
     .page-header { flex-direction: column; align-items: flex-start; gap: 10px; }
     .ph-right { width: 100%; }
     .data-table thead th:nth-child(4),
@@ -449,7 +483,7 @@ body {
 }
 @media (max-width: 480px) {
     .kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-    .kpi-card { padding: 14px 14px; }
+    .kpi-card { padding: 14px; }
     .kpi-number { font-size: 20px; }
     .data-table thead th:nth-child(2),
     .data-table tbody td:nth-child(2) { display: none; }
@@ -484,7 +518,6 @@ body {
 
     <!-- ── KPI Cards ── -->
     <div class="kpi-grid">
-
         <div class="kpi-card kc-blue">
             <div class="kpi-top">
                 <div class="kpi-icon"><i class="bi bi-person-fill"></i></div>
@@ -495,7 +528,6 @@ body {
             <div class="kpi-divider"></div>
             <div class="kpi-footer"><i class="bi bi-people" style="color:var(--blue);"></i> Unique patients on record</div>
         </div>
-
         <div class="kpi-card kc-teal">
             <div class="kpi-top">
                 <div class="kpi-icon"><i class="bi bi-file-earmark-text-fill"></i></div>
@@ -506,7 +538,6 @@ body {
             <div class="kpi-divider"></div>
             <div class="kpi-footer"><i class="bi bi-receipt" style="color:var(--teal);"></i> All billing transactions</div>
         </div>
-
         <div class="kpi-card kc-green">
             <div class="kpi-top">
                 <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
@@ -517,7 +548,6 @@ body {
             <div class="kpi-divider"></div>
             <div class="kpi-footer"><i class="bi bi-arrow-down-circle" style="color:var(--green);"></i> Successfully collected</div>
         </div>
-
         <div class="kpi-card kc-red">
             <div class="kpi-top">
                 <div class="kpi-icon"><i class="bi bi-exclamation-circle-fill"></i></div>
@@ -528,34 +558,67 @@ body {
             <div class="kpi-divider"></div>
             <div class="kpi-footer"><i class="bi bi-clock-history" style="color:var(--red);"></i> Pending collection</div>
         </div>
-
     </div>
 
-    <!-- ── Charts Row 1 ── -->
+    <!-- ════════════════════════════════
+         ROW 1 — BAR CHARTS (aligned)
+    ════════════════════════════════ -->
     <div class="section-title">
-        <i class="bi bi-bar-chart-fill" style="color:var(--blue);"></i> Revenue Analysis
+        <i class="bi bi-bar-chart-fill" style="color:var(--blue);"></i> Revenue Trends
     </div>
 
-    <div class="chart-grid-main">
+    <div class="charts-row">
 
-        <!-- Monthly Revenue Trend (spans 2 cols) -->
-        <div class="chart-card col-span-2">
+        <!-- Bar Chart 1: Monthly Revenue -->
+        <div class="chart-card">
             <div class="chart-card-hdr">
                 <div>
                     <div class="chart-card-title">
                         <i class="bi bi-graph-up-arrow" style="color:var(--blue);"></i>
-                        Monthly Revenue Trend
+                        Monthly Revenue
                     </div>
                     <div class="chart-card-sub">Last 6 months — total billed amounts</div>
                 </div>
-                <span class="chart-hdr-badge"><span class="legend-dot" style="background:var(--blue);"></span>Revenue</span>
+                <span class="chart-hdr-badge">
+                    <span class="legend-dot" style="background:var(--blue);"></span> Revenue
+                </span>
             </div>
             <div class="chart-card-body">
-                <canvas id="monthlyChart" height="160"></canvas>
+                <canvas id="monthlyChart" height="200"></canvas>
             </div>
         </div>
 
-        <!-- Paid vs Unpaid Doughnut — compact -->
+        <!-- Bar Chart 2: Daily Transactions (last 7 days) -->
+        <div class="chart-card">
+            <div class="chart-card-hdr">
+                <div>
+                    <div class="chart-card-title">
+                        <i class="bi bi-calendar3-week" style="color:var(--teal);"></i>
+                        Daily Collections
+                    </div>
+                    <div class="chart-card-sub">Last 7 days — daily revenue</div>
+                </div>
+                <span class="chart-hdr-badge">
+                    <span class="legend-dot" style="background:var(--teal);"></span> Daily
+                </span>
+            </div>
+            <div class="chart-card-body">
+                <canvas id="dailyChart" height="200"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ════════════════════════════════
+         ROW 2 — PIE CHARTS (aligned)
+    ════════════════════════════════ -->
+    <div class="section-title">
+        <i class="bi bi-pie-chart-fill" style="color:var(--green);"></i> Collection Breakdown
+    </div>
+
+    <div class="charts-row">
+
+        <!-- Pie Chart 1: Paid vs Unpaid Doughnut -->
         <div class="chart-card">
             <div class="chart-card-hdr">
                 <div>
@@ -563,56 +626,55 @@ body {
                         <i class="bi bi-pie-chart-fill" style="color:var(--green);"></i>
                         Paid vs Unpaid
                     </div>
-                    <div class="chart-card-sub">Collection overview</div>
+                    <div class="chart-card-sub">Overall collection rate</div>
                 </div>
+                <span class="chart-hdr-badge" style="background:var(--green-light);color:var(--green);border-color:var(--green-border);">
+                    <?= $collection_rate ?>% Collected
+                </span>
             </div>
-            <div class="status-card-body">
-                <!-- Fixed-size canvas wrapper -->
-                <div class="status-chart-wrap">
-                    <canvas id="statusChart" style="width:140px;height:140px;"></canvas>
-                    <?php
-                    $total_billing   = $total_paid + $total_unpaid;
-                    $collection_rate = $total_billing > 0 ? round(($total_paid / $total_billing) * 100, 1) : 0;
-                    ?>
-                    <div class="status-center-label">
-                        <div class="status-center-pct"><?= $collection_rate ?>%</div>
-                        <div class="status-center-lbl">Collected</div>
+            <div class="pie-card-body">
+                <div class="donut-wrap">
+                    <canvas id="statusChart"></canvas>
+                    <div class="donut-center">
+                        <div class="donut-pct"><?= $collection_rate ?>%</div>
+                        <div class="donut-lbl">Collected</div>
                     </div>
                 </div>
 
-                <div class="status-legend">
-                    <div class="sl-item">
-                        <div class="sl-dot" style="background:var(--green);"></div>
-                        <span class="sl-label">Paid</span>
+                <div class="chart-legend">
+                    <div class="cl-item">
+                        <div class="cl-dot" style="background:var(--green);"></div>
+                        <span class="cl-label">Paid</span>
+                        <span class="cl-value">₱<?= number_format($total_paid, 0) ?></span>
                     </div>
-                    <div class="sl-item">
-                        <div class="sl-dot" style="background:var(--red);"></div>
-                        <span class="sl-label">Unpaid</span>
+                    <div class="cl-item">
+                        <div class="cl-dot" style="background:var(--red);"></div>
+                        <span class="cl-label">Unpaid</span>
+                        <span class="cl-value">₱<?= number_format($total_unpaid, 0) ?></span>
                     </div>
                 </div>
 
-                <div class="status-divider"></div>
-
-                <div class="status-stat-row">
-                    <div class="ss-item">
-                        <div class="ss-num" style="color:var(--green);">₱<?= number_format($total_paid/1000, 1) ?>K</div>
-                        <div class="ss-lbl">Paid</div>
+                <div class="donut-stat-divider"></div>
+                <div class="donut-stat-row">
+                    <div class="ds-item">
+                        <div class="ds-num" style="color:var(--green);">₱<?= number_format($total_paid/1000, 1) ?>K</div>
+                        <div class="ds-lbl">Paid</div>
                     </div>
-                    <div style="width:1px;background:var(--border);"></div>
-                    <div class="ss-item">
-                        <div class="ss-num" style="color:var(--red);">₱<?= number_format($total_unpaid/1000, 1) ?>K</div>
-                        <div class="ss-lbl">Unpaid</div>
+                    <div class="ds-divider"></div>
+                    <div class="ds-item">
+                        <div class="ds-num" style="color:var(--blue);">₱<?= number_format($total_billing/1000, 1) ?>K</div>
+                        <div class="ds-lbl">Total Billed</div>
+                    </div>
+                    <div class="ds-divider"></div>
+                    <div class="ds-item">
+                        <div class="ds-num" style="color:var(--red);">₱<?= number_format($total_unpaid/1000, 1) ?>K</div>
+                        <div class="ds-lbl">Unpaid</div>
                     </div>
                 </div>
             </div>
         </div>
 
-    </div>
-
-    <!-- ── Charts Row 2 ── -->
-    <div class="chart-grid-2">
-
-        <!-- Revenue by Payment Method Pie -->
+        <!-- Pie Chart 2: Revenue by Payment Method -->
         <div class="chart-card">
             <div class="chart-card-hdr">
                 <div>
@@ -620,42 +682,44 @@ body {
                         <i class="bi bi-credit-card-fill" style="color:var(--indigo);"></i>
                         Revenue by Payment Method
                     </div>
-                    <div class="chart-card-sub">Share of total collected</div>
+                    <div class="chart-card-sub">Share of total collected per channel</div>
                 </div>
             </div>
-            <div class="chart-card-body" style="display:flex;justify-content:center;align-items:center;">
-                <div style="width:100%;max-width:260px;">
-                    <canvas id="paymentChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Payment Methods Breakdown List -->
-        <div class="chart-card">
-            <div class="chart-card-hdr">
-                <div>
-                    <div class="chart-card-title">
-                        <i class="bi bi-list-ul" style="color:var(--teal);"></i>
-                        Payment Methods Breakdown
-                    </div>
-                    <div class="chart-card-sub">Transactions &amp; revenue per method</div>
-                </div>
-            </div>
-            <div class="chart-card-body">
+            <div class="pie-card-body">
                 <?php
                 $pm_colors = ['#1b56f5','#0d9f6b','#c77b0a','#e12b2b','#5046e5','#0580a4'];
                 $pm_max    = !empty($payment_methods) ? max(array_column($payment_methods, 'total')) : 1;
                 if ($pm_max == 0) $pm_max = 1;
                 ?>
-                <div class="pm-list">
-                <?php foreach ($payment_methods as $idx => $pm):
-                    $color = $pm_colors[$idx % count($pm_colors)];
-                    $pct   = round(($pm['total'] / $pm_max) * 100);
-                ?>
-                    <div>
-                        <div class="pm-row">
+
+                <!-- Pie canvas centred, same donut-wrap size -->
+                <div class="donut-wrap">
+                    <canvas id="paymentChart"></canvas>
+                </div>
+
+                <!-- Dynamic legend matching the pie slices -->
+                <div class="chart-legend">
+                    <?php foreach ($payment_methods as $idx => $pm): ?>
+                    <div class="cl-item">
+                        <div class="cl-dot" style="background:<?= $pm_colors[$idx % count($pm_colors)] ?>;"></div>
+                        <span class="cl-label"><?= htmlspecialchars($pm['payment_method'] ?: 'N/A') ?></span>
+                        <span class="cl-value"><?= $pm['count'] ?> tx</span>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="donut-stat-divider"></div>
+
+                <!-- Breakdown list inside the pie card -->
+                <div class="pm-list" style="width:100%;">
+                    <?php foreach ($payment_methods as $idx => $pm):
+                        $color = $pm_colors[$idx % count($pm_colors)];
+                        $pct   = $pm_max > 0 ? round(($pm['total'] / $pm_max) * 100) : 0;
+                    ?>
+                    <div class="pm-item">
+                        <div class="pm-item-top">
                             <span class="pm-dot" style="background:<?= $color ?>;"></span>
-                            <span class="pm-name"><?= htmlspecialchars($pm['payment_method']) ?></span>
+                            <span class="pm-name"><?= htmlspecialchars($pm['payment_method'] ?: 'N/A') ?></span>
                             <span class="pm-count"><?= $pm['count'] ?> tx</span>
                             <span class="pm-amount">₱<?= number_format($pm['total'], 2) ?></span>
                         </div>
@@ -663,8 +727,9 @@ body {
                             <div class="pm-bar-fill" style="width:<?= $pct ?>%;background:<?= $color ?>;"></div>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                    <?php endforeach; ?>
                 </div>
+
             </div>
         </div>
 
@@ -697,8 +762,8 @@ body {
         <tbody>
         <?php if ($recent_receipts): ?>
             <?php foreach ($recent_receipts as $r):
-                $status = $r['status'];
-                $pill   = $status === 'Paid' ? 'sp-paid' : ($status === 'Unpaid' ? 'sp-unpaid' : 'sp-other');
+                $status    = $r['status'];
+                $pill      = $status === 'Paid' ? 'sp-paid' : ($status === 'Unpaid' ? 'sp-unpaid' : 'sp-other');
                 $pill_icon = $status === 'Paid' ? 'bi-check-circle-fill' : 'bi-clock-fill';
             ?>
             <tr>
@@ -710,7 +775,12 @@ body {
                     </div>
                 </td>
                 <td><span class="amount-mono">₱<?= number_format($r['grand_total'], 2) ?></span></td>
-                <td><span class="method-tag"><i class="bi bi-credit-card"></i><?= htmlspecialchars($r['payment_method']) ?></span></td>
+                <td>
+                    <span class="method-tag">
+                        <i class="bi bi-credit-card"></i>
+                        <?= htmlspecialchars($r['payment_method'] ?: 'N/A') ?>
+                    </span>
+                </td>
                 <td>
                     <span class="status-pill <?= $pill ?>">
                         <i class="bi <?= $pill_icon ?>"></i> <?= htmlspecialchars($status) ?>
@@ -746,6 +816,7 @@ Chart.defaults.font.size   = 11.5;
 Chart.defaults.color       = '#8b93ad';
 const gridColor = 'rgba(227,231,240,0.65)';
 
+/* ── Data from PHP ── */
 const pmLabels = <?= json_encode(array_column($payment_methods, 'payment_method')) ?>;
 const pmValues = <?= json_encode(array_map(fn($p) => floatval($p['total']), $payment_methods)) ?>;
 const pmColors = ['#1b56f5','#0d9f6b','#c77b0a','#e12b2b','#5046e5','#0580a4'];
@@ -753,40 +824,61 @@ const pmColors = ['#1b56f5','#0d9f6b','#c77b0a','#e12b2b','#5046e5','#0580a4'];
 const monthlyLabels = <?= json_encode(array_column($monthly, 'month')) ?>;
 const monthlyValues = <?= json_encode(array_map(fn($m) => floatval($m['total']), $monthly)) ?>;
 
-/* ── Monthly Revenue Line Chart ── */
+const dailyLabels = <?= json_encode(array_column($daily, 'day_label')) ?>;
+const dailyValues = <?= json_encode(array_map(fn($d) => floatval($d['total']), $daily)) ?>;
+
+/* ── Shared tooltip style ── */
+const tooltipStyle = {
+    backgroundColor: '#0d1117', titleColor: '#fff', bodyColor: '#8b93ad',
+    padding: 12, cornerRadius: 8,
+    borderColor: 'rgba(255,255,255,.06)', borderWidth: 1,
+    callbacks: {
+        label: ctx => '  ₱' + ctx.parsed.y.toLocaleString('en-PH', { minimumFractionDigits: 2 })
+    }
+};
+const pieTooltipStyle = {
+    backgroundColor: '#0d1117', titleColor: '#fff', bodyColor: '#8b93ad',
+    padding: 12, cornerRadius: 8,
+    callbacks: {
+        label: ctx => '  ₱' + ctx.parsed.toLocaleString('en-PH', { minimumFractionDigits: 2 })
+    }
+};
+
+/* ══════════════════════════════════
+   BAR CHART 1 — Monthly Revenue
+══════════════════════════════════*/
 new Chart(document.getElementById('monthlyChart'), {
-    type: 'line',
+    type: 'bar',
     data: {
         labels: monthlyLabels,
         datasets: [{
             label: 'Revenue',
             data: monthlyValues,
-            borderColor: '#1b56f5',
-            backgroundColor: 'rgba(27,86,245,0.07)',
-            borderWidth: 2.5,
-            pointBackgroundColor: '#1b56f5',
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2.5,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-            tension: 0.42,
-            fill: true,
+            backgroundColor: 'rgba(27,86,245,0.85)',
+            hoverBackgroundColor: '#1040d8',
+            borderRadius: 6,
+            borderSkipped: false,
+            barPercentage: 0.62,
+            categoryPercentage: 0.72,
         }]
     },
     options: {
         responsive: true,
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: false },
-            tooltip: {
-                backgroundColor: '#0d1117', titleColor: '#fff', bodyColor: '#8b93ad',
-                padding: 12, cornerRadius: 8, borderColor: 'rgba(255,255,255,.06)', borderWidth: 1,
-                callbacks: { label: ctx => '  ₱' + ctx.parsed.y.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
-            }
+            tooltip: tooltipStyle,
         },
         scales: {
-            x: { grid: { color: gridColor }, ticks: { font: { size: 11, weight: '600' } } },
+            x: {
+                grid: { display: false },
+                ticks: { font: { size: 11, weight: '600' } },
+                border: { display: false }
+            },
             y: {
-                beginAtZero: true, grid: { color: gridColor },
+                beginAtZero: true,
+                grid: { color: gridColor },
+                border: { display: false, dash: [4, 4] },
                 ticks: {
                     callback: v => v >= 1000 ? '₱' + (v/1000).toFixed(0) + 'K' : '₱' + v
                 }
@@ -795,7 +887,78 @@ new Chart(document.getElementById('monthlyChart'), {
     }
 });
 
-/* ── Payment Method Pie ── */
+/* ══════════════════════════════════
+   BAR CHART 2 — Daily Revenue
+══════════════════════════════════*/
+new Chart(document.getElementById('dailyChart'), {
+    type: 'bar',
+    data: {
+        labels: dailyLabels,
+        datasets: [{
+            label: 'Daily Revenue',
+            data: dailyValues,
+            backgroundColor: 'rgba(5,128,164,0.82)',
+            hoverBackgroundColor: '#046b8c',
+            borderRadius: 6,
+            borderSkipped: false,
+            barPercentage: 0.62,
+            categoryPercentage: 0.72,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: tooltipStyle,
+        },
+        scales: {
+            x: {
+                grid: { display: false },
+                ticks: { font: { size: 11, weight: '600' } },
+                border: { display: false }
+            },
+            y: {
+                beginAtZero: true,
+                grid: { color: gridColor },
+                border: { display: false, dash: [4, 4] },
+                ticks: {
+                    callback: v => v >= 1000 ? '₱' + (v/1000).toFixed(0) + 'K' : '₱' + v
+                }
+            }
+        }
+    }
+});
+
+/* ══════════════════════════════════
+   PIE CHART 1 — Paid vs Unpaid (Doughnut)
+══════════════════════════════════*/
+new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Paid', 'Unpaid'],
+        datasets: [{
+            data: [<?= floatval($total_paid) ?>, <?= floatval($total_unpaid) ?>],
+            backgroundColor: ['#0d9f6b', '#e12b2b'],
+            borderColor: '#fff',
+            borderWidth: 3,
+            hoverOffset: 6,
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '72%',
+        plugins: {
+            legend: { display: false },
+            tooltip: pieTooltipStyle,
+        }
+    }
+});
+
+/* ══════════════════════════════════
+   PIE CHART 2 — Revenue by Payment Method
+══════════════════════════════════*/
 new Chart(document.getElementById('paymentChart'), {
     type: 'pie',
     data: {
@@ -804,46 +967,16 @@ new Chart(document.getElementById('paymentChart'), {
             data: pmValues,
             backgroundColor: pmColors,
             borderColor: '#fff',
-            borderWidth: 2.5,
-            hoverOffset: 5,
+            borderWidth: 3,
+            hoverOffset: 6,
         }]
     },
     options: {
         responsive: true,
-        plugins: {
-            legend: { position: 'bottom', labels: { padding: 14, font: { size: 11.5, weight: '600' }, boxWidth: 10, boxHeight: 10 } },
-            tooltip: {
-                backgroundColor: '#0d1117', titleColor: '#fff', bodyColor: '#8b93ad',
-                padding: 12, cornerRadius: 8,
-                callbacks: { label: ctx => '  ₱' + ctx.parsed.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
-            }
-        }
-    }
-});
-
-/* ── Paid vs Unpaid Doughnut — fixed size 140×140 ── */
-const statusCtx = document.getElementById('statusChart');
-new Chart(statusCtx, {
-    type: 'doughnut',
-    data: {
-        labels: ['Paid', 'Unpaid'],
-        datasets: [{
-            data: [<?= floatval($total_paid) ?>, <?= floatval($total_unpaid) ?>],
-            backgroundColor: ['#0d9f6b', '#e12b2b'],
-            borderColor: '#fff', borderWidth: 3,
-            hoverOffset: 4,
-        }]
-    },
-    options: {
-        responsive: false,   /* fixed size — no stretching */
-        cutout: '70%',
+        maintainAspectRatio: true,
         plugins: {
             legend: { display: false },
-            tooltip: {
-                backgroundColor: '#0d1117', titleColor: '#fff', bodyColor: '#8b93ad',
-                padding: 10, cornerRadius: 8,
-                callbacks: { label: ctx => '  ₱' + ctx.parsed.toLocaleString('en-PH', { minimumFractionDigits: 2 }) }
-            }
+            tooltip: pieTooltipStyle,
         }
     }
 });

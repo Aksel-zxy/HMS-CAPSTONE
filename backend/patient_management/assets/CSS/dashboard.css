@@ -26,3 +26,19 @@
   color: #333;
   font-weight: bold;
 }
+
+.stats-grid {
+    display: flex;
+    gap: 1rem;
+    width: 100%;
+}
+
+.stats-grid .card {
+    flex: 1;          /* equal width */
+    min-width: 160px; /* prevents shrinking too much */
+}
+@media (max-width: 576px) {
+    .stats-row {
+        flex-direction: column;
+    }
+}
