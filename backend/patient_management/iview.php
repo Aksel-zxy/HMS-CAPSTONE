@@ -8,7 +8,15 @@ $patientObj = new Patient($conn);
 
 $callerObj = new Caller($conn); // create Caller instance
 
+if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
+    header('Location: login.php');
+    exit();
+}
 
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+    echo "User ID is not set in session.";
+    exit();
+}
 
 try {
     $patient_id = $_GET['patient_id'] ?? null;

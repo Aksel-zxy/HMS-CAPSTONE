@@ -150,6 +150,11 @@ th {
     color: white;
 }
 
+.status-offduty {
+    background-color: purple;
+    color: white;
+}
+
 .status-undertime {
     background-color: orange;
     color: white;

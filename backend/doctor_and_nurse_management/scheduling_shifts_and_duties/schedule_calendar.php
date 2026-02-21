@@ -55,7 +55,7 @@ $events = [];
 
 while ($row = $result->fetch_assoc()) {
     $table_rows[] = $row;
-    
+
     // Override the visual week display to match the actual DB record (if off by 1-6 days)
     if (count($table_rows) === 1) {
         $actual_start = $row['week_start'];
@@ -178,7 +178,7 @@ while ($row = $result->fetch_assoc()) {
                 </ul>
             </li>
 
-             <li class="sidebar-item">
+            <li class="sidebar-item">
                 <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#evaluation"
                     aria-expanded="true" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.0.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->
@@ -199,7 +199,15 @@ while ($row = $result->fetch_assoc()) {
                     </li>
                 </ul>
             </li>
-
+            <li class="sidebar-item">
+                <a href="../repair_request.php" class="sidebar-link collapsed has-dropdown" data-bs-toggle="#" data-bs-target="#request_repair"
+                    aria-expanded="true" aria-controls="auth">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 640 640"><!--!Font Awesome Free v7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.-->
+                        <path d="M160 80c0-35.3 28.7-64 64-64s64 28.7 64 64l0 48-128 0 0-48zm-48 48l-64 0c-26.5 0-48 21.5-48 48L0 384c0 53 43 96 96 96l256 0c53 0 96-43 96-96l0-208c0-26.5-21.5-48-48-48l-64 0 0-48c0-61.9-50.1-112-112-112S112 18.1 112 80l0 48zm24 48a24 24 0 1 1 0 48 24 24 0 1 1 0-48zm152 24a24 24 0 1 1 48 0 24 24 0 1 1 -48 0z"/>
+                    </svg>
+                    <span style="font-size: 18px;">Purchase Request</span>
+                </a>
+            </li>
         </aside>
         <!----- End of Sidebar ----->
 
@@ -251,17 +259,17 @@ while ($row = $result->fetch_assoc()) {
                     <form method="GET" class="d-flex align-items-center">
                         <div class="input-group shadow-sm">
                             <a href="?week=<?= $prev_week ?>" class="btn btn-outline-secondary bg-white" title="Previous Week">
-                               <
-                            </a>
+                                <
+                                    </a>
 
-                            <input type="date" name="week" value="<?= $selected_week ?>"
-                                class="form-control text-center border-secondary border-start-0 border-end-0"
-                                style="max-width: 150px; cursor: pointer;"
-                                onchange="this.form.submit()">
+                                    <input type="date" name="week" value="<?= $selected_week ?>"
+                                        class="form-control text-center border-secondary border-start-0 border-end-0"
+                                        style="max-width: 150px; cursor: pointer;"
+                                        onchange="this.form.submit()">
 
-                            <a href="?week=<?= $next_week ?>" class="btn btn-outline-secondary bg-white" title="Next Week">
-                                >
-                            </a>
+                                    <a href="?week=<?= $next_week ?>" class="btn btn-outline-secondary bg-white" title="Next Week">
+                                        >
+                                    </a>
                         </div>
                     </form>
 
