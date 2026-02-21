@@ -73,13 +73,24 @@ class Patient {
     //For Edit Patient
     public function getPatientById($id) {
         $stmt = $this->conn->prepare("
-        SELECT p.*, 
-               CONCAT(e.first_name, ' ', e.last_name) AS doctor_name
-        FROM patientinfo p
-        LEFT JOIN hr_employees e
-               ON p.attending_doctor = e.employee_id
-        WHERE p.patient_id = ?
-        LIMIT 1
+        SELECT 
+    p.*, 
+    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+    b.bed_number,
+    b.room_number
+FROM patientinfo p
+
+LEFT JOIN hr_employees e
+    ON p.attending_doctor = e.employee_id
+
+LEFT JOIN p_bed_assignments ba
+    ON p.patient_id = ba.patient_id
+
+LEFT JOIN p_beds b
+    ON ba.bed_id = b.bed_id
+
+WHERE p.patient_id = ?
+LIMIT 1;
     ");
         $stmt->bind_param("i", $id);
         $stmt->execute();

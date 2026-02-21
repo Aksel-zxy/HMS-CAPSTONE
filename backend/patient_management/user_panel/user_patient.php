@@ -185,13 +185,21 @@ try {
                                         <?= htmlspecialchars($patient['fname'] . ' ' . $patient['mname'] . ' ' . $patient['lname']) ?>
                                     </p>
                                     <p class="fs-6"><strong>Age:</strong> <?= htmlspecialchars($patient['age']) ?></p>
+                                    <p class="fs-6"><strong>Room:</strong>
+                                        <?= htmlspecialchars($patient['room_number'] ?? 'Not Assigned') ?>
+                                    </p>
                                 </div>
                                 <div class="col-md-6 text-md-start text-end">
                                     <p class="fs-6"><strong>Contact:</strong>
                                         <?= htmlspecialchars($patient['phone_number']) ?></p>
                                     <p class="fs-6"><strong>Gender:</strong> <?= htmlspecialchars($patient['gender']) ?>
                                     </p>
+                                    <p class="fs-6"><strong>Attending Doctor:</strong>
+                                        <?= htmlspecialchars($patient['doctor_name'] ?? 'Not Assigned') ?>
+                                    </p>
+
                                 </div>
+
                             </div>
                         </div>
                     </div>
