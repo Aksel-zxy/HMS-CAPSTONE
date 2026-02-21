@@ -102,7 +102,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 /* =====================================================
    DATA FETCH
 =====================================================*/
-$stmt = $pdo->prepare("SELECT MIN(id) AS id, item_name FROM inventory WHERE item_type = 'Diagnostic Equipment' GROUP BY item_name ORDER BY item_name ASC");
+
+/*
+ * ── ALL inventory items, grouped by item_type for the schedule dropdown.
+ *    Changed from: WHERE item_type = 'Diagnostic Equipment'
+ *    to: all items, ordered by type then name so the <optgroup> grouping works.
+ */
+$stmt = $pdo->prepare("
+    SELECT MIN(id) AS id, item_name, item_type
+    FROM inventory
+    GROUP BY item_name, item_type
+    ORDER BY item_type ASC, item_name ASC
+");
 $stmt->execute();
 $equipment = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -245,12 +256,7 @@ function statusBadgeHtml(string $status): string {
         .pro-table tbody tr:last-child td { border-bottom:none; }
         .pro-table tbody tr:hover td { background:var(--gray-50); }
 
-        /* ─────────────────────────────────────────
-           INLINE UPDATE CONTROLS — NOT a <form>
-           Each set of controls is scoped to its own
-           [data-id] wrapper. The Save button uses
-           closest('[data-id]') to find ITS controls only.
-        ───────────────────────────────────────── */
+        /* INLINE UPDATE CONTROLS */
         .update-row { display:flex; gap:.4rem; align-items:center; flex-wrap:nowrap; }
         .update-row select,
         .update-row input[type=text] { font-size:.82rem; border:1px solid var(--gray-200); border-radius:6px; padding:.3rem .55rem; background:#fff; color:var(--gray-800); transition:border-color .15s; }
@@ -454,7 +460,6 @@ function statusBadgeHtml(string $status): string {
                                 <td><span class="priority-badge <?= priorityBadge($req['priority']) ?>"><?= htmlspecialchars($req['priority']) ?></span></td>
                                 <td class="status-cell"><?= statusBadgeHtml($req['status']) ?></td>
                                 <td>
-                                    <!-- ✅ div, NOT <form> — scoped by data-id -->
                                     <div class="update-row"
                                          data-id="<?= intval($req['id']) ?>"
                                          data-current="<?= htmlspecialchars($req['status']) ?>">
@@ -509,7 +514,6 @@ function statusBadgeHtml(string $status): string {
                                 <span><i class="bi bi-geo-alt"></i><?= htmlspecialchars($req['location'] ?: 'Unknown') ?></span>
                                 <span><span class="priority-badge <?= priorityBadge($req['priority']) ?>"><?= htmlspecialchars($req['priority']) ?></span></span>
                             </div>
-                            <!-- ✅ div, NOT <form> — scoped by data-id -->
                             <div class="req-card-actions"
                                  data-id="<?= intval($req['id']) ?>"
                                  data-current="<?= htmlspecialchars($req['status']) ?>">
@@ -547,13 +551,37 @@ function statusBadgeHtml(string $status): string {
                             <form method="POST" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>" class="row g-3">
                                 <input type="hidden" name="action" value="schedule">
                                 <div class="col-12 col-sm-6 col-lg-5">
-                                    <label class="form-label fw-semibold" style="font-size:.82rem;">Equipment</label>
+                                    <label class="form-label fw-semibold" style="font-size:.82rem;">Equipment / Item</label>
                                     <select name="inventory_id" class="form-select form-select-sm" required>
-                                        <option value="" disabled selected>— Select equipment —</option>
-                                        <?php $scheduled_ids = array_column($schedules, 'inventory_id'); foreach ($equipment as $eq): $dis = in_array($eq['id'], $scheduled_ids) ? 'disabled' : ''; ?>
-                                            <option value="<?= $eq['id'] ?>" <?= $dis ?>><?= htmlspecialchars($eq['item_name']) ?><?= $dis ? ' — Already Scheduled' : '' ?></option>
+                                        <option value="" disabled selected>— Select item from inventory —</option>
+                                        <?php
+                                        /*
+                                         * Build <optgroup> sections per item_type so the dropdown
+                                         * is easy to navigate even with many inventory items.
+                                         * Items already scheduled are shown as disabled.
+                                         */
+                                        $scheduled_ids = array_column($schedules, 'inventory_id');
+
+                                        // Group by item_type
+                                        $grouped = [];
+                                        foreach ($equipment as $eq) {
+                                            $grouped[$eq['item_type']][] = $eq;
+                                        }
+
+                                        foreach ($grouped as $type => $items):
+                                        ?>
+                                            <optgroup label="<?= htmlspecialchars($type) ?>">
+                                                <?php foreach ($items as $eq):
+                                                    $dis = in_array($eq['id'], $scheduled_ids) ? 'disabled' : '';
+                                                ?>
+                                                    <option value="<?= $eq['id'] ?>" <?= $dis ?>>
+                                                        <?= htmlspecialchars($eq['item_name']) ?><?= $dis ? ' — Already Scheduled' : '' ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </optgroup>
                                         <?php endforeach; ?>
                                     </select>
+                                    <div class="form-text" style="font-size:.72rem;">All inventory items listed, grouped by type.</div>
                                 </div>
                                 <div class="col-12 col-sm-6 col-lg-3">
                                     <label class="form-label fw-semibold" style="font-size:.82rem;">Day of Month</label>
@@ -674,17 +702,11 @@ function makeBadge(status) {
     return `<span class="status-badge ${key}"><i class="bi ${icons[status]||'bi-circle'}" style="font-size:.62rem;"></i> ${status}</span>`;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   AJAX UPDATE
-   The key fix: btn.closest('[data-id]') scopes ALL selectors
-   to the SINGLE row/card that owns this Save button.
-   No other row's controls are ever touched.
-═══════════════════════════════════════════════════════════ */
+/* ── AJAX UPDATE ── */
 document.addEventListener('click', function (e) {
     const btn = e.target.closest('.btn-update');
     if (!btn) return;
 
-    // Scope: the wrapper div that has data-id (only this row's wrapper)
     const wrap      = btn.closest('[data-id]');
     const id        = wrap.dataset.id;
     const oldStatus = wrap.dataset.current;
@@ -709,7 +731,6 @@ document.addEventListener('click', function (e) {
         showToast(data.message, 'ok');
 
         if (data.deleted) {
-            // Remove ONLY this row / card — identified by data-id
             document.querySelector(`#requestTableBody tr[data-id="${id}"]`)?.remove();
             document.querySelector(`#mobileCards .req-card[data-id="${id}"]`)?.remove();
 
@@ -718,18 +739,15 @@ document.addEventListener('click', function (e) {
             if (oldStatus === 'In Progress') adjustStat('statProg', -1);
             refreshBadge();
 
-            // Show empty state if no rows remain
             if (!document.querySelector('#requestTableBody tr[data-id]')) {
                 const emptyHtml = `<div class="empty-state"><i class="bi bi-inbox"></i><p>No repair requests found.</p></div>`;
                 document.getElementById('requestTableBody').innerHTML = `<tr><td colspan="7">${emptyHtml}</td></tr>`;
                 document.getElementById('mobileCards').innerHTML = emptyHtml;
             }
         } else {
-            // Update the status badge in the desktop table cell for THIS row only
             const tr = document.querySelector(`#requestTableBody tr[data-id="${id}"]`);
             if (tr) tr.querySelector('.status-cell').innerHTML = makeBadge(newStatus);
 
-            // Update the mobile card badge for THIS card only
             const card = document.querySelector(`#mobileCards .req-card[data-id="${id}"]`);
             if (card) {
                 const mb = card.querySelector('.mobile-status-badge');
@@ -741,7 +759,6 @@ document.addEventListener('click', function (e) {
                 }
             }
 
-            // Update counters
             if (oldStatus !== newStatus) {
                 if (oldStatus === 'Open')        adjustStat('statOpen', -1);
                 if (oldStatus === 'In Progress') adjustStat('statProg', -1);
@@ -750,9 +767,7 @@ document.addEventListener('click', function (e) {
                 refreshBadge();
             }
 
-            // Update data-current so the NEXT save for this row is correct
             wrap.dataset.current = newStatus;
-
             btn.disabled = false;
             btn.innerHTML = origHtml;
         }
