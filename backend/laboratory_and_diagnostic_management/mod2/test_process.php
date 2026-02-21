@@ -207,7 +207,7 @@ $allPatients = $patient->getAllPatients();
                                 <th style="padding:12px;text-align:center;">Status</th>
                                 <th style="padding:12px;text-align:center;">Completed Time</th>
                                 <th style="padding:12px;text-align:center;">Result</th>
-                                <th style="padding:12px;text-align:center;">AI Impression</th>
+                                <!-- <th style="padding:12px;text-align:center;">AI Impression</th> -->
                                 <th style="padding:12px;text-align:center;">Action</th>
                             </tr>
                         </thead>
@@ -297,14 +297,14 @@ $allPatients = $patient->getAllPatients();
                                                 View Result
                                             </button>
                                         </td>
-                                        <td style="padding:12px; text-align:center;">
+                                        <!-- <td style="padding:12px; text-align:center;">
                                             <button class="btn btn-warning ai-impression-btn"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#aiImpressionModal"
                                                 data-impression="<?= htmlspecialchars($aiImpression) ?>">
                                                 View Impression
                                             </button>
-                                        </td>
+                                        </td> -->
                                         <td style="padding:12px; text-align:center;">
                                             <?php if ($allCompleted): ?>
                                                 
