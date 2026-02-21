@@ -730,6 +730,7 @@ while ($row = $dept_result->fetch_row()) {
             line-height: 1.5;
             display: -webkit-box;
             -webkit-line-clamp: 3;
+            line-clamp: 3;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
@@ -826,8 +827,6 @@ while ($row = $dept_result->fetch_row()) {
         ══════════════════════════════════════════ */
         @media (max-width: 1100px) {
             .stat-grid { grid-template-columns: repeat(3, 1fr); }
-            .stat-card:nth-child(4),
-            .stat-card:nth-child(5) { /* last two fill evenly */ }
         }
 
         /* ══════════════════════════════════════════
@@ -1282,7 +1281,7 @@ while ($row = $dept_result->fetch_row()) {
                                             <?= htmlspecialchars($req['equipment']) ?>
                                         </td>
                                         <td style="max-width:190px;">
-                                            <span style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:.81rem;">
+                                            <span style="display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:.81rem;">
                                                 <?= htmlspecialchars($req['issue']) ?>
                                             </span>
                                             <?php if (!empty($req['remarks'])): ?>
