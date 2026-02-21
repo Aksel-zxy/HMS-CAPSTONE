@@ -239,6 +239,141 @@ if ($result->num_rows > 0) {
                     </div>
                 </div>
             </div>
+
+            <center style="margin-top: 40px;">
+                <button class="hahaha" onclick="openModal('doctorsModal')">Request Employee for Doctor</button> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <button class="hahaha" onclick="openModal('nursesModal')">Request Employee for Nurse</button>
+            </center>
+
+            <!-- Doctors Modal -->
+            <div id="doctorsModal" class="bastabubukas">
+                <div class="lalagyanannya">
+                    <bttn class="close-btn" onclick="closeModal('doctorsModal')">X</bttn>
+                    <center>
+                        <h3 style="font-weight: bold;">Doctor Replacement Request</h3> 
+                    </center>
+                    <br />
+
+                    <form action="submit_replacement_request.php" method="POST">
+                        <input type="hidden" name="profession" value="Doctor" required>
+
+                        <!-- Department / Subspecialty Dropdown -->
+                        <label>Department / Subspecialty</label>
+                        <select id="department" name="department" required>
+                            <option value="">--- Select Department ---</option>
+                            <option value="Anesthesiology & Pain Management">Anesthesiology & Pain Management</option>
+                            <option value="Cardiology (Heart & Vascular System)">Cardiology (Heart & Vascular System)</option>
+                            <option value="Dermatology (Skin, Hair, & Nails)">Dermatology (Skin, Hair, & Nails)</option>
+                            <option value="Ear, Nose, and Throat (ENT)">Ear, Nose, and Throat (ENT)</option>
+                            <option value="Emergency Department (ER)">Emergency Department (ER)</option>
+                            <option value="Gastroenterology (Digestive System & Liver)">Gastroenterology (Digestive System & Liver)</option>
+                            <option value="Geriatrics & Palliative Care (Elderly & Terminal Care)">Geriatrics & Palliative Care</option>
+                            <option value="Infectious Diseases & Immunology">Infectious Diseases & Immunology</option>
+                            <option value="Internal Medicine (General & Subspecialties)">Internal Medicine</option>
+                            <option value="Nephrology (Kidneys & Dialysis)">Nephrology</option>
+                            <option value="Neurology & Neurosurgery (Brain & Nervous System)">Neurology & Neurosurgery</option>
+                            <option value="Obstetrics & Gynecology (OB-GYN)">Obstetrics & Gynecology (OB-GYN)</option>
+                            <option value="Oncology (Cancer Treatment)">Oncology</option>
+                            <option value="Ophthalmology (Eye Care)">Ophthalmology</option>
+                            <option value="Orthopedics (Bones, Joints, and Muscles)">Orthopedics</option>
+                            <option value="Pediatrics (Child Healthcare)">Pediatrics</option>
+                            <option value="Psychiatry & Mental Health">Psychiatry & Mental Health</option>
+                            <option value="Pulmonology (Lungs & Respiratory System)">Pulmonology</option>
+                            <option value="Rehabilitation & Physical Therapy">Rehabilitation & Physical Therapy</option>
+                            <option value="Surgery (General & Subspecialties)">Surgery</option>
+                        </select>
+
+                        <!-- Specialization Dropdown -->
+                        <label>Specialist to Replace</label>
+                        <select id="specialization" name="position" required>
+                            <option value="">--- Select Specialization ---</option>
+                        </select>
+
+                        <!-- Other Specialization (hidden initially) -->
+                        <input type="text" id="otherSpecialization" name="other_specialization" placeholder="Specify Other Specialist" style="display:none;">
+
+                        <label>Leaving Employee Name</label>
+                        <input type="text" name="leaving_employee_name">
+
+                        <label>Leaving Employee ID</label>
+                        <input type="text" name="leaving_employee_id">
+
+                        <label>Reason for Leaving</label>
+                        <textarea name="reason_for_leaving"></textarea>
+
+                        <label>Requested By</label>
+                        <input type="text" name="requested_by" required>
+
+                        <button type="submit">Submit Request</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Nurses Modal -->
+            <div id="nursesModal" class="bastabubukas">
+                <div class="lalagyanannya">
+                    <bttn class="close-btn" onclick="closeModal('nursesModal')">X</bttn>
+                    <center>
+                        <h3 style="font-weight: bold;">Nurse Replacement Request</h3> 
+                    </center>
+                    <br />
+
+                    <form action="submit_replacement_request.php" method="POST">
+                        <input type="hidden" name="profession" value="Nurse" required>
+
+                        <!-- Department / Subspecialty Dropdown -->
+                        <label>Department / Subspecialty</label>
+                        <select id="nurseDepartment" name="department" required>
+                            <option value="">--- Select Department ---</option>
+                            <option value="Anesthesiology & Pain Management">Anesthesiology & Pain Management</option>
+                            <option value="Cardiology (Heart & Vascular System)">Cardiology (Heart & Vascular System)</option>
+                            <option value="Dermatology (Skin, Hair, & Nails)">Dermatology (Skin, Hair, & Nails)</option>
+                            <option value="Ear, Nose, and Throat (ENT)">Ear, Nose, and Throat (ENT)</option>
+                            <option value="Emergency Department (ER)">Emergency Department (ER)</option>
+                            <option value="Gastroenterology (Digestive System & Liver)">Gastroenterology (Digestive System & Liver)</option>
+                            <option value="Geriatrics & Palliative Care (Elderly & Terminal Care)">Geriatrics & Palliative Care</option>
+                            <option value="Infectious Diseases & Immunology">Infectious Diseases & Immunology</option>
+                            <option value="Internal Medicine (General & Subspecialties)">Internal Medicine</option>
+                            <option value="Nephrology (Kidneys & Dialysis)">Nephrology</option>
+                            <option value="Neurology & Neurosurgery (Brain & Nervous System)">Neurology & Neurosurgery</option>
+                            <option value="Obstetrics & Gynecology (OB-GYN)">Obstetrics & Gynecology (OB-GYN)</option>
+                            <option value="Oncology (Cancer Treatment)">Oncology</option>
+                            <option value="Ophthalmology (Eye Care)">Ophthalmology</option>
+                            <option value="Orthopedics (Bones, Joints, and Muscles)">Orthopedics</option>
+                            <option value="Pediatrics (Child Healthcare)">Pediatrics</option>
+                            <option value="Psychiatry & Mental Health">Psychiatry & Mental Health</option>
+                            <option value="Pulmonology (Lungs & Respiratory System)">Pulmonology</option>
+                            <option value="Rehabilitation & Physical Therapy">Rehabilitation & Physical Therapy</option>
+                            <option value="Surgery (General & Subspecialties)">Surgery</option>
+                        </select>
+
+                        <!-- Specialization Dropdown -->
+                        <label>Nurse Type to Replace</label>
+                        <select id="nurseSpecialization" name="position" required>
+                            <option value="">--- Select Specialization ---</option>
+                        </select>
+
+                        <!-- Other Specialization (hidden initially) -->
+                        <input type="text" id="otherNurseSpecialization" name="other_specialization" placeholder="Specify Other Nurse Type" style="display:none;">
+
+                        <label>Leaving Employee Name</label>
+                        <input type="text" name="leaving_employee_name">
+
+                        <label>Leaving Employee ID</label>
+                        <input type="text" name="leaving_employee_id">
+
+                        <label>Reason for Leaving</label>
+                        <textarea name="reason_for_leaving"></textarea>
+
+                        <label>Requested By</label>
+                        <input type="text" name="requested_by" required>
+
+                        <button type="submit">Submit Request</button>
+                    </form>
+                </div>
+            </div>
+
+
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->
@@ -248,6 +383,132 @@ if ($result->num_rows > 0) {
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+
+        function openModal(id) {
+            document.getElementById(id).style.display = "flex";
+        }
+        function closeModal(id) {
+            document.getElementById(id).style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            const modals = ['doctorsModal','nursesModal','pharmacyModal','laboratoryModal','accountingModal'];
+            modals.forEach(id => {
+                const modal = document.getElementById(id);
+                if(event.target == modal) closeModal(id);
+            });
+        }
+
+        <!-- JavaScript For Doctors -->
+        const specializations = {
+            "Anesthesiology & Pain Management": ["Anesthesiologist"],
+            "Cardiology (Heart & Vascular System)": ["Cardiologist"],
+            "Dermatology (Skin, Hair, & Nails)": ["Dermatologist"],
+            "Ear, Nose, and Throat (ENT)": ["ENT Specialist (Otolaryngologist)"],
+            "Emergency Department (ER)": ["Emergency Medicine Physician"],
+            "Gastroenterology (Digestive System & Liver)": ["Gastroenterologist"],
+            "Geriatrics & Palliative Care (Elderly & Terminal Care)": ["Internal Medicine Physician (Elder Care)", "General Practitioner (Elder Care)"],
+            "Infectious Diseases & Immunology": ["Infectious Disease Specialist"],
+            "Internal Medicine (General & Subspecialties)": ["Internal Medicine Physician", "General Practitioner"],
+            "Nephrology (Kidneys & Dialysis)": ["Nephrologist"],
+            "Neurology & Neurosurgery (Brain & Nervous System)": ["Neurologist", "Neurosurgeon"],
+            "Obstetrics & Gynecology (OB-GYN)": ["Gynecologist / Obstetrician (OB-GYN)"],
+            "Oncology (Cancer Treatment)": ["Oncologist"],
+            "Ophthalmology (Eye Care)": ["Ophthalmologist"],
+            "Orthopedics (Bones, Joints, and Muscles)": ["Orthopedic Surgeon"],
+            "Pediatrics (Child Healthcare)": ["Pediatrician"],
+            "Psychiatry & Mental Health": ["Psychiatrist"],
+            "Pulmonology (Lungs & Respiratory System)": ["Pulmonologist"],
+            "Rehabilitation & Physical Therapy": ["Rehabilitation Medicine Specialist"],
+            "Surgery (General & Subspecialties)": ["General Surgeon", "Plastic Surgeon", "Vascular Surgeon"]
+        };
+
+        document.getElementById("department").addEventListener("change", function() {
+            const dept = this.value;
+            const specializationSelect = document.getElementById("specialization");
+            const otherInput = document.getElementById("otherSpecialization");
+            
+            specializationSelect.innerHTML = '<option value="">--- Select Specialization ---</option>';
+            
+            if (specializations[dept]) {
+                specializations[dept].forEach(function(spec) {
+                    const opt = document.createElement("option");
+                    opt.value = spec;
+                    opt.textContent = spec;
+                    specializationSelect.appendChild(opt);
+                });
+                const optOthers = document.createElement("option");
+                optOthers.value = "Others";
+                optOthers.textContent = "Others";
+                specializationSelect.appendChild(optOthers);
+            }
+            otherInput.style.display = "none";
+        });
+
+        document.getElementById("specialization").addEventListener("change", function() {
+            const otherInput = document.getElementById("otherSpecialization");
+            if (this.value === "Others") {
+                otherInput.style.display = "block";
+            } else {
+                otherInput.style.display = "none";
+            }
+        });
+
+        <!-- JavaScript For Nurse -->
+        const nurseSpecializations = {
+            "Anesthesiology & Pain Management": ["Anesthesia Nurse", "Pain Management Nurse"],
+            "Cardiology (Heart & Vascular System)": ["Cardiac Nurse", "CCU Nurse"],
+            "Dermatology (Skin, Hair, & Nails)": ["Dermatology Nurse", "Aesthetic Nurse"],
+            "Ear, Nose, and Throat (ENT)": ["ENT Nurse"],
+            "Emergency Department (ER)": ["ER Nurse", "Trauma Nurse"],
+            "Gastroenterology (Digestive System & Liver)": ["GI Nurse", "Endoscopy Nurse"],
+            "Geriatrics & Palliative Care (Elderly & Terminal Care)": ["Geriatric Nurse", "Palliative Care Nurse", "Hospice Nurse"],
+            "Infectious Diseases & Immunology": ["Infection Control Nurse", "Immunology Nurse"],
+            "Internal Medicine (General & Subspecialties)": ["General Medicine Nurse", "Medical Ward Nurse"],
+            "Nephrology (Kidneys & Dialysis)": ["Dialysis Nurse", "Renal Nurse"],
+            "Neurology & Neurosurgery (Brain & Nervous System)": ["Neuro Nurse", "Neuroscience Nurse"],
+            "Obstetrics & Gynecology (OB-GYN)": ["OB Nurse", "Labor & Delivery Nurse", "Antenatal Care Nurse"],
+            "Oncology (Cancer Treatment)": ["Oncology Nurse", "Chemotherapy Nurse"],
+            "Ophthalmology (Eye Care)": ["Ophthalmic Nurse"],
+            "Orthopedics (Bones, Joints, and Muscles)": ["Orthopedic Nurse", "Post-Ortho Surgery Nurse"],
+            "Pediatrics (Child Healthcare)": ["Pediatric Nurse", "Pediatric ICU Nurse"],
+            "Psychiatry & Mental Health": ["Psychiatric Nurse", "Mental Health Nurse"],
+            "Pulmonology (Lungs & Respiratory System)": ["Pulmonary Nurse", "Respiratory Therapy Nurse"],
+            "Rehabilitation & Physical Therapy": ["Rehab Nurse", "Physiotherapy Support Nurse"],
+            "Surgery (General & Subspecialties)": ["Scrub Nurse", "Circulating Nurse", "Perioperative Nurse"]
+        };
+
+        document.getElementById("nurseDepartment").addEventListener("change", function() {
+            const dept = this.value;
+            const specializationSelect = document.getElementById("nurseSpecialization");
+            const otherInput = document.getElementById("otherNurseSpecialization");
+            
+            specializationSelect.innerHTML = '<option value="">--- Select Specialization ---</option>';
+            
+            if (nurseSpecializations[dept]) {
+                nurseSpecializations[dept].forEach(function(spec) {
+                    const opt = document.createElement("option");
+                    opt.value = spec;
+                    opt.textContent = spec;
+                    specializationSelect.appendChild(opt);
+                });
+                const optOthers = document.createElement("option");
+                optOthers.value = "Others";
+                optOthers.textContent = "Others";
+                specializationSelect.appendChild(optOthers);
+            }
+            otherInput.style.display = "none";
+        });
+
+        document.getElementById("nurseSpecialization").addEventListener("change", function() {
+            const otherInput = document.getElementById("otherNurseSpecialization");
+            if (this.value === "Others") {
+                otherInput.style.display = "block";
+            } else {
+                otherInput.style.display = "none";
+            }
+        });
+
     </script>
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
