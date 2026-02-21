@@ -19,17 +19,15 @@ $paymongoClient = new Client([
         'Authorization' => 'Basic ' . base64_encode(PAYMONGO_SECRET_KEY . ':'),
     ],
     'timeout' => 8,
-    'verify'  => false, // disable SSL for localhost testing
+    'verify'  => false,
 ]);
 
 /* =====================================================
    RESOLVE billing_id + patient_id FROM URL
-   Supports: ?billing_id=X&patient_id=Y  OR  ?patient_id=Y (legacy)
 ===================================================== */
 $billing_id = (int)($_GET['billing_id'] ?? 0);
 $patient_id = (int)($_GET['patient_id'] ?? 0);
 
-/* If only patient_id given, look up their latest billing_id */
 if (!$billing_id && $patient_id) {
     $s = $conn->prepare("
         SELECT billing_id FROM billing_records
@@ -67,25 +65,15 @@ $existing_link  = $billing['paymongo_link_id'];
 $patient_name   = trim($billing['full_name']);
 
 /* =====================================================
-   LOCK IF PAID
-===================================================== */
-if ($status === 'Paid') {
-    header("Location: patient_billing.php?msg=already_paid");
-    exit;
-}
-
-/* =====================================================
    CHECK PAYMONGO FOR PAID STATUS IF LINK EXISTS
-   (Auto-sync without needing to click Refresh)
 ===================================================== */
 if ($existing_link && $status !== 'Paid') {
     try {
-        $linkResp = $paymongoClient->get("links/{$existing_link}");
-        $linkData = json_decode($linkResp->getBody(), true);
+        $linkResp   = $paymongoClient->get("links/{$existing_link}");
+        $linkData   = json_decode($linkResp->getBody(), true);
         $linkStatus = $linkData['data']['attributes']['status'] ?? null;
 
         if ($linkStatus === 'paid') {
-            // Mark as paid immediately
             $s = $conn->prepare("UPDATE billing_records SET status='Paid', payment_method='PAYMONGO', payment_date=NOW(), paymongo_link_id=? WHERE billing_id=?");
             $s->bind_param("si", $existing_link, $billing_id); $s->execute();
 
@@ -93,17 +81,14 @@ if ($existing_link && $status !== 'Paid') {
             $s2->bind_param("ssi", $existing_link, $existing_link, $billing_id); $s2->execute();
 
             $status = 'Paid';
-            header("Location: patient_billing.php?msg=already_paid");
-            exit;
         }
     } catch (Exception $e) {
-        // Silent — just don't block page load
         error_log("PayMongo link check error: " . $e->getMessage());
     }
 }
 
 /* =====================================================
-   FETCH PATIENT RECEIPT (for discount / insurance)
+   FETCH PATIENT RECEIPT
 ===================================================== */
 $receipt = null;
 $stmt = $conn->prepare("SELECT * FROM patient_receipt WHERE billing_id = ? LIMIT 1");
@@ -131,14 +116,12 @@ foreach ($raw_items as $item) {
     $name = 'Billing Item';
     $desc = '';
 
-    /* Try dl_services */
     $ns = $conn->prepare("SELECT serviceName, description FROM dl_services WHERE price = ? LIMIT 1");
     $ns->bind_param("d", $item['unit_price']);
     $ns->execute();
     $svc = $ns->get_result()->fetch_assoc();
     if ($svc) { $name = $svc['serviceName']; $desc = $svc['description'] ?? ''; }
 
-    /* Try dnm_procedure_list */
     if (!$svc) {
         $np = $conn->prepare("SELECT procedure_name AS serviceName FROM dnm_procedure_list WHERE price = ? LIMIT 1");
         $np->bind_param("d", $item['unit_price']);
@@ -147,7 +130,6 @@ foreach ($raw_items as $item) {
         if ($prc) { $name = $prc['serviceName']; $desc = 'Procedure'; }
     }
 
-    /* Try pharmacy_inventory */
     if (!$svc && !isset($prc)) {
         $nm = $conn->prepare("SELECT med_name AS serviceName, dosage FROM pharmacy_inventory WHERE unit_price = ? LIMIT 1");
         $nm->bind_param("d", $item['unit_price']);
@@ -185,14 +167,32 @@ if ($out_of_pocket < 0) $out_of_pocket = 0;
 if ($grand_total   < 0) $grand_total   = 0;
 
 /* =====================================================
-   AUTO-MARK PAID IF FULLY COVERED
+   AUTO-MARK PAID IF FULLY COVERED BY INSURANCE
+   (grand_total = 0 means insurance/discount covers everything)
 ===================================================== */
+$auto_paid_by_insurance = false;
 if ($grand_total <= 0 && $status !== 'Paid') {
-    $s = $conn->prepare("UPDATE billing_records SET status='Paid' WHERE billing_id=?");
-    $s->bind_param("i", $billing_id); $s->execute();
-    $s2 = $conn->prepare("UPDATE patient_receipt SET status='Paid' WHERE billing_id=?");
-    $s2->bind_param("i", $billing_id); $s2->execute();
+    $ins_ref = 'INS-COVERED-' . $billing_id;
+
+    $s = $conn->prepare("
+        UPDATE billing_records
+        SET status='Paid', payment_method='Insurance', payment_date=NOW(), paid_amount=?
+        WHERE billing_id=?
+    ");
+    $covered_amount = $subtotal; // the full amount was covered
+    $s->bind_param("di", $covered_amount, $billing_id);
+    $s->execute();
+
+    $s2 = $conn->prepare("
+        UPDATE patient_receipt
+        SET status='Paid', payment_method='Insurance', payment_reference=?
+        WHERE billing_id=?
+    ");
+    $s2->bind_param("si", $ins_ref, $billing_id);
+    $s2->execute();
+
     $status = 'Paid';
+    $auto_paid_by_insurance = true;
 }
 
 /* =====================================================
@@ -200,7 +200,6 @@ if ($grand_total <= 0 && $status !== 'Paid') {
 ===================================================== */
 if (isset($_POST['payment_method']) && $_POST['payment_method'] === 'cash' && $grand_total > 0) {
     $cash_ref = 'CASH-' . time();
-    // FIX: Include "Billing #ID" in remarks so fetch_paid_payments.php can match it
     $desc = "Billing #{$billing_id} — Cash Payment — {$patient_name}";
 
     $s = $conn->prepare("
@@ -210,8 +209,8 @@ if (isset($_POST['payment_method']) && $_POST['payment_method'] === 'cash' && $g
     $s->bind_param("sdsii", $cash_ref, $grand_total, $desc, $billing_id, $patient_id);
     $s->execute();
 
-    $s2 = $conn->prepare("UPDATE billing_records SET status='Paid', payment_method='Cash', payment_date=NOW(), paymongo_payment_id=? WHERE billing_id=?");
-    $s2->bind_param("si", $cash_ref, $billing_id); $s2->execute();
+    $s2 = $conn->prepare("UPDATE billing_records SET status='Paid', payment_method='Cash', payment_date=NOW(), paymongo_payment_id=?, paid_amount=? WHERE billing_id=?");
+    $s2->bind_param("sdi", $cash_ref, $grand_total, $billing_id); $s2->execute();
 
     $s3 = $conn->prepare("UPDATE patient_receipt SET status='Paid', payment_method='Cash', payment_reference=? WHERE billing_id=?");
     $s3->bind_param("si", $cash_ref, $billing_id); $s3->execute();
@@ -224,9 +223,8 @@ if (isset($_POST['payment_method']) && $_POST['payment_method'] === 'cash' && $g
 ===================================================== */
 $payLinkUrl = null;
 
-if ($grand_total > 0) {
+if ($grand_total > 0 && $status !== 'Paid') {
     if ($existing_link) {
-        // Reuse existing link
         try {
             $linkResp   = $paymongoClient->get("links/{$existing_link}");
             $linkData   = json_decode($linkResp->getBody(), true);
@@ -236,13 +234,10 @@ if ($grand_total > 0) {
         }
     } else {
         try {
-            // FIX: Use "Billing #ID" in BOTH description AND remarks
-            // This ensures fetch_paid_payments.php can always extract the billing_id
             $payload = ['data' => ['attributes' => [
                 'amount'      => (int)round($grand_total * 100),
                 'currency'    => 'PHP',
                 'description' => "Hospital Bill #{$billing_id}",
-                // ↓ KEY FIX: was "TXN:{$transaction_id}" — now includes billing_id
                 'remarks'     => "Billing #{$billing_id} TXN:{$transaction_id}",
             ]]];
 
@@ -254,7 +249,6 @@ if ($grand_total > 0) {
             if ($link_id) {
                 $remarks = "Billing #{$billing_id} TXN:{$transaction_id}";
 
-                // Save to paymongo_payments with billing_id and patient_id already linked
                 $s = $conn->prepare("
                     INSERT IGNORE INTO paymongo_payments
                         (payment_id, amount, status, payment_method, remarks, billing_id, patient_id)
@@ -263,7 +257,6 @@ if ($grand_total > 0) {
                 $s->bind_param("sdsii", $link_id, $grand_total, $remarks, $billing_id, $patient_id);
                 $s->execute();
 
-                // Save link_id to billing_records
                 $s2 = $conn->prepare("
                     UPDATE billing_records
                     SET paymongo_link_id = ?, paymongo_reference_number = ?
@@ -271,7 +264,6 @@ if ($grand_total > 0) {
                 ");
                 $s2->bind_param("ssi", $link_id, $transaction_id, $billing_id); $s2->execute();
 
-                // Ensure patient_receipt exists
                 $s3 = $conn->prepare("
                     INSERT INTO patient_receipt (patient_id, billing_id, status, paymongo_reference, payment_reference)
                     VALUES (?, ?, 'Pending', ?, ?)
@@ -411,6 +403,52 @@ body {
 .pat-badge.pending { background: var(--amber-bg); color: var(--amber); }
 .pat-badge.paid    { background: var(--green-bg); color: var(--green); }
 
+/* ── PAID / INSURANCE COVERED BANNER ── */
+.fully-paid-banner {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    display: flex; align-items: flex-start; gap: 18px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(5,150,105,.25);
+    color: #fff;
+    position: relative; overflow: hidden;
+}
+.fully-paid-banner::before {
+    content: '';
+    position: absolute; right: -20px; bottom: -20px;
+    width: 140px; height: 140px; border-radius: 50%;
+    background: rgba(255,255,255,.08);
+}
+.paid-banner-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(255,255,255,.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; flex-shrink: 0;
+}
+.paid-banner-title {
+    font-family: var(--ff-head); font-size: 1.4rem;
+    color: #fff; line-height: 1.1; margin-bottom: 6px;
+}
+.paid-banner-sub { font-size: .85rem; color: rgba(255,255,255,.8); line-height: 1.5; }
+.paid-banner-badge {
+    margin-left: auto; flex-shrink: 0;
+    background: rgba(255,255,255,.2); padding: 6px 16px;
+    border-radius: 999px; font-size: .8rem; font-weight: 700;
+    color: #fff; white-space: nowrap;
+    border: 1.5px solid rgba(255,255,255,.3);
+}
+.btn-back-billing {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 14px; padding: 9px 20px;
+    background: rgba(255,255,255,.2); color: #fff;
+    border: 1.5px solid rgba(255,255,255,.35);
+    border-radius: var(--radius-sm); font-family: var(--ff-body);
+    font-size: .85rem; font-weight: 700; text-decoration: none;
+    transition: all .15s;
+}
+.btn-back-billing:hover { background: rgba(255,255,255,.3); color: #fff; }
+
 /* CARD */
 .card {
     background: var(--white); border-radius: var(--radius);
@@ -468,16 +506,7 @@ body {
 .tot-row.ins   { background: var(--sky-bg);   color: var(--sky);   font-weight: 600; }
 .tot-row.grand { background: var(--navy); color: var(--white); font-weight: 700; font-size: 1rem; margin-top: 10px; border-radius: var(--radius-sm); }
 .tot-row.grand .tot-amt { font-family: var(--ff-head); font-size: 1.4rem; color: var(--gold); }
-
-/* FULLY COVERED */
-.covered-banner {
-    background: var(--green-bg); border: 1px solid #6ee7b7;
-    border-radius: var(--radius); padding: 18px 24px;
-    display: flex; align-items: center; gap: 14px; margin-bottom: 20px;
-    color: #065f46; font-weight: 600; font-size: 14px;
-}
-.covered-banner i { font-size: 1.6rem; flex-shrink: 0; }
-.covered-banner small { display: block; font-weight: 400; opacity: .75; margin-top: 2px; font-size: .82rem; }
+.tot-row.covered { background: var(--green-bg); color: var(--green); font-weight: 700; font-size: 1rem; margin-top: 10px; border-radius: var(--radius-sm); }
 
 /* PAYMENT METHODS */
 .pay-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 24px; }
@@ -531,6 +560,7 @@ body {
 .hbadge.pending  { background: var(--amber-bg); color: var(--amber); }
 .hbadge.cash-m   { background: var(--gray-100); color: var(--gray-600); }
 .hbadge.online-m { background: var(--sky-bg);   color: var(--sky); }
+.hbadge.ins-m    { background: #dbeafe;          color: #1d4ed8; }
 .empty-hist td   { text-align: center; padding: 36px; color: var(--gray-400); font-style: italic; }
 
 /* Auto-sync notice */
@@ -544,6 +574,8 @@ body {
     .cw { margin-left: 0; padding: 24px 14px 60px; }
     .pay-grid { grid-template-columns: 1fr; }
     .top-nav { flex-direction: column; align-items: stretch; text-align: center; }
+    .fully-paid-banner { flex-direction: column; }
+    .paid-banner-badge { margin-left: 0; }
 }
 @media(max-width: 480px) {
     .billing-center { padding: 0; }
@@ -600,14 +632,52 @@ body {
     </div>
     <?php endif; ?>
 
-    <!-- FULLY COVERED -->
-    <?php if ($grand_total <= 0): ?>
-    <div class="covered-banner">
-        <i class="bi bi-shield-check-fill"></i>
-        <div>
-            This bill is fully covered — no payment required.
-            <small>Insurance and discounts have settled the entire balance.</small>
+    <!-- ── INSURANCE FULLY PAID BANNER ── -->
+    <?php if ($auto_paid_by_insurance): ?>
+    <div class="fully-paid-banner">
+        <div class="paid-banner-icon"><i class="bi bi-shield-fill-check"></i></div>
+        <div style="flex:1;">
+            <div class="paid-banner-title">Bill Fully Covered by Insurance</div>
+            <div class="paid-banner-sub">
+                This patient's bill has been fully covered by their insurance plan.<br>
+                No additional payment is required. The billing record has been automatically marked as <strong>Paid</strong>
+                and removed from the pending billing queue.
+            </div>
+            <a href="patient_billing.php" class="btn-back-billing">
+                <i class="bi bi-arrow-left"></i> Return to Patient Billing
+            </a>
         </div>
+        <span class="paid-banner-badge"><i class="bi bi-check-circle-fill"></i> Auto-Settled</span>
+    </div>
+    <?php elseif ($status === 'Paid' && $grand_total <= 0): ?>
+    <!-- Already paid + fully covered (revisit) -->
+    <div class="fully-paid-banner">
+        <div class="paid-banner-icon"><i class="bi bi-shield-fill-check"></i></div>
+        <div style="flex:1;">
+            <div class="paid-banner-title">Bill Fully Covered by Insurance</div>
+            <div class="paid-banner-sub">
+                This bill has already been settled. Insurance covered the entire amount — no payment needed.
+            </div>
+            <a href="patient_billing.php" class="btn-back-billing">
+                <i class="bi bi-arrow-left"></i> Return to Patient Billing
+            </a>
+        </div>
+        <span class="paid-banner-badge"><i class="bi bi-check-circle-fill"></i> Settled</span>
+    </div>
+    <?php elseif ($status === 'Paid'): ?>
+    <!-- Paid by cash or online -->
+    <div class="fully-paid-banner" style="background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%); box-shadow: 0 8px 32px rgba(29,78,216,.25);">
+        <div class="paid-banner-icon"><i class="bi bi-check-circle-fill"></i></div>
+        <div style="flex:1;">
+            <div class="paid-banner-title">Payment Completed</div>
+            <div class="paid-banner-sub">
+                This billing has already been paid and settled. No further action is required.
+            </div>
+            <a href="patient_billing.php" class="btn-back-billing">
+                <i class="bi bi-arrow-left"></i> Return to Patient Billing
+            </a>
+        </div>
+        <span class="paid-banner-badge"><i class="bi bi-check-circle-fill"></i> Paid</span>
     </div>
     <?php endif; ?>
 
@@ -661,15 +731,23 @@ body {
                 <span>−₱<?= number_format($insurance_covered, 2) ?></span>
             </div>
             <?php endif; ?>
+
+            <?php if ($grand_total <= 0): ?>
+            <div class="tot-row covered">
+                <span><i class="bi bi-shield-check-fill"></i> &nbsp;Fully Covered — No Payment Due</span>
+                <span>₱0.00</span>
+            </div>
+            <?php else: ?>
             <div class="tot-row grand">
                 <span>Total Amount Due</span>
                 <span class="tot-amt">₱<?= number_format($grand_total, 2) ?></span>
             </div>
+            <?php endif; ?>
         </div>
     </div>
 
-    <!-- PAYMENT METHODS CARD -->
-    <?php if ($grand_total > 0): ?>
+    <!-- PAYMENT METHODS — only show if NOT paid and amount > 0 -->
+    <?php if ($grand_total > 0 && $status !== 'Paid'): ?>
     <div class="card">
         <div class="card-header">
             <div class="card-icon icon-teal"><i class="bi bi-wallet2"></i></div>
@@ -741,6 +819,8 @@ body {
                 <td>
                     <?php if (strpos($h['payment_id'], 'CASH-') === 0): ?>
                         <span class="hbadge cash-m"><i class="bi bi-cash"></i> Cash</span>
+                    <?php elseif (strpos($h['payment_id'], 'INS-') === 0): ?>
+                        <span class="hbadge ins-m"><i class="bi bi-shield-check"></i> Insurance</span>
                     <?php else: ?>
                         <span class="hbadge online-m"><i class="bi bi-globe"></i> Online</span>
                     <?php endif; ?>
@@ -757,7 +837,17 @@ body {
                 </td>
             </tr>
             <?php endforeach; else: ?>
+            <?php if ($auto_paid_by_insurance || ($status === 'Paid' && $grand_total <= 0)): ?>
+            <tr>
+                <td><span class="ref-chip">INS-COVERED-<?= $billing_id ?></span></td>
+                <td><strong>₱<?= number_format($subtotal, 2) ?></strong></td>
+                <td><span class="hbadge ins-m"><i class="bi bi-shield-check"></i> Insurance</span></td>
+                <td><span class="hbadge paid"><i class="bi bi-check-circle-fill"></i> Paid</span></td>
+                <td style="color:var(--gray-600);"><?= date('M d, Y  H:i') ?></td>
+            </tr>
+            <?php else: ?>
             <tr class="empty-hist"><td colspan="5">No payment transactions recorded yet.</td></tr>
+            <?php endif; ?>
             <?php endif; ?>
             </tbody>
         </table>

@@ -45,6 +45,7 @@ while ($row = $pending->fetch_assoc()) {
 
 /* =====================================================
    FETCH PENDING BILLINGS
+   Only show patients whose billing_records status is NOT 'Paid'
 ===================================================== */
 $sql = "
 SELECT
@@ -56,19 +57,23 @@ SELECT
     MAX(pr.status) AS payment_status,
     MAX(pr.insurance_covered) AS insurance_covered,
     MAX(pr.payment_method) AS payment_method,
-    MAX(pr.paymongo_reference) AS paymongo_reference
+    MAX(pr.paymongo_reference) AS paymongo_reference,
+    MAX(br.status) AS billing_status
 FROM patientinfo p
 INNER JOIN billing_items bi ON bi.patient_id = p.patient_id AND bi.finalized = 1
+INNER JOIN billing_records br ON br.billing_id = bi.billing_id
 LEFT JOIN patient_receipt pr ON pr.billing_id = bi.billing_id
+WHERE br.status != 'Paid'
+  AND br.status != 'Cancelled'
 GROUP BY p.patient_id, bi.billing_id
-HAVING MAX(pr.status) IS NULL OR MAX(pr.status) != 'Paid'
+HAVING (MAX(pr.status) IS NULL OR MAX(pr.status) != 'Paid')
 ORDER BY p.lname, p.fname
 ";
 
 $result = $conn->query($sql);
 if (!$result) { error_log("SQL Error: " . $conn->error); }
 
-/* Pre-fetch ALL rows before any HTML — avoids cursor being drained mid-page */
+/* Pre-fetch ALL rows before any HTML */
 $rows_cache    = [];
 $total_pending = 0;
 $total_amount  = 0;
@@ -127,7 +132,6 @@ body {
   margin: 0;
 }
 
-/* ── Content wrapper — margin here, NOT on body ── */
 .cw {
   margin-left: var(--sidebar-w);
   padding: 60px 28px 60px;
@@ -159,7 +163,6 @@ body {
   margin: 0; line-height: 1.1;
 }
 .page-head p { font-size: .82rem; color: var(--ink-light); margin: 3px 0 0; }
-
 .head-actions { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 .btn-refresh {
@@ -273,7 +276,6 @@ body {
 .pat-name  { font-weight: 600; color: var(--navy); font-size: .9rem; }
 .pat-id    { font-size: .72rem; color: var(--ink-light); margin-top: 1px; }
 
-/* Billing ID */
 .bill-id {
   font-family: 'Courier New', monospace;
   font-size: .8rem; color: var(--ink-light);
@@ -292,7 +294,6 @@ body {
 .badge-ins     { background: #dbeafe; color: #1d4ed8; }
 .badge-none    { background: #f1f5f9; color: #64748b; }
 
-/* Amount */
 .amount-val { font-weight: 700; color: var(--navy); font-size: .95rem; }
 
 /* Action buttons */
@@ -494,16 +495,16 @@ body {
           </tr>
         <?php else: ?>
           <?php foreach ($rows_cache as $row):
-            $patient_id       = (int)($row['patient_id'] ?? 0);
-            $full_name        = trim($row['full_name'] ?? 'Unknown Patient');
-            $billing_id       = (int)($row['billing_id'] ?? 0);
-            $total            = (float)($row['total_amount'] ?? 0);
-            $receipt_id       = $row['receipt_id'] ?? null;
-            $status           = $row['payment_status'] ?? 'Pending';
+            $patient_id        = (int)($row['patient_id'] ?? 0);
+            $full_name         = trim($row['full_name'] ?? 'Unknown Patient');
+            $billing_id        = (int)($row['billing_id'] ?? 0);
+            $total             = (float)($row['total_amount'] ?? 0);
+            $receipt_id        = $row['receipt_id'] ?? null;
+            $status            = $row['payment_status'] ?? 'Pending';
             $insurance_covered = (float)($row['insurance_covered'] ?? 0);
-            $payment_method   = $row['payment_method'] ?? null;
-            $insuranceApplied = ($insurance_covered > 0);
-            $initials         = strtoupper(substr($full_name, 0, 1));
+            $payment_method    = $row['payment_method'] ?? null;
+            $insuranceApplied  = ($insurance_covered > 0);
+            $initials          = strtoupper(substr($full_name, 0, 1));
 
             if (!$patient_id || !$billing_id) continue;
 
@@ -513,7 +514,7 @@ body {
                 $stmt->bind_param("ii", $patient_id, $billing_id);
                 if ($stmt->execute()) {
                   $receipt_id = $conn->insert_id;
-                  $row['receipt_id'] = $receipt_id; // sync back so mobile loop has it
+                  $row['receipt_id'] = $receipt_id;
                 }
                 $stmt->close();
               }
@@ -578,16 +579,16 @@ body {
       </div>
     <?php else: ?>
       <?php foreach ($rows_cache as $row):
-        $patient_id       = (int)($row['patient_id'] ?? 0);
-        $full_name        = trim($row['full_name'] ?? 'Unknown Patient');
-        $billing_id       = (int)($row['billing_id'] ?? 0);
-        $total            = (float)($row['total_amount'] ?? 0);
-        $receipt_id       = $row['receipt_id'] ?? null;
-        $status           = $row['payment_status'] ?? 'Pending';
+        $patient_id        = (int)($row['patient_id'] ?? 0);
+        $full_name         = trim($row['full_name'] ?? 'Unknown Patient');
+        $billing_id        = (int)($row['billing_id'] ?? 0);
+        $total             = (float)($row['total_amount'] ?? 0);
+        $receipt_id        = $row['receipt_id'] ?? null;
+        $status            = $row['payment_status'] ?? 'Pending';
         $insurance_covered = (float)($row['insurance_covered'] ?? 0);
-        $payment_method   = $row['payment_method'] ?? null;
-        $insuranceApplied = ($insurance_covered > 0);
-        $initials         = strtoupper(substr($full_name, 0, 1));
+        $payment_method    = $row['payment_method'] ?? null;
+        $insuranceApplied  = ($insurance_covered > 0);
+        $initials          = strtoupper(substr($full_name, 0, 1));
         if (!$patient_id || !$billing_id) continue;
       ?>
       <div class="m-bill-card mobile-row">
@@ -676,7 +677,6 @@ body {
         </div>
 
         <div id="insurance_preview_<?= $billing_id ?>"></div>
-
         <div id="billing_info_<?= $billing_id ?>"></div>
       </div>
       <div class="modal-footer">

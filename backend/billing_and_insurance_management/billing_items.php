@@ -171,10 +171,6 @@ $existing_bill = $stmt->get_result()->fetch_assoc();
 if (!isset($_SESSION['billing_cart'][$patient_id])) {
     $_SESSION['billing_cart'][$patient_id] = [];
 
-    /* ── 1. dl_results ──────────────────────────────────────
-       FIXED: Match dl_services by serviceName directly from dl_results.result
-       since dl_schedule may not have a serviceID column.
-    ────────────────────────────────────────────────────── */
     $stmt = $conn->prepare("
         SELECT
             dr.resultID,
@@ -202,9 +198,6 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
         ];
     }
 
-    /* ── 2. dnm_records ─────────────────────────────────────
-       Try linking via duty_assignments if table exists, otherwise skip gracefully.
-    ────────────────────────────────────────────────────── */
     $dnm_query = "
         SELECT
             dnmr.record_id,
@@ -239,7 +232,6 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
         }
     }
 
-    /* ── 3. pharmacy_prescription_items ─────────────────────*/
     $stmt = $conn->prepare("
         SELECT
             ppi.item_id,
@@ -278,7 +270,7 @@ if (!isset($_SESSION['billing_cart'][$patient_id])) {
 }
 
 /* =========================================================
-   ADD EXTRA LABORATORY SERVICE (from dl_services)
+   ADD EXTRA LABORATORY SERVICE
 ========================================================= */
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_lab'])) {
     $svc_id = (int)$_POST['lab_service_id'];
@@ -305,7 +297,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_lab'])) {
 }
 
 /* =========================================================
-   ADD EXTRA SERVICE (manual, from dnm_procedure_list)
+   ADD EXTRA SERVICE
 ========================================================= */
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_service'])) {
     $proc_id = (int)$_POST['procedure_id'];
@@ -332,7 +324,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_service'])) {
 }
 
 /* =========================================================
-   ADD EXTRA MEDICINE (manual, from pharmacy_inventory)
+   ADD EXTRA MEDICINE
 ========================================================= */
 if ($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['add_medicine'])) {
     $med_id = (int)$_POST['med_id'];
@@ -379,18 +371,20 @@ if (isset($_GET['reset_cart'])) {
 
 /* =========================================================
    FINALIZE
-   billing_records columns: patient_id, billing_date, total_amount,
-   grand_total, status, transaction_id  (NO total_discount column)
-   Discount is stored in patient_receipt.total_discount
 ========================================================= */
 if (isset($_GET['finalize']) && $_GET['finalize']==1) {
     $cart_f     = $_SESSION['billing_cart'][$patient_id];
     $subtotal_f = array_sum(array_column($cart_f,'price'));
     $discount_f = ($is_pwd||$is_senior) ? round($subtotal_f*0.20,2) : 0.00;
     $grand_f    = round($subtotal_f - $discount_f, 2);
-    $txn        = 'TXN-'.strtoupper(uniqid());
 
-    /* ── billing_records (no total_discount column) ── */
+    /* Block finalize if grand total is 0 */
+    if ($grand_f <= 0) {
+        header("Location: billing_items.php?patient_id=$patient_id&err=zero_total"); exit;
+    }
+
+    $txn = 'TXN-'.strtoupper(uniqid());
+
     if ($existing_bill) {
         $billing_id = $existing_bill['billing_id'];
         $s = $conn->prepare("
@@ -414,7 +408,6 @@ if (isset($_GET['finalize']) && $_GET['finalize']==1) {
         $billing_id = $conn->insert_id;
     }
 
-    /* ── billing_items ── */
     foreach ($cart_f as $item) {
         $s = $conn->prepare("
             INSERT INTO billing_items (billing_id, patient_id, quantity, unit_price, total_price, finalized)
@@ -424,7 +417,6 @@ if (isset($_GET['finalize']) && $_GET['finalize']==1) {
         $s->execute();
     }
 
-    /* ── patient_receipt — upsert discount & totals ── */
     $pwd_flag = ($is_pwd || $is_senior) ? 1 : 0;
     $chk = $conn->prepare("SELECT receipt_id FROM patient_receipt WHERE billing_id=? LIMIT 1");
     $chk->bind_param("i", $billing_id);
@@ -451,7 +443,6 @@ if (isset($_GET['finalize']) && $_GET['finalize']==1) {
         $r->execute();
     }
 
-    /* ── mark pharmacy prescriptions as billed ── */
     $u = $conn->prepare("
         UPDATE pharmacy_prescription
         SET billing_status='billed'
@@ -483,17 +474,14 @@ $med_total = array_sum(array_column($cat_medicines, 'price'));
 /* =========================================================
    DROPDOWNS
 ========================================================= */
-// Lab services
 $lab_svc_res = $conn->query("SELECT serviceID,serviceName,price FROM dl_services ORDER BY serviceName");
 $lab_services = [];
 while ($ls = $lab_svc_res->fetch_assoc()) $lab_services[] = $ls;
 
-// Procedures
 $proc_res   = $conn->query("SELECT procedure_id,procedure_name,price FROM dnm_procedure_list WHERE status='Active' ORDER BY procedure_name");
 $procedures = [];
 while ($p = $proc_res->fetch_assoc()) $procedures[] = $p;
 
-// Medicines
 $seeded_ids = array_unique(array_filter(array_column($cart,'med_id')));
 if ($seeded_ids) {
     $ph   = implode(',',array_fill(0,count($seeded_ids),'?'));
@@ -507,12 +495,14 @@ if ($seeded_ids) {
 $medicines = [];
 while ($m = $med_res->fetch_assoc()) $medicines[] = $m;
 
-/* Patient helpers */
 $full_name  = trim($patient['fname'].' '.($patient['mname']??'').' '.$patient['lname']);
 $gender     = ucfirst($patient['gender'] ?? '—');
 $contact    = $patient['contact_no'] ?? $patient['phone'] ?? '—';
 $address    = $patient['address'] ?? '—';
 $patient_no = $patient['patient_no'] ?? $patient['patient_id'];
+
+/* ── Is the bill finalizable? ── */
+$can_finalize = !empty($cart) && $grand_total > 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -542,13 +532,11 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .cw{margin-left:var(--sidebar-w);padding:44px 28px 80px;transition:margin-left .3s;}
 .cw.sidebar-collapsed{margin-left:0;}
 
-/* Page header */
 .page-head{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
 .head-icon{width:50px;height:50px;background:linear-gradient(135deg,var(--navy),var(--accent));border-radius:13px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;box-shadow:0 6px 18px rgba(11,29,58,.2);flex-shrink:0;}
 .page-head h2{font-family:var(--ff-head);font-size:clamp(1.2rem,2.5vw,1.7rem);color:var(--navy);margin:0;}
 .page-head p{font-size:.82rem;color:var(--ink-light);margin-top:3px;}
 
-/* Patient card */
 .pat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
 .pat-head{background:linear-gradient(135deg,var(--navy),#1e3a6e);padding:16px 22px;display:flex;align-items:center;gap:14px;}
 .pat-av{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.18);border:2.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-family:var(--ff-head);font-size:1.35rem;color:#fff;flex-shrink:0;}
@@ -565,25 +553,23 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .gi-lbl{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-light);display:flex;align-items:center;gap:4px;margin-bottom:3px;}
 .gi-val{font-size:.9rem;font-weight:600;color:var(--navy);}
 
-/* Banners */
 .alert-ok{background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-weight:600;color:var(--success);margin-bottom:16px;}
+
+/* Zero total warning banner */
+.alert-zero{background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:10px;font-weight:600;color:#c2410c;margin-bottom:16px;}
+
 .bill-banner{display:flex;align-items:center;gap:10px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:12px 18px;margin-bottom:16px;font-size:.87rem;font-weight:600;color:#92400e;flex-wrap:wrap;}
 .bb-acts{margin-left:auto;display:flex;gap:7px;}
 .bb-acts a{display:inline-flex;align-items:center;gap:4px;background:#fff;color:#92400e;border:1.5px solid #fde68a;border-radius:7px;padding:4px 12px;font-size:.77rem;font-weight:700;text-decoration:none;}
 .bb-acts a:hover{background:#fef3c7;}
 
-/* Discount */
 .disc-bar{display:flex;align-items:center;gap:10px;padding:11px 16px;background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:10px;margin-bottom:16px;font-size:.87rem;color:#065f46;font-weight:600;}
 .disc-bar.sc{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8;}
 .disc-bar input{width:17px;height:17px;accent-color:var(--success);cursor:pointer;flex-shrink:0;}
 .d-badge{margin-left:auto;border-radius:999px;padding:3px 11px;font-size:.71rem;font-weight:700;color:#fff;background:#059669;}
 
-/* ── TWO-COLUMN LAYOUT — left=panel, right=table ── */
 .billing-layout{display:grid;grid-template-columns:400px 1fr;gap:22px;align-items:start;}
-.billing-left{}
-.billing-right{}
 
-/* Bill table */
 .bcard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
 .bcard-head{padding:11px 20px;display:flex;align-items:center;gap:8px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.88);}
 .h-bill{background:linear-gradient(90deg,var(--navy),#1e40af);}
@@ -592,7 +578,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .h-lab{background:#047857;}
 .bcard-body{padding:18px;}
 
-/* Add cards */
 .add-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px;}
 .add-card:last-of-type{margin-bottom:0;}
 .add-card-header{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--border);}
@@ -607,7 +592,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .add-card-sub{font-size:.69rem;color:var(--ink-light);margin-top:1px;}
 .add-card-body{padding:14px 18px;}
 
-/* Add form fields */
 .af-field{margin-bottom:10px;}
 .af-label{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.55px;color:var(--ink-light);display:block;margin-bottom:5px;}
 .af-select{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:var(--ff-body);font-size:.85rem;color:var(--ink);background:var(--card);outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;transition:border-color .2s,box-shadow .2s;cursor:pointer;}
@@ -615,7 +599,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .add-card-lab .af-select:focus{border-color:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.1);}
 .add-card-svc .af-select:focus{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.1);}
 
-/* Add buttons */
 .af-btn{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:10px 16px;border:none;border-radius:9px;font-family:var(--ff-body);font-size:.87rem;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.2px;}
 .af-btn-lab{background:#059669;color:#fff;box-shadow:0 3px 10px rgba(5,150,105,.25);}
 .af-btn-lab:hover{background:#047857;transform:translateY(-1px);}
@@ -626,8 +609,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 
 /* ── BILL FOOTER ── */
 .bill-footer{border-top:2px solid var(--border);background:#fafbfc;}
-
-/* Totals block */
 .bf-totals-block{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
 .bf-line{display:flex;justify-content:space-between;align-items:center;}
 .bf-lbl{font-size:.88rem;color:var(--ink-light);font-weight:500;}
@@ -638,16 +619,22 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .bf-grand-line{margin-top:2px;}
 .bf-grand-lbl{font-size:1.05rem;font-weight:800;color:var(--navy);}
 .bf-grand-amt{font-size:1.25rem;font-weight:800;color:var(--success);}
+/* Zero total highlight */
+.bf-grand-amt.zero{color:var(--danger);}
 
-/* Actions row */
 .bf-actions{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:14px 20px;gap:12px;}
 .bf-act-left{display:flex;justify-content:flex-start;}
 .bf-act-center{display:flex;justify-content:center;}
 .bf-act-right{display:flex;justify-content:flex-end;gap:8px;}
 .bf-empty-note{color:var(--ink-light);font-size:.82rem;font-style:italic;}
 
+/* Active finalize button */
 .bf-btn-finalize{display:inline-flex;align-items:center;gap:8px;padding:11px 28px;background:var(--success);color:#fff;border:none;border-radius:10px;font-family:var(--ff-head);font-size:.95rem;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(5,150,105,.3);transition:all .15s;white-space:nowrap;}
 .bf-btn-finalize:hover{background:#047857;transform:translateY(-1px);box-shadow:0 6px 20px rgba(5,150,105,.35);}
+
+/* Disabled finalize button (zero total) */
+.bf-btn-finalize-disabled{display:inline-flex;align-items:center;gap:8px;padding:11px 28px;background:#e2e8f0;color:#94a3b8;border:none;border-radius:10px;font-family:var(--ff-head);font-size:.95rem;font-weight:700;cursor:not-allowed;white-space:nowrap;box-shadow:none;}
+
 .bf-btn-back{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
 .bf-btn-back:hover{border-color:var(--accent);color:var(--accent);background:#eff6ff;}
 .bf-btn-reload{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
@@ -655,7 +642,7 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .bf-btn-view{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;background:#fffbeb;color:#92400e;border:1.5px solid #fde68a;border-radius:8px;font-family:var(--ff-body);font-size:.84rem;font-weight:600;text-decoration:none;transition:all .15s;}
 .bf-btn-view:hover{background:#fef3c7;}
 
-@media(max-width:640px){.bf-actions{grid-template-columns:1fr 1fr;}.bf-act-center{grid-column:1/-1;order:-1;}.bf-btn-finalize{width:100%;justify-content:center;}}
+@media(max-width:640px){.bf-actions{grid-template-columns:1fr 1fr;}.bf-act-center{grid-column:1/-1;order:-1;}.bf-btn-finalize,.bf-btn-finalize-disabled{width:100%;justify-content:center;}}
 .af-qty-row{display:flex;align-items:flex-end;gap:10px;}
 .qty-stepper{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:9px;overflow:hidden;height:38px;}
 .qty-btn{width:36px;height:100%;background:#f8fafc;border:none;color:var(--ink);font-size:1.1rem;font-weight:700;cursor:pointer;flex-shrink:0;transition:background .12s;}
@@ -665,22 +652,6 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 
 .af-empty{color:var(--ink-light);font-size:.84rem;font-style:italic;text-align:center;padding:10px 0;}
 
-/* Breakdown rows in totals */
-.t-breakdown-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:9px;margin-bottom:5px;opacity:.45;transition:opacity .2s;}
-.t-breakdown-row.active{opacity:1;background:#f8fafc;}
-.t-bd-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
-.t-breakdown-row.active .t-bd-icon.svc{background:#ede9fe;color:#6d28d9;}
-.t-breakdown-row.active .t-bd-icon.lab{background:#d1fae5;color:#047857;}
-.t-breakdown-row.active .t-bd-icon.med{background:#dbeafe;color:#1d4ed8;}
-.t-bd-icon.svc{background:#f1f1f1;color:#aaa;}
-.t-bd-icon.lab{background:#f1f1f1;color:#aaa;}
-.t-bd-icon.med{background:#f1f1f1;color:#aaa;}
-.t-bd-info{flex:1;min-width:0;}
-.t-bd-label{font-size:.84rem;font-weight:600;color:var(--navy);display:block;}
-.t-bd-count{font-size:.68rem;color:var(--ink-light);}
-.t-bd-amt{font-size:.9rem;font-weight:700;color:var(--navy);white-space:nowrap;}
-
-/* Bill table */
 .itbl{width:100%;border-collapse:collapse;font-size:.85rem;}
 .itbl thead th{background:#f8fafc;color:var(--ink-light);font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:9px 14px;border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;}
 .itbl thead th.r{text-align:right;}.itbl thead th.c{text-align:center;}
@@ -715,55 +686,12 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 .lock-i{color:var(--ink-light);font-size:.82rem;}
 .empty-row td{text-align:center;padding:28px;color:var(--ink-light);font-style:italic;font-size:.84rem;}
 
-/* ── TOTALS PANEL (sticky right column) ── */
-.totals-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;position:sticky;top:20px;}
-.totals-header{background:linear-gradient(135deg,var(--navy),#1e40af);padding:14px 20px;display:flex;align-items:center;gap:8px;}
-.totals-header h5{font-family:var(--ff-head);color:#fff;margin:0;font-size:1rem;}
-.totals-body{padding:20px;}
-
-.t-section{margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--border);}
-.t-section:last-of-type{border-bottom:none;margin-bottom:0;}
-.t-section-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--ink-light);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
-.t-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:.87rem;gap:8px;}
-.t-lbl{color:var(--ink-light);font-weight:500;}
-.t-val{font-weight:600;color:var(--ink);}
-.t-sub-row{display:flex;justify-content:space-between;padding:3px 0 3px 12px;font-size:.8rem;}
-.t-sub-lbl{color:var(--ink-light);}
-.t-sub-val{font-weight:500;}
-.t-divider{border:none;border-top:2px solid var(--border);margin:12px 0;}
-.t-grand-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f0fdf4;border-radius:10px;margin-top:10px;}
-.t-grand-lbl{font-size:1rem;font-weight:700;color:var(--navy);}
-.t-grand-val{font-size:1.3rem;font-weight:700;color:var(--success);}
-.t-discount-row{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#fff7f7;border-radius:8px;margin-bottom:8px;font-size:.86rem;}
-.t-discount-lbl{color:var(--danger);font-weight:600;}
-.t-discount-val{color:var(--danger);font-weight:700;}
-.t-zero{color:var(--ink-light);font-style:italic;font-size:.8rem;text-align:center;padding:8px 0;}
-
-/* Finalize button in panel */
-.btn-finalize-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:8px;padding:12px;background:var(--success);color:#fff;border:none;border-radius:10px;font-family:var(--ff-head);font-size:1rem;cursor:pointer;margin-top:14px;transition:background .15s,transform .1s;box-shadow:0 4px 14px rgba(5,150,105,.3);}
-.btn-finalize-panel:hover{background:#047857;transform:translateY(-1px);}
-.btn-viewbill-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:9px;background:#fffbeb;color:#92400e;border:1.5px solid #fde68a;border-radius:10px;font-family:var(--ff-body);font-size:.87rem;font-weight:700;text-decoration:none;margin-top:8px;transition:all .15s;}
-.btn-viewbill-panel:hover{background:#fef3c7;}
-.btn-reset-panel{display:flex;width:100%;justify-content:center;align-items:center;gap:6px;padding:7px;background:#fff;color:var(--ink-light);border:1.5px solid var(--border);border-radius:10px;font-family:var(--ff-body);font-size:.82rem;font-weight:600;text-decoration:none;margin-top:6px;transition:all .15s;}
-.btn-reset-panel:hover{border-color:var(--danger);color:var(--danger);}
-
-/* Item count badge */
 .item-count{background:rgba(255,255,255,.2);border-radius:999px;padding:2px 9px;font-size:.68rem;margin-left:auto;}
 
-/* Actions bottom */
-.actions-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;}
-.btn-back{padding:10px 20px;background:var(--card);color:var(--ink-light);border:1.5px solid var(--border);border-radius:9px;font-family:var(--ff-body);font-size:.87rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
-.btn-back:hover{border-color:var(--accent);color:var(--accent);background:#eff6ff;}
-
-/* Accordion-style add panels */
-.add-section{margin-bottom:12px;}
-.add-section:last-child{margin-bottom:0;}
-.add-sect-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--ink-light);margin-bottom:8px;display:flex;align-items:center;gap:5px;}
-
 @media(max-width:1100px){.billing-layout{grid-template-columns:360px 1fr;}}
-@media(max-width:900px){.billing-layout{grid-template-columns:1fr;}.totals-panel{position:static;}.af-qty-row{flex-direction:column;}.af-btn{width:100%;}}
+@media(max-width:900px){.billing-layout{grid-template-columns:1fr;}.af-qty-row{flex-direction:column;}.af-btn{width:100%;}}
 @media(max-width:768px){.cw{margin-left:0;padding:52px 14px 60px;}.pat-chips{display:none;}}
-@media(max-width:480px){.cw{padding:48px 10px 60px;}.actions-bar{flex-direction:column-reverse;}.btn-back{width:100%;justify-content:center;}.pat-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:480px){.cw{padding:48px 10px 60px;}.pat-grid{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
@@ -772,6 +700,10 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 
 <?php if (isset($_GET['success'])): ?>
 <div class="alert-ok"><i class="bi bi-check-circle-fill" style="font-size:1.3rem;"></i> Billing finalized successfully!</div>
+<?php endif; ?>
+
+<?php if (isset($_GET['err']) && $_GET['err'] === 'zero_total'): ?>
+<div class="alert-zero"><i class="bi bi-exclamation-triangle-fill" style="font-size:1.3rem;"></i> Cannot finalize — the bill total is ₱0.00. Please add at least one billable item with a price.</div>
 <?php endif; ?>
 
 <div class="page-head">
@@ -823,17 +755,10 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 </div>
 <?php endif; ?>
 
-<!-- ══════════════════════════════════════════════════
-     TWO-COLUMN LAYOUT  |  LEFT = Summary + Add Panels  |  RIGHT = Bill Table
-══════════════════════════════════════════════════ -->
 <div class="billing-layout">
 
-    <!-- ════════════════════════════════
-         LEFT COLUMN — Summary & Add Items
-    ════════════════════════════════ -->
+    <!-- LEFT COLUMN -->
     <div class="billing-left">
-
-
 
         <!-- ADD LABORATORY SERVICE -->
         <div class="add-card add-card-lab">
@@ -947,9 +872,7 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
     </div><!-- /.billing-left -->
 
 
-    <!-- ════════════════════════════════
-         RIGHT COLUMN — Bill Table
-    ════════════════════════════════ -->
+    <!-- RIGHT COLUMN — Bill Table -->
     <div class="billing-right">
         <div class="bcard">
             <div class="bcard-head h-bill">
@@ -1062,10 +985,10 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
             </table>
             </div>
 
-            <!-- ── BILL FOOTER: Totals + Finalize ── -->
+            <!-- ── BILL FOOTER ── -->
             <div class="bill-footer">
 
-                <!-- Row 1: Subtotal / Discount / Grand Total -->
+                <!-- Totals -->
                 <div class="bf-totals-block">
                     <div class="bf-line">
                         <span class="bf-lbl">Subtotal</span>
@@ -1080,20 +1003,32 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
                     <div class="bf-divider"></div>
                     <div class="bf-line bf-grand-line">
                         <span class="bf-grand-lbl">Grand Total</span>
-                        <span class="bf-grand-amt">₱<?=number_format($grand_total,2)?></span>
+                        <span class="bf-grand-amt <?= $grand_total <= 0 && !empty($cart) ? 'zero' : '' ?>">
+                            ₱<?=number_format($grand_total,2)?>
+                        </span>
                     </div>
+                    <?php if (!empty($cart) && $grand_total <= 0): ?>
+                    <div style="margin-top:8px;padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:.8rem;color:#c2410c;display:flex;align-items:center;gap:6px;">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        All items have ₱0.00 prices. Update item prices before finalizing.
+                    </div>
+                    <?php endif; ?>
                 </div>
 
-                <!-- Row 2: Action buttons — Back left, Finalize center, Reload right -->
+                <!-- Action buttons -->
                 <div class="bf-actions">
                     <div class="bf-act-left">
                         <a href="billing_items.php" class="bf-btn-back"><i class="bi bi-arrow-left"></i> Back</a>
                     </div>
                     <div class="bf-act-center">
-                        <?php if (!empty($cart)): ?>
+                        <?php if ($can_finalize): ?>
                         <button class="bf-btn-finalize" onclick="confirmFinalize()">
                             <i class="bi bi-check-circle-fill"></i>
                             <?=$existing_bill?'Update &amp; Finalize':'Finalize Billing'?>
+                        </button>
+                        <?php elseif (!empty($cart) && $grand_total <= 0): ?>
+                        <button class="bf-btn-finalize-disabled" disabled title="Grand total is ₱0.00 — nothing to bill">
+                            <i class="bi bi-slash-circle"></i> Total is ₱0.00
                         </button>
                         <?php else: ?>
                         <span class="bf-empty-note"><i class="bi bi-inbox"></i> No items to finalize</span>
@@ -1114,7 +1049,8 @@ body{font-family:var(--ff-body);background:var(--surface);color:var(--ink);}
 
 </div><!-- /.billing-layout -->
 
-</div>
+</div><!-- /.cw -->
+
 <script>
 function stepQty(btn, delta) {
     const input = btn.parentElement.querySelector('.qty-input');
@@ -1122,10 +1058,25 @@ function stepQty(btn, delta) {
     v = Math.max(1, Math.min(999, v + delta));
     input.value = v;
 }
-function confirmFinalize(){
+
+function confirmFinalize() {
+    // Server-side guard: $can_finalize is already false if grand_total <= 0,
+    // so this JS guard is an extra safety net.
+    const grandTotal = <?= $grand_total ?>;
+    if (grandTotal <= 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Cannot Finalize',
+            html: 'The grand total is <strong>₱0.00</strong>.<br>Please ensure at least one item has a price greater than zero.',
+            confirmButtonColor: '#0b1d3a',
+            confirmButtonText: 'Got it',
+        });
+        return;
+    }
+
     Swal.fire({
-        title:'<?=$existing_bill?"Update Bill?":"Finalize Bill?"?>',
-        html:`<div style="text-align:left;font-size:.9rem;line-height:2;">
+        title: '<?=$existing_bill?"Update Bill?":"Finalize Bill?"?>',
+        html: `<div style="text-align:left;font-size:.9rem;line-height:2;">
             <?php if(!empty($cat_services)):?><div>🩺 Procedures: <strong>₱<?=number_format($svc_total,2)?></strong></div><?php endif;?>
             <?php if(!empty($cat_laboratory)):?><div>🧪 Laboratory: <strong>₱<?=number_format($lab_total,2)?></strong></div><?php endif;?>
             <?php if(!empty($cat_medicines)):?><div>💊 Medicines: <strong>₱<?=number_format($med_total,2)?></strong></div><?php endif;?>
@@ -1134,11 +1085,17 @@ function confirmFinalize(){
             <div style="font-weight:700;font-size:1.05rem;margin-top:4px;">Grand Total: ₱<?=number_format($grand_total,2)?></div>
             <small style="color:#64748b;"><?=$existing_bill?"This will update the existing bill.":"This cannot be undone."?></small>
         </div>`,
-        icon:'question',showCancelButton:true,
-        confirmButtonColor:'#059669',cancelButtonColor:'#64748b',
-        confirmButtonText:'<?=$existing_bill?"Yes, Update":"Yes, Finalize"?>',cancelButtonText:'Cancel'
-    }).then(r=>{if(r.isConfirmed)window.location.href='billing_items.php?patient_id=<?=$patient_id?>&finalize=1';});
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#059669',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: '<?=$existing_bill?"Yes, Update":"Yes, Finalize"?>',
+        cancelButtonText: 'Cancel'
+    }).then(r => {
+        if (r.isConfirmed) window.location.href = 'billing_items.php?patient_id=<?=$patient_id?>&finalize=1';
+    });
 }
+
 (function(){
     const sb=document.getElementById('mySidebar'),cw=document.getElementById('mainCw');
     if(!sb||!cw)return;
