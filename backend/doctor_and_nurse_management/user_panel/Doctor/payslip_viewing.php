@@ -1,6 +1,125 @@
 <?php
 include '../../../../SQL/config.php';
 
+// ------------------ PaySlip Viewing Class ------------------
+class PayrollReports
+{
+    private $conn;
+
+    public function __construct($conn)
+    {
+        $this->conn = $conn;
+    }
+
+    /**
+     * Get all payrolls marked as 'Pending', optionally filtered by date range
+     *
+     * @param string $start Start date (YYYY-MM-DD)
+     * @param string $end End date (YYYY-MM-DD)
+     * @return array
+     */
+    public function getPayrolls($employeeId, $start = '', $end = '')
+    {
+        $sql = "
+            SELECT 
+                p.payroll_id,
+                e.employee_id,
+                TRIM(CONCAT(
+                    COALESCE(e.first_name, ''), ' ',
+                    COALESCE(e.middle_name, ''), ' ',
+                    COALESCE(e.last_name, ''), ' ',
+                    COALESCE(e.suffix_name, '')
+                )) AS employee_name,
+                e.profession,
+                e.department,
+                p.pay_period_start,
+                p.pay_period_end,
+                p.days_worked,
+                p.overtime_hours,
+                p.basic_pay,
+                p.overtime_pay,
+                p.allowances,
+                p.bonuses,
+                p.thirteenth_month,
+                p.undertime_deduction,
+                p.sss_deduction,
+                p.philhealth_deduction,
+                p.pagibig_deduction,
+                p.absence_deduction,
+                p.gross_pay,
+                p.total_deductions,
+                p.net_pay,
+                p.disbursement_method,
+                p.date_generated
+            FROM hr_payroll p
+            JOIN hr_employees e ON p.employee_id = e.employee_id
+            WHERE p.status = 'Pending' AND e.employee_id = ?
+        ";
+
+        $params = [$employeeId];
+        $types = "i";
+
+        if (!empty($start) && !empty($end)) {
+            $sql .= " AND p.pay_period_start >= ? AND p.pay_period_end <= ?";
+            $params[] = $start;
+            $params[] = $end;
+            $types .= "ss";
+        }
+
+        $sql .= " ORDER BY p.date_generated DESC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $payrolls = [];
+        while ($row = $result->fetch_assoc()) {
+            $row['gross_pay'] = (float) ($row['gross_pay'] ?? 0);
+            $row['total_deductions'] = (float) ($row['total_deductions'] ?? 0);
+            $row['net_pay'] = (float) ($row['net_pay'] ?? 0);
+            $payrolls[] = $row;
+        }
+
+        return $payrolls;
+    }
+
+    /**
+     * Get payroll summary totals
+     *
+     * @param array $payrolls Array of payroll rows
+     * @return array ['total_gross' => , 'total_deductions' => , 'total_net' => ]
+     */
+    public function getSummaryTotals($payrolls)
+    {
+        $totalGross = $totalDeductions = $totalNet = 0;
+
+        foreach ($payrolls as $row) {
+            $totalGross += $row['gross_pay'];
+            $totalDeductions += $row['total_deductions'];
+            $totalNet += $row['net_pay'];
+        }
+
+        return [
+            'total_gross' => $totalGross,
+            'total_deductions' => $totalDeductions,
+            'total_net' => $totalNet
+        ];
+    }
+
+    /**
+     * Format totals for display
+     *
+     * @param float $amount
+     * @return string
+     */
+    public function formatCurrency($amount)
+    {
+        return number_format($amount, 2);
+    }
+}
+
+// ------------------ Access Control ------------------
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Doctor') {
     header('Location: login.php');
     exit();
@@ -11,7 +130,7 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
-// 1. Fetch user details
+// Fetch user details from database
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
@@ -24,55 +143,20 @@ if (!$user) {
     exit();
 }
 
-// 2. Fetch Rooms Lookup List
-$rooms_lookup = [];
-$room_query = "SELECT room_id, room_name FROM rooms_table";
-$room_result = $conn->query($room_query);
+// ------------------ Initialize PayrollReports ------------------
+$report = new PayrollReports($conn);
 
-if ($room_result) {
-    while ($r_row = $room_result->fetch_assoc()) {
-        $rooms_lookup[$r_row['room_id']] = $r_row['room_name'];
-    }
-}
-// 3. Fetch Nurse Schedules
-$nurse_lookup = [];
+// Get filter values from GET request
+$start = $_GET['start'] ?? '';
+$end = $_GET['end'] ?? '';
 
-$nurse_sql = "SELECT s.*, e.first_name, e.last_name 
-              FROM shift_scheduling s
-              JOIN hr_employees e ON s.employee_id = e.employee_id
-              WHERE e.profession = 'Nurse'";
+// Fetch payrolls and totals
+$employeeId = $_SESSION['employee_id'];
+$payrolls = $report->getPayrolls($employeeId, $start, $end);
+$totals = $report->getSummaryTotals($payrolls);
 
-$nurse_result = $conn->query($nurse_sql);
-
-if ($nurse_result) {
-    while ($n_row = $nurse_result->fetch_assoc()) {
-        $week = $n_row['week_start'];
-        $nurse_name = $n_row['first_name'] . ' ' . $n_row['last_name'];
-        $day_prefixes = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-        foreach ($day_prefixes as $d_prefix) {
-            $r_id = $n_row[$d_prefix . '_room_id'];
-            if (!empty($r_id)) {
-                $nurse_lookup[$week][$d_prefix][$r_id][] = $nurse_name;
-            }
-        }
-    }
-}
-// 4. Fetch schedule for the logged-in doctor
-$modal_schedules = [];
-$employee_id = $_SESSION['employee_id'];
-// NOTE: You might want to remove "ORDER BY week_start ASC" or change to DESC if you want newest weeks first
-$stmt = $conn->prepare("SELECT * FROM shift_scheduling WHERE employee_id = ? ORDER BY week_start ASC");
-$stmt->bind_param("i", $employee_id);
-$stmt->execute();
-$result = $stmt->get_result();
-while ($row = $result->fetch_assoc()) {
-    $modal_schedules[] = $row;
-}
-
-// Define days of the week
-$days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -80,16 +164,18 @@ $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Su
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HMS | Doctor User Panel</title>
+    <title>HMS | User Panel</title>
     <link rel="shortcut icon" href="../../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../../assets/CSS/super.css">
     <link rel="stylesheet" href="../../assets/CSS/my_schedule.css">
+    <link rel="stylesheet" href="payslip_viewing.css">
     <link rel="stylesheet" href="notif.css">
 </head>
 
 <body>
     <div class="d-flex">
+        <!----- Sidebar ----->
         <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../../assets/image/logo-dark.png" width="90px" height="20px">
@@ -147,12 +233,12 @@ $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Su
                     <span style="font-size: 18px;">Performance and Evaluation</span>
                 </a>
             </li>
-            <li class="sidebar-item">
+             <li class="sidebar-item">
                 <a href="leave_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" class="bi bi-person-walking" viewBox="0 0 16 16">
-                        <path d="M9.5 1.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0M6.44 3.752A.75.75 0 0 1 7 3.5h1.445c.742 0 1.32.643 1.243 1.38l-.43 4.083a1.8 1.8 0 0 1-.088.395l-.318.906.213.242a.8.8 0 0 1 .114.175l2 4.25a.75.75 0 1 1-1.357.638l-1.956-4.154-1.68-1.921A.75.75 0 0 1 6 8.96l.138-2.613-.435.489-.464 2.786a.75.75 0 1 1-1.48-.246l.5-3a.75.75 0 0 1 .18-.375l2-2.25Z" />
-                        <path d="M6.25 11.745v-1.418l1.204 1.375.261.524a.8.8 0 0 1-.12.231l-2.5 3.25a.75.75 0 1 1-1.19-.914zm4.22-4.215-.494-.494.205-1.843.006-.067 1.124 1.124h1.44a.75.75 0 0 1 0 1.5H11a.75.75 0 0 1-.531-.22Z" />
+                        <path d="M9.5 1.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0M6.44 3.752A.75.75 0 0 1 7 3.5h1.445c.742 0 1.32.643 1.243 1.38l-.43 4.083a1.8 1.8 0 0 1-.088.395l-.318.906.213.242a.8.8 0 0 1 .114.175l2 4.25a.75.75 0 1 1-1.357.638l-1.956-4.154-1.68-1.921A.75.75 0 0 1 6 8.96l.138-2.613-.435.489-.464 2.786a.75.75 0 1 1-1.48-.246l.5-3a.75.75 0 0 1 .18-.375l2-2.25Z"/>
+                        <path d="M6.25 11.745v-1.418l1.204 1.375.261.524a.8.8 0 0 1-.12.231l-2.5 3.25a.75.75 0 1 1-1.19-.914zm4.22-4.215-.494-.494.205-1.843.006-.067 1.124 1.124h1.44a.75.75 0 0 1 0 1.5H11a.75.75 0 0 1-.531-.22Z"/>
                     </svg>
                     <span style="font-size: 18px;">Leave Request</span>
                 </a>
@@ -161,12 +247,14 @@ $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Su
                 <a href="payslip_viewing.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" class="bi bi-file-earmark-text-fill" viewBox="0 0 16 16">
-                        <path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1M4.5 9a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1zM4 10.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 0 1z" />
+                        <path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1M4.5 9a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1zM4 10.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 0 1z"/>
                     </svg>
                     <span style="font-size: 18px;">Payslip Viewing</span>
                 </a>
             </li>
         </aside>
+        <!----- End of Sidebar ----->
+        <!----- Main Content ----->
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
@@ -214,141 +302,81 @@ $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Su
                             </li>
                         </ul>
                     </div>
-
                 </div>
             </div>
-            <?php
-            // --- 1. LOGIC: Separate Upcoming vs History ---
-            $upcoming_schedules = [];
-            $history_schedules = [];
-            $today = date('Y-m-d');
+            <!-- START CODING HERE -->
+            <div class="payrollreports">
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Payroll Reports</p>
 
-            if (!empty($modal_schedules)) {
-                foreach ($modal_schedules as $sched) {
-                    $week_start = $sched['week_start'];
-                    // Calculate Sunday (End of week)
-                    $week_end_date = date('Y-m-d', strtotime($week_start . ' + 6 days'));
+                <!-- FILTER FORM -->
+                <form method="GET" class="payrollreports-nav-inline">
+                    <label>Start Date:</label>
+                    <input type="date" name="start" value="<?= htmlspecialchars($start) ?>">
 
-                    if ($today > $week_end_date) {
-                        $history_schedules[] = $sched;
-                    } else {
-                        $upcoming_schedules[] = $sched;
-                    }
-                }
-                // Reverse history (Newest past week at top)
-                $history_schedules = array_reverse($history_schedules);
-            }
+                    <label>End Date:</label>
+                    <input type="date" name="end" value="<?= htmlspecialchars($end) ?>">
 
-            // --- 2. HELPER: Function to render the table card ---
-            // Defined here to avoid copying the table code twice
-            if (!function_exists('render_schedule_card')) {
-                function render_schedule_card($modal_schedule, $days, $rooms_lookup, $nurse_lookup)
-                {
-                    $week_start = $modal_schedule['week_start'];
-            ?>
-                    <div class="mb-4 border rounded p-3 schedule-list-view">
-                        <h6 class="schedule-date">Week: <?= htmlspecialchars($week_start) ?></h6>
-                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                            <table class="table table-bordered bg-white schedule-calendar-table mb-0">
-                                <thead style="position: sticky; top: 0; background-color: #ffffff; z-index: 1;">
-                                    <tr class="schedule-table-header">
-                                        <th>Day</th>
-                                        <th>Start</th>
-                                        <th>End</th>
-                                        <th>Status</th>
-                                        <th>Room</th>
-                                        <th>Nurse</th>
+                    <button type="submit">Filter</button>
+                    <a href="payslip_viewing.php" style="text-decoration:none; padding:8px 16px; background:#404040; color:white; border-radius:5px;">Reset</a>
+                </form>
+
+                <!-- PAYROLL TABLE -->
+                <div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Employee</th>
+                                <th>Position</th>
+                                <th>Department</th>
+                                <th>Pay Period</th>
+                                <th>Gross Pay</th>
+                                <th>Total Deductions</th>
+                                <th>Net Pay</th>
+                                <th>Date Paid</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($payrolls)): ?>
+                                <?php $i = 1;
+                                foreach ($payrolls as $row): ?>
+                                    <tr>
+                                        <td><?= $i++ ?></td>
+                                        <td><?= htmlspecialchars($row['employee_name']) ?></td>
+                                        <td><?= htmlspecialchars($row['profession']) ?></td>
+                                        <td><?= htmlspecialchars($row['department']) ?></td>
+                                        <td>
+                                            <?= $row['pay_period_start'] ?>
+                                            <br />
+                                            to
+                                            <br />
+                                            <?= $row['pay_period_end'] ?>
+                                        </td>
+                                        <td><?= number_format($row['gross_pay'], 2) ?></td>
+                                        <td><?= number_format($row['total_deductions'], 2) ?></td>
+                                        <td><strong><?= number_format($row['net_pay'], 2) ?></strong></td>
+                                        <td><?= $row['date_generated'] ?></td>
+                                        <td>
+                                            <a href="view_payslip.php?payroll_id=<?= $row['payroll_id'] ?>" target="_blank" class="view-link"> View Payslip </a>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($days as $day): ?>
-                                        <?php
-                                        $prefix = strtolower(substr($day, 0, 3));
-                                        $status = $modal_schedule[$prefix . '_status'] ?? '';
-                                        $is_off = in_array($status, ['Off Duty', 'Leave', 'Sick']);
-                                        $room_id = $modal_schedule[$prefix . '_room_id'] ?? null;
-                                        ?>
-                                        <tr>
-                                            <td><?= $day ?></td>
-                                            <td><?= $is_off ? '---' : htmlspecialchars($modal_schedule[$prefix . '_start'] ?? '') ?></td>
-                                            <td><?= $is_off ? '---' : htmlspecialchars($modal_schedule[$prefix . '_end'] ?? '') ?></td>
-                                            <td><?= htmlspecialchars($status) ?></td>
-                                            <td>
-                                                <?= ($is_off) ? '---' : htmlspecialchars($rooms_lookup[$room_id] ?? '---'); ?>
-                                            </td>
-                                            <td>
-                                                <?php
-                                                if (!$is_off && !empty($room_id) && isset($nurse_lookup[$week_start][$prefix][$room_id])) {
-                                                    echo implode(', ', $nurse_lookup[$week_start][$prefix][$room_id]);
-                                                } else {
-                                                    echo ($is_off) ? '---' : '<span class="text-muted">None</span>';
-                                                }
-                                                ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-            <?php
-                }
-            }
-            ?>
-            <div class="container-fluid mt-3">
-
-                <div class="row align-items-center mb-3">
-
-                    <div class="col">
-                        <h2 class="schedule-title mb-0">🧑‍⚕️ My Schedule</h2>
-                    </div>
-
-                    <div class="col-auto">
-                        <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#historyModal">
-                            <i class="fas fa-history"></i> View History
-                        </button>
-                    </div>
-
-                </div>
-
-                <?php if (!empty($upcoming_schedules)): ?>
-                    <div class="schedule-list-container" style="max-height: 75vh; overflow-y: auto; padding-right: 5px;">
-                        <?php foreach ($upcoming_schedules as $sched): ?>
-                            <?php render_schedule_card($sched, $days, $rooms_lookup, $nurse_lookup); ?>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="alert alert-info">You have no upcoming schedules.</div>
-                <?php endif; ?>
-
-            </div>
-
-            <div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-xl modal-dialog-scrollable">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">📜 Schedule History</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body bg-light">
-                            <?php if (!empty($history_schedules)): ?>
-                                <?php foreach ($history_schedules as $sched): ?>
-                                    <?php render_schedule_card($sched, $days, $rooms_lookup, $nurse_lookup); ?>
                                 <?php endforeach; ?>
                             <?php else: ?>
-                                <div class="alert alert-secondary text-center">No past schedule history found.</div>
+                                <tr>
+                                    <td colspan="10" style="text-align:center;">No payroll records found.</td>
+                                </tr>
                             <?php endif; ?>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        </div>
-                    </div>
+                        </tbody>
+                    </table>
                 </div>
             </div>
+
+            <!-- END CODING HERE -->
         </div>
+        <?php include 'doctor_profile.php'; ?>
+        <!----- End of Main Content ----->
     </div>
-    </div>
-    <?php include 'doctor_profile.php'; ?>
     <script>
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {

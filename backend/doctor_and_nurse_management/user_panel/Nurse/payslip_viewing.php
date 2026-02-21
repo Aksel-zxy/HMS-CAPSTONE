@@ -1,6 +1,125 @@
 <?php
 include '../../../../SQL/config.php';
 
+// ------------------ PaySlip Viewing Class ------------------
+class PayrollReports
+{
+    private $conn;
+
+    public function __construct($conn)
+    {
+        $this->conn = $conn;
+    }
+
+    /**
+     * Get all payrolls marked as 'Pending', optionally filtered by date range
+     *
+     * @param string $start Start date (YYYY-MM-DD)
+     * @param string $end End date (YYYY-MM-DD)
+     * @return array
+     */
+    public function getPayrolls($employeeId, $start = '', $end = '')
+    {
+        $sql = "
+            SELECT 
+                p.payroll_id,
+                e.employee_id,
+                TRIM(CONCAT(
+                    COALESCE(e.first_name, ''), ' ',
+                    COALESCE(e.middle_name, ''), ' ',
+                    COALESCE(e.last_name, ''), ' ',
+                    COALESCE(e.suffix_name, '')
+                )) AS employee_name,
+                e.profession,
+                e.department,
+                p.pay_period_start,
+                p.pay_period_end,
+                p.days_worked,
+                p.overtime_hours,
+                p.basic_pay,
+                p.overtime_pay,
+                p.allowances,
+                p.bonuses,
+                p.thirteenth_month,
+                p.undertime_deduction,
+                p.sss_deduction,
+                p.philhealth_deduction,
+                p.pagibig_deduction,
+                p.absence_deduction,
+                p.gross_pay,
+                p.total_deductions,
+                p.net_pay,
+                p.disbursement_method,
+                p.date_generated
+            FROM hr_payroll p
+            JOIN hr_employees e ON p.employee_id = e.employee_id
+            WHERE p.status = 'Pending' AND e.employee_id = ?
+        ";
+
+        $params = [$employeeId];
+        $types = "i";
+
+        if (!empty($start) && !empty($end)) {
+            $sql .= " AND p.pay_period_start >= ? AND p.pay_period_end <= ?";
+            $params[] = $start;
+            $params[] = $end;
+            $types .= "ss";
+        }
+
+        $sql .= " ORDER BY p.date_generated DESC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $payrolls = [];
+        while ($row = $result->fetch_assoc()) {
+            $row['gross_pay'] = (float) ($row['gross_pay'] ?? 0);
+            $row['total_deductions'] = (float) ($row['total_deductions'] ?? 0);
+            $row['net_pay'] = (float) ($row['net_pay'] ?? 0);
+            $payrolls[] = $row;
+        }
+
+        return $payrolls;
+    }
+
+    /**
+     * Get payroll summary totals
+     *
+     * @param array $payrolls Array of payroll rows
+     * @return array ['total_gross' => , 'total_deductions' => , 'total_net' => ]
+     */
+    public function getSummaryTotals($payrolls)
+    {
+        $totalGross = $totalDeductions = $totalNet = 0;
+
+        foreach ($payrolls as $row) {
+            $totalGross += $row['gross_pay'];
+            $totalDeductions += $row['total_deductions'];
+            $totalNet += $row['net_pay'];
+        }
+
+        return [
+            'total_gross' => $totalGross,
+            'total_deductions' => $totalDeductions,
+            'total_net' => $totalNet
+        ];
+    }
+
+    /**
+     * Format totals for display
+     *
+     * @param float $amount
+     * @return string
+     */
+    public function formatCurrency($amount)
+    {
+        return number_format($amount, 2);
+    }
+}
+
+// ------------------ Access Control ------------------
 if (!isset($_SESSION['profession']) || $_SESSION['profession'] !== 'Nurse') {
     header('Location: login.php');
     exit();
@@ -11,6 +130,7 @@ if (!isset($_SESSION['employee_id'])) {
     exit();
 }
 
+// Fetch user details from database
 $query = "SELECT * FROM hr_employees WHERE employee_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['employee_id']);
@@ -23,27 +143,20 @@ if (!$user) {
     exit();
 }
 
-$target_employee_id = $_GET['employee_id'] ?? $_SESSION['employee_id'];
-$license_info = null;
+// ------------------ Initialize PayrollReports ------------------
+$report = new PayrollReports($conn);
 
-if ($target_employee_id) {
-    $sql_fetch = "SELECT document_id, uploaded_at 
-                  FROM hr_employees_documents 
-                  WHERE employee_id = ? 
-                  AND document_type = 'License ID' 
-                  LIMIT 1";
+// Get filter values from GET request
+$start = $_GET['start'] ?? '';
+$end = $_GET['end'] ?? '';
 
-    $stmt = $conn->prepare($sql_fetch);
-    $stmt->bind_param("i", $target_employee_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+// Fetch payrolls and totals
+$employeeId = $_SESSION['employee_id'];
+$payrolls = $report->getPayrolls($employeeId, $start, $end);
+$totals = $report->getSummaryTotals($payrolls);
 
-    if ($result->num_rows > 0) {
-        $license_info = $result->fetch_assoc();
-    }
-    $stmt->close();
-}
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -51,17 +164,19 @@ if ($target_employee_id) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HMS | Nurse User Panel</title>
+    <title>HMS | User Panel</title>
     <link rel="shortcut icon" href="../../assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../../assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="../../assets/CSS/super.css">
     <link rel="stylesheet" href="../../assets/CSS/my_schedule.css">
+    <link rel="stylesheet" href="payslip_viewing.css">
     <link rel="stylesheet" href="../Doctor/notif.css">
 </head>
 
 <body>
     <div class="d-flex">
-         <aside id="sidebar" class="sidebar-toggle">
+        <!----- Sidebar ----->
+        <aside id="sidebar" class="sidebar-toggle">
             <div class="sidebar-logo mt-3">
                 <img src="../../assets/image/logo-dark.png" width="90px" height="20px">
             </div>
@@ -138,26 +253,34 @@ if ($target_employee_id) {
                 </a>
             </li>
         </aside>
-        
+        <!----- End of Sidebar ----->
+        <!----- Main Content ----->
         <div class="main">
             <div class="topbar">
                 <div class="toggle">
                     <button class="toggler-btn" type="button">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="30px" height="30px" fill="currentColor" class="bi bi-list-ul" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m-3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2" />
+                        <svg xmlns="http://www.w3.org/2000/svg" width="30px" height="30px" fill="currentColor" class="bi bi-list-ul"
+                            viewBox="0 0 16 16">
+                            <path fill-rule="evenodd"
+                                d="M5 11.5a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 0 1h-9a.5.5 0 0 1-.5-.5m-3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2m0 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2" />
                         </svg>
                     </button>
                 </div>
-                <div class="logo d-flex align-items-center">
+                  <div class="logo d-flex align-items-center">
                     <div class="notification-wrapper position-relative me-4" style="cursor: pointer;">
                         <div onclick="toggleNotifications()">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-bell-fill" viewBox="0 0 16 16">
                                 <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2m.995-14.901a1 1 0 1 0-1.99 0A5 5 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901" />
                             </svg>
-                            <span id="notification-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none; font-size: 0.6rem;">0</span>
+                            <span id="notification-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display:none; font-size: 0.6rem;">
+                                0
+                            </span>
                         </div>
+
                         <div id="notification-dropdown" class="custom-notify-dropdown hidden">
-                            <div class="notify-header">License Alerts</div>
+                            <div class="notify-header">
+                                License Alerts
+                            </div>
                             <ul id="notification-list">
                                 <li class="empty-state">Loading...</li>
                             </ul>
@@ -173,111 +296,93 @@ if ($target_employee_id) {
                                 <span>Welcome <strong style="color: #007bff;"><?php echo $user['last_name']; ?></strong>!</span>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="../../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">Logout</a>
+                                <a class="dropdown-item" href="../../../logout.php" style="font-size: 14px; color: #007bff; text-decoration: none; padding: 8px 12px; border-radius: 4px; transition: background-color 0.3s ease;">
+                                    Logout
+                                </a>
                             </li>
                         </ul>
                     </div>
+
+                </div>
+            </div>
+            <!-- START CODING HERE -->
+            <div class="payrollreports">
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Payroll Reports</p>
+
+                <!-- FILTER FORM -->
+                <form method="GET" class="payrollreports-nav-inline">
+                    <label>Start Date:</label>
+                    <input type="date" name="start" value="<?= htmlspecialchars($start) ?>">
+
+                    <label>End Date:</label>
+                    <input type="date" name="end" value="<?= htmlspecialchars($end) ?>">
+
+                    <button type="submit">Filter</button>
+                    <a href="payslip_viewing.php" style="text-decoration:none; padding:8px 16px; background:#404040; color:white; border-radius:5px;">Reset</a>
+                </form>
+
+                <!-- PAYROLL TABLE -->
+                <div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Employee</th>
+                                <th>Position</th>
+                                <th>Department</th>
+                                <th>Pay Period</th>
+                                <th>Gross Pay</th>
+                                <th>Total Deductions</th>
+                                <th>Net Pay</th>
+                                <th>Date Paid</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($payrolls)): ?>
+                                <?php $i = 1;
+                                foreach ($payrolls as $row): ?>
+                                    <tr>
+                                        <td><?= $i++ ?></td>
+                                        <td><?= htmlspecialchars($row['employee_name']) ?></td>
+                                        <td><?= htmlspecialchars($row['profession']) ?></td>
+                                        <td><?= htmlspecialchars($row['department']) ?></td>
+                                        <td>
+                                            <?= $row['pay_period_start'] ?>
+                                            <br />
+                                            to
+                                            <br />
+                                            <?= $row['pay_period_end'] ?>
+                                        </td>
+                                        <td><?= number_format($row['gross_pay'], 2) ?></td>
+                                        <td><?= number_format($row['total_deductions'], 2) ?></td>
+                                        <td><strong><?= number_format($row['net_pay'], 2) ?></strong></td>
+                                        <td><?= $row['date_generated'] ?></td>
+                                        <td>
+                                            <a href="view_payslip.php?payroll_id=<?= $row['payroll_id'] ?>" target="_blank" class="view-link"> View Payslip </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="10" style="text-align:center;">No payroll records found.</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <div class="container-fluid py-4">
-                <h2 class="schedule-title">Compliance License Renewal</h2>
-
-                <div class="row justify-content-center">
-                    <div class="col-lg-8 col-xl-7">
-
-                        <?php if ($license_info): ?>
-                            <div class="alert alert-success shadow-sm border-0 p-4 mb-4">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-check-circle-fill fs-1 me-4 text-success"></i>
-                                        <div>
-                                            <h5 class="alert-heading fw-bold">License Uploaded</h5>
-                                            <p class="mb-0 text-muted">
-                                                Last updated: 
-                                                <strong><?= date("M d, Y h:i A", strtotime($license_info['uploaded_at'])) ?></strong>
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <a href="view_license.php?employee_id=<?= $target_employee_id ?>" 
-                                       target="_blank" 
-                                       class="btn btn-outline-success fw-bold px-4">
-                                        <i class="bi bi-eye me-2"></i> View File
-                                    </a>
-                                </div>
-                            </div>
-                        <?php else: ?>
-                            <div class="alert alert-warning d-flex align-items-center shadow-sm border-0 p-4 mb-4">
-                                <i class="bi bi-exclamation-triangle-fill fs-1 me-4 text-warning"></i>
-                                <div>
-                                    <h5 class="alert-heading fw-bold">Action Required</h5>
-                                    <p class="mb-0">No valid License ID found. Please upload your latest document immediately.</p>
-                                </div>
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="card border-0 shadow-sm rounded-3">
-                            <div class="card-header bg-white py-3 border-bottom">
-                                <h5 class="mb-0 text-primary fw-bold"><i class="bi bi-cloud-upload me-2"></i>Update Document</h5>
-                            </div>
-                            <div class="card-body p-4">
-
-                                <form action="upd_license.php" method="POST" enctype="multipart/form-data">
-                                    <input type="hidden" name="employee_id" value="<?= $target_employee_id ?>">
-
-                                    <div class="mb-4">
-                                        <label class="form-label fw-bold">Select Document</label>
-
-                                        <div class="upload-zone position-relative">
-                                            <i class="bi bi-file-earmark-pdf text-primary fs-1 mb-2"></i>
-                                            <h6 class="fw-bold">Click to Browse or Drag File Here</h6>
-                                            <p class="text-muted small mb-0">Supported formats: JPG, PNG, PDF (Max 4MB)</p>
-
-                                            <input type="file" name="license_file" class="form-control position-absolute top-0 start-0 w-100 h-100 opacity-0"
-                                                style="cursor: pointer;" required onchange="showFileName(this)">
-                                        </div>
-                                        <div id="file-name-display" class="mt-2 text-center text-success small fw-bold"></div>
-                                    </div>
-
-                                    <div class="d-grid">
-                                        <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold shadow-sm">
-                                            <i class="bi bi-save me-2"></i> Save / Update License
-                                        </button>
-                                    </div>
-                                </form>
-
-                            </div>
-                        </div>
-
-                        <div class="text-center mt-4">
-                            <small class="text-muted">
-                                <i class="bi bi-lock-fill me-1"></i>
-                                Documents are stored securely and encrypted in the database.
-                            </small>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
+            <!-- END CODING HERE -->
         </div>
+        <?php include 'nurse_profile.php'; ?>
+        <!----- End of Main Content ----->
     </div>
-    
-    <?php include 'nurse_profile.php'; ?>
-    
     <script>
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
-
-        function showFileName(input) {
-            const display = document.getElementById('file-name-display');
-            if (input.files && input.files.length > 0) {
-                display.textContent = "Selected: " + input.files[0].name;
-            } else {
-                display.textContent = "";
-            }
-        }
     </script>
     <script src="../Doctor/notif.js"></script>
     <script src="../../assets/Bootstrap/all.min.js"></script>
