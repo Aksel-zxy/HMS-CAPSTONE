@@ -33,7 +33,7 @@ $sales = new Sales($conn);
 $period = $_GET['period'] ?? 'all';
 
 // Fetch data based on selected period
-$totalSales      = $sales->getTotalSales($period);
+$totalSales      = $sales->getTotalcashSales($period);
 $totalOrders     = $sales->getTotalOrders($period);
 $dispensedToday  = $sales->getDispensedToday();
 $totalStocks     = $sales->getTotalStocks();
@@ -350,7 +350,12 @@ if (isset($_POST['clear_recent'])) {
                 </a>
             </li>
 
-
+            <li class="sidebar-item">
+                <a href="pharmacy_otc.php" class="sidebar-link position-relative">
+                    <i class="fa-solid fa-briefcase-medical"></i>
+                    <span style="font-size: 18px;">Over The Counter</span>
+                </a>
+            </li>
             <li class="sidebar-item">
                 <a href="pharmacy_sales.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
