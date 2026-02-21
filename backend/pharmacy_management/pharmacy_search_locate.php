@@ -32,7 +32,7 @@ $sales = new Sales($conn);
 $period = $_GET['period'] ?? 'all';
 
 // Fetch data based on selected period
-$totalSales      = $sales->getTotalSales($period);
+$totalSales      = $sales->getTotalcashSales($period);
 $totalOrders     = $sales->getTotalOrders($period);
 $dispensedToday  = $sales->getDispensedToday();
 $totalStocks     = $sales->getTotalStocks();
@@ -349,6 +349,12 @@ if (isset($_POST['clear_recent'])) {
                 </a>
             </li>
 
+            <li class="sidebar-item">
+                <a href="pharmacy_otc.php" class="sidebar-link position-relative">
+                    <i class="fa-solid fa-briefcase-medical"></i>
+                    <span style="font-size: 18px;">Over The Counter</span>
+                </a>
+            </li>
 
             <li class="sidebar-item">
                 <a href="pharmacy_sales.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
@@ -625,83 +631,83 @@ if (isset($_POST['clear_recent'])) {
                             <div class="alert alert-secondary text-center">No recent searches yet.</div>
                         <?php endif; ?>
                     </div>
-
-                    <!-- END CODING HERE -->
                 </div>
-                <!----- End of Main Content ----->
+                <!-- END CODING HERE -->
             </div>
-            <script>
-                document.addEventListener("DOMContentLoaded", function() {
-                    const loadMoreBtn = document.getElementById("loadMoreNotif");
-                    if (loadMoreBtn) {
-                        loadMoreBtn.addEventListener("click", function(e) {
-                            e.preventDefault();
-                            document.querySelectorAll(".extra-notif").forEach(el => el.classList.remove("d-none"));
-                            this.style.display = "none"; // hide the button once expanded
-                        });
-                    }
-                });
-            </script>
-            <script>
-                // Dropdown fetching
-                document.getElementById('generic_name').addEventListener('change', function() {
-                    const generic = this.value;
-                    const brandSelect = document.getElementById('brand_name');
-                    const dosageSelect = document.getElementById('dosage');
-                    brandSelect.innerHTML = '<option value="">-- Select Brand --</option>';
-                    dosageSelect.innerHTML = '<option value="">-- Select Dosage --</option>';
-                    brandSelect.disabled = true;
-                    dosageSelect.disabled = true;
-                    if (!generic) return;
-                    fetch(`fetch_medicine_options.php?type=brands&generic=${encodeURIComponent(generic)}`)
-                        .then(res => res.json()).then(data => {
-                            if (data.length === 0) return;
-                            brandSelect.disabled = false;
-                            data.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
-                        });
-                });
-
-                document.getElementById('brand_name').addEventListener('change', function() {
-                    const brand = this.value;
-                    const generic = document.getElementById('generic_name').value;
-                    const dosageSelect = document.getElementById('dosage');
-                    dosageSelect.innerHTML = '<option value="">-- Select Dosage --</option>';
-                    dosageSelect.disabled = true;
-                    if (!brand || !generic) return;
-                    fetch(`fetch_medicine_options.php?type=dosage&generic=${encodeURIComponent(generic)}&brand=${encodeURIComponent(brand)}`)
-                        .then(res => res.json()).then(data => {
-                            if (data.length === 0) return;
-                            dosageSelect.disabled = false;
-                            data.forEach(d => dosageSelect.innerHTML += `<option value="${d}">${d}</option>`);
-                        });
-                });
-
-                // Clear result modal on close
-                const resultModalEl = document.getElementById('resultModal');
-                resultModalEl.addEventListener('hidden.bs.modal', function() {
-                    document.getElementById('locationResult').innerHTML = '';
-                });
-
-                // Auto-open result modal after search
-                <?php if ($openResultModal && !empty($searchResultHTML)): ?>
-                    document.addEventListener("DOMContentLoaded", function() {
-                        const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
-                        document.getElementById('locationResult').innerHTML = <?= json_encode($searchResultHTML) ?>;
-                        resultModal.show();
+            <!----- End of Main Content ----->
+        </div>
+        <script>
+            document.addEventListener("DOMContentLoaded", function() {
+                const loadMoreBtn = document.getElementById("loadMoreNotif");
+                if (loadMoreBtn) {
+                    loadMoreBtn.addEventListener("click", function(e) {
+                        e.preventDefault();
+                        document.querySelectorAll(".extra-notif").forEach(el => el.classList.remove("d-none"));
+                        this.style.display = "none"; // hide the button once expanded
                     });
-                <?php endif; ?>
-            </script>
+                }
+            });
+        </script>
+        <script>
+            // Dropdown fetching
+            document.getElementById('generic_name').addEventListener('change', function() {
+                const generic = this.value;
+                const brandSelect = document.getElementById('brand_name');
+                const dosageSelect = document.getElementById('dosage');
+                brandSelect.innerHTML = '<option value="">-- Select Brand --</option>';
+                dosageSelect.innerHTML = '<option value="">-- Select Dosage --</option>';
+                brandSelect.disabled = true;
+                dosageSelect.disabled = true;
+                if (!generic) return;
+                fetch(`fetch_medicine_options.php?type=brands&generic=${encodeURIComponent(generic)}`)
+                    .then(res => res.json()).then(data => {
+                        if (data.length === 0) return;
+                        brandSelect.disabled = false;
+                        data.forEach(b => brandSelect.innerHTML += `<option value="${b}">${b}</option>`);
+                    });
+            });
 
-            <script>
-                const toggler = document.querySelector(".toggler-btn");
-                toggler.addEventListener("click", function() {
-                    document.querySelector("#sidebar").classList.toggle("collapsed");
+            document.getElementById('brand_name').addEventListener('change', function() {
+                const brand = this.value;
+                const generic = document.getElementById('generic_name').value;
+                const dosageSelect = document.getElementById('dosage');
+                dosageSelect.innerHTML = '<option value="">-- Select Dosage --</option>';
+                dosageSelect.disabled = true;
+                if (!brand || !generic) return;
+                fetch(`fetch_medicine_options.php?type=dosage&generic=${encodeURIComponent(generic)}&brand=${encodeURIComponent(brand)}`)
+                    .then(res => res.json()).then(data => {
+                        if (data.length === 0) return;
+                        dosageSelect.disabled = false;
+                        data.forEach(d => dosageSelect.innerHTML += `<option value="${d}">${d}</option>`);
+                    });
+            });
+
+            // Clear result modal on close
+            const resultModalEl = document.getElementById('resultModal');
+            resultModalEl.addEventListener('hidden.bs.modal', function() {
+                document.getElementById('locationResult').innerHTML = '';
+            });
+
+            // Auto-open result modal after search
+            <?php if ($openResultModal && !empty($searchResultHTML)): ?>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const resultModal = new bootstrap.Modal(document.getElementById('resultModal'));
+                    document.getElementById('locationResult').innerHTML = <?= json_encode($searchResultHTML) ?>;
+                    resultModal.show();
                 });
-            </script>
-            <script src="assets/Bootstrap/all.min.js"></script>
-            <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
-            <script src="assets/Bootstrap/fontawesome.min.js"></script>
-            <script src="assets/Bootstrap/jq.js"></script>
+            <?php endif; ?>
+        </script>
+
+        <script>
+            const toggler = document.querySelector(".toggler-btn");
+            toggler.addEventListener("click", function() {
+                document.querySelector("#sidebar").classList.toggle("collapsed");
+            });
+        </script>
+        <script src="assets/Bootstrap/all.min.js"></script>
+        <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
+        <script src="assets/Bootstrap/fontawesome.min.js"></script>
+        <script src="assets/Bootstrap/jq.js"></script>
 </body>
 
 </html>
