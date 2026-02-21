@@ -253,7 +253,7 @@ while ($row = $logsResult->fetch_assoc()) {
                             <?php if (!empty($maintenanceLogs)): ?>
                                 <?php foreach ($maintenanceLogs as $row): ?>
                                     <tr style="border-bottom:1px solid #f1f1f1;">
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['maintenance_date']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['maintenance_date']?? '') ?></td>
                                         <td style="padding:12px; text-align:left;"><?= htmlspecialchars($row['equipment']) ?></td>
                                         <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['maintenance_type']) ?></td>
                                         <td style="padding:12px; text-align:center;">
