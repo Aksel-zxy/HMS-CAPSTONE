@@ -608,9 +608,57 @@ for ($i = 1; $i <= 12; $i++) {
                         </div>
                     </div>
 
+
+
                 </div>
 
+                <center>
+                    <button class="hahaha" onclick="openModal('pharmacyModal')">Request Employee for <br /> Pharmacy Dept.</button>
+                </center>
 
+                <!-- Pharmacy Modal -->
+                <div id="pharmacyModal" class="bastabubukas">
+                    <div class="lalagyanannya">
+                        <bttn class="close-btn" onclick="closeModal('pharmacyModal')">X</bttn>
+                        <center>
+                            <h3 style="font-weight: bold;">Pharmacy Department Replacement Request</h3> 
+                        </center>
+                        <br />
+
+                        <form action="submit_replacement_request.php" method="POST">
+                            <input type="hidden" name="profession" value="Pharmacist" required>
+
+                            <label for="department">Department:</label>
+                            <select id="department" name="department" required>
+                                <option value="Pharmacy">Pharmacy</option>
+                            </select>
+
+                            <!-- Specialist Dropdown -->
+                            <label>Pharmacist Type to Replace</label>
+                            <select name="position" required>
+                                <option value="">--- Select Pharmacist Type ---</option>
+                                <option value="Clinical Pharmacist">Clinical Pharmacist</option>
+                                <option value="Hospital Pharmacist">Hospital Pharmacist</option>
+                                <option value="Compounding Pharmacist">Compounding Pharmacist</option>
+                                <option value="Dispensing Pharmacist">Dispensing Pharmacist</option>
+                            </select>
+
+                            <label>Leaving Employee Name</label>
+                            <input type="text" name="leaving_employee_name">
+
+                            <label>Leaving Employee ID</label>
+                            <input type="text" name="leaving_employee_id">
+
+                            <label>Reason for Leaving</label>
+                            <textarea name="reason_for_leaving"></textarea>
+
+                            <label>Requested By</label>
+                            <input type="text" name="requested_by" required>
+
+                            <button type="submit">Submit Request</button>
+                        </form>
+                    </div>
+                </div>
 
             </div>
 
@@ -830,6 +878,22 @@ for ($i = 1; $i <= 12; $i++) {
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+
+        function openModal(id) {
+            document.getElementById(id).style.display = "flex";
+        }
+        function closeModal(id) {
+            document.getElementById(id).style.display = "none";
+        }
+
+        window.onclick = function(event) {
+            const modals = ['laboratoryModal'];
+            modals.forEach(id => {
+                const modal = document.getElementById(id);
+                if(event.target == modal) closeModal(id);
+            });
+        }
+
     </script>
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>
