@@ -12,7 +12,7 @@ class Login
     private $conn;
     private $error;
     // change to false to turn off OTP
-    private $useOTP = false;
+    private $useOTP = true;
 
     public function __construct($conn)
     {

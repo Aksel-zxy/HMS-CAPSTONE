@@ -36,7 +36,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'receive') {
         $pcs_per_box = $item['pcs_per_box'] ?? 1;
         $price       = $item['price'] ?? 0;
 
-        $total_qty = (strtolower($unit_type) === 'box')
+        // Map unit value to match inventory ENUM('Piece','Box')
+        $unit_enum = (strtolower($unit_type) === 'box') ? 'Box' : 'Piece';
+
+        $total_qty = ($unit_enum === 'Box')
             ? $received_qty * $pcs_per_box
             : $received_qty;
 
@@ -50,15 +53,27 @@ if (isset($_POST['action']) && $_POST['action'] === 'receive') {
             );
             $stmtUpdate->execute([$received_qty, $total_qty, $price, $existing['id']]);
         } else {
+            // Get next available ID to handle tables without AUTO_INCREMENT on id
+            $stmtMaxId = $pdo->query("SELECT COALESCE(MAX(id), 0) + 1 FROM inventory");
+            $nextId    = (int)$stmtMaxId->fetchColumn();
+
             $stmtInsert = $pdo->prepare(
-                "INSERT INTO inventory (item_id, item_name, item_type, category, sub_type, quantity, total_qty, price, unit_type, pcs_per_box, received_at, location)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)"
+                "INSERT INTO inventory (id, item_id, item_name, item_type, category, sub_type, quantity, total_qty, price, unit_type, pcs_per_box, received_at, location)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)"
             );
             $stmtInsert->execute([
-                $item_id, $item['item_name'], $item['item_type'] ?? 'Supply',
-                $item['category'] ?? '', $item['sub_type'] ?? '',
-                $received_qty, $total_qty, $price, ucfirst($unit_type),
-                $pcs_per_box, 'Main Storage'
+                $nextId,
+                $item_id,
+                $item['item_name'],
+                $item['item_type'] ?? 'Supply',
+                $item['category'] ?? '',
+                $item['sub_type'] ?? '',
+                $received_qty,
+                $total_qty,
+                $price,
+                $unit_enum,        // ← now correctly 'Piece' or 'Box'
+                $pcs_per_box,
+                'Main Storage'
             ]);
         }
 
