@@ -6,8 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // header.php - Reusable header component
 $user = [
-    'fname' => 'Test',
-    'lname' => 'User'
+    'fname' => 'Ezekiel',
+    'lname' => 'Lamoste'
 ];
 ?>
 <!DOCTYPE html>
