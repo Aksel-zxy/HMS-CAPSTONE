@@ -192,7 +192,7 @@
                         <span class="badge ${getStatusColor(m.status)}">${m.status}</span>
 
                         <div class="d-flex justify-content-end mt-3">
-                            <a href="http://localhost:8080/backend/report_and_analytics/month_department_budget_summary.php?month=${m.month}&year=${data.year}"
+                            <a href="https://bsis-03.keikaizen.xyz/backend/report_and_analytics/month_department_budget_summary.php?month=${m.month}&year=${data.year}"
                                class="btn btn-sm btn-outline-primary">View</a>
                         </div>
                     </div>
@@ -263,7 +263,7 @@
                         <td><span class="badge bg-warning text-dark">${p.status}</span></td>
                         <td>${new Date(p.request_date).toLocaleDateString()}</td>
                         <td>
-                            <a href="https://localhost:7212/journal/backend/report_and_analytics/month_department_budget_summary.php?month=${p.month}&year=${year}"
+                            <a href="https://bsis-03.keikaizen.xyz/journal/backend/report_and_analytics/month_department_budget_summary.php?month=${p.month}&year=${year}"
                                class="btn btn-sm btn-outline-warning">View</a>
                         </td>
                     </tr>
