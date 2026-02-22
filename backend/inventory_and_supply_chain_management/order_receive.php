@@ -50,11 +50,16 @@ if (isset($_POST['action']) && $_POST['action'] === 'receive') {
             );
             $stmtUpdate->execute([$received_qty, $total_qty, $price, $existing['id']]);
         } else {
+            // Get next available ID to handle tables without AUTO_INCREMENT
+            $stmtMaxId = $pdo->query("SELECT COALESCE(MAX(id), 0) + 1 FROM inventory");
+            $nextId    = (int)$stmtMaxId->fetchColumn();
+
             $stmtInsert = $pdo->prepare(
-                "INSERT INTO inventory (item_id, item_name, item_type, category, sub_type, quantity, total_qty, price, unit_type, pcs_per_box, received_at, location)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)"
+                "INSERT INTO inventory (id, item_id, item_name, item_type, category, sub_type, quantity, total_qty, price, unit_type, pcs_per_box, received_at, location)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)"
             );
             $stmtInsert->execute([
+                $nextId,
                 $item_id, $item['item_name'], $item['item_type'] ?? 'Supply',
                 $item['category'] ?? '', $item['sub_type'] ?? '',
                 $received_qty, $total_qty, $price, ucfirst($unit_type),
