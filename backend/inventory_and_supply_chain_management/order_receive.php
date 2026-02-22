@@ -873,7 +873,7 @@ document.querySelectorAll('.receive-items-btn').forEach(btn => {
             const received = parseInt(item.received_quantity || 0);
             return (approved - received) > 0;
         });
-
+                        
         if (receivableItems.length === 0) {
             alert('All items have already been fully received.');
             return;
