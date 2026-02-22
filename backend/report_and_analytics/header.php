@@ -1,4 +1,9 @@
 <?php
+// Start session BEFORE any HTML
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // header.php - Reusable header component
 $user = [
     'fname' => 'Test',
