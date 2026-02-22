@@ -321,17 +321,6 @@ if (!$user) {
                     </a>
                 </div>
 
-                <div class="col-md-3">
-                    <a href="shift_and_duty.php" class="text-decoration-none text-dark">
-                        <div class="report-card d-flex flex-column align-items-center p-3 shadow-sm border rounded">
-                            <i class="bi bi-calendar-check report-icon fs-1 mb-2 text-primary"></i>
-                            <div class="report-title fw-semibold text-center">
-                                Shift & Duty Monitoring
-                            </div>
-                        </div>
-                    </a>
-                </div>
-
             </div>
 
         </div><!-- END MAIN CONTENT -->
