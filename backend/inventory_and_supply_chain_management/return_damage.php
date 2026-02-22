@@ -669,7 +669,7 @@ textarea.form-control { resize: vertical; min-height: 100px; }
                     <div class="form-group">
                         <label class="form-label">Photo Evidence <span class="req">*</span></label>
                         <div class="file-upload-zone" id="dropZone">
-                            <input type="file" name="photo" id="photo" accept="image/*" required>
+                            <input type="file" name="photo" id="photo" accept="image/*">
                             <div class="file-upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
                             <div class="file-upload-label">Click to upload or drag &amp; drop</div>
                             <div class="file-upload-sub">PNG, JPG, JPEG · Max 5MB</div>
