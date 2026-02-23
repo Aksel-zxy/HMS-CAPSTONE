@@ -97,6 +97,12 @@ logAction($conn, $user_id, 'VIEW_PATIENT', $patient_id);
                             <p><strong>Diagnosis Date:</strong>
                                 <?= htmlspecialchars($admission['diagnosis_date'] ?? 'N/A') ?></p>
                             <p><strong>Notes:</strong> <?= htmlspecialchars($admission['notes'] ?? 'N/A') ?></p>
+                             <?php if (!empty($admission['image_blob'])): ?>
+                        <a href="view_image.php?type=history&patient_id=<?= $admission['patient_id'] ?>" target="_blank"
+                            class="btn btn-secondary btn-sm mt-2">View History Image</a>
+                        <?php else: ?>
+                        <p class="text-muted"><em>No History image available</em></p>
+                        <?php endif; ?>
                         </div>
 
                         <a href="inpatient.php" class="btn btn-secondary mt-3">Back</a>
