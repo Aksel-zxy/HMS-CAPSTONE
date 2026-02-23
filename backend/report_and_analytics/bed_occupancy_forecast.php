@@ -160,7 +160,7 @@ include 'header.php'
                     `Forecast for <strong>${now.toLocaleString('default', { month: 'long' })} ${year}</strong>`;
 
                 try {
-                    const response = await fetch(`https://bsis-03.keikaizen.xyz/property/getMonthForecastResult?month=2&year=2026`);
+                    const response = await fetch(`https://localhost:7212/property/getMonthForecastResult?month=2&year=2026`);
                     const forecast = await response.json();
 
                     // SUMMARY STATS

@@ -91,7 +91,7 @@
 
         <script>
             // API base
-            const apiBase = "https://bsis-03.keikaizen.xyz/journal/getMonthBillingReport";
+            const apiBase = "https://localhost:7212/journal/getMonthBillingReport";
 
             const monthNames = [
                 "January", "February", "March", "April", "May", "June",

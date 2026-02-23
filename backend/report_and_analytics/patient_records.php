@@ -182,7 +182,7 @@
                 if (cachedData) {
                     data = JSON.parse(cachedData);
                 } else {
-                    const response = await fetch(`https://bsis-03.keikaizen.xyz/employee/patientMedicalRecords/${patientId}`);
+                    const response = await fetch(`https://localhost:7212/employee/patientMedicalRecords/${patientId}`);
                     if (!response.ok) throw new Error("Failed to fetch patient record.");
                     data = await response.json();
                 }

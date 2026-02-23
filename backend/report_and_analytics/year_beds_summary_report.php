@@ -183,7 +183,7 @@ include 'header.php';
         }
 
         // --- MAIN LOGIC ---
-        const endpoint = `https://bsis-03.keikaizen.xyz/property/getYearBedsDistributionReport/${year}`;
+        const endpoint = `https://localhost:7212/property/getYearBedsDistributionReport/${year}`;
         let bedsChart;
 
         async function loadReport() {

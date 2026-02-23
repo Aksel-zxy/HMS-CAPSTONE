@@ -201,8 +201,8 @@ include 'header.php'
         </div>
 
         <script>
-            const forecastApiUrl = "https://bsis-03.keikaizen.xyz/journal/getMonthMedicineShortageResult";
-            const prevMonthApiUrl = "https://bsis-03.keikaizen.xyz/journal/getPreviousMonthMedicineDispensed";
+            const forecastApiUrl = "https://localhost:7212/journal/getMonthMedicineShortageResult";
+            const prevMonthApiUrl = "https://localhost:7212/journal/getPreviousMonthMedicineDispensed";
 
             const medicineMap = {
                 21: {

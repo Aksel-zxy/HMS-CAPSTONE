@@ -151,7 +151,7 @@
 
         /* LOAD SUMMARY USING NEW API FORMAT */
         async function loadSummary(month, year) {
-            const response = await fetch(`https://bsis-03.keikaizen.xyz/employee/getEmployeeMonthReportPerformance?month=${month}&year=${year}`);
+            const response = await fetch(`https://localhost:7212/employee/getEmployeeMonthReportPerformance?month=${month}&year=${year}`);
             const data = await response.json();
 
             document.getElementById("avgScore").innerText = data.average_score;

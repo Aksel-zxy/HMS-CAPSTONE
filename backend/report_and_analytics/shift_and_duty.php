@@ -246,7 +246,7 @@
 
                     if (!month || !year) return alert("Please select month and year.");
 
-                    const url = `https://bsis-03.keikaizen.xyz/employee/getMonthShiftAndDutyReport/${month}/${year}`;
+                    const url = `https://localhost:7212/employee/getMonthShiftAndDutyReport/${month}/${year}`;
                     const statsContainer = document.getElementById('statsContainer');
 
                     try {

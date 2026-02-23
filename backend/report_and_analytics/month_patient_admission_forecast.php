@@ -181,8 +181,8 @@ include 'header.php'
         <script>
             let chart;
 
-            const forecastUrl = "https://bsis-03.keikaizen.xyz/patient/getPatientAdmissionForecast";
-            const historyUrl = "https://bsis-03.keikaizen.xyz/patient/getPreviousMonthsAdmissionReport";
+            const forecastUrl = "https://localhost:7212/patient/getPatientAdmissionForecast";
+            const historyUrl = "https://localhost:7212/patient/getPreviousMonthsAdmissionReport";
 
             async function loadPatientAdmissionForecast() {
                 try {

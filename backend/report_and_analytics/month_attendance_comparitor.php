@@ -163,7 +163,7 @@ include 'header.php';
                 try {
 
                     const res = await fetch(
-                        `https://bsis-03.keikaizen.xyz/employee/monthAttendanceComparisonEndpoint?baseMonth=${baseMonth}&baseYear=${baseYear}&partnerMonth=${partnerMonth}&partnerYear=${partnerYear}`
+                        `https://localhost:7212/employee/monthAttendanceComparisonEndpoint?baseMonth=${baseMonth}&baseYear=${baseYear}&partnerMonth=${partnerMonth}&partnerYear=${partnerYear}`
                     );
 
                     // 🔥 HANDLE BACKEND MESSAGE (400)

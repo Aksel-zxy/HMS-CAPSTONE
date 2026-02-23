@@ -87,7 +87,7 @@
     </div>
 
     <script>
-        const baseApi = "https://bsis-03.keikaizen.xyz/journal/yearBillingReportSummary?year=";
+        const baseApi = "https://localhost:7212/journal/yearBillingReportSummary?year=";
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",

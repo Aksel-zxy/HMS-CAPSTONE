@@ -175,7 +175,7 @@ include 'header.php';
                 try {
 
                     const res = await fetch(
-                        `https://bsis-03.keikaizen.xyz/journal/monthRevenueComparisonEndpoint?month=${baseMonth}&year=${baseYear}&partnerMonth=${partnerMonth}&partnerYear=${partnerYear}`
+                        `https://localhost:7212/journal/monthRevenueComparisonEndpoint?month=${baseMonth}&year=${baseYear}&partnerMonth=${partnerMonth}&partnerYear=${partnerYear}`
                     );
 
                     const contentType = res.headers.get("content-type");

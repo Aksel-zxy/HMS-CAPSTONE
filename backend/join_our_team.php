@@ -27,10 +27,10 @@ $posts = $jobPost->getAllPosts();
                     <img src="assets/image/logo-dark.png" alt="HMS Logo" style="height: 30px;">
                 </center>
             </a>
-                <div class="subtext">
-        <h1>We're Looking for Passionate People Like You</h1>
-        <p>at Dr. Eduardo V. Roquero Memorial Hospital</p>
-    </div>
+            <div class="subtext">
+                <h1>We're Looking for Passionate People Like You</h1>
+                <p>at Dr. Eduardo V. Roquero Memorial Hospital</p>
+            </div>
 
             <div class="job_post-container">
                 <?php if (!empty($posts)): ?>
@@ -60,7 +60,7 @@ $posts = $jobPost->getAllPosts();
                 <div class="form-container">
                     <bttn class="close-btn" onclick="closeForm()">X</bttn>
                     <center>
-                        <h3 style="font-weight: bold;">Job Application Form</h3> 
+                        <h3 style="font-weight: bold;">Job Application Form</h3>
                     </center>
                     <form action="hr_management/recruitment_onboarding_module/submit_application.php" method="post" enctype="multipart/form-data">
 
@@ -72,7 +72,7 @@ $posts = $jobPost->getAllPosts();
 
                         <label for="job_title">Job Title:</label>
                         <input type="text" id="job_title" name="job_title" readonly>
-                        
+
                         <label for="job_position">Job Position:</label>
                         <input type="text" id="job_position" name="job_position" readonly>
 
@@ -80,7 +80,7 @@ $posts = $jobPost->getAllPosts();
                         <input type="text" id="specialization" name="specialization" readonly>
                         <br />
                         <br />
-                        
+
                         <label for="first_name">First Name:</label>
                         <input type="text" id="first_name" name="first_name" required>
 
@@ -103,8 +103,8 @@ $posts = $jobPost->getAllPosts();
                         <input type="text" id="address" name="address" required>
 
                         <center>
-                        <h4 style="font-weight: bold;">Upload Documents</h4> 
-                        <span style="color: red;font-weight: bold;font-size: 15px;">*Maximum file size: 5MB per document. Only PDF, JPG, JPEG, or PNG formats are accepted.*</span>
+                            <h4 style="font-weight: bold;">Upload Documents</h4>
+                            <span style="color: red;font-weight: bold;font-size: 15px;">*Maximum file size: 5MB per document. Only PDF, JPG, JPEG, or PNG formats are accepted.*</span>
                         </center>
                         <br />
 

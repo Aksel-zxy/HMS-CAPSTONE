@@ -174,7 +174,7 @@ include 'header.php';
                 try {
 
                     const res = await fetch(
-                        `https://bsis-03.keikaizen.xyz/journal/monthPharmacySalesComparisonEndpoint?firstMoth=${firstMonth}&firstYear=${firstYear}&secondMonth=${secondMonth}&secondYear=${secondYear}`
+                        `https://localhost:7212/journal/monthPharmacySalesComparisonEndpoint?firstMoth=${firstMonth}&firstYear=${firstYear}&secondMonth=${secondMonth}&secondYear=${secondYear}`
                     );
 
                     // 🔥 ALWAYS READ RESPONSE BODY FIRST

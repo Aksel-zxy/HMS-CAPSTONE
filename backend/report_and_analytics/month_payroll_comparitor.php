@@ -177,7 +177,7 @@ include 'header.php';
                 try {
 
                     const res = await fetch(
-                        `https://bsis-03.keikaizen.xyz/payroll/monthPayrollComparisonEndpoint?month=${baseMonth}&year=${baseYear}&partnerMonth=${partnerMonth}&partnerYear=${partnerYear}`
+                        `https://localhost:7212/payroll/monthPayrollComparisonEndpoint?month=${baseMonth}&year=${baseYear}&partnerMonth=${partnerMonth}&partnerYear=${partnerYear}`
                     );
 
                     // 🔥 HANDLE SAME MONTH ERROR (400)

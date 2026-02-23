@@ -84,7 +84,7 @@ include 'header.php';
     </div>
 
     <script>
-        const baseApi = "https://bsis-03.keikaizen.xyz/payroll/yearHospitalPayrollReport?year=";
+        const baseApi = "https://localhost:7212/payroll/yearHospitalPayrollReport?year=";
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",

@@ -303,7 +303,7 @@
     </div>
 
     <script>
-        const baseApi = "https://bsis-03.keikaizen.xyz/employee/getYearAttendanceSummary?year=";
+        const baseApi = "https://localhost:7212/employee/getYearAttendanceSummary?year=";
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December"

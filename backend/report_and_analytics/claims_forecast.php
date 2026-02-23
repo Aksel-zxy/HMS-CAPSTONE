@@ -183,8 +183,8 @@ include 'header.php'
                 });
                 document.getElementById('periodLabel').innerText = `${monthName} ${year}`;
 
-                const amountUrl = `https://bsis-03.keikaizen.xyz/insurance/getMonthProviderAmountForecast?month=${month}&year=${year}`;
-                const statusUrl = `https://bsis-03.keikaizen.xyz/insurance/getMonthProviderStatusForecast?month=${month}&year=${year}`;
+                const amountUrl = `https://localhost:7212/insurance/getMonthProviderAmountForecast?month=${month}&year=${year}`;
+                const statusUrl = `https://localhost:7212/insurance/getMonthProviderStatusForecast?month=${month}&year=${year}`;
 
                 try {
                     const [amountRes, statusRes] = await Promise.all([fetch(amountUrl), fetch(statusUrl)]);

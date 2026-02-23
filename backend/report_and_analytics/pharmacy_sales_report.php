@@ -152,7 +152,7 @@ include 'header.php'
         });
 
         const endpoint =
-            `https://bsis-03.keikaizen.xyz/journal/getMonthPharmacySales/${month}/${year}`;
+            `https://localhost:7212/journal/getMonthPharmacySales/${month}/${year}`;
 
         let distributionChart;
 

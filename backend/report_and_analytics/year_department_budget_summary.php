@@ -115,8 +115,8 @@
     </div>
 
     <script>
-        const baseApi = "https://bsis-03.keikaizen.xyz/journal/yearDepartmentBudgetSummaryReport?year=";
-        const pendingApi = "https://bsis-03.keikaizen.xyz/journal/yearPendingBudgetSummary?year=";
+        const baseApi = "https://localhost:7212/journal/yearDepartmentBudgetSummaryReport?year=";
+        const pendingApi = "https://localhost:7212/journal/yearPendingBudgetSummary?year=";
 
         let yearChart;
 

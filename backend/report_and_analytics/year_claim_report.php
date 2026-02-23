@@ -89,7 +89,7 @@ include 'header.php';
 
     <script>
         const baseApi =
-            "https://bsis-03.keikaizen.xyz/insurance/getYearInsuranceReport?year=";
+            "https://localhost:7212/insurance/getYearInsuranceReport?year=";
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",

@@ -4,7 +4,7 @@ $month = $_GET['month'] ?? date('n');
 $year  = $_GET['year'] ?? date('Y');
 
 // ✅ Adjusted API endpoint
-$apiUrl = "https://bsis-03.keikaizen.xyz/journal/getMonthTotalRevenueForecast?month=$month&year=$year";
+$apiUrl = "https://localhost:7212/journal/getMonthTotalRevenueForecast?month=$month&year=$year";
 
 $response = null;
 $error = null;

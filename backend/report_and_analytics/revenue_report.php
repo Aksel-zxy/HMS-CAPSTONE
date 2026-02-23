@@ -104,7 +104,7 @@
         </main>
 
         <script>
-            const API_BASE = "https://bsis-03.keikaizen.xyz/journal/getMonthsDetailsRevenueReport";
+            const API_BASE = "https://localhost:7212/journal/getMonthsDetailsRevenueReport";
             const monthNames = [
                 "January", "February", "March", "April", "May", "June",
                 "July", "August", "September", "October", "November", "December"

@@ -1,29 +1,3 @@
-<?php
-include 'header.php';
-
-include '../../SQL/config.php';
-
-if (!isset($_SESSION['report']) || $_SESSION['report'] !== true) {
-    header('Location: login.php'); // Redirect to login if not logged in
-    exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    echo "User ID is not set in session.";
-    exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param("i", $_SESSION['user_id']);
-$stmt->execute();
-$result = $stmt->get_result();
-$user = $result->fetch_assoc();
-
-if (!$user) {
-    echo "No user found.";
-    exit();
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">

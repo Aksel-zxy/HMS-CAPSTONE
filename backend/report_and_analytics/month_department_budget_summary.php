@@ -137,7 +137,7 @@
             `${monthNames[cleanMonth - 1]} ${year} Budget Summary`;
 
         async function loadReport() {
-            const url = `https://bsis-03.keikaizen.xyz/journal/monthDepartmentBudgetSummaryReport?month=${cleanMonth}&year=${year}`;
+            const url = `https://localhost:7212/journal/monthDepartmentBudgetSummaryReport?month=${cleanMonth}&year=${year}`;
 
             const res = await fetch(url);
             const data = await res.json();

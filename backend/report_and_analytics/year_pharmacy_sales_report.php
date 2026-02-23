@@ -84,7 +84,7 @@ include 'header.php';
     </div>
 
     <script>
-        const baseApi = "https://bsis-03.keikaizen.xyz/journal/getYearPharmacySalesReport/";
+        const baseApi = "https://localhost:7212/journal/getYearPharmacySalesReport/";
         const monthNames = [
             "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December"

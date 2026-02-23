@@ -207,7 +207,7 @@
 
                 try {
                     const url =
-                        `https://bsis-03.keikaizen.xyz/journal/monthBillingReportComparisonEndpoint?` +
+                        `https://localhost:7212/journal/monthBillingReportComparisonEndpoint?` +
                         `firstMoth=${firstMonth}&firstYear=${firstYear}` +
                         `&secondMonth=${secondMonth}&secondYear=${secondYear}`;
 

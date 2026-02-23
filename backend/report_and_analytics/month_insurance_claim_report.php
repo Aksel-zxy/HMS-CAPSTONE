@@ -219,7 +219,7 @@ include 'header.php';
         };
 
         async function fetchReport() {
-            const url = `https://bsis-03.keikaizen.xyz/insurance/getMonthInsuranceReport?month=${month}&year=${year}&page=${currentPage}&size=${pageSize}`;
+            const url = `https://localhost:7212/insurance/getMonthInsuranceReport?month=${month}&year=${year}&page=${currentPage}&size=${pageSize}`;
             const res = await fetch(url);
             const data = await res.json();
 

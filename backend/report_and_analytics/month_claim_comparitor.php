@@ -150,7 +150,7 @@ include 'header.php';
 
                 try {
                     const res = await fetch(
-                        `https://bsis-03.keikaizen.xyz/insurance/monthClaimComparisonEndpoint?month=${baseMonth}&year=${baseYear}&partnerMonth=${partnerMonth}&partnerYear=${partnerYear}`
+                        `https://localhost:7212/insurance/monthClaimComparisonEndpoint?month=${baseMonth}&year=${baseYear}&partnerMonth=${partnerMonth}&partnerYear=${partnerYear}`
                     );
 
                     if (!res.ok) throw new Error("Fetch error");
