@@ -22,170 +22,55 @@ if (!$user) {
     exit();
 }
 
-$GEMINI_API_KEY = getenv('GERALD_KEY') ?? '';
+$patient_id = isset($_GET['patient_id']) ? (int)$_GET['patient_id'] : 0;
+$patient_details = null;
+$tests = [];
 
-function getGeminiSummary($apiKey, $prompt) {
-    if (empty($apiKey)) return "This report presents the number of tests recorded per laboratory service category during the reporting period. It helps monitor testing trends, resource allocation, and overall laboratory performance.";
+if ($patient_id > 0) {
+    $stmt = $conn->prepare("SELECT * FROM patientinfo WHERE patient_id = ?");
+    $stmt->bind_param("i", $patient_id);
+    $stmt->execute();
+    $patient_details = $stmt->get_result()->fetch_assoc();
 
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" . $apiKey;
-    $data = [ "contents" => [ [ "parts" => [ ["text" => $prompt] ] ] ] ];
-
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-
-    $response = curl_exec($ch);
-    if (curl_errno($ch)) return "This report presents the number of tests recorded per laboratory service category during the reporting period. It helps monitor testing trends, resource allocation, and overall laboratory performance.";
-    curl_close($ch);
-
-    $decoded = json_decode($response, true);
-    if (isset($decoded['candidates'][0]['content']['parts'][0]['text'])) {
-        return str_replace(['*', '#'], '', $decoded['candidates'][0]['content']['parts'][0]['text']);
-    }
-    return "This report presents the number of tests recorded per laboratory service category during the reporting period. It helps monitor testing trends, resource allocation, and overall laboratory performance.";
-}
-
-$selected_month = isset($_GET['month']) ? (int)$_GET['month'] : date('m');
-$selected_year = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
-$month_name = date("F", mktime(0, 0, 0, $selected_month, 10));
-
-$total_patients = 0;
-$sql_patients = "SELECT COUNT(DISTINCT patientID) as count FROM dl_schedule WHERE MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year";
-$res_p = $conn->query($sql_patients);
-if ($res_p && $row = $res_p->fetch_assoc()) {
-    $total_patients = $row['count'];
-}
-
-$chart_dates = [];
-$chart_counts = [];
-
-$sql_line = "SELECT scheduleDate as log_date, COUNT(*) as total 
-             FROM dl_schedule 
-             WHERE MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year 
-             GROUP BY scheduleDate 
-             ORDER BY log_date ASC";
-
-$res_line = $conn->query($sql_line);
-if ($res_line) {
-    while ($row = $res_line->fetch_assoc()) {
-        $chart_dates[] = date('M d', strtotime($row['log_date']));
-        $chart_counts[] = $row['total'];
+    if ($patient_details) {
+        $query_tests = "
+            SELECT 
+                s.scheduleID,    
+                s.serviceName,
+                s.completed_at,
+                r.result,
+                r.remarks,
+                CONCAT(e.first_name, ' ', e.last_name) AS laboratorist_name,
+                (SELECT COUNT(*) FROM dl_billing_dispatch b WHERE b.scheduleID = s.scheduleID) AS is_billed
+            FROM dl_results r
+            INNER JOIN dl_result_schedules rs ON r.resultID = rs.resultID
+            INNER JOIN dl_schedule s ON rs.scheduleID = s.scheduleID
+            LEFT JOIN hr_employees e ON s.employee_id = e.employee_id
+            WHERE s.patientID = ?
+            ORDER BY s.completed_at DESC
+        ";
+        $stmt_tests = $conn->prepare($query_tests);
+        $stmt_tests->bind_param("i", $patient_id);
+        $stmt_tests->execute();
+        $res_tests = $stmt_tests->get_result();
+        while ($t = $res_tests->fetch_assoc()) {
+            $tests[] = $t;
+        }
     }
 }
 
-$donut_labels = [];
-$donut_data = [];
-
-$sql_donut = "SELECT serviceName, COUNT(*) as total 
-              FROM dl_schedule 
-              WHERE MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year 
-              GROUP BY serviceName 
-              ORDER BY total DESC 
-              LIMIT 5";
-
-$res_donut = $conn->query($sql_donut);
-if ($res_donut) {
-    while ($row = $res_donut->fetch_assoc()) {
-        $donut_labels[] = $row['serviceName'];
-        $donut_data[] = $row['total'];
+$all_patients = [];
+$res_p = $conn->query("
+    SELECT DISTINCT p.patient_id, CONCAT(p.fname, ' ', p.lname) AS full_name 
+    FROM patientinfo p 
+    JOIN dl_schedule s ON p.patient_id = s.patientID 
+    JOIN dl_result_schedules rs ON s.scheduleID = rs.scheduleID 
+    ORDER BY full_name ASC
+");
+if ($res_p) {
+    while ($row = $res_p->fetch_assoc()) {
+        $all_patients[] = $row;
     }
-}
-
-$avg_turnaround = "0";
-$sql_turnaround = "SELECT AVG(TIMESTAMPDIFF(MINUTE, CONCAT(scheduleDate, ' ', scheduleTime), completed_at)) as avg_min 
-                   FROM dl_schedule 
-                   WHERE completed_at IS NOT NULL AND completed_at != '0000-00-00 00:00:00' 
-                   AND MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year";
-
-$res_turn = $conn->query($sql_turnaround);
-if ($res_turn && $row = $res_turn->fetch_assoc()) {
-    $minutes = $row['avg_min'];
-    if ($minutes > 0) {
-        $avg_turnaround = round($minutes / 60, 1);
-    }
-}
-
-$equipment_health = 0;
-
-$total_machines = 0;
-$sql_total_eq = "SELECT COUNT(*) as total FROM machine_equipments";
-$res_total_eq = $conn->query($sql_total_eq);
-if ($res_total_eq && $row = $res_total_eq->fetch_assoc()) {
-    $total_machines = $row['total'];
-}
-
-$working_machines = 0;
-$sql_working_eq = "SELECT COUNT(*) as working FROM machine_equipments WHERE status = 'Available'";
-$res_working_eq = $conn->query($sql_working_eq);
-if ($res_working_eq && $row = $res_working_eq->fetch_assoc()) {
-    $working_machines = $row['working'];
-}
-
-if ($total_machines > 0) {
-    $equipment_health = round(($working_machines / $total_machines) * 100, 1);
-} else {
-    $equipment_health = 100;
-}
-
-$json_dates = json_encode($chart_dates);
-$json_counts = json_encode($chart_counts);
-$json_donut_labels = json_encode($donut_labels);
-$json_donut_data = json_encode($donut_data);
-
-
-$sql_all_tests = "SELECT serviceName, COUNT(*) as total 
-                  FROM dl_schedule 
-                  WHERE MONTH(scheduleDate) = $selected_month AND YEAR(scheduleDate) = $selected_year
-                  GROUP BY serviceName 
-                  ORDER BY total DESC";
-$res_all_tests = $conn->query($sql_all_tests);
-$all_tests = [];
-$total_all_tests = 0;
-if ($res_all_tests) {
-    while ($row = $res_all_tests->fetch_assoc()) {
-        $all_tests[] = $row;
-        $total_all_tests += $row['total'];
-    }
-}
-
-$test_stats_text = "";
-if (!empty($all_tests)) {
-    foreach($all_tests as $t) {
-        $test_stats_text .= "- " . $t['serviceName'] . ": " . $t['total'] . " tests\n";
-    }
-} else {
-    $test_stats_text = "No tests recorded.";
-}
-
-$prompt = "Act as a professional Laboratory Manager. Write a short, professional summary (max 3 sentences) for this month's laboratory operations based on the following data:\n" .
-    "Total Patients: " . number_format($total_patients) . "\n" .
-    "Average Turnaround Time: $avg_turnaround hours\n" .
-    "Equipment Health: $equipment_health%\n" .
-    "Test Statistics:\n$test_stats_text\n\n" .
-    "Instructions: Make it professional, highlight key performance indicators, and mention any trends or areas of note. Do not use asterisks or formatting, just plain text.";
-
-$ai_summary = getGeminiSummary($GEMINI_API_KEY, $prompt);
-
-if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
-    header('Content-Type: application/json');
-    echo json_encode([
-        'total_patients' => number_format($total_patients),
-        'avg_turnaround' => $avg_turnaround,
-        'equipment_health' => $equipment_health,
-        'lineLabels' => $chart_dates,
-        'lineData' => $chart_counts,
-        'donutLabels' => $donut_labels,
-        'donutData' => $donut_data,
-        'all_tests' => $all_tests,
-        'total_all_tests' => $total_all_tests,
-        'month_name' => $month_name,
-        'selected_year' => $selected_year,
-        'ai_summary' => $ai_summary
-    ]);
-    exit();
 }
 ?>
 <!DOCTYPE html>
@@ -203,11 +88,12 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
             display: none;
             width: 100%; 
             background: white;
+            padding: 20px;
         }
         .print-header-banner {
             background-color: #1e5b86 !important; 
             color: #ffffff !important;
-            padding: 25px 40px;
+            padding: 20px 30px;
             font-size: 20px;
             font-weight: bold;
             text-transform: uppercase;
@@ -215,76 +101,35 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
             font-family: Arial, sans-serif;
         }
         .print-body { 
-            padding: 0 40px; 
             font-family: Arial, sans-serif;
         }
         .print-info p { 
-            margin: 0; 
-            font-size: 15px; 
-        }
-        .print-info p strong {
-            font-weight: bold;
+            margin: 5px 0; 
+            font-size: 14px; 
         }
         .print-line { 
             border-top: 2px solid #a3b8c2; 
-            margin: 20px 0; 
-        }
-        .print-section-title { 
-            font-weight: bold; 
-            font-size: 16px; 
-            margin-bottom: 15px; 
-            text-transform: uppercase; 
-            color: #000;
-        }
-        .print-summary-text { 
-            font-size: 14px; 
-            line-height: 1.6; 
-            margin-bottom: 20px; 
-            text-align: justify; 
+            margin: 15px 0; 
         }
         .print-table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-bottom: 50px; 
-            font-size: 14px; 
+            margin-bottom: 30px; 
+            font-size: 13px; 
             color: #000;
         }
         .print-table th { 
             background-color: #ccebc5 !important; 
-            padding: 10px 15px; 
+            padding: 8px 10px; 
             text-align: left; 
-            font-weight: bold;
-            color: #000;
             border-bottom: 1px solid #ccebc5;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
         }
         .print-table td { 
-            padding: 8px 15px; 
+            padding: 8px 10px; 
             border-bottom: 1px solid #ddd;
-            color: #000;
         }
-        .print-table tr:nth-child(even) td { 
-            background-color: #f2f2f2 !important; 
-        }
-        .print-signatures { 
-            display: flex; 
-            justify-content: space-between; 
-            margin-top: 100px;
-            margin-bottom: 40px;
-        }
-        .signature-box { 
-            width: 25%; 
-            text-align: center; 
-        }
-        .signature-line { 
-            border-top: 1px solid black; 
-            margin-bottom: 5px; 
-        }
-        .signature-text { 
-            font-size: 14px; 
-            font-weight: bold; 
-            color: #000;
-        }
-
         @media print {
             @page {
                 size: auto;
@@ -296,7 +141,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
                 background-color: #ffffff; 
                 -webkit-print-color-adjust: exact;
                 color-adjust: exact;
-                print-color-adjust: exact;
             }
             #sidebar, .topbar, .no-print { 
                 display: none !important; 
@@ -306,7 +150,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
                 padding: 0 !important; 
                 width: 100% !important; 
                 background-color: #ffffff !important; 
-                overflow: visible !important;
             }
             .print-container { 
                 display: block !important; 
@@ -446,9 +289,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
             </li>
         </aside>
         
-        
         <div class="main">
-            <div class="topbar">
+            <div class="topbar no-print">
                 <div class="toggle">
                     <button class="toggler-btn" type="button">
                         <svg xmlns="http://www.w3.org/2000/svg" width="30px" height="30px" fill="currentColor" class="bi bi-list-ul"
@@ -482,154 +324,195 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
             <div class="container-fluid p-4 no-print">
 
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:20px; border-bottom:2px solid #0d6efd; padding-bottom:8px;"
-                     class="mb-0 text-secondary">Monthly Laboratory Report</h3>
+                    <h3 style="font-family:Arial, sans-serif; color:#0d6efd; margin-bottom:0; border-bottom:2px solid #0d6efd; padding-bottom:8px;"
+                     class="text-secondary">Patient Laboratory Report</h3>
                     <div class="d-flex align-items-center">
-                        <form id="filterForm" class="d-flex align-items-center me-3 mb-0" onsubmit="return false;">
-                            <select id="filterMonth" class="form-select me-2" style="width: auto;">
-                                
-                            </select>
-                            <select id="filterYear" class="form-select me-2" style="width: auto;">
-                                
+                        <form method="GET" class="d-flex align-items-center me-3 mb-0">
+                            <select name="patient_id" class="form-select me-2" style="width: 250px;" onchange="this.form.submit()">
+                                <option value="0">-- Select a Patient --</option>
+                                <?php foreach ($all_patients as $p): ?>
+                                    <option value="<?= $p['patient_id'] ?>" <?= ($p['patient_id'] == $patient_id) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($p['full_name']) ?> (ID: <?= $p['patient_id'] ?>)
+                                    </option>
+                                <?php endforeach; ?>
                             </select>
                         </form>
+                        <?php if ($patient_details && !empty($tests)): ?>
                         <button class="btn btn-primary px-4 py-2 shadow-sm" onclick="downloadPDF()">
-                            <i class="fas fa-file-pdf me-2"></i> Download Report
+                            <i class="fas fa-file-pdf me-2"></i> Download PDF
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
+                <?php if ($patient_details): ?>
                 <div class="row g-4 mb-4">
-                    <div class="col-md-7">
-                        <div class="card border-0 shadow-sm h-100">
+                    <div class="col-md-12">
+                        <div class="card border-0 shadow-sm">
                             <div class="card-body">
-                                <h5 class="card-title text-muted mb-4">Total Tests Performed</h5>
-                                <canvas id="lineChart" style="max-height: 250px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-5">
-                        <div class="card border-0 shadow-sm h-100">
-                            <div class="card-body">
-                                <h5 class="card-title text-muted mb-4">Test Breakdown</h5>
-                                <div style="position: relative; height: 200px; display: flex; justify-content: center;">
-                                    <canvas id="donutChart"></canvas>
+                                <h5 class="card-title text-muted mb-3">Patient Information</h5>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <p class="mb-1"><strong>Name:</strong> <?= htmlspecialchars($patient_details['fname'] . ' ' . $patient_details['lname']) ?></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1"><strong>Age:</strong> <?= htmlspecialchars($patient_details['age']) ?></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1"><strong>Gender:</strong> <?= htmlspecialchars($patient_details['gender']) ?></p>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <p class="mb-1"><strong>Phone:</strong> <?= htmlspecialchars($patient_details['phone'] ?? 'N/A') ?></p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="row g-4">
-                    <div class="col-md-4">
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-body d-flex align-items-center">
-                                <div class="me-3 rounded" style="width: 8px; height: 40px; background-color: #0d6efd;"></div>
-                                <div>
-                                    <h6 class="text-muted mb-0">Total Patients</h6>
-                                    <h4 id="valTotalPatients" class="mb-0 fw-bold"><?php echo number_format($total_patients); ?></h4>
-                                </div>
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title text-muted mb-3">Laboratory Tests History</h5>
+                        
+                        <form id="billingForm" action="send_to_billing.php" method="POST">
+                            <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead style="background:#f1f5f9;">
+                                        <tr>
+                                            <th style="width: 40px;"><input type="checkbox" id="selectAllTests" class="form-check-input"></th>
+                                            <th style="color: #0d6efd;">Test Name</th>
+                                            <th style="color: #0d6efd;">Completed Date</th>
+                                            <th style="color: #0d6efd;">Remarks</th>
+                                            <th style="color: #0d6efd;">Result</th>
+                                            <th style="color: #0d6efd;">Laboratorist</th>
+                                            <th style="color: #0d6efd;">Billing</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if (empty($tests)): ?>
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted py-3">No laboratory tests found for this patient.</td>
+                                            </tr>
+                                        <?php else: ?>
+                                            <?php foreach ($tests as $t): ?>
+                                                <tr>
+                                                    <td class="align-middle">
+                                                        <?php if ($t['is_billed'] > 0): ?>
+                                                            <i class="fas fa-check-circle text-success" title="Already Billed"></i>
+                                                        <?php else: ?>
+                                                            <input type="checkbox" name="schedules[]" value="<?= $t['scheduleID'] ?>" class="form-check-input test-checkbox">
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="align-middle fw-bold"><?= htmlspecialchars($t['serviceName']) ?></td>
+                                                    <td class="align-middle"><?= $t['completed_at'] ? date("M d, Y h:i A", strtotime($t['completed_at'])) : "N/A" ?></td>
+                                                    <td class="align-middle"><?= htmlspecialchars($t['remarks']) ?></td>
+                                                    <td class="align-middle">
+                                                        <?php
+                                                        $testData = [
+                                                            "scheduleID"  => $t['scheduleID'],
+                                                            "serviceName" => $t['serviceName']
+                                                        ];
+                                                        ?>
+                                                        <button type="button" class="btn btn-sm btn-outline-success view-result-btn"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#viewResultModal"
+                                                            data-results='<?= json_encode([$testData]) ?>'>
+                                                            View Result
+                                                        </button>
+                                                    </td>
+                                                    <td class="align-middle"><?= htmlspecialchars($t['laboratorist_name'] ?? 'Not Specified') ?></td>
+                                                    <td class="align-middle">
+                                                        <?php if ($t['is_billed'] > 0): ?>
+                                                            <span class="badge bg-success">Billed</span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-secondary">Unbilled</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-body d-flex align-items-center">
-                                <div class="me-3 rounded" style="width: 8px; height: 40px; background-color: #6ea8fe;"></div>
-                                <div>
-                                    <h6 class="text-muted mb-0">Avg Turnaround Time</h6>
-                                    <h4 id="valAvgTurnaround" class="mb-0 fw-bold"><?php echo $avg_turnaround; ?> hrs</h4>
-                                </div>
+                            
+                            <?php if (!empty($tests)): ?>
+                            <div class="mt-3 text-end d-flex justify-content-end align-items-center">
+                                <span id="selectedCount" class="text-muted me-3" style="display: none;">0 tests selected</span>
+                                <button type="submit" id="btnSendBilling" class="btn btn-warning shadow-sm" style="display: none;">
+                                    <i class="fas fa-file-invoice-dollar me-2"></i> Send to Billing
+                                </button>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <div class="card border-0 shadow-sm">
-                            <div class="card-body d-flex align-items-center">
-
-                                <div id="equipHealthColor" class="me-3 rounded" style="width: 8px; height: 40px; 
-                background-color: <?php echo ($equipment_health < 50) ? '#dc3545' : (($equipment_health < 80) ? '#ffc107' : '#adb5bd'); ?>;">
-                                </div>
-
-                                <div>
-                                    <h6 class="text-muted mb-0">Equipment Health</h6>
-                                    <h4 id="valEquipHealth" class="mb-0 fw-bold"><?php echo $equipment_health; ?>%</h4>
-
-                                    <small id="equipHealthWarning" class="text-danger" style="font-size: 12px; display: <?php echo ($equipment_health < 100) ? 'block' : 'none'; ?>;">Issues Detected</small>
-                                </div>
-                            </div>
-                        </div>
+                            <?php endif; ?>
+                        </form>
                     </div>
                 </div>
+                <?php elseif ($patient_id > 0): ?>
+                    <div class="alert alert-warning">Patient not found.</div>
+                <?php else: ?>
+                    <div class="alert alert-info border-0 shadow-sm rounded-3">
+                        <i class="fas fa-info-circle me-2"></i> Please select a patient from the dropdown above to view their laboratory history.
+                    </div>
+                <?php endif; ?>
 
             </div>
 
-            
+            <?php if ($patient_details && !empty($tests)): ?>
             <div class="print-container">
                 <div class="print-header-banner">
-                    Diagnostic and Laboratory Services Report
+                    Patient Laboratory Report
                 </div>
                 <div class="print-body">
                     <div class="print-info">
-                        <p><strong>Hospital:</strong> <?php echo "Dr. Eduardo V. Roquero Memorial Hospital"; ?></p>
-                        <p><strong>Reporting period:</strong> <span id="valPrintPeriod"><?php echo $month_name . ' ' . $selected_year; ?></span></p>
+                        <p><strong>Patient Name:</strong> <?= htmlspecialchars($patient_details['fname'] . ' ' . $patient_details['lname']) ?></p>
+                        <p><strong>Patient ID:</strong> <?= htmlspecialchars($patient_id) ?></p>
+                        <p><strong>Age/Gender:</strong> <?= htmlspecialchars($patient_details['age']) ?> / <?= htmlspecialchars($patient_details['gender']) ?></p>
+                        <p><strong>Contact:</strong> <?= htmlspecialchars($patient_details['phone'] ?? 'N/A') ?></p>
+                        <p><strong>Date Generated:</strong> <?= date('F d, Y') ?></p>
                     </div>
                     
                     <div class="print-line"></div>
                     
-                    <div class="print-section-title">SUMMARY</div>
-                    <p class="print-summary-text" id="valPrintSummary">
-                        <?php echo htmlspecialchars($ai_summary); ?>
-                    </p>
-                    
-                    <div class="print-line"></div>
-                    
-                    <div class="print-section-title">TEST STATISTIC</div>
+                    <h4 style="margin: 20px 0 10px; font-size: 16px; text-transform: uppercase;">Test History</h4>
                     <table class="print-table">
                         <thead>
                             <tr>
                                 <th>TEST NAME</th>
-                                <th>TOTAL TESTS</th>
-                                <th>PERCENTAGE (%)</th>
+                                <th>COMPLETED AT</th>
+                                <th>REMARKS</th>
+                                <th>LABORATORIST</th>
                             </tr>
                         </thead>
-                        <tbody id="printTableBody">
-                            <?php if (empty($all_tests)): ?>
+                        <tbody>
+                            <?php foreach ($tests as $t): ?>
                             <tr>
-                                <td colspan="3" style="text-align:center;">No tests recorded in this period.</td>
+                                <td><strong><?= htmlspecialchars($t['serviceName']) ?></strong></td>
+                                <td><?= $t['completed_at'] ? date("m/d/Y H:i", strtotime($t['completed_at'])) : "N/A" ?></td>
+                                <td><?= htmlspecialchars($t['remarks']) ?></td>
+                                <td><?= htmlspecialchars($t['laboratorist_name'] ?? 'Not Specified') ?></td>
                             </tr>
-                            <?php else: ?>
-                                <?php foreach ($all_tests as $test): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($test['serviceName']); ?></td>
-                                    <td><?php echo number_format($test['total']); ?></td>
-                                    <td>
-                                        <?php 
-                                        $pct = ($total_all_tests > 0) ? round(($test['total'] / $total_all_tests) * 100) : 0;
-                                        echo $pct . '%'; 
-                                        ?>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
-                    
-                    <div class="print-signatures">
-                        <div class="signature-box">
-                            <div class="signature-line"></div>
-                            <div class="signature-text">Prepared by</div>
+                </div>
+            </div>
+            <?php endif; ?>
+            
+            <!-- Result Modal -->
+            <div class="modal fade" id="viewResultModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title" id="modalTitle">Laboratory Result</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="signature-box">
-                            <div class="signature-line"></div>
-                            <div class="signature-text">Reviewed by</div>
+                        <div class="modal-body" id="resultContent">
+                            <p class="text-center text-muted">Loading result...</p>
                         </div>
-                        <div class="signature-box">
-                            <div class="signature-line"></div>
-                            <div class="signature-text">Approved by</div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" id="prevResult" style="display:none;">Previous</button>
+                            <button type="button" class="btn btn-primary" id="nextResult" style="display:none;">Next</button>
+                            <button type="button" class="btn btn-dark" data-bs-dismiss="modal">Close</button>
                         </div>
                     </div>
                 </div>
@@ -638,105 +521,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
         </div>
         
         <script>
-            window.dashboardData = {
-                lineLabels: <?php echo $json_dates; ?>,
-                lineData: <?php echo $json_counts; ?>,
-                donutLabels: <?php echo $json_donut_labels; ?>,
-                donutData: <?php echo $json_donut_data; ?>
-            };
-            
-            const selectedMonth = <?php echo $selected_month; ?>;
-            const selectedYear = <?php echo $selected_year; ?>;
-            const currentYear = new Date().getFullYear();
-            const currentMonth = new Date().getMonth() + 1;
-            
-            const filterMonth = document.getElementById('filterMonth');
-            const filterYear = document.getElementById('filterYear');
-
-            
-            for (let y = 2025; y <= currentYear; y++) {
-                let opt = new Option(y, y);
-                if (y == selectedYear) opt.selected = true;
-                filterYear.add(opt);
-            }
-
-            
-            function updateMonths() {
-                const year = parseInt(filterYear.value);
-                const maxMonth = (year === currentYear) ? currentMonth : 12;
-                
-                
-                let currentVal = parseInt(filterMonth.value) || selectedMonth; 
-                filterMonth.innerHTML = '';
-                
-                for (let m = 1; m <= maxMonth; m++) {
-                    const d = new Date(2000, m - 1, 1);
-                    const name = d.toLocaleString('en-US', { month: 'long' });
-                    let opt = new Option(name, m);
-                    if (m === currentVal) {
-                        opt.selected = true;
-                    }
-                    filterMonth.add(opt);
-                }
-                
-                
-                if (parseInt(filterMonth.value) !== currentVal && currentVal > maxMonth) {
-                    filterMonth.value = maxMonth;
-                }
-            }
-            updateMonths();
-
-            
-            function fetchReportData() {
-                const m = filterMonth.value;
-                const y = filterYear.value;
-                
-                fetch(`operation_report.php?ajax=1&month=${m}&year=${y}`)
-                .then(res => res.json())
-                .then(data => {
-                    
-                    document.getElementById('valTotalPatients').innerText = data.total_patients;
-                    document.getElementById('valAvgTurnaround').innerText = data.avg_turnaround + ' hrs';
-                    document.getElementById('valEquipHealth').innerText = data.equipment_health + '%';
-                    
-                    document.getElementById('equipHealthWarning').style.display = (data.equipment_health < 100) ? 'block' : 'none';
-                    let healthColor = (data.equipment_health < 50) ? '#dc3545' : ((data.equipment_health < 80) ? '#ffc107' : '#adb5bd');
-                    document.getElementById('equipHealthColor').style.backgroundColor = healthColor;
-
-                    
-                    const tbody = document.getElementById('printTableBody');
-                    tbody.innerHTML = '';
-                    if (data.all_tests.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No tests recorded in this period.</td></tr>';
-                    } else {
-                        data.all_tests.forEach(test => {
-                            let pct = (data.total_all_tests > 0) ? Math.round((test.total / data.total_all_tests) * 100) : 0;
-                            let tr = document.createElement('tr');
-                            tr.innerHTML = `<td>${test.serviceName}</td><td>${test.total}</td><td>${pct}%</td>`;
-                            tbody.appendChild(tr);
-                        });
-                    }
-
-                    
-                    document.getElementById('valPrintPeriod').innerText = `${data.month_name} ${data.selected_year}`;
-
-                    if (data.ai_summary) {
-                        document.getElementById('valPrintSummary').innerText = data.ai_summary;
-                    }
-
-                    
-                    if (window.initCharts) {
-                        window.initCharts(data);
-                    }
-                })
-                .catch(err => console.error("Error fetching data: ", err));
-            }
-
-            filterYear.addEventListener('change', () => {
-                updateMonths();
-                fetchReportData();
-            });
-            filterMonth.addEventListener('change', fetchReportData);
             const toggler = document.querySelector(".toggler-btn");
             toggler.addEventListener("click", function() {
                 document.querySelector("#sidebar").classList.toggle("collapsed");
@@ -748,7 +532,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
                 
                 var opt = {
                     margin:       [0.5, 0], 
-                    filename:     'Lab_Report_<?php echo $month_name; ?>_<?php echo $selected_year; ?>.pdf',
+                    filename:     'Patient_Lab_Report_<?= $patient_id ?>.pdf',
                     image:        { type: 'jpeg', quality: 0.98 },
                     html2canvas:  { scale: 2 },
                     jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
@@ -758,14 +542,87 @@ if (isset($_GET['ajax']) && $_GET['ajax'] == 1) {
                     element.style.display = 'none';
                 });
             }
+
+            document.addEventListener('DOMContentLoaded', function() {
+                const selectAll = document.getElementById('selectAllTests');
+                const checkboxes = document.querySelectorAll('.test-checkbox');
+                const btnSend = document.getElementById('btnSendBilling');
+                const selectedCount = document.getElementById('selectedCount');
+
+                function updateSelection() {
+                    let checked = 0;
+                    checkboxes.forEach(cb => {
+                        if (cb.checked) checked++;
+                    });
+                    
+                    if (checked > 0) {
+                        selectedCount.textContent = checked + (checked === 1 ? ' test selected' : ' tests selected');
+                        selectedCount.style.display = 'inline';
+                        btnSend.style.display = 'inline-block';
+                    } else {
+                        selectedCount.style.display = 'none';
+                        btnSend.style.display = 'none';
+                    }
+
+                    if (selectAll) {
+                        selectAll.checked = (checked === checkboxes.length && checkboxes.length > 0);
+                    }
+                }
+
+                if (selectAll) {
+                    selectAll.addEventListener('change', function() {
+                        const isChecked = this.checked;
+                        checkboxes.forEach(cb => {
+                            cb.checked = isChecked;
+                        });
+                        updateSelection();
+                    });
+                }
+
+                checkboxes.forEach(cb => {
+                    cb.addEventListener('change', updateSelection);
+                });
+
+                const billingForm = document.getElementById('billingForm');
+                if (billingForm) {
+                    billingForm.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        
+                        btnSend.disabled = true;
+                        btnSend.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Sending...';
+
+                        const formData = new FormData(billingForm);
+
+                        fetch('send_to_billing.php', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert(data.message);
+                                window.location.reload();
+                            } else {
+                                alert('Error: ' + data.message);
+                                btnSend.disabled = false;
+                                btnSend.innerHTML = '<i class="fas fa-file-invoice-dollar me-2"></i> Send to Billing';
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Error:', err);
+                            alert('An unexpected error occurred.');
+                            btnSend.disabled = false;
+                            btnSend.innerHTML = '<i class="fas fa-file-invoice-dollar me-2"></i> Send to Billing';
+                        });
+                    });
+                }
+            });
         </script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="../assets/javascript/lab_report.js"></script>
         <script src="../assets/Bootstrap/all.min.js"></script>
         <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
         <script src="../assets/Bootstrap/fontawesome.min.js"></script>
         <script src="../assets/Bootstrap/jq.js"></script>
+        <script src="../assets/javascript/test_process.js"></script>
 </body>
-
 </html>
