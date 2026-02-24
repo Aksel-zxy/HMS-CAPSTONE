@@ -25,13 +25,16 @@ $salary = new Salary($conn);
 $employees = $salary->getEmployees();
 
 $salaryResult = null;
+if (isset($_SESSION['computed_salary'])) {
+    $salaryResult = $_SESSION['computed_salary'];
+}
 
 // COMPUTE SALARY
 if (isset($_POST['compute_salary'])) {
 
     $employee_id = (int)$_POST['employee_id'];
-    $pay_period  = $_POST['pay_period'];      // YYYY-MM
-    $period_type = $_POST['period_type'];     // full | first | second
+    $pay_period  = $_POST['pay_period'];
+    $period_type = $_POST['period_type'];
 
     $salaryResult = $salary->computeEmployeeSalary(
         $employee_id,
@@ -49,60 +52,65 @@ if (isset($_POST['compute_salary'])) {
             }
         }
 
-        // Save computed salary to session
-        $_SESSION['computed_salary'] = $salaryResult;
+        // 🚨 CHECK IF ALREADY EXISTS (prevent duplicate)
+        $existingPayroll = $salary->checkExistingPayroll(
+            $employee_id,
+            $salaryResult['pay_period_start'],
+            $salaryResult['pay_period_end']
+        );
+
+        if ($existingPayroll) {
+
+            $_SESSION['computed_salary'] = $existingPayroll;
+            $_SESSION['message'] = "Payroll already exists for this period.";
+
+        } else {
+
+            // ✅ AUTO SAVE AS PENDING
+            $payrollId = $salary->savePayroll($salaryResult, 'Pending');
+
+            if ($payrollId) {
+
+                $salaryResult['payroll_id'] = $payrollId;
+                $salaryResult['status'] = 'Pending';
+                $_SESSION['computed_salary'] = $salaryResult;
+                $_SESSION['message'] = "Payroll computed and saved as Pending.";
+
+            } else {
+                $_SESSION['message'] = "Failed to save payroll.";
+            }
+        }
+
+        header("Location: salary_computation.php");
+        exit;
 
     } else {
-        echo "<script>
-                alert('No compensation data found for this employee.');
-              </script>";
+        echo "<script>alert('No compensation data found for this employee.');</script>";
     }
 }
 
 //  SAVE PAYROLL
 if (isset($_POST['save_payroll'])) {
-    if (!isset($_SESSION['computed_salary'])) {
-        $_SESSION['message'] = "No computed salary to save.";
+
+    if (!isset($_SESSION['computed_salary']['payroll_id'])) {
+        $_SESSION['message'] = "No payroll record found.";
         header("Location: salary_computation.php");
         exit;
-    } else {
-        $salaryData = $_SESSION['computed_salary'];
-        $payrollId = $salary->savePayroll($salaryData);
-        if ($payrollId) {
-            $_SESSION['computed_salary']['payroll_id'] = $payrollId;
-            $_SESSION['computed_salary']['status'] = 'Unpaid';
-            $salaryResult = $_SESSION['computed_salary'];
-            $_SESSION['message'] = "Payroll saved successfully!";
-            header("Location: salary_computation.php");
-            exit;
-        } else {
-            $_SESSION['message'] = "Failed to generate payroll.";
-            header("Location: salary_computation.php");
-            exit;
-        }
     }
-}
 
-// MARK PAYROLL AS PAID
-if (isset($_POST['mark_paid'])) {
-    $payroll_id = (int)$_POST['payroll_id'];
+    $payroll_id = $_SESSION['computed_salary']['payroll_id'];
+
     if ($salary->markAsPaid($payroll_id)) {
-        echo "<script>
-                alert('Payroll marked as Paid successfully!');
-              </script>";
 
-        // Reload updated payroll
-        $salaryResult = $salary->getPayrollById($payroll_id);
-        $_SESSION['computed_salary'] = $salaryResult;
+        $_SESSION['computed_salary']['status'] = 'Paid';
+        $_SESSION['message'] = "Payroll marked as Paid successfully!";
 
-        // Redirect to avoid resubmission
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit;
     } else {
-        echo "<script>
-                alert('Failed to mark Payroll as Paid.');
-              </script>";
+        $_SESSION['message'] = "Failed to update payroll status.";
     }
+
+    header("Location: salary_computation.php");
+    exit;
 }
 
 if (!empty($_SESSION['message'])) {
@@ -449,22 +457,9 @@ if (!empty($_SESSION['message'])) {
                             <br />
 
                             <center>
-                                <?php if (!isset($salaryResult['payroll_id'])): ?>
-                                    <form method="POST">
-                                        <button type="submit" name="save_payroll" class="hahaha">
-                                            Save to Payroll
-                                        </button>
-                                    </form>
-                                <?php endif; ?>
-
-                                <?php if (isset($salaryResult['payroll_id']) && ($salaryResult['status'] ?? '') != 'Paid'): ?>
-                                    <form method="POST">
-                                        <input type="hidden" name="payroll_id" value="<?= $salaryResult['payroll_id']; ?>">
-                                        <button type="submit" name="mark_paid" class="hahahaha">
-                                            Mark as Paid
-                                        </button>
-                                    </form>
-                                <?php endif; ?>
+                                <button type="button" id="savePayrollBtn" class="hahaha">
+                                    Save to Payroll
+                                </button>
                             </center>
                         </div>
                     </div>
@@ -507,6 +502,64 @@ if (!empty($_SESSION['message'])) {
                 })
                 .catch(err => console.error(err));
         }
+
+        document.getElementById('savePayrollBtn').addEventListener('click', function() {
+
+            const payrollId = <?= json_encode($salaryResult['payroll_id'] ?? null) ?>;
+
+            if (!payrollId) {
+                alert("Payroll ID not found. Please compute salary first.");
+                return;
+            }
+
+            this.disabled = true;
+            this.innerText = 'Saving...';
+
+            fetch('save_payroll.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    payroll_action: 'mark_paid',
+                    payroll_id: payrollId
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error("Network response was not OK");
+                }
+                return response.text(); // safer than direct json()
+            })
+            .then(text => {
+
+                // Try parsing JSON safely
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error("Invalid JSON:", text);
+                    throw new Error("Invalid JSON response");
+                }
+
+                if (data.success) {
+                    alert('Payroll saved! Status updated to Paid.');
+
+                    // Safest approach → reload page
+                    location.reload();
+
+                } else {
+                    alert('Error: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error("Fetch error:", error);
+                alert('An error occurred while processing the request.');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.innerText = 'Save to Payroll';
+            });
+
+        });
 
         // Example: when employee or period changes
         document.getElementById('employee_select').addEventListener('change', function() {

@@ -129,6 +129,9 @@ while ($row = $logsResult->fetch_assoc()) {
                         <a href="../mod3/result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="../mod3/patient_report.php" class="sidebar-link">Patient Report</a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="../mod3/operation_report.php" class="sidebar-link">Laboratory Report</a>
                     </li>
                 </ul>
@@ -253,7 +256,7 @@ while ($row = $logsResult->fetch_assoc()) {
                             <?php if (!empty($maintenanceLogs)): ?>
                                 <?php foreach ($maintenanceLogs as $row): ?>
                                     <tr style="border-bottom:1px solid #f1f1f1;">
-                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['maintenance_date']) ?></td>
+                                        <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['maintenance_date']?? '') ?></td>
                                         <td style="padding:12px; text-align:left;"><?= htmlspecialchars($row['equipment']) ?></td>
                                         <td style="padding:12px; text-align:center;"><?= htmlspecialchars($row['maintenance_type']) ?></td>
                                         <td style="padding:12px; text-align:center;">

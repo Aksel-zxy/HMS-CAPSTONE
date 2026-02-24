@@ -340,7 +340,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <br />
 
                 <label for="nurseDepartment"><span style="color: red; font-weight: bold; font-size: 15px;">*</span>Department:</label>
-                <select id="nurseDepartment" name="nurseDepartment" required>
+                <select id="nurseDepartment" name="department" required>
                     <option value="">--- Select Department ---</option>
                     <option value="Anesthesiology & Pain Management">Anesthesiology & Pain Management</option>
                     <option value="Cardiology (Heart & Vascular System)">Cardiology (Heart & Vascular System)</option>
@@ -367,11 +367,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <br />
 
                 <label for="nurseSpecialization"><span style="color: red; font-weight: bold; font-size: 15px;">*</span>Specialization:</label>
-                <select id="nurseSpecialization" name="nurseSpecialization" required>
+                <select id="nurseSpecialization" name="specialization" required>
                     <option value="">--- Select Specialization ---</option>
                 </select>
 
-                <input type="text" id="otherNurseSpecialization" name="otherNurseSpecialization" placeholder="Please specify" style="display:none; margin-top:5px;">
+                <input type="text" id="otherNurseSpecialization" name="other_specialization" placeholder="Please specify" style="display:none; margin-top:5px;">
 
                 <br />
 
@@ -401,7 +401,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <option value="">--- Select Educational Status ---</option>
                     <option value="Graduate">Graduate</option>
                     <option value="Post Graduate">Post Graduate</option>
-                <select>
+                </select>
                 <br />
 
                 <label for="degree_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Degree Type:</label>
@@ -422,7 +422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label for="license_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>License Type:</label>
                 <select id="license_type" name="license_type" required>
                     <option value="Registered Nurse">Registered Nurse</option>
-                <select>
+                </select>
                 <br />
 
                 <label for="license_number"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>License Number:</label>
@@ -599,7 +599,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         });
 
-        const nurseSpecialization = {
+        const nurseSpecializations = {
             "Anesthesiology & Pain Management": ["Anesthesia Nurse", "Pain Management Nurse"],
             "Cardiology (Heart & Vascular System)": ["Cardiac Nurse", "CCU Nurse"],
             "Dermatology (Skin, Hair, & Nails)": ["Dermatology Nurse", "Aesthetic Nurse"],
@@ -629,8 +629,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             specializationSelect.innerHTML = '<option value="">--- Select Specialization ---</option>';
             
-            if (nurseSpecialization[dept]) {
-                nurseSpecialization[dept].forEach(function(spec) {
+            if (nurseSpecializations[dept]) {
+                nurseSpecializations[dept].forEach(function(spec) {
                     const opt = document.createElement("option");
                     opt.value = spec;
                     opt.textContent = spec;

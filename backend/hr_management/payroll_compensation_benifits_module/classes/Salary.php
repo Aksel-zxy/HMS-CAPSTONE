@@ -228,7 +228,7 @@ class Salary {
     }
 
     // Inside Salary.php class
-    public function savePayroll($data) {
+    public function savePayroll($data, $status = 'Pending') {
         $stmt = $this->conn->prepare("
             INSERT INTO hr_payroll (
                 employee_id,
@@ -282,15 +282,22 @@ class Salary {
         }
     }
 
-        public function markAsPaid($payroll_id) {
-            $stmt = $this->conn->prepare("
-                UPDATE hr_payroll
-                SET status = 'Paid'
-                WHERE payroll_id = ?
-            ");
-            $stmt->bind_param("i", $payroll_id);
-            return $stmt->execute();
-        }
+    public function checkExistingPayroll($employee_id, $start, $end) {
+
+        $stmt = $this->conn->prepare("
+            SELECT * FROM hr_payroll 
+            WHERE employee_id = ?
+            AND pay_period_start = ?
+            AND pay_period_end = ?
+            LIMIT 1
+        ");
+
+        $stmt->bind_param("iss", $employee_id, $start, $end);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        return $result->fetch_assoc();
+    }
 
         public function getPayrollById($payroll_id) {
             $stmt = $this->conn->prepare("SELECT * FROM hr_payroll WHERE payroll_id = ?");

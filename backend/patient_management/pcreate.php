@@ -64,11 +64,16 @@ $patients = $patientObj->getAllPatients();
                         </select>
                     </div>
                     <!-- Appointment Date & Time -->
-                    <div class="mb-3">
-                        <label for="appointment_date" class="form-label">Appointment Date & Time</label>
-                        <input type="datetime-local" class="form-control" id="appointment_date" name="appointment_date"
-                            required>
-                    </div>
+                   <label for="appointment_time">Appointment Time:</label>
+<select name="appointment_time" id="appointment_time" required>
+    <?php if (!empty($timeSlots)): ?>
+        <?php foreach ($timeSlots as $slot): ?>
+            <option value="<?= $slot ?>"><?= $slot ?></option>
+        <?php endforeach; ?>
+    <?php else: ?>
+        <option value="">No available times</option>
+    <?php endif; ?>
+</select>
 
                     <!-- Purpose -->
                     <div class="mb-3">
