@@ -95,7 +95,6 @@
                                 <th>Approved</th>
                                 <th>Status</th>
                                 <th>Requested Date</th>
-                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="pendingTableBody">
@@ -190,11 +189,6 @@
 
                         <div class="small-text mt-1">Status</div>
                         <span class="badge ${getStatusColor(m.status)}">${m.status}</span>
-
-                        <div class="d-flex justify-content-end mt-3">
-                            <a href="http://localhost:8080/backend/report_and_analytics/month_department_budget_summary.php?month=${m.month}&year=${data.year}"
-                               class="btn btn-sm btn-outline-primary">View</a>
-                        </div>
                     </div>
                 </div>`;
                     });
@@ -262,10 +256,6 @@
                         <td>₱${p.approved_amount.toLocaleString()}</td>
                         <td><span class="badge bg-warning text-dark">${p.status}</span></td>
                         <td>${new Date(p.request_date).toLocaleDateString()}</td>
-                        <td>
-                            <a href="https://localhost:7212/journal/backend/report_and_analytics/month_department_budget_summary.php?month=${p.month}&year=${year}"
-                               class="btn btn-sm btn-outline-warning">View</a>
-                        </td>
                     </tr>
                 `;
                     });

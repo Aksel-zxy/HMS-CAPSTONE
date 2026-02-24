@@ -194,7 +194,7 @@
         </li>
 
         <li class="sidebar-item">
-            <a href="../report_and_analytics/dashboard.php" class="sidebar-link">
+            <a href="../report_and_analytics/report_dashboard.php" class="sidebar-link">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
                     class="bi bi-building" viewBox="0 0 16 16" style="margin-bottom: 7px;">
                     <path
