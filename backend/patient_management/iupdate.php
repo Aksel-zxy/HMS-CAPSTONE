@@ -13,7 +13,7 @@ $patientObj = new Patient($conn);
 $patient = $patientObj->getPatientById($patient_id);
 
 
-$sql = "SELECT condition_name, diagnosis_date, notes 
+$sql = "SELECT condition_name, diagnosis_date, notes, image_blob
         FROM p_previous_medical_records
         WHERE patient_id = ?";
 $stmt = $conn->prepare($sql);
@@ -60,7 +60,7 @@ logAction($conn, $_SESSION['user_id'], 'UPDATE_PATIENT', $patient_id);
             <div class="card-body">
 
 
-                <form method="post">
+                <form method="post" enctype="multipart/form-data">
                     <div class="step" id="step1">
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">First Name</label>
@@ -221,6 +221,13 @@ logAction($conn, $_SESSION['user_id'], 'UPDATE_PATIENT', $patient_id);
                             <div class="col-sm-9">
                                 <input type="date" class="form-control" name="diagnosis_date"
                                     value="<?= $patient['diagnosis_date']; ?>">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <label class="col-sm-3 col-form-label">Image</label>
+                            <div class="col-sm-9">
+                                <input type="file" class="form-control" name="image" accept="image/*" value=" <?php echo $patient['image_blob'] ?? ''; ?>">
                             </div>
                         </div>
 

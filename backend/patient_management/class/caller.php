@@ -151,9 +151,9 @@ public function callBeddings() {
 
 
 public function getAllDoctors() {
-    $sql = "SELECT employee_id, first_name, last_name
+    $sql = "SELECT employee_id, concat(first_name, ' ', last_name) AS full_name, specialization
             FROM hr_employees 
-            WHERE profession = 'Doctor'";
+            WHERE profession = 'Doctor' and status = 'Active'";
     $result = $this->conn->query($sql);
     return $result;
 }
@@ -207,7 +207,7 @@ public function getDoctors() {
     $stmt = $this->conn->prepare("
         SELECT 
             p.patient_id,
-
+            mh.image_blob AS medical_history_image,
             -- CBC
             c.testType AS cbc_test,
             c.wbc, c.rbc, c.hemoglobin, c.hematocrit, c.platelets,
@@ -239,6 +239,7 @@ public function getDoctors() {
         LEFT JOIN dl_lab_ct ct   ON p.patient_id = ct.patientID
         LEFT JOIN dl_lab_mri mri ON p.patient_id = mri.patientID
         LEFT JOIN dl_lab_xray x  ON p.patient_id = x.patientID
+        LEFT JOIN p_previous_medical_records mh ON p.patient_id = mh.patient_id
         WHERE p.patient_id = ? LIMIT 1
     ");
 

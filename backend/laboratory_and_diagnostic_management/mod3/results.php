@@ -117,6 +117,9 @@ $allPatients = $patient->getAllPatients();
                         <a href="result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="patient_report.php" class="sidebar-link">Patient Report</a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="operation_report.php" class="sidebar-link">Laboratory Report</a>
                     </li>
                 </ul>
@@ -258,12 +261,23 @@ $allPatients = $patient->getAllPatients();
                                     $firstRow = true;
                                     $allRemarks = !empty($pdata['remarks']) ? implode("\n---\n", array_unique($pdata['remarks'])) : "No remarks yet";
 
-                                    foreach ($pdata['tests'] as $test):
+                                        $allTestsForPatient = [];
+                                        foreach($pdata['tests'] as $testMap) {
+                                            $allTestsForPatient[] = [
+                                                "scheduleID" => $testMap['scheduleID'],
+                                                "serviceName" => $testMap['serviceName']
+                                            ];
+                                        }
+
+                                        foreach ($pdata['tests'] as $test):
                             ?>
                                         <tr onmouseover="this.style.background='#f9fbfd';" onmouseout="this.style.background='';">
                                             <?php if ($firstRow): ?>
                                                 <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>"><?= htmlspecialchars($patientId) ?></td>
-                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>"><?= htmlspecialchars($pdata['name']) ?></td>
+                                                <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
+                                                    <strong><?= htmlspecialchars($pdata['name']) ?></strong><br>
+                                                    <a href="patient_report.php?patient_id=<?= $patientId ?>" class="btn btn-sm btn-outline-primary mt-2" style="font-size: 11px;">Generate Report</a>
+                                                </td>
                                                 <td style="padding:12px;text-align:center;" rowspan="<?= $rowspan ?>">
                                                     <button class="btn btn-warning ai-impression-btn"
                                                         data-bs-toggle="modal"
@@ -280,16 +294,10 @@ $allPatients = $patient->getAllPatients();
                                                 <?= $test['completed_at'] ? date("Y-m-d | H:i", strtotime($test['completed_at'])) : "N/A" ?>
                                             </td>
                                             <td style="padding:12px; text-align:center;">
-                                                <?php
-                                                $testData = [
-                                                    "scheduleID"  => $test['scheduleID'],
-                                                    "serviceName" => $test['serviceName']
-                                                ];
-                                                ?>
                                                 <button class="btn btn-success view-result-btn"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#viewResultModal"
-                                                    data-results='<?= json_encode([$testData]) ?>'>
+                                                    data-results='<?= json_encode($allTestsForPatient) ?>'>
                                                     View Result
                                                 </button>
                                             </td>
