@@ -110,7 +110,9 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
 
 
 // Query all medicines
-$query = "SELECT med_name, stock_quantity FROM pharmacy_inventory ORDER BY med_name ASC";
+$query = "SELECT generic_name, brand_name, stock_quantity 
+          FROM pharmacy_inventory 
+          ORDER BY generic_name ASC";
 $result = $conn->query($query);
 
 // Group medicines by stock thresholds
@@ -354,7 +356,7 @@ for ($i = 1; $i <= 12; $i++) {
                         <a href="pharmacy_sales.php" class="sidebar-link">Financial Report</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="" class="sidebar-link">Dispensing Report</a>
+                        <a href="pharmacy_dispense_report.php" class="sidebar-link">Dispensing Report</a>
                     </li>
                 </ul>
             </li>
@@ -577,7 +579,118 @@ for ($i = 1; $i <= 12; $i++) {
                     </div>
 
                 </div>
+                <!-- STOCK STATUS CARDS -->
+                <div class="row g-3 mb-4">
 
+                    <!-- HIGH STOCK -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card shadow-sm rounded-4 p-3 h-100 border-start border-4 border-success">
+                            <h6 class="fw-bold text-success mb-3">
+                                <i class="fa-solid fa-circle-check me-2"></i> HIGH STOCK
+                            </h6>
+
+                            <ul class="list-group list-group-flush small" style="max-height:250px; overflow-y:auto;">
+                                <?php if (!empty($highStock)): ?>
+                                    <?php foreach ($highStock as $med): ?>
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong><?= htmlspecialchars($med['generic_name']) ?></strong><br>
+                                                <small class="text-muted"><?= htmlspecialchars($med['brand_name']) ?></small>
+                                            </div>
+                                            <span class="badge bg-success">
+                                                <?= number_format($med['stock_quantity']) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <li class="list-group-item text-muted">No medicines</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- NEAR LOW -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card shadow-sm rounded-4 p-3 h-100 border-start border-4 border-info">
+                            <h6 class="fw-bold text-info mb-3">
+                                <i class="fa-solid fa-circle-info me-2"></i> NEAR LOW
+                            </h6>
+
+                            <ul class="list-group list-group-flush small" style="max-height:250px; overflow-y:auto;">
+                                <?php if (!empty($nearLowStock)): ?>
+                                    <?php foreach ($nearLowStock as $med): ?>
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong><?= htmlspecialchars($med['generic_name']) ?></strong><br>
+                                                <small class="text-muted"><?= htmlspecialchars($med['brand_name']) ?></small>
+                                            </div>
+                                            <span class="badge bg-info text-dark">
+                                                <?= number_format($med['stock_quantity']) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <li class="list-group-item text-muted">No medicines</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- LOW STOCK -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card shadow-sm rounded-4 p-3 h-100 border-start border-4 border-warning">
+                            <h6 class="fw-bold text-warning mb-3">
+                                <i class="fa-solid fa-triangle-exclamation me-2"></i> LOW STOCK
+                            </h6>
+
+                            <ul class="list-group list-group-flush small" style="max-height:250px; overflow-y:auto;">
+                                <?php if (!empty($lowStock)): ?>
+                                    <?php foreach ($lowStock as $med): ?>
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong><?= htmlspecialchars($med['generic_name']) ?></strong><br>
+                                                <small class="text-muted"><?= htmlspecialchars($med['brand_name']) ?></small>
+                                            </div>
+                                            <span class="badge bg-warning text-dark">
+                                                <?= number_format($med['stock_quantity']) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <li class="list-group-item text-muted">No medicines</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- NO STOCK -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card shadow-sm rounded-4 p-3 h-100 border-start border-4 border-danger">
+                            <h6 class="fw-bold text-danger mb-3">
+                                <i class="fa-solid fa-circle-xmark me-2"></i> NO STOCK
+                            </h6>
+
+                            <ul class="list-group list-group-flush small" style="max-height:250px; overflow-y:auto;">
+                                <?php if (!empty($noStock)): ?>
+                                    <?php foreach ($noStock as $med): ?>
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong><?= htmlspecialchars($med['generic_name']) ?></strong><br>
+                                                <small class="text-muted"><?= htmlspecialchars($med['brand_name']) ?></small>
+                                            </div>
+                                            <span class="badge bg-danger">
+                                                <?= number_format($med['stock_quantity']) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <li class="list-group-item text-muted">No medicines</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
                 <!-- MAIN CHART ROW -->
                 <div class="row mb-4">
                     <!-- SALES PERFORMANCE -->
@@ -619,9 +732,6 @@ for ($i = 1; $i <= 12; $i++) {
                             <div id="revenueChart"></div>
                         </div>
                     </div>
-
-
-
                 </div>
 
                 <center>
@@ -633,7 +743,7 @@ for ($i = 1; $i <= 12; $i++) {
                     <div class="lalagyanannya">
                         <bttn class="close-btn" onclick="closeModal('pharmacyModal')">X</bttn>
                         <center>
-                            <h3 style="font-weight: bold;">Pharmacy Department Replacement Request</h3> 
+                            <h3 style="font-weight: bold;">Pharmacy Department Replacement Request</h3>
                         </center>
                         <br />
 
@@ -894,6 +1004,7 @@ for ($i = 1; $i <= 12; $i++) {
         function openModal(id) {
             document.getElementById(id).style.display = "flex";
         }
+
         function closeModal(id) {
             document.getElementById(id).style.display = "none";
         }
@@ -902,10 +1013,9 @@ for ($i = 1; $i <= 12; $i++) {
             const modals = ['laboratoryModal'];
             modals.forEach(id => {
                 const modal = document.getElementById(id);
-                if(event.target == modal) closeModal(id);
+                if (event.target == modal) closeModal(id);
             });
         }
-
     </script>
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>

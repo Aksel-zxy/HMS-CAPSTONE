@@ -374,7 +374,7 @@ if (isset($_POST['clear_recent'])) {
                         <a href="pharmacy_sales.php" class="sidebar-link">Financial Report</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="" class="sidebar-link">Dispensing Report</a>
+                        <a href="pharmacy_dispense_report.php" class="sidebar-link">Dispensing Report</a>
                     </li>
                 </ul>
             </li>

@@ -349,6 +349,7 @@ $notifCount = $notif->notifCount;
                 margin: 0;
                 padding: 0;
             }
+
             .sidebar-toggle,
             .topbar,
             .filter-section,
@@ -359,37 +360,48 @@ $notifCount = $notif->notifCount;
             .toggler-btn {
                 display: none !important;
             }
+
             .main {
                 margin-left: 0 !important;
                 padding: 0 !important;
             }
+
             .content {
                 padding: 20px !important;
             }
+
             .table {
                 font-size: 11px;
             }
+
             .stat-box {
                 page-break-inside: avoid;
             }
+
             .table-container,
             .chart-container {
                 page-break-inside: avoid;
                 box-shadow: none !important;
                 border: 1px solid #ddd;
             }
+
             .stat-box {
                 background: white !important;
                 border: 1px solid #ddd !important;
                 color: #333 !important;
             }
-            h1, h3 {
+
+            h1,
+            h3 {
                 color: #000 !important;
             }
-            td, th {
+
+            td,
+            th {
                 border: 1px solid #999 !important;
                 padding: 6px !important;
             }
+
             .section-header {
                 border-bottom: 2px solid #000 !important;
             }
@@ -643,7 +655,7 @@ $notifCount = $notif->notifCount;
                         <a href="pharmacy_sales.php" class="sidebar-link">Financial Report</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="" class="sidebar-link">Dispensing Report</a>
+                        <a href="pharmacy_dispense_report.php" class="sidebar-link">Dispensing Report</a>
                     </li>
                 </ul>
             </li>
@@ -928,63 +940,63 @@ $notifCount = $notif->notifCount;
                     <div id="listing-tab" class="tab-content">
                         <div style="overflow-x: auto;">
                             <table id="detailedInventoryTable" class="report-table">
-                            <thead class="table-light">
-                                <tr class="text-nowrap">
-                                    <th>Med ID</th>
-                                    <th>Medicine Name</th>
-                                    <th>Generic Name</th>
-                                    <th>Category</th>
-                                    <th>Stock</th>
-                                    <th>Unit Price (₱)</th>
-                                    <th>Total Value (₱)</th>
-                                    <th>Unit</th>
-                                    <th>Rx</th>
-                                    <th>Status</th>
-                                    <th>Location</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (!empty($all_medicines)): ?>
-                                    <?php foreach ($all_medicines as $med): ?>
-                                        <?php
-                                        $status_badge = '';
-                                        if ($med['status'] == 'Out of Stock') {
-                                            $status_badge = 'danger';
-                                        } elseif ($med['status'] == 'Low Stock') {
-                                            $status_badge = 'warning';
-                                        } else {
-                                            $status_badge = 'success';
-                                        }
-                                        ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($med['med_id']); ?></td>
-                                            <td><?php echo htmlspecialchars($med['med_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($med['generic_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($med['category']); ?></td>
-                                            <td><?php echo $med['stock_quantity']; ?> pieces</td>
-                                            <td><?php echo number_format($med['unit_price'], 2); ?></td>
-                                            <td><?php echo number_format($med['total_value'], 2); ?></td>
-                                            <td><?php echo htmlspecialchars($med['unit']); ?></td>
-                                            <td>
-                                                <?php echo $med['prescription_required'] == 'Yes' ? '<span class="badge bg-danger">Rx</span>' : '<span class="badge bg-success">OTC</span>'; ?>
-                                            </td>
-                                            <td>
-                                                <span class="badge bg-<?php echo $status_badge; ?>">
-                                                    <?php echo htmlspecialchars($med['status']); ?>
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <small><?php echo htmlspecialchars($med['storage_room']); ?> | Shelf <?php echo $med['shelf_no']; ?> | Rack <?php echo $med['rack_no']; ?> | Bin <?php echo $med['bin_no']; ?></small>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td colspan="11" class="text-center text-muted">No inventory records found</td>
+                                <thead class="table-light">
+                                    <tr class="text-nowrap">
+                                        <th>Med ID</th>
+                                        <th>Medicine Name</th>
+                                        <th>Generic Name</th>
+                                        <th>Category</th>
+                                        <th>Stock</th>
+                                        <th>Unit Price (₱)</th>
+                                        <th>Total Value (₱)</th>
+                                        <th>Unit</th>
+                                        <th>Rx</th>
+                                        <th>Status</th>
+                                        <th>Location</th>
                                     </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    <?php if (!empty($all_medicines)): ?>
+                                        <?php foreach ($all_medicines as $med): ?>
+                                            <?php
+                                            $status_badge = '';
+                                            if ($med['status'] == 'Out of Stock') {
+                                                $status_badge = 'danger';
+                                            } elseif ($med['status'] == 'Low Stock') {
+                                                $status_badge = 'warning';
+                                            } else {
+                                                $status_badge = 'success';
+                                            }
+                                            ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($med['med_id']); ?></td>
+                                                <td><?php echo htmlspecialchars($med['med_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($med['generic_name']); ?></td>
+                                                <td><?php echo htmlspecialchars($med['category']); ?></td>
+                                                <td><?php echo $med['stock_quantity']; ?> pieces</td>
+                                                <td><?php echo number_format($med['unit_price'], 2); ?></td>
+                                                <td><?php echo number_format($med['total_value'], 2); ?></td>
+                                                <td><?php echo htmlspecialchars($med['unit']); ?></td>
+                                                <td>
+                                                    <?php echo $med['prescription_required'] == 'Yes' ? '<span class="badge bg-danger">Rx</span>' : '<span class="badge bg-success">OTC</span>'; ?>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-<?php echo $status_badge; ?>">
+                                                        <?php echo htmlspecialchars($med['status']); ?>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <small><?php echo htmlspecialchars($med['storage_room']); ?> | Shelf <?php echo $med['shelf_no']; ?> | Rack <?php echo $med['rack_no']; ?> | Bin <?php echo $med['bin_no']; ?></small>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="11" class="text-center text-muted">No inventory records found</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
