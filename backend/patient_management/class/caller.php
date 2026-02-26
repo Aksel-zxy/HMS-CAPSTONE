@@ -130,7 +130,8 @@ public function callBeddings() {
         SELECT DISTINCT
             b.room_number, 
             b.bed_number, 
-            b.status, 
+            b.status,
+            b.bed_type, 
             p.fname, 
             p.lname
         FROM p_beds b
@@ -170,6 +171,27 @@ public function getAllAppointments() {
         return $result;
     }
     
+    public function getDoctorSchedule($employee_id){
+    $sql = "SELECT appointment_date, status 
+            FROM p_appointments 
+            WHERE doctor_id = ? 
+            AND status != 'Cancelled'
+            ORDER BY appointment_date ASC";
+
+    $stmt = $this->conn->prepare($sql);
+    $stmt->bind_param("i", $employee_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $appointments = [];
+
+    while ($row = $result->fetch_assoc()) {
+        $appointments[] = $row;
+    }
+
+    return $appointments;
+}
+
 public function getDoctors() {
     $sql = "SELECT employee_id, first_name, last_name, specialization
             FROM hr_employees 

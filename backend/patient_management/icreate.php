@@ -25,7 +25,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">First Name</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" name="fname"required>
+                                <input type="text" class="form-control" name="fname" required>
                             </div>
                         </div>
 
@@ -39,14 +39,14 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Last Name</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" name="lname"required>
+                                <input type="text" class="form-control" name="lname" required>
                             </div>
                         </div>
 
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Address</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" name="address"required>
+                                <input type="text" class="form-control" name="address" required>
                             </div>
                         </div>
 
@@ -131,7 +131,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             <label class="col-sm-3 col-form-label">Admission Type</label>
                             <div class="col-sm-9">
                                 <select class="form-select" name="admission_type" required>
-                                    <option value="">-- Select Admission Type --</option>
+                                    <option value="Registered Patient">Registered Patient</option>
                                     <option value="Emergency">Emergency</option>
                                     <option value="Planned">Planned</option>
                                     <option value="Elective">Elective</option>
