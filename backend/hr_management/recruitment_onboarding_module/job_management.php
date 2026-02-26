@@ -198,10 +198,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../payroll_compensation_benifits_module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -337,6 +337,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <input type="text" id="job_position" name="job_position" required>
                     <br />
 
+                    <label for="job_qualification">Job Qualification:</label>
+                    <textarea rows="3" id="job_qualification" name="job_qualification" required></textarea>
+                    <br />
+
                     <label for="job_description">Job Description:</label>
                     <textarea rows="3" id="job_description" name="job_description" required></textarea>
                     <br />
@@ -360,44 +364,58 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 <h2>Job Posting</h2>
                 <div class="job_post-container">
                     <?php
-                        $result = $conn->query("SELECT * FROM hr_job ORDER BY date_post DESC");
-
-                        if ($result->num_rows > 0) {
-                            while ($row = $result->fetch_assoc()) {
-                                echo '<div class="job_post-item">';
-
-                                    // ✅ Show image directly from DB
-                                    if (!empty($row['image'])) {
-                                        echo '<div style="text-align:center;">
-                                                <img src="data:image/jpeg;base64,' . htmlspecialchars($row['image']) . '" 
-                                                    alt="Job Post Image"
-                                                    style="max-width: 100%; height: auto; margin-bottom: 10px;">
-                                            </div>';
-                                    }
-
-                                    echo '<p><strong>Profession:</strong> ' . htmlspecialchars($row['profession']) . '</p>';
-                                    echo '<p><strong>Title:</strong> ' . htmlspecialchars($row['title']) . '</p>';
-                                    echo '<p><strong>Position:</strong> ' . htmlspecialchars($row['job_position']) . '</p>';
-                                    echo '<p style="text-align: justify;"><strong>Description:</strong> ' . htmlspecialchars($row['job_description']) . '</p>';
-                                    echo '<p><strong>Specialization:</strong> ' . htmlspecialchars($row['specialization']) . '</p>';
-                                    echo '<p><strong>Date Posted:</strong> ' . htmlspecialchars($row['date_post']) . '</p>';
-
-                                    echo '<div class="delete">';
-                                        echo '<a href="job_management.php?job_id=' . $row['job_id'] . '" 
-                                                onclick="return confirm(\'Are you sure you want to delete this job post?\');">
-                                                Delete
-                                            </a>';
-                                    echo '</div>';
-
-                                echo '</div>';
+                    function formatToListPreserve($text) {
+                        $lines = explode("\n", $text);
+                        $output = "<ul>";
+                        foreach ($lines as $line) {
+                            $line = trim($line);
+                            if ($line != '') {
+                                if (preg_match('/^•\s*/', $line)) {
+                                    $line = htmlspecialchars($line);
+                                    $output .= "<li>" . $line . "</li>";
+                                } else {
+                                    $output .= "<li>" . htmlspecialchars($line) . "</li>";
+                                }
                             }
-                        } else {
-                            echo '<p style="text-align:center;">No job post found.</p>';
                         }
+                        $output .= "</ul>";
+                        return $output;
+                    }
+
+                    $result = $conn->query("SELECT * FROM hr_job ORDER BY date_post DESC");
+
+                    if ($result->num_rows > 0) {
+                        while ($row = $result->fetch_assoc()) {
+                            echo '<div class="job_post-item">';
+
+                            if (!empty($row['image'])) {
+                                echo '<div style="text-align:center;">
+                                        <img src="data:image/jpeg;base64,' . htmlspecialchars($row['image']) . '" 
+                                            alt="Job Post Image"
+                                            style="max-width: 100%; height: auto; margin-bottom: 10px;">
+                                    </div>';
+                            }
+                            echo '<p><strong>Profession:</strong> ' . htmlspecialchars($row['profession']) . '</p>';
+                            echo '<p><strong>Title:</strong> ' . htmlspecialchars($row['title']) . '</p>';
+                            echo '<p><strong>Position:</strong> ' . htmlspecialchars($row['job_position']) . '</p>';
+                            echo '<p><strong>Description:</strong></p>' . formatToListPreserve($row['job_description']);
+                            echo '<p><strong>Qualification:</strong></p>' . formatToListPreserve($row['job_qualification']);
+                            echo '<p><strong>Specialization:</strong> ' . htmlspecialchars($row['specialization']) . '</p>';
+                            echo '<p><strong>Date Posted:</strong> ' . htmlspecialchars($row['date_post']) . '</p>';
+                            echo '<div class="delete">';
+                                echo '<a href="job_management.php?job_id=' . $row['job_id'] . '" 
+                                        onclick="return confirm(\'Are you sure you want to delete this job post?\');">
+                                        Delete
+                                    </a>';
+                            echo '</div>';
+
+                            echo '</div>';
+                        }
+                    } else {
+                        echo '<p style="text-align:center;">No job post found.</p>';
+                    }
                     ?>
                 </div>
-            </div>
-
             </div>
             <!-- END CODING HERE -->
 
@@ -411,7 +429,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <!----- End of Footer Content ----->
 
     <script>
-
         window.addEventListener("load", function(){
             setTimeout(function(){
                 document.getElementById("loading-screen").style.display = "none";

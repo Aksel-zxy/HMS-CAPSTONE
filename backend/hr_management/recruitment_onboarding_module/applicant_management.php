@@ -85,6 +85,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 </head>
 
 <body>
+
     <!----- Full-page Loader ----->
     <div id="loading-screen">
         <div class="loader">
@@ -334,28 +335,36 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                     🤖 AI Evaluate
                                     </a>
 
-                                    <!-- Interview / Status Form -->
-                                    <form method="POST" class="d-flex flex-column align-items-center gap-2">
-                                        <input type="hidden" name="applicant_id" value="<?= $row['applicant_id']; ?>">
+                                <form method="POST" class="d-flex flex-column align-items-center gap-2">
+                                    <input type="hidden" name="applicant_id" value="<?= $row['applicant_id']; ?>">
 
-                                        <?php if ($currentStatus !== 'Done Interview'): ?>
-                                            <input type="date" name="interview_date" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
-                                            <input type="text" name="notes" placeholder="Notes (Optional)" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
-                                            <button type="submit" name="action" value="schedule_interview" class="btn btn-primary btn-sm" style="max-width:120px;">Schedule</button>
-                                        <?php endif; ?>
+                                    <!-- Date Input -->
+                                    <input type="date" name="interview_date" class="form-control form-control-sm" style="max-width:200px; text-align:center;">
 
-                                        <?php if (isset($tracking['interview_date']) && in_array($currentStatus, ['Pending Interview', 'Scheduled'])): ?>
-                                            <button type="submit" name="action" value="done_interview" class="btn btn-warning btn-sm mt-1" style="max-width:120px;">Done Interview</button>
-                                        <?php endif; ?>
+                                    <!-- Notes Input --> 
+                                    <input type="text" name="notes" placeholder="Notes (Optional)" class="form-control form-control-sm" style="max-width:200px; text-align:center;"> 
 
-                                        <?php if ($currentStatus === 'Done Interview'): ?>
-                                            <div class="d-flex gap-2 justify-content-center mt-1">
-                                                <button type="submit" name="action" value="update_status" class="btn btn-success btn-sm" title="Hired" onclick="this.form.status.value='Hired';"><i class="fas fa-check"></i></button>
-                                                <button type="submit" name="action" value="update_status" class="btn btn-danger btn-sm" title="Rejected" onclick="this.form.status.value='Rejected';"><i class="fas fa-times"></i></button>
-                                                <input type="hidden" name="status" value="">
-                                            </div>
-                                        <?php endif; ?>
-                                    </form>
+                                    <!-- Schedule Button --> 
+                                    <button type="submit" name="action" value="schedule_interview" class="btn btn-primary btn-sm" style="max-width:120px;">Schedule</button>                                        
+
+                                    <!-- Done Interview Button (optional) -->
+                                    <?php if (isset($tracking['interview_date']) && in_array($tracking['status'], ['Pending Interview', 'Scheduled'])): ?>
+                                        <button type="submit" name="action" value="done_interview" class="btn btn-warning btn-sm mt-1" style="max-width:120px;">
+                                            Done Interview
+                                        </button>
+                                    <?php endif; ?>
+
+                                    <!-- Hired & Rejected Buttons (always visible) -->
+                                    <div class="d-flex gap-2 justify-content-center mt-1">
+                                        <button type="submit" name="action" value="update_status" class="btn btn-success btn-sm" title="Hired" onclick="this.form.status.value='Hired';">
+                                            <i class="fas fa-check"></i> Hired
+                                        </button>
+                                        <button type="submit" name="action" value="update_status" class="btn btn-danger btn-sm" title="Rejected" onclick="this.form.status.value='Rejected';">
+                                            <i class="fas fa-times"></i> Rejected
+                                        </button>
+                                        <input type="hidden" name="status" value="">
+                                    </div>
+                                </form>
                                 </td>
 
                                 <!-- AI Analysis Column -->
@@ -405,7 +414,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
         window.addEventListener("load", function(){
             setTimeout(function(){
                 document.getElementById("loading-screen").style.display = "none";
-                document.body.classList.add("show-cards");
             }, 2000);
         });
 

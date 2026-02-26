@@ -19,7 +19,7 @@ body {
 
 .job-container {
   width: 100%;
-  max-width: 1200px;
+  max-width: 1300px;
   display: flex;
   justify-content: center;
   margin: 50px 0;
@@ -28,7 +28,7 @@ body {
 .job-box {
   padding: 40px 30px;
   border-radius: 10px;
-  max-width: 1000px;
+  max-width: 1200px;
   width: 100%;
   box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
   height: auto;
@@ -59,8 +59,9 @@ body {
 /* ---------- Job Post ---------- */
 .job_post-container {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap; /* allow multiple columns */
   gap: 20px;
+  justify-content: center; /* center the columns */
 }
 
 .job_post-item {
@@ -68,23 +69,14 @@ body {
   background-color: #ffffff;
   border: 1px solid #ddd;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.9);
-  width: calc(33.333% - 20px);
-  max-width: 350px;
+  width: calc(50% - 100px); /* two columns */
+  max-width: 500px;       /* optional max width per item */
   opacity: 0;
   transform: translateY(20px);
-  animation: fadeInLeft 0.6s ease forwards;
+  animation: fadeInUp 0.6s ease forwards;
+  text-align: justify;
+  transition: transform 0.3s, box-shadow 0.3s;
 }
-
-.job_post-item:nth-child(1) { animation-delay: 0.4s; }
-.job_post-item:nth-child(2) { animation-delay: 0.6s; }
-.job_post-item:nth-child(3) { animation-delay: 0.8s; }
-.job_post-item:nth-child(4) { animation-delay: 1s; }
-.job_post-item:nth-child(5) { animation-delay: 1.2s; }
-.job_post-item:nth-child(6) { animation-delay: 1.4s; }
-.job_post-item:nth-child(7) { animation-delay: 1.6s; }
-.job_post-item:nth-child(8) { animation-delay: 1.8s; }
-.job_post-item:nth-child(9) { animation-delay: 2s; }
-.job_post-item:nth-child(10) { animation-delay: 2.2s; }
 
 .job_post-item:hover {
   border-radius: 10px;
@@ -94,43 +86,33 @@ body {
 
 .job_post-item img {
   max-width: 100%;
-  width: 500px;
   height: auto;
   border-radius: 4px;
   border: 3px solid black;
 }
 
-.job_post-container:has(.job_post-item:nth-child(1):nth-last-child(1)) {
-  justify-content: center;
-}
-.job_post-item:nth-child(1):nth-last-child(1) {
-  width: 100%;
-  max-width: 400px;
-}
-
-.job_post-container:has(.job_post-item:nth-child(2):nth-last-child(1)) {
-  justify-content: center;
-}
-.job_post-item:nth-child(2):nth-last-child(1),
-.job_post-item:nth-child(1):nth-last-child(2) {
-  width: calc(50% - 20px);
+/* Remove old nth-child column animations if any */
+.job_post-item:nth-child(1),
+.job_post-item:nth-child(2),
+.job_post-item:nth-child(3),
+.job_post-item:nth-child(4),
+.job_post-item:nth-child(5) {
+  animation-delay: 0.4s; /* optional same delay */
 }
 
+/* ---------- Responsive ---------- */
 @media (max-width: 768px) {
   .job_post-container {
     flex-direction: column;
     align-items: center;
   }
-  .job_post-list {
-    width: 100%;
-    max-width: 400px;
-  }
   .job_post-item {
     width: 100%;
-    max-width: 350px;
+    max-width: 400px; /* fit mobile screen */
   }
 }
 
+/* ---------- Animations ---------- */
 @keyframes fadeInUp {
   to {
     opacity: 1;

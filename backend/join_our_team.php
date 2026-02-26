@@ -32,29 +32,69 @@ $posts = $jobPost->getAllPosts();
         <p>at Dr. Eduardo V. Roquero Memorial Hospital</p>
     </div>
 
-            <div class="job_post-container">
-                <?php if (!empty($posts)): ?>
-                    <?php foreach ($posts as $row): ?>
-                        <div class="job_post-item">
-                            <?php if (!empty($row['image'])): ?>
-                                <img src="data:image/jpeg;base64,<?= htmlspecialchars($row['image']) ?>" alt="Job Post Image" style="max-width: 100%; height: auto; margin-bottom: 10px;">
-                                <p style="font-size: 13px; margin-top: 5px; text-align: justify;">
-                                    <span style="font-weight: bold; color: black;">Profession: </span><?= htmlspecialchars($row['profession']) ?><br>
-                                    <span style="font-weight: bold; color: black;">Title: </span><?= htmlspecialchars($row['title']) ?><br>
-                                    <span style="font-weight: bold; color: black;">Job Position: </span><?= htmlspecialchars($row['job_position']) ?><br>
-                                    <span style="font-weight: bold; color: black;">Specialization: </span><?= htmlspecialchars($row['specialization']) ?><br>
-                                    <span style="font-weight: bold; color: black;">Job Description: </span><?= htmlspecialchars($row['job_description']) ?><br>
-                                </p>
-                                <center>
-                                    <button class="apply" onclick="openForm('<?= htmlspecialchars($row['profession']) ?>','<?= htmlspecialchars($row['job_position']) ?>', '<?= htmlspecialchars($row['specialization']) ?>', '<?= htmlspecialchars($row['title']) ?>')">APPLY NOW!!!!</button>
-                                </center>
-                            <?php endif; ?>
+        <div class="job_post-container">
+            <?php if (!empty($posts)): ?>
+
+                <?php
+                // Function to format text to bullet list, preserve existing bullets
+                function formatToListPreserve($text) {
+                    $lines = explode("\n", $text); // split by line break
+                    $output = "<ul>";
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if ($line != '') {
+                            // Remove leading bullet character if exists
+                            $line = preg_replace('/^•\s*/', '', $line);
+                            $output .= "<li>" . htmlspecialchars($line) . "</li>";
+                        }
+                    }
+                    $output .= "</ul>";
+                    return $output;
+                }
+                ?>
+
+                <?php foreach ($posts as $row): ?>
+                    <div class="job_post-item">
+
+                        <!-- Job Image -->
+                        <?php if (!empty($row['image'])): ?>
+                            <img src="data:image/jpeg;base64,<?= htmlspecialchars($row['image']) ?>" 
+                                alt="Job Post Image">
+                        <?php endif; ?>
+
+                        <!-- Job Info -->
+                        <div class="job_post-info" style="font-size: 14px; line-height: 1.5; text-align: justify; color: black; margin-top: 10px;">
+                            <p><strong>Profession:</strong> <?= htmlspecialchars($row['profession']) ?></p>
+                            <p><strong>Title:</strong> <?= htmlspecialchars($row['title']) ?></p>
+                            <p><strong>Job Position:</strong> <?= htmlspecialchars($row['job_position']) ?></p>
+                            <p><strong>Specialization:</strong> <?= htmlspecialchars($row['specialization']) ?></p>
+
+                            <!-- Job Description -->
+                            <p><strong>Job Description:</strong></p>
+                            <?= formatToListPreserve($row['job_description']) ?>
+
+                            <!-- Job Qualification -->
+                            <p><strong>Job Qualification:</strong></p>
+                            <?= formatToListPreserve($row['job_qualification']) ?>
                         </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p style="color:white; text-align:center;">No job post available at the moment.</p>
-                <?php endif; ?>
-            </div>
+
+                        <!-- Apply Button -->
+                        <div style="text-align: center; margin-top: 10px;">
+                            <button class="apply" onclick="openForm(
+                                '<?= htmlspecialchars($row['profession']) ?>',
+                                '<?= htmlspecialchars($row['job_position']) ?>',
+                                '<?= htmlspecialchars($row['specialization']) ?>',
+                                '<?= htmlspecialchars($row['title']) ?>'
+                            )">APPLY NOW</button>
+                        </div>
+
+                    </div>
+                <?php endforeach; ?>
+
+            <?php else: ?>
+                <p style="color:white; text-align:center;">No job post available at the moment.</p>
+            <?php endif; ?>
+        </div>
 
             <div id="jobApplicationForm" class="popup-form">
                 <div class="form-container">
@@ -114,8 +154,11 @@ $posts = $jobPost->getAllPosts();
                         <label for="application_letter">Upload Application Letter</label>
                         <input type="file" id="application_letter" name="application_letter" required>
 
-                        <label for="government_id">Upload Goverment ID</label>
-                        <input type="file" id="government_id" name="government_id" required>
+                        <label for="license_id">Upload License ID</label>
+                        <input type="file" id="license_id" name="license_id" required>
+
+                        <label for="nbi_clearance">Upload NBI Clearance</label>
+                        <input type="file" id="nbi_clearance" name="nbi_clearance" required>
 
                         <label for="id_picture">Upload 2x2 Picture</label>
                         <input type="file" id="id_picture" name="id_picture" required>
