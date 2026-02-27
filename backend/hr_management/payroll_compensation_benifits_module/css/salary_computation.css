@@ -53,6 +53,37 @@
     margin-bottom: 50px;
 }
 
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    border: 1px solid transparent;
+    display: block;
+}
+
+.alert-info {
+    background-color: #e7f3fe;
+    color: #0c5460;      
+    border-color: #b8daff;
+}
+
+.alert-info:hover {
+    background-color: #d0e7fd;
+}
+
+.alert .close-btn {
+    float: right;
+    cursor: pointer;
+    font-weight: bold;
+    color: inherit;
+    border: none;
+    background: transparent;
+    font-size: 1rem;
+    line-height: 1;
+}
+
 /* ---------- Form ---------- */
 .card h3 {
     text-align: center;
