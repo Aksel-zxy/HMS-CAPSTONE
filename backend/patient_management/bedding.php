@@ -43,107 +43,7 @@ if (!$user) {
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
-    <style>
-    .seat {
-        width: 60px;
-        height: 90px;
-        background: linear-gradient(145deg, #e9ecef, #dee2e6);
-        border-radius: 0.4rem;
-        box-shadow: inset 3px 3px 5px #c1c7cd, inset -3px -3px 5px white;
-        position: relative;
-        overflow: hidden;
-        /* So overlay doesn’t spill out */
-    }
 
-    .room-card {
-        background: white;
-        border-radius: 0.5rem;
-        box-shadow: 0 0.25rem 0.5rem rgb(0 0 0 / 0.1);
-        padding: 1.5rem 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .seats {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1rem;
-        justify-items: center;
-        align-items: center;
-    }
-
-    .seat::before {
-        content: "";
-        position: absolute;
-        top: 20%;
-        left: 10%;
-        width: 80%;
-        height: 60%;
-        background: #adb5bd;
-        border-radius: 0.2rem;
-        box-shadow: inset 2px 2px 4px #6c757d;
-    }
-
-    /* ✅ Status overlay instead of replacing */
-    .seat.Available::after,
-    .seat.Occupied::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        /* full cover */
-        opacity: 0.4;
-        /* semi-transparent overlay */
-    }
-
-    .seat.Available::after {
-        background-color: #28a745;
-        /* green overlay */
-    }
-
-    .seat-name.empty {
-        height: 18px;
-        /* keeps seats aligned even when no name */
-    }
-
-    .seat-name {
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 4px;
-        color: black;
-    }
-
-    .seat.Occupied::after {
-        background-color: #dc3545;
-        /* red overlay */
-    }
-
-    .seat.Maintenance::after {
-        content: "⚠️";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 2rem;
-        color: #ffc107;
-        /* yellow warning */
-    }
-
-    .room-header {
-        grid-column: span 3;
-        text-align: center;
-        font-weight: 600;
-        font-size: 1.25rem;
-        color: #333;
-        margin-top: 0.5rem;
-    }
-
-
-    @media (max-width: 575.98px) {
-        .seat {
-            width: 40px;
-            height: 60px;
-        }
-    }
-    </style>
 </head>
 
 <body>
@@ -316,62 +216,56 @@ if (!$user) {
                 </div>
                 <div id="modalContainer"></div>
 
-                <div class="row gy-4 justify-content-center">
+                <div class="table-responsive mt-4">
+                    <table class="table table-bordered table-hover align-middle text-center">
+                        <thead class="table-primary">
+                            <tr>
+                                <th>Room Number</th>
+                                <th>Bed Number</th>
+                                <th>Patient Name</th>
+                                <th>Status</th>
+                                <th>Bed Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
 
-                    <?php foreach ($rooms as $room_number => $beds): ?>
-                    <div class="col-12 col-md-5 col-lg-4">
-                        <div class="room-card text-center">
+                            <?php foreach ($rooms as $room_number => $beds): ?>
+                            <?php foreach ($beds as $bed): ?>
 
+                            <?php
+                        $status = $bed['status'];
+                        $badgeClass = '';
 
+                        if ($status == 'Occupied') {
+                            $badgeClass = 'bg-danger';
+                        } elseif ($status == 'Available') {
+                            $badgeClass = 'bg-success';
+                        } else {
+                            $badgeClass = 'bg-warning text-dark';
+                        }
 
-                            <!-- ROOM NUMBER BELOW NAME -->
-                            <div class="room-header room-header-top">
-                                Room <?php echo $room_number; ?>
-                            </div>
+                        $patientName = ($status == 'Occupied' && !empty($bed['fname']))
+                            ? $bed['fname'] . ' ' . $bed['lname']
+                            : '—';
+                    ?>
 
-                            <div class="seats mt-2">
+                            <tr>
+                                <td><strong>Room <?php echo $room_number; ?></strong></td>
+                                <td>Bed <?php echo $bed['bed_number']; ?></td>
+                                <td><?php echo $patientName; ?></td>
+                                <td>
+                                    <span class="badge <?php echo $badgeClass; ?>">
+                                        <?php echo $status; ?>
+                                    </span>
+                                </td>
+                                <td><?php echo $bed['bed_type']; ?></td>
+                            </tr>
 
-                                <?php foreach ($beds as $bed): ?>
-                                <?php
-                            $seatClass = ($bed['status'] == 'Occupied') ? 'Occupied' :
-                                        (($bed['status'] == 'Available') ? 'Available' : 'Maintenance');
-                        ?>
+                            <?php endforeach; ?>
+                            <?php endforeach; ?>
 
-                                <div class="seat-wrapper">
-
-                                    <!-- NAME ABOVE SEAT -->
-                                    <?php if ($bed['status'] == 'Occupied' && !empty($bed['fname'])): ?>
-                                    <div class="seat-name">
-                                        <?php echo $bed['fname'] . ' ' . $bed['lname']; ?>
-                                    </div>
-                                    <?php else: ?>
-                                    <div class="seat-name empty"></div>
-                                    <?php endif; ?>
-
-                                    <!-- SEAT ICON -->
-                                    <div class="seat <?php echo $seatClass; ?>" title="<?php 
-                                        if ($bed['status'] == 'Occupied') {
-                                            echo 'Occupied by: ' . $bed['fname'] . ' ' . $bed['lname'];
-                                        } elseif ($bed['status'] == 'Under Maintenance') {
-                                            echo 'Under Maintenance (Bed ' . $bed['bed_number'] . ')';
-                                        } else {
-                                            echo 'Available (Bed ' . $bed['bed_number'] . ')';
-                                        }
-                                         ?>">
-                                    </div>
-
-                                </div>
-                                <?php endforeach; ?>
-
-                            </div>
-
-
-                        </div>
-                    </div>
-
-
-                    <?php endforeach; ?>
-
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

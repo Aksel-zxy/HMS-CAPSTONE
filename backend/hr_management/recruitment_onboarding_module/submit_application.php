@@ -41,7 +41,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $all_docs = [
             'resume'             => 'Resume',
             'application_letter' => 'Application Letter',
-            'government_id'      => 'Government ID',
+            'license_id'      => 'License ID',
+            'nbi_clearance'      => 'NBI Clearance',
             'id_picture'         => '2x2 Picture',
         ];
 

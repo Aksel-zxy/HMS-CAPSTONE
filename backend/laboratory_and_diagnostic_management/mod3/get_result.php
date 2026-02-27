@@ -85,7 +85,22 @@ function getAdvancedInterpretation($test, $value, $age, $gender) {
 
 
 
-$query = "SELECT * FROM $table WHERE scheduleID = ?";
+$query = "
+    SELECT t.*, 
+           e.first_name as medtech_fname, 
+           e.last_name as medtech_lname, 
+           e.license_number as medtech_license, 
+           v.fname as val_fname, 
+           v.lname as val_lname, 
+           NULL as val_license 
+    FROM $table t 
+    LEFT JOIN dl_schedule s ON t.scheduleID = s.scheduleID
+    LEFT JOIN dl_result_schedules rs ON s.scheduleID = rs.scheduleID
+    LEFT JOIN dl_results r ON rs.resultID = r.resultID
+    LEFT JOIN hr_employees e ON COALESCE(t.processed_by, s.employee_id) = e.employee_id
+    LEFT JOIN users v ON r.validated_by = v.user_id
+    WHERE t.scheduleID = ?
+";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $scheduleID);
 $stmt->execute();
@@ -190,9 +205,38 @@ $patient = $stmtPatient->get_result()->fetch_assoc();
         </table>
     <?php endif; ?>
 
-    <div style="margin-top:40px; display:flex; justify-content:space-between; text-align:center; font-size:0.8rem;">
-        <div><p style="border-top:1px solid #000; padding-top:5px; width:150px;">MedTech (Processed)</p></div>
-        <div><p style="border-top:1px solid #000; padding-top:5px; width:150px;">MedTech (Validated)</p></div>
-        <div><p style="border-top:1px solid #000; padding-top:5px; width:150px;">Pathologist</p></div>
+            <div style="margin-top:40px; display:flex; justify-content:space-around; text-align:center; font-size:0.8rem;">
+        <div>
+            <?php if (!empty($data['medtech_fname'])): ?>
+                <div style="margin-bottom: 5px; font-weight: bold; font-size: 0.9rem;">
+                    <?= strtoupper($data['medtech_fname'] . " " . $data['medtech_lname']) ?>
+                </div>
+                <div style="margin-bottom: 2px; font-size: 0.75rem;">
+                    Lic No: <?= htmlspecialchars($data['medtech_license'] ?? 'N/A') ?>
+                </div>
+            <?php else: ?>
+                <div style="margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; color: transparent;">-</div>
+                <div style="margin-bottom: 2px; font-size: 0.75rem; color: transparent;">-</div>
+            <?php endif; ?>
+            <p style="border-top:1px solid #000; padding-top:5px; width:200px; margin: 0 auto;">MedTech (Processed)</p>
+        </div>
+
+        <div>
+            <?php if (!empty($data['val_fname'])): ?>
+                <div style="margin-bottom: 5px; font-weight: bold; font-size: 0.9rem;">
+                    <?= strtoupper($data['val_fname'] . " " . $data['val_lname']) ?>
+                </div>
+                <div style="margin-bottom: 2px; font-size: 0.75rem;">
+                    Lic No: <?= htmlspecialchars($data['val_license'] ?? 'N/A') ?>
+                </div>
+            <?php else: ?>
+                <div style="margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; color: transparent;">-</div>
+                <div style="margin-bottom: 2px; font-size: 0.75rem; color: transparent;">-</div>
+            <?php endif; ?>
+            <p style="border-top:1px solid #000; padding-top:5px; width:200px; margin: 0 auto;">MedTech (Validated)</p>
+        </div>
     </div>
+</div>
+</div>
+</div>
 </div>

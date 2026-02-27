@@ -297,7 +297,7 @@ $allPatients = $patient->getAllPatients();
                                                 <button class="btn btn-success view-result-btn"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#viewResultModal"
-                                                    data-results='<?= json_encode($allTestsForPatient) ?>'>
+                                                    data-results="<?= htmlspecialchars(json_encode($allTestsForPatient), ENT_QUOTES, 'UTF-8') ?>">
                                                     View Result
                                                 </button>
                                             </td>

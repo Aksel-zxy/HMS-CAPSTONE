@@ -196,10 +196,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -265,13 +265,31 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                             <div>
                                 <label>Employee</label>
                                 <select name="employee_id" id="employee_id" required>
-                                    <option value="">----- Select Employee -----</option>
+                                    <option value="">-- Select Employee --</option>
+
                                     <?php foreach ($employees as $emp): ?>
-                                        <option value="<?php echo $emp['employee_id']; ?>">
-                                            <?php echo htmlspecialchars($emp['full_name'] ?? ''); ?> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Employee ID: <?php echo $emp['employee_id']; ?>)
+                                        <option 
+                                            value="<?= $emp['employee_id']; ?>"
+                                            data-profession="<?= strtolower($emp['profession']); ?>"
+                                            data-role="<?= strtolower($emp['role']); ?>"
+                                        >
+                                            <?= htmlspecialchars($emp['full_name']); ?>
+                                            (<?= $emp['employee_id']; ?>)
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                            </div>
+
+                            <!-- Profession -->
+                            <div>
+                                <label for="profession">Profession</label>
+                                <input type="text" name="profession" id="profession" readonly>
+                            </div>
+
+                            <!-- Role -->
+                            <div>
+                                <label for="role">Role</label>
+                                <input type="text" name="role" id="role" readonly>
                             </div>
 
                             <!-- Pay Period -->
@@ -346,38 +364,93 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
     <script>
         window.addEventListener("load", function(){
             setTimeout(function(){
-                document.getElementById("loading-screen").style.display = "none";
+                const loader = document.getElementById("loading-screen");
+                if(loader) loader.style.display = "none";
             }, 2000);
         });
 
+        // Sidebar toggle
         const toggler = document.querySelector(".toggler-btn");
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
 
-        // Initialize manual flags
+        // ===== AUTO SUGGEST BASIC PAY BASED ON PROFESSION + ROLE =====
+        const employeeSelect = document.getElementById('employee_id');
+        const basicPayField = document.getElementById('basic_pay');
+        const professionField = document.getElementById('profession');
+        const roleField = document.getElementById('role');
+
+        // Manual override flags
+        basicPayField.dataset.manual = false;
         ['sss','philhealth','pagibig'].forEach(id => {
             let el = document.getElementById(id);
             el.dataset.manual = false;
-
-            // mark as manual if HR types something
             el.addEventListener('input', function() {
                 this.dataset.manual = true;
             });
         });
 
-        // Auto-suggest contributions based on basic pay
-        document.getElementById('basic_pay').addEventListener('input', function() {
-            let basicPay = parseFloat(this.value) || 0;
-
-            let sss = (basicPay * 0.05).toFixed(2);
-            let philhealth = (basicPay * 0.025).toFixed(2);
-            let pagibig = 500;
-
-            if (document.getElementById('sss').dataset.manual == 'false') document.getElementById('sss').value = sss;
-            if (document.getElementById('philhealth').dataset.manual == 'false') document.getElementById('philhealth').value = philhealth;
-            if (document.getElementById('pagibig').dataset.manual == 'false') document.getElementById('pagibig').value = pagibig;
+        // Mark basic pay as manual if HR edits
+        basicPayField.addEventListener('input', function () {
+            this.dataset.manual = true;
         });
+
+        // Update fields when employee changes
+        employeeSelect.addEventListener('change', function () {
+            const selected = this.options[this.selectedIndex];
+
+            // Reset manual flag so auto-fill works
+            basicPayField.dataset.manual = false;
+
+            let profession = (selected.dataset.profession || '').trim();
+            let role = (selected.dataset.role || '').trim();
+
+            // Populate Profession & Role fields
+            professionField.value = profession ? profession.charAt(0).toUpperCase() + profession.slice(1) : '';
+            roleField.value = role ? role.charAt(0).toUpperCase() + role.slice(1) : '';
+
+            // ===== BASIC PAY SUGGESTION =====
+            let suggestedSalary = 0;
+            let profLower = profession.toLowerCase();
+            let roleLower = role.toLowerCase();
+
+            if (profLower.includes('doctor')) {
+                if (roleLower === 'resident doctor') {
+                    suggestedSalary = 55000;
+                } else if (roleLower === 'non-resident doctor') {
+                    suggestedSalary = 65000;
+                } else {
+                    suggestedSalary = 45000; // fallback
+                }
+            } else if (profLower.includes('nurse')) {
+                suggestedSalary = 23000;
+            } else if (profLower.includes('medical technologist') || profLower.includes('laboratorist')) {
+                suggestedSalary = 25000;
+            } else if (profLower.includes('pharmacist')) {
+                suggestedSalary = 27000;
+            }
+
+            // Auto-fill basic pay if not manually edited
+            if (basicPayField.dataset.manual === 'false') {
+                basicPayField.value = suggestedSalary;
+                basicPayField.dispatchEvent(new Event('input')); // trigger contribution auto compute
+            }
+        });
+
+        // ===== AUTO-SUGGEST CONTRIBUTIONS BASED ON BASIC PAY =====
+        basicPayField.addEventListener('input', function() {
+            const basicPay = parseFloat(this.value) || 0;
+
+            const sss = (basicPay * 0.05).toFixed(2);
+            const philhealth = (basicPay * 0.025).toFixed(2);
+            const pagibig = 500;
+
+            if (document.getElementById('sss').dataset.manual === 'false') document.getElementById('sss').value = sss;
+            if (document.getElementById('philhealth').dataset.manual === 'false') document.getElementById('philhealth').value = philhealth;
+            if (document.getElementById('pagibig').dataset.manual === 'false') document.getElementById('pagibig').value = pagibig;
+        });
+
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>

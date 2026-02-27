@@ -254,10 +254,10 @@ if (!empty($_SESSION['message'])) {
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="payroll_reports.php" class="sidebar-link">Payroll Reports</a>
