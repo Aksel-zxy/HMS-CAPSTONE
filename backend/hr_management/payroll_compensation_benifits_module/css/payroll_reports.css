@@ -54,14 +54,60 @@
     }
 }
 
+/* ---------- Search Bar ---------- */  
+.search-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.search-bar form {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.search-bar input[type="text"],
+.search-bar select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    outline: none;
+}
+
+.search-bar select {
+    background: #fff;
+    cursor: pointer;
+}
+
+.search-bar input[type="submit"] {
+    background: #0047ab;
+    color: white;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    width: 100px;
+    transition: background-color 0.3s;
+}
+
+.search-bar input[type="submit"]:hover {
+    background-color: #0096c7;
+    font-weight: bold;
+    transition: background-color 0.3s;
+    box-shadow: 10px 10px 10px rgba(0, 0, 0, 1);
+}
+
 /* ---------- Payroll Reports Nav-Link ---------- */
 .payrollreports-nav-inline {
     display: flex;
     justify-content: center; 
     align-items: center;    
     gap: 15px;            
-    margin-bottom: 30px;
-    flex-wrap: wrap;   
 }
 
 .payrollreports-nav-inline label {
@@ -70,31 +116,37 @@
 }
 
 .payrollreports-nav-inline input[type="date"] {
-    padding: 6px 10px;
-    border: 1px solid #ced4da;
+    padding: 8px;
+    border: 1px solid #ccc;
     border-radius: 5px;
     font-size: 14px;
+    outline: none;
 }
 
 .payrollreports-nav-inline button {
-    padding: 8px 16px;
-    background-color: #0047ab;
-    color: #fff;
+    background: #0047ab;
+    color: white;
     border: none;
+    padding: 8px 15px;
     border-radius: 5px;
     cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.3s ease;
+    font-size: 14px;
+    font-weight: bold;
+    width: 100px;
+    transition: background-color 0.3s;
 }
 
 .payrollreports-nav-inline button:hover {
     background-color: #0096c7;
+    font-weight: bold;
+    transition: background-color 0.3s;
+    box-shadow: 10px 10px 10px rgba(0, 0, 0, 1);
 }
 
 /* ---------- Table Style ---------- */
 .payrollreports {
     width: 96%;
-    margin: 15px auto;
+    margin: 0 auto;
     padding: 10px;
     overflow-x: auto;
     box-sizing: border-box;

@@ -26,11 +26,11 @@ $leaveNotif = new LeaveNotification($conn);
 // Initialize PayrollReports
 $report = new PayrollReports($conn);
 
-// Filter
-$start = $_GET['start'] ?? '';
-$end = $_GET['end'] ?? '';
+$start  = $_GET['start'] ?? '';
+$end    = $_GET['end'] ?? '';
+$search = $_GET['search'] ?? '';
 
-$payrolls = $report->getPayrolls($start, $end);
+$payrolls = $report->getPayrolls($start, $end, $search);
 $totals = $report->getSummaryTotals($payrolls);
 
 $pendingCount = $leaveNotif->getPendingLeaveCount();
@@ -170,10 +170,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -230,19 +230,49 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             </div>
             <!-- START CODING HERE -->
             <div class="payrollreports">
+                
                 <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Payroll Reports</p>
 
-                <!-- FILTER FORM -->
-                <form method="GET" class="payrollreports-nav-inline">
-                    <label>Start Date:</label>
-                    <input type="date" name="start" value="<?= htmlspecialchars($start) ?>">
+                <!-- ----- TopBar ----- -->
+                <div class="topbars" style="margin-bottom: 20px;">
+                    <div class="search-bar">
+                        <form method="GET">
 
-                    <label>End Date:</label>
-                    <input type="date" name="end" value="<?= htmlspecialchars($end) ?>">
+                            <!-- Preserve date filters -->
+                            <input type="hidden" name="start" value="<?= htmlspecialchars($start) ?>">
+                            <input type="hidden" name="end" value="<?= htmlspecialchars($end) ?>">
 
-                    <button type="submit">Filter</button>
-                    <a href="payroll_reports.php" style="text-decoration:none; padding:8px 16px; background:#404040; color:white; border-radius:5px;">Reset</a>
-                </form>
+                            <input type="text"
+                                name="search"
+                                placeholder="Search employee, position, department..."
+                                value="<?= htmlspecialchars($search) ?>"
+                                style="padding:8px; width:250px;">
+
+                            <input type="submit" value="Search">
+
+                        </form>
+
+                        <form method="GET" class="payrollreports-nav-inline">
+
+                            <label>Start Date:</label>
+                            <input type="date" name="start" value="<?= htmlspecialchars($start) ?>">
+
+                            <label>End Date:</label>
+                            <input type="date" name="end" value="<?= htmlspecialchars($end) ?>">
+
+                            <!-- Preserve search value -->
+                            <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
+
+                            <button type="submit">Filter</button>
+
+                            <a href="payroll_reports.php"
+                            style="text-decoration:none; padding:8px 16px; background:#404040; color:white; border-radius:5px;">
+                            Reset
+                            </a>
+                        </form>
+
+                    </div>
+                </div>
 
                 <!-- PAYROLL TABLE -->
                 <div>
