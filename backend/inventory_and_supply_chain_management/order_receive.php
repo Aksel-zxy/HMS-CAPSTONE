@@ -52,7 +52,10 @@ if (isset($_POST['action']) && $_POST['action'] === 'receive') {
         $pcs_per_box = $item['pcs_per_box'] ?? 1;
         $price       = $item['price']       ?? 0;
 
-        $total_qty = (strtolower($unit_type) === 'box')
+        // Map unit value to match inventory ENUM('Piece','Box')
+        $unit_enum = (strtolower($unit_type) === 'box') ? 'Box' : 'Piece';
+
+        $total_qty = ($unit_enum === 'Box')
             ? $received_qty * $pcs_per_box
             : $received_qty;
 

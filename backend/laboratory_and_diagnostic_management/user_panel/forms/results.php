@@ -3,6 +3,8 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once __DIR__ . "/../../../../SQL/config.php";
+session_start();
+$employee_id = $_SESSION['employee_id'] ?? null;
 
 
 function markScheduleCompleted($conn, $scheduleID)
@@ -79,13 +81,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $query = "
             INSERT INTO dl_lab_cbc
             (scheduleID, patientID, testType, wbc, rbc, hemoglobin, hematocrit, 
-             platelets, mcv, mch, mchc, remarks, created_at)
-            VALUES (?, ?, 'CBC', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+             platelets, mcv, mch, mchc, remarks, processed_by, created_at)
+            VALUES (?, ?, 'CBC', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ";
 
         $stmt = $conn->prepare($query);
         $stmt->bind_param(
-            "iisssssssss",
+            "iissssssssssi",
             $scheduleID,
             $patientID,
             $wbc,
@@ -96,7 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mcv,
             $mch,
             $mchc,
-            $remarks
+            $remarks,
+            $employee_id
         );
 
         if ($stmt->execute()) {
@@ -131,22 +134,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $query = "
             INSERT INTO $table
-            (scheduleID, patientID, testType, findings, impression, remarks, image_blob, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+            (scheduleID, patientID, testType, findings, impression, remarks, image_blob, processed_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ";
 
         $stmt = $conn->prepare($query);
         $null = NULL;
 
         $stmt->bind_param(
-            "iissssb",
+            "iissssbi",
             $scheduleID,
             $patientID,
             $testType,
             $findings,
             $impression,
             $remarks,
-            $null
+            $null,
+            $employee_id
         );
 
         if ($imageBlob !== null) {

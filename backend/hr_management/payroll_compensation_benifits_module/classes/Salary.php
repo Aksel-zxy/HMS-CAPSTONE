@@ -15,7 +15,9 @@ class Salary {
                     COALESCE(first_name,''),' ',
                     COALESCE(middle_name,''),' ',
                     COALESCE(last_name,'')
-                )) AS full_name
+                )) AS full_name,
+                profession,
+                role
             FROM hr_employees
             ORDER BY employee_id
         ");
@@ -47,6 +49,7 @@ class Salary {
         return $stmt->get_result()->fetch_assoc();
     }
 
+    // Compute salary for an employee
     public function computeEmployeeSalary($employee_id, $pay_period, $period_type = 'full') {
 
         // 1️⃣ MONTHLY COMPENSATION
@@ -84,7 +87,7 @@ class Salary {
         $profession = $profession_row['profession'] ?? '';
         $stmt->close();
 
-        // 4️⃣ FULL MONTH ON DUTY DAYS (for daily rate)
+        // 4️⃣ FULL MONTH ON DUTY DAYS
         $stmt = $this->conn->prepare("
             SELECT COUNT(*) as total_duty_days
             FROM hr_daily_attendance
@@ -97,7 +100,7 @@ class Salary {
         $total_duty_days_full = (int)$stmt->get_result()->fetch_assoc()['total_duty_days'];
         $stmt->close();
 
-        // 5️⃣ TOTAL DUTY DAYS IN CURRENT PAY PERIOD (for absence calculation)
+        // 5️⃣ TOTAL DUTY DAYS IN CURRENT PAY PERIOD
         $stmt = $this->conn->prepare("
             SELECT COUNT(*) as total_duty_days
             FROM hr_daily_attendance
@@ -124,9 +127,8 @@ class Salary {
 
         while ($row = $result->fetch_assoc()) {
             $status = $row['status'];
-
-            // Paid leave check
             $is_paid_leave = false;
+
             if (in_array($status, ['On Leave','On Leave (Half Day)'])) {
                 $stmt_leave = $this->conn->prepare("
                     SELECT is_paid
@@ -142,7 +144,6 @@ class Salary {
                 $is_paid_leave = ($leave_row['is_paid'] ?? 'No') === 'Yes';
             }
 
-            // Compute days worked
             switch ($status) {
                 case 'Present':
                 case 'Late':
@@ -161,7 +162,6 @@ class Salary {
                     $days_worked += 0.5;
                     break;
                 case 'Off Duty':
-                    // no deduction
                     break;
             }
 
@@ -179,7 +179,7 @@ class Salary {
         $bonuses_period = $total_duty_days_full > 0 ? ($monthly_bonuses / $total_duty_days_full) * $days_worked : 0;
         $thirteenth_month_period = $total_duty_days_full > 0 ? ($monthly_13th / $total_duty_days_full) * $days_worked : 0;
 
-        // 8️⃣ ABSENCE DEDUCTION (use pay period duty days, not full month)
+        // 8️⃣ ABSENCE DEDUCTION
         $absence_days = max(0, $total_duty_days_period - $days_worked);
         $absence_deduction = $daily_rate * $absence_days;
 
@@ -227,8 +227,11 @@ class Salary {
         ];
     }
 
-    // Inside Salary.php class
-    public function savePayroll($data) {
+    // Save payroll only if it does not exist
+    public function savePayroll($data, $status = 'Pending') {
+        $existing = $this->checkExistingPayroll($data['employee_id'], $data['pay_period_start'], $data['pay_period_end']);
+        if ($existing) return $existing['payroll_id']; // return existing payroll ID
+
         $stmt = $this->conn->prepare("
             INSERT INTO hr_payroll (
                 employee_id,
@@ -249,12 +252,13 @@ class Salary {
                 gross_pay,
                 total_deductions,
                 net_pay,
+                status,
                 date_generated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
 
         $stmt->bind_param(
-            "issddddddddddddddd",
+            "issddddddddddddddds",
             $data['employee_id'],
             $data['pay_period_start'],
             $data['pay_period_end'],
@@ -273,31 +277,45 @@ class Salary {
             $data['gross_pay'],
             $data['total_deductions'],
             $data['net_pay'],
+            $status
         );
 
-        if ($stmt->execute()) {
-            return $stmt->insert_id; // Returns the new payroll_id
-        } else {
-            return false;
-        }
+        if ($stmt->execute()) return $stmt->insert_id;
+        return false;
     }
 
-        public function markAsPaid($payroll_id) {
-            $stmt = $this->conn->prepare("
-                UPDATE hr_payroll
-                SET status = 'Paid'
-                WHERE payroll_id = ?
-            ");
-            $stmt->bind_param("i", $payroll_id);
-            return $stmt->execute();
-        }
-
-        public function getPayrollById($payroll_id) {
-            $stmt = $this->conn->prepare("SELECT * FROM hr_payroll WHERE payroll_id = ?");
-            $stmt->bind_param("i", $payroll_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            return $result->fetch_assoc(); // return as associative array
-        }
+    // Check if payroll exists
+    public function checkExistingPayroll($employee_id, $start, $end) {
+        $stmt = $this->conn->prepare("
+            SELECT * FROM hr_payroll 
+            WHERE employee_id = ?
+            AND pay_period_start = ?
+            AND pay_period_end = ?
+            LIMIT 1
+        ");
+        $stmt->bind_param("iss", $employee_id, $start, $end);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_assoc();
     }
 
+    // Get payroll by ID
+    public function getPayrollById($payroll_id) {
+        $stmt = $this->conn->prepare("SELECT * FROM hr_payroll WHERE payroll_id = ?");
+        $stmt->bind_param("i", $payroll_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        return $result->fetch_assoc();
+    }
+
+    // Mark payroll as Paid
+    public function markAsPaid($payroll_id) {
+        $stmt = $this->conn->prepare("
+            UPDATE hr_payroll
+            SET status = 'Paid'
+            WHERE payroll_id = ?
+        ");
+        $stmt->bind_param("i", $payroll_id);
+        return $stmt->execute();
+    }
+}

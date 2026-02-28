@@ -31,11 +31,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $stmt->close();
 
+    
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $validatorID = $_SESSION['user_id'] ?? null;
+
     $testList = implode(", ", $testNames);
-    $sql = "INSERT INTO dl_results (scheduleID, patientID, status, resultDate, result, remarks) 
-            VALUES (?, ?, ?, NOW(), ?, ?)";
+    $sql = "INSERT INTO dl_results (scheduleID, patientID, status, resultDate, result, remarks, validated_by) 
+            VALUES (?, ?, ?, NOW(), ?, ?, ?)";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iisss", $firstScheduleID, $patientID, $status, $testList, $remarks);
+    $bindValidatorID = $validatorID ? (int)$validatorID : 0;
+    $stmt->bind_param("iisssi", $firstScheduleID, $patientID, $status, $testList, $remarks, $bindValidatorID);
     $stmt->execute();
     $resultID = $stmt->insert_id;
     $stmt->close();

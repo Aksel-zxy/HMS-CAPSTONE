@@ -170,10 +170,10 @@ $result = $attendanceRecords->getDailyRecords($date);
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../payroll_compensation_benifits_module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>

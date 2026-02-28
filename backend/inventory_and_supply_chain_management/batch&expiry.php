@@ -26,7 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['set_expiry_submit']))
         $stmt2 = $pdo->prepare("SELECT id FROM vendor_products WHERE item_name LIKE ? LIMIT 1");
         $stmt2->execute(['%' . $item['item_name'] . '%']);
         $vp      = $stmt2->fetch(PDO::FETCH_ASSOC);
-        $item_id = $vp ? $vp['id'] : 0;
+        // Use null instead of 0 when no vendor product found, to avoid FK/constraint errors
+        $item_id = $vp ? $vp['id'] : null;
 
         $batch_no  = 'DRI-' . $item['id'];
         $total_pcs = intval($item['received_quantity']) * intval($item['pcs_per_box']);

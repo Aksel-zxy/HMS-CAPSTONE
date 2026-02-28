@@ -1,6 +1,41 @@
 <?php
 include '../../SQL/config.php';
 
+/* ── Initialize error & handle POST ── */
+$addError = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add_insurance') {
+    $full_name         = trim($_POST['full_name'] ?? '');
+    $relationship      = trim($_POST['relationship_to_insured'] ?? '');
+    $insurance_number  = trim($_POST['insurance_number'] ?? '');
+    $insurance_company = trim($_POST['insurance_company'] ?? '');
+    $promo_name        = trim($_POST['promo_name'] ?? '');
+    $discount_value    = trim($_POST['discount_value'] ?? '');
+    $discount_type     = trim($_POST['discount_type'] ?? 'Percentage');
+    $status            = trim($_POST['status'] ?? 'Active');
+
+    if (!$full_name || !$relationship || !$insurance_number || !$insurance_company || $discount_value === '') {
+        $addError = 'Please fill in all required fields and select an insurance company.';
+    } else {
+        $stmt = $conn->prepare("INSERT INTO patient_insurance 
+            (full_name, relationship_to_insured, insurance_number, insurance_company, promo_name, discount_value, discount_type, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->bind_param('sssssdss',
+            $full_name, $relationship, $insurance_number,
+            $insurance_company, $promo_name, $discount_value,
+            $discount_type, $status
+        );
+
+        if ($stmt->execute()) {
+            header('Location: ' . $_SERVER['PHP_SELF'] . '?added=1');
+            exit;
+        } else {
+            $addError = 'Database error: ' . htmlspecialchars($conn->error);
+        }
+        $stmt->close();
+    }
+}
+
 /* ── COLOR MAP PER INSURANCE COMPANY ── */
 function cardGradient($company) {
     return match ($company) {
@@ -112,11 +147,10 @@ body {
   transition: margin-left var(--tr);
   display: flex;
   flex-direction: column;
-  align-items: center;   /* ← centers everything horizontally */
+  align-items: center;
 }
 .cw.sidebar-collapsed { margin-left: 0; }
 
-/* Inner width cap — gives centered, comfortable reading area */
 .cw-inner {
   width: 100%;
   max-width: 1100px;
@@ -140,7 +174,6 @@ body {
   position: absolute; top: 0; left: 0; right: 0; height: 4px;
   background: linear-gradient(90deg, var(--navy) 0%, var(--blue) 50%, var(--teal) 100%);
 }
-/* Subtle background pattern */
 .masthead::after {
   content: '';
   position: absolute;
@@ -175,6 +208,10 @@ body {
   text-transform: uppercase; letter-spacing: .08em; font-weight: 500;
 }
 
+.masthead-right {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+
 .masthead-stats {
   display: flex; gap: 20px; flex-wrap: wrap; align-items: center;
 }
@@ -192,6 +229,28 @@ body {
   font-size: .65rem; font-weight: 700; text-transform: uppercase;
   letter-spacing: .08em; color: var(--ink-3); margin-top: 3px;
 }
+
+/* ── Add Insurance Button ── */
+.btn-add-insurance {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 22px;
+  background: linear-gradient(135deg, var(--navy), var(--blue));
+  color: #fff; border: none;
+  border-radius: var(--radius-lg);
+  font-family: var(--ff-body); font-size: .86rem; font-weight: 700;
+  cursor: pointer; text-decoration: none;
+  box-shadow: 0 6px 20px rgba(26,86,219,.35);
+  transition: all .2s;
+  white-space: nowrap;
+  letter-spacing: .02em;
+}
+.btn-add-insurance:hover {
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(26,86,219,.45);
+  color: #fff;
+}
+.btn-add-insurance i { font-size: 1rem; }
 
 /* ════════════════════════════════════════
    TOOLBAR
@@ -246,7 +305,6 @@ body {
   margin-bottom: 24px;
 }
 
-/* ── Individual Insurance Record Card ── */
 .ins-record-card {
   background: var(--paper);
   border: 1px solid var(--border);
@@ -263,7 +321,6 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
-/* Top colored band (mini insurance card preview) */
 .irc-top {
   height: 110px;
   position: relative;
@@ -309,7 +366,6 @@ body {
   color: rgba(255,255,255,.9); position: relative; z-index: 1;
 }
 
-/* Body section */
 .irc-body {
   padding: 16px 20px 14px;
   flex: 1;
@@ -330,7 +386,6 @@ body {
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.irc-detail-item {}
 .irc-detail-label {
   font-size: .63rem; font-weight: 700; text-transform: uppercase;
   letter-spacing: .08em; color: var(--ink-4); margin-bottom: 2px;
@@ -341,7 +396,6 @@ body {
 .irc-detail-val.discount { color: var(--green); }
 .irc-detail-val.mono    { font-family: var(--ff-mono); font-size: .76rem; }
 
-/* Footer */
 .irc-footer {
   padding: 12px 20px;
   border-top: 1px solid var(--border);
@@ -383,6 +437,27 @@ body {
 .empty-state p  { font-size: .85rem; }
 
 /* ════════════════════════════════════════
+   SUCCESS TOAST
+════════════════════════════════════════ */
+.toast-success {
+  position: fixed; top: 24px; right: 24px; z-index: 9999;
+  background: #fff; border: 1.5px solid #bbf7d0;
+  border-radius: var(--radius-lg);
+  padding: 14px 20px; display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--shadow-lg);
+  animation: slideInRight .35s ease, fadeOut .4s ease 3.5s forwards;
+  min-width: 280px;
+}
+.toast-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #d1fae5; color: var(--green);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.toast-text strong { display: block; font-size: .88rem; color: var(--ink); }
+.toast-text span   { font-size: .78rem; color: var(--ink-3); }
+
+/* ════════════════════════════════════════
    MODAL — INSURANCE CARD VIEWER
 ════════════════════════════════════════ */
 .modal-content {
@@ -414,7 +489,146 @@ body {
   background: #f4f7fb;
 }
 
-/* ── The Card itself ── */
+/* ── Add Insurance Modal specific ── */
+.add-modal .modal-body {
+  background: var(--paper);
+  padding: 28px 28px 24px;
+}
+.add-modal .modal-header {
+  background: linear-gradient(135deg, var(--navy), var(--blue));
+}
+
+.form-section {
+  margin-bottom: 22px;
+}
+.form-section-title {
+  font-size: .7rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--ink-4);
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+}
+.form-section-title i { color: var(--blue-2); }
+
+.form-row { display: grid; gap: 14px; margin-bottom: 14px; }
+.form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+.form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--ink-2);
+}
+.form-label .req { color: var(--red); margin-left: 2px; }
+
+.form-control-custom {
+  padding: 10px 13px;
+  border: 1.5px solid var(--border-2); border-radius: var(--radius);
+  font-family: var(--ff-body); font-size: .86rem; color: var(--ink);
+  background: var(--surface-2);
+  outline: none; transition: border-color .2s, box-shadow .2s, background .2s;
+  width: 100%;
+}
+.form-control-custom:focus {
+  border-color: var(--blue-2);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+  background: var(--paper);
+}
+select.form-control-custom { cursor: pointer; }
+.form-control-custom.is-invalid { border-color: var(--red); }
+
+/* Company selector cards */
+.company-selector {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin-bottom: 0;
+}
+.company-opt {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 6px;
+  border: 2px solid var(--border-2); border-radius: var(--radius);
+  cursor: pointer; transition: all .15s;
+  background: var(--surface-2);
+}
+.company-opt:hover { border-color: var(--ink-3); background: var(--paper); }
+.company-opt.selected { border-color: var(--blue); background: #eff6ff; }
+.company-opt input[type="radio"] { display: none; }
+.company-opt-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; color: #fff;
+}
+.company-opt-label {
+  font-size: .65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--ink-2); text-align: center; line-height: 1.2;
+}
+.company-opt.selected .company-opt-label { color: var(--blue); }
+
+/* Discount toggle */
+.discount-toggle {
+  display: flex; gap: 8px;
+}
+.dtype-btn {
+  flex: 1; padding: 10px 8px; border-radius: var(--radius);
+  border: 2px solid var(--border-2); background: var(--surface-2);
+  font-family: var(--ff-body); font-size: .8rem; font-weight: 600;
+  cursor: pointer; transition: all .15s; color: var(--ink-2);
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.dtype-btn.active {
+  border-color: var(--blue); background: #eff6ff; color: var(--blue);
+}
+
+/* Status pills */
+.status-selector { display: flex; gap: 8px; }
+.status-opt {
+  flex: 1; padding: 10px 8px; border-radius: var(--radius);
+  border: 2px solid var(--border-2); background: var(--surface-2);
+  font-family: var(--ff-body); font-size: .8rem; font-weight: 600;
+  cursor: pointer; transition: all .15s; color: var(--ink-2);
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  text-align: center;
+}
+.status-opt.active-opt  { border-color: var(--green); background: #d1fae5; color: var(--green); }
+.status-opt.inactive-opt{ border-color: var(--red);   background: #fee2e2; color: var(--red);   }
+.status-opt.pending-opt { border-color: var(--amber);  background: #fef3c7; color: var(--amber); }
+
+/* Add modal footer */
+.add-modal-footer {
+  padding: 16px 28px 20px;
+  border-top: 1px solid var(--border);
+  display: flex; gap: 10px; justify-content: flex-end;
+  background: var(--surface-2);
+}
+.btn-cancel {
+  padding: 10px 22px; border-radius: var(--radius);
+  border: 1.5px solid var(--border-2); background: var(--paper);
+  font-family: var(--ff-body); font-size: .86rem; font-weight: 600;
+  color: var(--ink-2); cursor: pointer; transition: all .15s;
+}
+.btn-cancel:hover { background: var(--surface); border-color: var(--ink-3); }
+.btn-submit {
+  padding: 10px 26px; border-radius: var(--radius);
+  border: none;
+  background: linear-gradient(135deg, var(--navy), var(--blue));
+  color: #fff; font-family: var(--ff-body); font-size: .86rem; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  box-shadow: 0 4px 14px rgba(26,86,219,.3);
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.btn-submit:hover {
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(26,86,219,.4);
+}
+
+.error-alert {
+  background: #fee2e2; border: 1.5px solid #fecaca;
+  border-radius: var(--radius); padding: 12px 16px;
+  color: var(--red); font-size: .84rem; font-weight: 600;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 18px;
+}
+
+/* ── The Card itself (modal viewer) ── */
 .card-stage {
   display: flex; justify-content: center;
   perspective: 1000px;
@@ -433,7 +647,6 @@ body {
 }
 .ins-card:hover { transform: rotateY(6deg) rotateX(-3deg) scale(1.03); }
 
-/* Decorative circles */
 .ins-card .deco1 {
   position: absolute; top: -70px; right: -50px;
   width: 220px; height: 220px; border-radius: 50%;
@@ -451,7 +664,6 @@ body {
   background: rgba(255,255,255,.03); pointer-events: none;
 }
 
-/* Card inner sections */
 .ic-top {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 12px; position: relative; z-index: 1;
@@ -519,7 +731,6 @@ body {
   border: 1px solid rgba(255,255,255,.25);
 }
 
-/* Detail pills below card */
 .detail-grid {
   display: grid; grid-template-columns: 1fr 1fr 1fr;
   gap: 10px; margin-top: 6px;
@@ -536,7 +747,7 @@ body {
 .detail-cell-val {
   font-size: .85rem; font-weight: 700; color: var(--ink);
 }
-.detail-cell-val.green  { color: var(--green); }
+.detail-cell-val.green         { color: var(--green); }
 .detail-cell-val.status-active   { color: var(--green); }
 .detail-cell-val.status-inactive { color: var(--red); }
 .detail-cell-val.status-pending  { color: var(--amber); }
@@ -547,6 +758,13 @@ body {
 @keyframes riseUp {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(60px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeOut {
+  to { opacity: 0; pointer-events: none; }
 }
 
 /* ════════════════════════════════════════
@@ -559,6 +777,7 @@ body {
   .masthead-title { font-size: 1.5rem; }
   .cards-grid { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr 1fr; }
+  .form-row.cols-3 { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 600px) {
   .cw { margin-left: 0 !important; padding: 56px 10px 40px; }
@@ -567,6 +786,10 @@ body {
   .search-wrap { max-width: 100%; }
   .detail-grid { grid-template-columns: 1fr 1fr; }
   .ins-card { height: auto; min-height: 210px; }
+  .form-row.cols-2,
+  .form-row.cols-3 { grid-template-columns: 1fr; }
+  .company-selector { grid-template-columns: repeat(2, 1fr); }
+  .btn-add-insurance span { display: none; }
 }
 @supports (padding: env(safe-area-inset-bottom)) {
   .cw { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
@@ -576,6 +799,16 @@ body {
 <body>
 
 <?php include 'billing_sidebar.php'; ?>
+
+<?php if (isset($_GET['added'])): ?>
+<div class="toast-success" id="successToast">
+  <div class="toast-icon"><i class="bi bi-check-lg"></i></div>
+  <div class="toast-text">
+    <strong>Insurance Added Successfully</strong>
+    <span>New patient insurance record has been saved.</span>
+  </div>
+</div>
+<?php endif; ?>
 
 <div class="cw" id="mainCw">
 <div class="cw-inner">
@@ -590,23 +823,29 @@ body {
           <div class="masthead-sub">HMS · Insurance Registry · Coverage Management</div>
         </div>
       </div>
-      <div class="masthead-stats">
-        <div class="stat-chip">
-          <div class="stat-chip-val"><?= $total ?></div>
-          <div class="stat-chip-lbl">Total Records</div>
-        </div>
-        <div class="stat-chip">
-          <div class="stat-chip-val">
-            <?= count(array_filter($rows, fn($r) => strtolower($r['status'] ?? 'active') === 'active')) ?>
+      <div class="masthead-right">
+        <div class="masthead-stats">
+          <div class="stat-chip">
+            <div class="stat-chip-val"><?= $total ?></div>
+            <div class="stat-chip-lbl">Total Records</div>
           </div>
-          <div class="stat-chip-lbl">Active</div>
-        </div>
-        <div class="stat-chip">
-          <div class="stat-chip-val">
-            <?= count(array_unique(array_column($rows, 'insurance_company'))) ?>
+          <div class="stat-chip">
+            <div class="stat-chip-val">
+              <?= count(array_filter($rows, fn($r) => strtolower($r['status'] ?? 'active') === 'active')) ?>
+            </div>
+            <div class="stat-chip-lbl">Active</div>
           </div>
-          <div class="stat-chip-lbl">Companies</div>
+          <div class="stat-chip">
+            <div class="stat-chip-val">
+              <?= count(array_unique(array_column($rows, 'insurance_company'))) ?>
+            </div>
+            <div class="stat-chip-lbl">Companies</div>
+          </div>
         </div>
+        <button class="btn-add-insurance" data-bs-toggle="modal" data-bs-target="#addInsuranceModal">
+          <i class="bi bi-plus-circle-fill"></i>
+          <span>Add Insurance</span>
+        </button>
       </div>
     </div>
   </div>
@@ -647,14 +886,14 @@ body {
       </div>
     <?php else: ?>
       <?php foreach ($rows as $i => $row):
-        $colors  = cardGradient($row['insurance_company']);
-        $co      = $row['insurance_company'];
-        $coKey   = strtolower(str_replace(' ', '', $co));
-        $status  = strtolower($row['status'] ?? 'active');
+        $colors   = cardGradient($row['insurance_company']);
+        $co       = $row['insurance_company'];
+        $coKey    = strtolower(str_replace(' ', '', $co));
+        $status   = strtolower($row['status'] ?? 'active');
         $discount = $row['discount_type'] === 'Percentage'
           ? htmlspecialchars($row['discount_value']) . '%'
           : '₱' . number_format($row['discount_value'], 2);
-        $modalId = 'modal_' . intval($row['patient_insurance_id']);
+        $modalId  = 'modal_' . intval($row['patient_insurance_id']);
         $numParts = implode(' ', str_split(preg_replace('/\s+/', '', $row['insurance_number']), 4));
 
         $badgeClass = match($co) {
@@ -678,7 +917,6 @@ body {
            style="animation-delay:<?= $i * 0.06 ?>s"
            data-bs-toggle="modal" data-bs-target="#<?= $modalId ?>">
 
-        <!-- Top colored band -->
         <div class="irc-top" style="background:linear-gradient(145deg,<?= $colors[0] ?>,<?= $colors[1] ?> 60%,<?= $colors[2] ?>);">
           <div class="irc-company-row">
             <span class="irc-company-name"><?= htmlspecialchars($co) ?></span>
@@ -687,7 +925,6 @@ body {
           <span class="irc-number"><?= $numParts ?></span>
         </div>
 
-        <!-- Body -->
         <div class="irc-body">
           <div class="irc-name"><?= htmlspecialchars($row['full_name']) ?></div>
           <div class="irc-meta">
@@ -716,7 +953,6 @@ body {
           </div>
         </div>
 
-        <!-- Footer -->
         <div class="irc-footer">
           <span class="irc-company-badge <?= $badgeClass ?>">
             <i class="bi <?= $icon ?>"></i>
@@ -735,14 +971,191 @@ body {
 </div><!-- /cw -->
 
 <!-- ════════════════════════════════════
+     ADD INSURANCE MODAL
+════════════════════════════════════ -->
+<div class="modal fade add-modal" id="addInsuranceModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <div class="modal-header-icon"><i class="bi bi-plus-circle"></i></div>
+        <div>
+          <div class="modal-title">Add Patient Insurance</div>
+          <div class="modal-sub">Register a new insurance record for a patient</div>
+        </div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="POST" action="" id="addInsuranceForm">
+        <input type="hidden" name="action" value="add_insurance">
+        <input type="hidden" name="insurance_company" id="selectedCompany" required>
+        <input type="hidden" name="discount_type" id="selectedDiscountType" value="Percentage" required>
+        <input type="hidden" name="status" id="selectedStatus" value="Active" required>
+
+        <div class="modal-body">
+
+          <?php if ($addError): ?>
+          <div class="error-alert">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <?= htmlspecialchars($addError) ?>
+          </div>
+          <?php endif; ?>
+
+          <!-- Patient Info -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <i class="bi bi-person-vcard"></i> Patient Information
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Full Name <span class="req">*</span></label>
+                <input type="text" name="full_name" class="form-control-custom"
+                       placeholder="e.g. Juan Dela Cruz"
+                       value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>" required>
+              </div>
+            </div>
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label">Relationship to Insured <span class="req">*</span></label>
+                <select name="relationship_to_insured" class="form-control-custom" required>
+                  <option value="" disabled <?= empty($_POST['relationship_to_insured']) ? 'selected' : '' ?>>Select relationship…</option>
+                  <option value="Self"      <?= ($_POST['relationship_to_insured'] ?? '') === 'Self'      ? 'selected' : '' ?>>Self</option>
+                  <option value="Spouse"    <?= ($_POST['relationship_to_insured'] ?? '') === 'Spouse'    ? 'selected' : '' ?>>Spouse</option>
+                  <option value="Child"     <?= ($_POST['relationship_to_insured'] ?? '') === 'Child'     ? 'selected' : '' ?>>Child</option>
+                  <option value="Parent"    <?= ($_POST['relationship_to_insured'] ?? '') === 'Parent'    ? 'selected' : '' ?>>Parent</option>
+                  <option value="Sibling"   <?= ($_POST['relationship_to_insured'] ?? '') === 'Sibling'   ? 'selected' : '' ?>>Sibling</option>
+                  <option value="Dependent" <?= ($_POST['relationship_to_insured'] ?? '') === 'Dependent' ? 'selected' : '' ?>>Dependent</option>
+                  <option value="Other"     <?= ($_POST['relationship_to_insured'] ?? '') === 'Other'     ? 'selected' : '' ?>>Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Insurance Number <span class="req">*</span></label>
+                <input type="text" name="insurance_number" class="form-control-custom"
+                       placeholder="e.g. PH-1234-5678"
+                       value="<?= htmlspecialchars($_POST['insurance_number'] ?? '') ?>" required>
+              </div>
+            </div>
+          </div>
+
+          <!-- Insurance Company -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <i class="bi bi-building-check"></i> Insurance Company <span class="req" style="margin-left:3px;">*</span>
+            </div>
+            <div class="company-selector" id="companySelector">
+              <label class="company-opt <?= ($_POST['insurance_company'] ?? '') === 'PhilHealth' ? 'selected' : '' ?>" data-company="PhilHealth">
+                <input type="radio" name="_company_radio" value="PhilHealth" <?= ($_POST['insurance_company'] ?? '') === 'PhilHealth' ? 'checked' : '' ?>>
+                <div class="company-opt-icon" style="background:linear-gradient(135deg,#0d2b6e,#1a56c4);">
+                  <i class="bi bi-hospital"></i>
+                </div>
+                <span class="company-opt-label">PhilHealth</span>
+              </label>
+              <label class="company-opt <?= ($_POST['insurance_company'] ?? '') === 'Maxicare' ? 'selected' : '' ?>" data-company="Maxicare">
+                <input type="radio" name="_company_radio" value="Maxicare" <?= ($_POST['insurance_company'] ?? '') === 'Maxicare' ? 'checked' : '' ?>>
+                <div class="company-opt-icon" style="background:linear-gradient(135deg,#0a6b5e,#0f9b8e);">
+                  <i class="bi bi-heart-pulse"></i>
+                </div>
+                <span class="company-opt-label">Maxicare</span>
+              </label>
+              <label class="company-opt <?= ($_POST['insurance_company'] ?? '') === 'Medicard' ? 'selected' : '' ?>" data-company="Medicard">
+                <input type="radio" name="_company_radio" value="Medicard" <?= ($_POST['insurance_company'] ?? '') === 'Medicard' ? 'checked' : '' ?>>
+                <div class="company-opt-icon" style="background:linear-gradient(135deg,#4a0080,#8e2de2);">
+                  <i class="bi bi-shield-heart"></i>
+                </div>
+                <span class="company-opt-label">Medicard</span>
+              </label>
+              <label class="company-opt <?= ($_POST['insurance_company'] ?? '') === 'Intellicare' ? 'selected' : '' ?>" data-company="Intellicare">
+                <input type="radio" name="_company_radio" value="Intellicare" <?= ($_POST['insurance_company'] ?? '') === 'Intellicare' ? 'checked' : '' ?>>
+                <div class="company-opt-icon" style="background:linear-gradient(135deg,#b35a00,#f7971e);">
+                  <i class="bi bi-shield-plus"></i>
+                </div>
+                <span class="company-opt-label">Intellicare</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Plan & Discount -->
+          <div class="form-section">
+            <div class="form-section-title">
+              <i class="bi bi-tag"></i> Plan & Discount
+            </div>
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label">Promo / Plan Name</label>
+                <input type="text" name="promo_name" class="form-control-custom"
+                       placeholder="e.g. Gold Plan, Basic Coverage"
+                       value="<?= htmlspecialchars($_POST['promo_name'] ?? '') ?>">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Discount Value <span class="req">*</span></label>
+                <input type="number" name="discount_value" class="form-control-custom"
+                       placeholder="e.g. 20" min="0" step="0.01"
+                       value="<?= htmlspecialchars($_POST['discount_value'] ?? '') ?>" required>
+              </div>
+            </div>
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label">Discount Type <span class="req">*</span></label>
+                <div class="discount-toggle" id="discountToggle">
+                  <button type="button"
+                          class="dtype-btn <?= ($_POST['discount_type'] ?? 'Percentage') === 'Percentage' ? 'active' : '' ?>"
+                          data-type="Percentage"
+                          onclick="selectDiscountType(this,'Percentage')">
+                    <i class="bi bi-percent"></i> Percentage
+                  </button>
+                  <button type="button"
+                          class="dtype-btn <?= ($_POST['discount_type'] ?? '') === 'Fixed' ? 'active' : '' ?>"
+                          data-type="Fixed"
+                          onclick="selectDiscountType(this,'Fixed')">
+                    <i class="bi bi-cash-coin"></i> Fixed (₱)
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Status <span class="req">*</span></label>
+                <div class="status-selector" id="statusSelector">
+                  <button type="button" class="status-opt active-opt"
+                          onclick="selectStatus(this,'Active')" data-status="Active">
+                    <i class="bi bi-check-circle-fill"></i> Active
+                  </button>
+                  <button type="button" class="status-opt inactive-opt"
+                          onclick="selectStatus(this,'Inactive')" data-status="Inactive">
+                    <i class="bi bi-x-circle"></i> Inactive
+                  </button>
+                  <button type="button" class="status-opt pending-opt"
+                          onclick="selectStatus(this,'Pending')" data-status="Pending">
+                    <i class="bi bi-clock"></i> Pending
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /modal-body -->
+
+        <div class="add-modal-footer">
+          <button type="button" class="btn-cancel" data-bs-dismiss="modal">
+            <i class="bi bi-x-lg"></i> Cancel
+          </button>
+          <button type="submit" class="btn-submit" id="submitBtn">
+            <i class="bi bi-shield-plus"></i> Save Insurance Record
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
      MODALS — Insurance Card Viewer
 ════════════════════════════════════ -->
 <?php foreach ($rows as $row):
-  $colors  = cardGradient($row['insurance_company']);
-  $accent  = cardAccent($row['insurance_company']);
-  $co      = $row['insurance_company'];
-  $modalId = 'modal_' . intval($row['patient_insurance_id']);
-  $status  = strtolower($row['status'] ?? 'active');
+  $colors   = cardGradient($row['insurance_company']);
+  $accent   = cardAccent($row['insurance_company']);
+  $co       = $row['insurance_company'];
+  $modalId  = 'modal_' . intval($row['patient_insurance_id']);
+  $status   = strtolower($row['status'] ?? 'active');
   $discount = $row['discount_type'] === 'Percentage'
     ? htmlspecialchars($row['discount_value']) . '%'
     : '₱' . number_format($row['discount_value'], 2);
@@ -769,8 +1182,6 @@ body {
       </div>
 
       <div class="modal-body">
-
-        <!-- The Card -->
         <div class="card-stage">
           <div class="ins-card"
                style="background:linear-gradient(150deg,<?= $colors[0] ?>,<?= $colors[1] ?> 52%,<?= $colors[2] ?>);">
@@ -787,7 +1198,6 @@ body {
             </div>
 
             <div class="ic-chip"></div>
-
             <div class="ic-number"><?= $numParts ?></div>
 
             <div class="ic-bottom">
@@ -803,7 +1213,6 @@ body {
           </div>
         </div>
 
-        <!-- Detail cells -->
         <div class="detail-grid">
           <div class="detail-cell">
             <div class="detail-cell-label">Relationship</div>
@@ -818,8 +1227,8 @@ body {
             <div class="detail-cell-val status-<?= $status ?>"><?= ucfirst($status) ?></div>
           </div>
         </div>
-
       </div>
+
     </div>
   </div>
 </div>
@@ -857,6 +1266,84 @@ function applyFilters() {
     card.style.display = (matchFilter && matchSearch) ? '' : 'none';
   });
 }
+
+/* ── Company selector ── */
+document.querySelectorAll('.company-opt').forEach(opt => {
+  opt.addEventListener('click', function () {
+    document.querySelectorAll('.company-opt').forEach(o => o.classList.remove('selected'));
+    this.classList.add('selected');
+    document.getElementById('selectedCompany').value = this.dataset.company;
+    this.querySelector('input[type="radio"]').checked = true;
+  });
+});
+
+/* Pre-select company if POST came back with error */
+(function () {
+  const preselect = '<?= htmlspecialchars($_POST['insurance_company'] ?? '') ?>';
+  if (preselect) {
+    document.getElementById('selectedCompany').value = preselect;
+    document.getElementById('selectedDiscountType').value = '<?= htmlspecialchars($_POST['discount_type'] ?? 'Percentage') ?>';
+    document.getElementById('selectedStatus').value = '<?= htmlspecialchars($_POST['status'] ?? 'Active') ?>';
+    // Highlight matching status button
+    document.querySelectorAll('.status-opt').forEach(b => b.style.outline = 'none');
+    const sBtn = document.querySelector(`.status-opt[data-status="<?= htmlspecialchars($_POST['status'] ?? 'Active') ?>"]`);
+    if (sBtn) { sBtn.style.outline = '2px solid currentColor'; sBtn.style.outlineOffset = '2px'; }
+  }
+})();
+
+/* ── Discount type toggle ── */
+function selectDiscountType(btn, type) {
+  document.querySelectorAll('.dtype-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('selectedDiscountType').value = type;
+}
+
+/* ── Status selector ── */
+function selectStatus(btn, status) {
+  document.querySelectorAll('.status-opt').forEach(b => {
+    b.style.outline = 'none';
+    b.style.outlineOffset = '';
+  });
+  btn.style.outline = '2px solid currentColor';
+  btn.style.outlineOffset = '2px';
+  document.getElementById('selectedStatus').value = status;
+}
+
+/* Set default status highlight on page load */
+(function () {
+  const defaultStatus = document.querySelector('.status-opt[data-status="Active"]');
+  if (defaultStatus && !document.getElementById('selectedStatus').value) {
+    defaultStatus.style.outline = '2px solid currentColor';
+    defaultStatus.style.outlineOffset = '2px';
+  }
+})();
+
+/* ── Form validation before submit ── */
+document.getElementById('addInsuranceForm').addEventListener('submit', function(e) {
+  const company = document.getElementById('selectedCompany').value;
+  if (!company) {
+    e.preventDefault();
+    const cs = document.getElementById('companySelector');
+    cs.style.outline = '2px solid #dc2626';
+    cs.style.borderRadius = '12px';
+    cs.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => { cs.style.outline = ''; }, 2500);
+    return;
+  }
+  const btn = document.getElementById('submitBtn');
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+  btn.disabled = true;
+});
+
+/* ── Auto-dismiss toast ── */
+const toast = document.getElementById('successToast');
+if (toast) setTimeout(() => toast.remove(), 4000);
+
+/* ── Re-open add modal on validation error ── */
+<?php if ($addError): ?>
+const addModal = new bootstrap.Modal(document.getElementById('addInsuranceModal'));
+addModal.show();
+<?php endif; ?>
 </script>
 </body>
 </html>

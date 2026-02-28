@@ -117,6 +117,9 @@ $allPatients = $patient->getAllPatients();
                         <a href="result_deliveries.php" class="sidebar-link">Result Deliveries</a>
                     </li>
                     <li class="sidebar-item">
+                        <a href="patient_report.php" class="sidebar-link">Patient Report</a>
+                    </li>
+                    <li class="sidebar-item">
                         <a href="operation_report.php" class="sidebar-link">Laboratory Report</a>
                     </li>
                 </ul>

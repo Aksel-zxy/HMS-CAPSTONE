@@ -11,7 +11,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
 <div class="modal fade" id="addPatientModal" tabindex="-1" aria-labelledby="addPatientModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
-            <form id="addPatientForm" action="class/create.php" method="POST">
+            <form id="addPatientForm" action="class/create.php" method="POST" enctype="multipart/form-data">
                 <div class="modal-body">
                     <?php if (isset($error)): ?>
                     <div class="alert alert-danger"><?php echo $error; ?></div>
@@ -25,7 +25,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">First Name</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" name="fname">
+                                <input type="text" class="form-control" name="fname" required>
                             </div>
                         </div>
 
@@ -39,21 +39,21 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Last Name</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" name="lname">
+                                <input type="text" class="form-control" name="lname" required>
                             </div>
                         </div>
 
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Address</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" name="address">
+                                <input type="text" class="form-control" name="address" required>
                             </div>
                         </div>
 
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Date of Birth</label>
                             <div class="col-sm-9">
-                                <input type="date" class="form-control" id="dob" name="dob">
+                                <input type="date" class="form-control" id="dob" name="dob" required>
                             </div>
                         </div>
 
@@ -99,7 +99,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Email</label>
                             <div class="col-sm-9">
-                                <input type="email" class="form-control" name="email">
+                                <input type="email" class="form-control" name="email" required>
                             </div>
                         </div>
 
@@ -107,13 +107,13 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             <!-- Height -->
                             <label class="col-sm-2 col-form-label">Height</label>
                             <div class="col-sm-4">
-                                <input type="text" class="form-control" name="height">
+                                <input type="text" class="form-control" name="height" required>
                             </div>
 
                             <!-- Weight -->
                             <label class="col-sm-2 col-form-label">Weight</label>
                             <div class="col-sm-4">
-                                <input type="text" class="form-control" name="weight">
+                                <input type="text" class="form-control" name="weight" required>
                             </div>
                         </div>
 
@@ -121,7 +121,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             <!-- Color of the Eyes -->
                             <label class="col-sm-3 col-form-label">Color of the Eyes</label>
                             <div class="col-sm-9">
-                                <input type="text" class="form-control" name="coe">
+                                <input type="text" class="form-control" name="coe" required>
                             </div>
 
                         </div>
@@ -130,10 +130,18 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Admission Type</label>
                             <div class="col-sm-9">
-                                <input class="form-control" name="admission_type" value="Registered Patient" readonly>
+                                <select class="form-select" name="admission_type" required>
+                                    <option value="Registered Patient">Registered Patient</option>
+                                    <option value="Emergency">Emergency</option>
+                                    <option value="Planned">Planned</option>
+                                    <option value="Elective">Elective</option>
+                                    <option value="Day Case">Day Case</option>
+                                    <option value="Maternity">Maternity</option>
+                                    <option value="Outpatient">Outpatient</option>
+                                    <option value="Observation">Observation</option>
+                                </select>
                             </div>
                         </div>
-
 
                         <div class="row mb-3">
                             <label class="col-sm-3 col-form-label">Attending Doctor</label>
@@ -144,7 +152,7 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                                         if ($doctors && $doctors->num_rows > 0) {
                                             while ($doc = $doctors->fetch_assoc()) {
                                                 echo "<option value='{$doc['employee_id']}'>" .
-                                                    htmlspecialchars($doc['first_name'] . ' ' . $doc['last_name']) .
+                                                    htmlspecialchars($doc['full_name'] . ' - ' . $doc['specialization']) .
                                                     "</option>";
                                             }
                                         } else {
@@ -190,6 +198,11 @@ $doctors = $callerObj->getAllDoctors(); // Fetch all doctors
                             <div class="col-sm-9">
                                 <input type="date" class="form-control" name="diagnosis_date">
                             </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Upload Image</label>
+                            <input class="form-control" type="file" name="image" accept="image/*" required>
                         </div>
 
                         <div class="row mb-3">

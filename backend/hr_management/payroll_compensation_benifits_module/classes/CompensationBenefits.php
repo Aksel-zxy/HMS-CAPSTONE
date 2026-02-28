@@ -22,7 +22,9 @@ class CompensationBenefits {
                         ' ',
                         COALESCE(suffix_name, '')
                     )
-                ) AS full_name
+                ) AS full_name,
+                profession,
+                role
             FROM hr_employees
             ORDER BY employee_id ASC
         ");

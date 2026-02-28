@@ -177,10 +177,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="payroll_compensation_benifits_module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -770,6 +770,20 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                             },
                             options: {
                                 responsive: true,
+                                animations: {
+                                    x: {
+                                        type: 'number',
+                                        easing: 'linear',
+                                        duration: 1500,   // total animation time
+                                        from: NaN         // starts from the left side
+                                    },
+                                    y: {
+                                        type: 'number',
+                                        easing: 'easeOutQuart',
+                                        duration: 1500,
+                                        from: 0           // starts from bottom
+                                    }
+                                },
                                 plugins: {
                                     title: {
                                         display: true,

@@ -13,7 +13,7 @@ class PayrollReports {
      * @param string $end End date (YYYY-MM-DD)
      * @return array
      */
-    public function getPayrolls($start = '', $end = '') {
+    public function getPayrolls($start = '', $end = '', $search = '') {
         $sql = "
             SELECT 
                 p.payroll_id,
@@ -28,36 +28,56 @@ class PayrollReports {
                 e.department,
                 p.pay_period_start,
                 p.pay_period_end,
-                p.days_worked,
-                p.overtime_hours,
-                p.basic_pay,
-                p.overtime_pay,
-                p.allowances,
-                p.bonuses,
-                p.thirteenth_month,
-                p.undertime_deduction,
-                p.sss_deduction,
-                p.philhealth_deduction,
-                p.pagibig_deduction,
-                p.absence_deduction,
                 p.gross_pay,
                 p.total_deductions,
                 p.net_pay,
-                p.disbursement_method,
                 p.date_generated
             FROM hr_payroll p
             JOIN hr_employees e ON p.employee_id = e.employee_id
-            WHERE p.status = 'Pending'
+            WHERE p.status = 'Paid'
         ";
 
         $params = [];
         $types = "";
 
+        // DATE FILTER
         if (!empty($start) && !empty($end)) {
             $sql .= " AND p.pay_period_start >= ? AND p.pay_period_end <= ?";
             $params[] = $start;
             $params[] = $end;
             $types .= "ss";
+        }
+
+        // SEARCH FILTER
+        if (!empty($search)) {
+            $words = explode(' ', $search);
+            $sql .= " AND (";
+
+            foreach ($words as $index => $word) {
+                $word = trim($word);
+                if ($word === '') continue;
+
+                if ($index > 0) $sql .= " AND "; // all words must match somewhere
+
+                $sql .= "(
+                    e.first_name LIKE ?
+                    OR e.middle_name LIKE ?
+                    OR e.last_name LIKE ?
+                    OR e.suffix_name LIKE ?
+                    OR e.profession LIKE ?
+                    OR e.role LIKE ?
+                    OR e.department LIKE ?
+                )";
+
+                // Add params for this word (7s columns now)
+                $searchTerm = "%{$word}%";
+                for ($i = 0; $i < 7; $i++) {
+                    $params[] = $searchTerm;
+                    $types .= "s";
+                }
+            }
+
+            $sql .= ")";
         }
 
         $sql .= " ORDER BY p.date_generated DESC";
@@ -73,7 +93,6 @@ class PayrollReports {
 
         $payrolls = [];
         while ($row = $result->fetch_assoc()) {
-            // Ensure numeric fields are safe
             $row['gross_pay'] = (float) ($row['gross_pay'] ?? 0);
             $row['total_deductions'] = (float) ($row['total_deductions'] ?? 0);
             $row['net_pay'] = (float) ($row['net_pay'] ?? 0);

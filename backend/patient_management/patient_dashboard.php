@@ -1,30 +1,29 @@
 <?php
+session_start();
 include '../../SQL/config.php';
 include 'class/dashb.php';
 include 'class/logs.php';
 
-$callerObj = new Dashboard($conn);
-$beds= $callerObj->getAvailableBedsCount($conn);
-$appointments = $callerObj->getAppointmentsCount($conn);
-$outpatients = $callerObj->getOutpatientsCount($conn);
-$inpatients = $callerObj->getInpatientsCount($conn);
-$registered = $callerObj->getRegisteredPatientsCount($conn);
-$totalPatients = $callerObj->getTotalPatients($conn);
-
-
-
-
 if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
-header('Location: login.php'); // Redirect to login if not logged in
+header('Location: ../login.php'); // Redirect to login if not logged in
 exit();
 }
 
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-echo "User ID is not set in session.";
-exit();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
 }
 
-$query = "SELECT * FROM users WHERE user_id = ?";
+$callerObj = new Dashboard($conn);
+
+$beds           = $callerObj->getAvailableBedsCount($conn);
+$appointments   = $callerObj->getAppointmentsCount($conn);
+$outpatients    = $callerObj->getOutpatientsCount($conn);
+$inpatients     = $callerObj->getInpatientsCount($conn);
+$registered     = $callerObj->getRegisteredPatientsCount($conn);
+$totalPatients  = $callerObj->getTotalPatients($conn);
+
+$query = "SELECT fname, lname FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
@@ -32,14 +31,13 @@ $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 
 if (!$user) {
-echo "No user found.";
-exit();
+    echo "No user found.";
+    exit();
 }
 
 logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
-
-
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -246,14 +244,14 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
                         </div>
                     </div>
 
-                     <div class="card text-center shadow-sm">
+                    <div class="card text-center shadow-sm">
                         <div class="card-body">
-                            <h6 class="card-title">Today's Appointments<</h6>
+                            <h6 class="card-title">Today's Appointments </h6>
                             <p class="card-text fs-4"><?php echo $appointments; ?></p>
                         </div>
                     </div>
 
-                    
+
                 </div>
 
             </div>
@@ -262,9 +260,10 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
                 <div class="d-flex flex-ROW gap-3">
                     <!-- Flex column wrapper -->
                     <div class="card w-100">
-                        <div class="card-body justify-content-center">
-                            <div class="d-flex gap-3 mb-3 align-items-end">
-                                <div class="flex-grow-1">
+                        <div class="card-body d-flex flex-column justify-content-center">
+                            <!-- Filters -->
+                            <div class="d-flex gap-3 mb-3 align-items-end flex-wrap">
+                                <div class="flex-grow-1 min-w-150px">
                                     <label for="typeSelect" class="form-label">Data Type</label>
                                     <select id="typeSelect" class="form-select">
                                         <option value="inpatient">Inpatient</option>
@@ -274,7 +273,7 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
                                     </select>
                                 </div>
 
-                                <div class="flex-grow-1">
+                                <div class="flex-grow-1 min-w-150px">
                                     <label for="rangeSelect" class="form-label">Time Range</label>
                                     <select id="rangeSelect" class="form-select">
                                         <option value="monthly">Monthly</option>
@@ -283,70 +282,63 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
                                 </div>
                             </div>
 
+                            <!-- Chart Container -->
+                            <div class="position-relative " style="min-height: 300px; max-height: 450px;">
+                                <!-- Optional loader -->
+                                <div id="chartLoader" class="position-absolute top-50 start-50 translate-middle d-none">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
 
-
-                            <!-- Chart below -->
-                            <div style="flex: 1; min-height: 400px;">
-                                <canvas id="monthlyReportChart"></canvas>
+                                <canvas id="monthlyReportChart" class="w-100 h-100"></canvas>
                             </div>
                         </div>
                     </div>
 
-                   <div class="col-12 col-lg-3">
-    <div class="card h-100">
-        <div class="card-body">
-            <h5 class="card-title text-center pb-3">Quick Actions</h5>
+                    <div class="col-12 col-lg-2">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title text-center pb-3">Quick Actions</h5>
 
-            <!-- Search -->
-            <div class="position-relative mb-3">
-                <input type="text" id="patientSearch" class="form-control"
-                    placeholder="Search patient...">
-                <div id="searchResults"
-                    class="list-group w-100 position-absolute"
-                    style="z-index:1000;"></div>
-            </div>
+                                <!-- Search -->
+                                <div class="position-relative mb-3">
+                                    <input type="text" id="patientSearch" class="form-control"
+                                        placeholder="Search patient...">
+                                    <div id="searchResults" class="list-group w-100 position-absolute"
+                                        style="z-index:1000;"></div>
+                                </div>
 
-            <!-- Buttons -->
-            <div class="d-grid gap-3">
+                                <!-- Buttons -->
+                                <div class="d-grid gap-3">
 
-                <button type="button"
-                    class="btn btn-primary btn-lg w-100 rounded-3"
-                    data-bs-toggle="modal"
-                    data-bs-target="#addPatientModal">
-                    Add Patient
-                </button>
+                                    <button type="button" class="btn btn-primary btn-lg w-100 rounded-3"
+                                        data-bs-toggle="modal" data-bs-target="#addPatientModal">
+                                        Add Patient
+                                    </button>
 
-                <button type="button"
-                    class="btn btn-primary btn-lg w-100 rounded-3"
-                    data-bs-toggle="modal"
-                    data-bs-target="#moveModal">
-                    Move Patient
-                </button>
+                                    <button type="button" class="btn btn-primary btn-lg w-100 rounded-3"
+                                        data-bs-toggle="modal" data-bs-target="#moveModal">
+                                        Move Patient
+                                    </button>
 
-                <button type="button"
-                    class="btn btn-primary btn-lg w-100 rounded-3"
-                    data-bs-toggle="modal"
-                    data-bs-target="#appointmentModal">
-                    Add Appointment
-                </button>
+                                    <button type="button" class="btn btn-primary btn-lg w-100 rounded-3"
+                                        data-bs-toggle="modal" data-bs-target="#appointmentModal">
+                                        Add Appointment
+                                    </button>
 
-            </div>
+                                </div>
 
-            <?php include 'icreate.php'; ?>
-            <?php include 'move.php'; ?>
-            <?php include 'pcreate.php'; ?>
+                                <?php include 'icreate.php'; ?>
+                                <?php include 'move.php'; ?>
+                                <?php include 'pcreate.php'; ?>
 
-        </div>
-    </div>
-</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
-
-
-
-
         <!-- END CODING HERE -->
     </div>
     <!----- End of Main Content ----->
@@ -355,120 +347,157 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
 
 
     <script>
+    // SIDEBAR TOGGLER
     const toggler = document.querySelector(".toggler-btn");
-    toggler.addEventListener("click", function() {
+    toggler.addEventListener("click", () => {
         document.querySelector("#sidebar").classList.toggle("collapsed");
     });
 
-    const ctx = document.getElementById('monthlyReportChart').getContext('2d');
+    // HELPER: Get selected type & range
+    const getChartParams = () => ({
+        type: document.getElementById('typeSelect').value,
+        range: document.getElementById('rangeSelect').value
+    });
 
+    // CHART INITIALIZATION
+    const ctx = document.getElementById('monthlyReportChart').getContext('2d');
     const chart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: [], // will be updated dynamically
+            labels: [],
             datasets: [{
                 label: '',
                 data: [],
                 tension: 0.3,
                 borderWidth: 2,
-                pointRadius: 4
+                pointRadius: 4,
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                intersect: false
+            }
         }
     });
 
-    function loadChartData(type, range) {
-        fetch(`class/dashboard_chart.php?type=${type}&range=${range}`)
-            .then(res => res.json())
-            .then(data => {
-                chart.data.datasets[0].data = data;
+    // LOAD CHART DATA
+    async function loadChartData(type, range) {
+        try {
+            const res = await fetch(`class/dashboard_chart.php?type=${type}&range=${range}`);
+            const data = await res.json();
 
-                if (range === 'weekly') {
-                    const labels = [];
-                    for (let i = 6; i >= 0; i--) {
-                        const d = new Date();
-                        d.setDate(d.getDate() - i);
-                        labels.push(d.toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric'
-                        }));
-                    }
-                    chart.data.labels = labels;
-                } else {
-                    chart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct',
-                        'Nov', 'Dec'
-                    ];
+            // Update dataset
+            chart.data.datasets[0].data = data;
+
+            // Update labels
+            if (range === 'weekly') {
+                const labels = [];
+                for (let i = 6; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(d.getDate() - i);
+                    labels.push(d.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                    }));
                 }
+                chart.data.labels = labels;
+            } else {
+                chart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov',
+                    'Dec'
+                ];
+            }
 
-                chart.data.datasets[0].label =
-                    `${document.querySelector(`#typeSelect option[value="${type}"]`).text} (${range})`;
+            // Update label
+            const typeText = document.querySelector(`#typeSelect option[value="${type}"]`).text;
+            chart.data.datasets[0].label = `${typeText} (${range})`;
 
-                chart.update();
-            })
-            .catch(err => console.error('Chart fetch error:', err));
+            chart.update();
+        } catch (err) {
+            console.error('Chart fetch error:', err);
+        }
     }
 
     // INITIAL LOAD
-    loadChartData('inpatient', 'monthly');
+    const initialParams = getChartParams();
+    loadChartData(initialParams.type, initialParams.range);
 
-    // Event listeners
-    document.getElementById('typeSelect').addEventListener('change', () => {
-        const type = document.getElementById('typeSelect').value;
-        const range = document.getElementById('rangeSelect').value;
-        loadChartData(type, range);
+    // EVENT LISTENERS FOR CHART
+    ['typeSelect', 'rangeSelect'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => {
+            const {
+                type,
+                range
+            } = getChartParams();
+            loadChartData(type, range);
+        });
     });
 
-    document.getElementById('rangeSelect').addEventListener('change', () => {
-        const type = document.getElementById('typeSelect').value;
-        const range = document.getElementById('rangeSelect').value;
-        loadChartData(type, range);
-    });
-
-
-
-
-    // Search Patient
+    // SEARCH PATIENT
     const searchInput = document.getElementById('patientSearch');
     const resultsDiv = document.getElementById('searchResults');
 
-    searchInput.addEventListener('input', function() {
-        const query = this.value.trim();
+    // DEBOUNCE HELPER
+    const debounce = (fn, delay = 300) => {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => fn(...args), delay);
+        };
+    };
 
-        if (query.length === 0) {
+    const searchPatients = async (query) => {
+        if (!query) {
             resultsDiv.innerHTML = '';
             return;
         }
 
-        fetch('class/search_patient.php?q=' + encodeURIComponent(query))
-            .then(response => response.json())
-            .then(data => {
-                resultsDiv.innerHTML = '';
+        resultsDiv.innerHTML = `<div class="list-group-item text-muted">Loading...</div>`;
 
-                if (data.length > 0) {
-                    data.forEach(patient => {
-                        const item = document.createElement('a');
-                        item.href = `iview.php?patient_id=${patient.id}`;
-                        item.classList.add('list-group-item', 'list-group-item-action');
-                        item.textContent = patient.name;
-                        resultsDiv.appendChild(item);
-                    });
-                } else {
-                    const noItem = document.createElement('div');
-                    noItem.classList.add('list-group-item', 'text-muted');
-                    noItem.textContent = 'No results found';
-                    resultsDiv.appendChild(noItem);
-                }
-            })
-            .catch(err => {
-                console.error('Error fetching patients:', err);
-            });
-    });
+        try {
+            const res = await fetch('class/search_patient.php?q=' + encodeURIComponent(query));
+            const data = await res.json();
 
-    // Hide results when clicking outside
-    document.addEventListener('click', function(e) {
+            resultsDiv.innerHTML = '';
+            if (data.length > 0) {
+                data.forEach(patient => {
+                    const item = document.createElement('a');
+                    item.href = `iview.php?patient_id=${patient.id}`;
+                    item.className = 'list-group-item list-group-item-action';
+                    item.textContent = patient.name;
+                    resultsDiv.appendChild(item);
+                });
+            } else {
+                const noItem = document.createElement('div');
+                noItem.className = 'list-group-item text-muted';
+                noItem.textContent = 'No results found';
+                resultsDiv.appendChild(noItem);
+            }
+        } catch (err) {
+            console.error('Error fetching patients:', err);
+        }
+    };
+
+    // INPUT EVENT WITH DEBOUNCE
+    searchInput.addEventListener('input', debounce(function() {
+        searchPatients(this.value.trim());
+    }, 300));
+
+    // HIDE RESULTS WHEN CLICKING OUTSIDE
+    document.addEventListener('click', (e) => {
         if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
             resultsDiv.innerHTML = '';
         }
