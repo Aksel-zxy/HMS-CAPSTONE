@@ -229,33 +229,43 @@ $stmt = $pdo->prepare("
 $stmt->execute();
 $new_delivered = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch inventory / batches
+// ── UPDATED: Fetch inventory / batches — only items WITH expiry dates ──
+// Also uses subquery to resolve real item names for DRI-xx batches
 $stmt = $pdo->prepare("
     SELECT 
         mb.id AS batch_id, mb.item_id,
-        COALESCE(vp.item_name, mb.batch_no) AS item_name,
+        COALESCE(
+            vp.item_name,
+            (SELECT di.item_name FROM department_request_items di
+             WHERE CONCAT('DRI-', di.id) = mb.batch_no LIMIT 1),
+            mb.batch_no
+        ) AS item_name,
         vp.price, vp.unit_type, vp.pcs_per_box,
         mb.quantity, mb.batch_no, mb.expiration_date, mb.has_expiry,
         COALESCE(inv.item_type, '')  AS item_type,
         COALESCE(inv.category,  '')  AS category
     FROM medicine_batches mb
     LEFT JOIN vendor_products vp ON mb.item_id = vp.id
-    LEFT JOIN inventory inv      ON inv.item_name = COALESCE(vp.item_name, mb.batch_no)
-    WHERE mb.expiration_date IS NOT NULL OR mb.has_expiry = 0
+    LEFT JOIN inventory inv ON inv.item_name = COALESCE(
+        vp.item_name,
+        (SELECT di2.item_name FROM department_request_items di2
+         WHERE CONCAT('DRI-', di2.id) = mb.batch_no LIMIT 1)
+    )
+    WHERE mb.has_expiry = 1 AND mb.expiration_date IS NOT NULL
     GROUP BY mb.id
-    ORDER BY COALESCE(vp.item_name, mb.batch_no), mb.expiration_date
+    ORDER BY COALESCE(
+        vp.item_name,
+        (SELECT di3.item_name FROM department_request_items di3
+         WHERE CONCAT('DRI-', di3.id) = mb.batch_no LIMIT 1),
+        mb.batch_no
+    ), mb.expiration_date
 ");
 $stmt->execute();
 $inventory_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$expired = $near_expiry = $safe = $no_expiry = $seven_days_alert = [];
+$expired = $near_expiry = $safe = $seven_days_alert = [];
 
 foreach ($inventory_rows as $row) {
-    if (!$row['has_expiry']) {
-        $row['status'] = 'No Expiry';
-        $no_expiry[]   = $row;
-        continue;
-    }
     $today    = new DateTime();
     $expiry   = new DateTime($row['expiration_date']);
     $diffDays = (int)$today->diff($expiry)->format("%r%a");
@@ -278,7 +288,9 @@ foreach ($inventory_rows as $row) {
         $safe[]        = $row;
     }
 }
-$all_stocks = array_merge($expired, $near_expiry, $safe, $no_expiry);
+
+// ── No expiry items removed from all_stocks ──
+$all_stocks = array_merge($expired, $near_expiry, $safe);
 
 $stmt = $pdo->prepare("SELECT * FROM disposed_medicines ORDER BY disposed_at DESC");
 $stmt->execute();
@@ -368,7 +380,7 @@ $total_disposed_value = array_sum(array_map(fn($d) => $d['quantity'] * $d['price
         .status-pills{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
         .status-pill{display:flex;align-items:center;gap:7px;padding:8px 16px;border-radius:24px;font-size:.82rem;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;border:2px solid transparent;user-select:none}
         .status-pill:hover{transform:translateY(-1px);box-shadow:var(--shadow)} .status-pill.active{border-color:currentColor}
-        .status-pill.all{background:#f0f0f0;color:var(--text-dark)} .status-pill.exp{background:var(--danger-light);color:var(--danger)} .status-pill.near{background:var(--warning-light);color:#8a5a00} .status-pill.safe{background:var(--success-light);color:var(--success)} .status-pill.noexp{background:var(--info-light);color:var(--info)}
+        .status-pill.all{background:#f0f0f0;color:var(--text-dark)} .status-pill.exp{background:var(--danger-light);color:var(--danger)} .status-pill.near{background:var(--warning-light);color:#8a5a00} .status-pill.safe{background:var(--success-light);color:var(--success)}
         .status-pill .pill-count{font-size:.95rem}
 
         .table-wrapper{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
@@ -376,8 +388,8 @@ $total_disposed_value = array_sum(array_map(fn($d) => $d['quantity'] * $d['price
         .data-table thead th{background:var(--bg);color:var(--text);font-size:.71rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:11px 14px;border-bottom:2px solid var(--border);white-space:nowrap}
         .data-table tbody tr{border-bottom:1px solid var(--border);transition:background .15s} .data-table tbody tr:last-child{border-bottom:none}
         .data-table td{padding:11px 14px;color:var(--text-dark);vertical-align:middle}
-        .row-expired{background:rgba(224,85,85,.05)!important} .row-near{background:rgba(243,156,18,.05)!important} .row-safe{background:rgba(39,174,96,.03)!important} .row-noexpiry{background:rgba(41,128,185,.04)!important}
-        .data-table tbody tr.row-expired:hover{background:rgba(224,85,85,.1)!important} .data-table tbody tr.row-near:hover{background:rgba(243,156,18,.1)!important} .data-table tbody tr.row-safe:hover{background:rgba(39,174,96,.07)!important} .data-table tbody tr.row-noexpiry:hover{background:rgba(41,128,185,.08)!important}
+        .row-expired{background:rgba(224,85,85,.05)!important} .row-near{background:rgba(243,156,18,.05)!important} .row-safe{background:rgba(39,174,96,.03)!important}
+        .data-table tbody tr.row-expired:hover{background:rgba(224,85,85,.1)!important} .data-table tbody tr.row-near:hover{background:rgba(243,156,18,.1)!important} .data-table tbody tr.row-safe:hover{background:rgba(39,174,96,.07)!important}
 
         .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.74rem;font-weight:700}
         .badge-expired{background:var(--danger-light);color:var(--danger);border:1px solid rgba(224,85,85,.2)} .badge-near{background:var(--warning-light);color:#8a5a00;border:1px solid rgba(243,156,18,.25)} .badge-safe{background:var(--success-light);color:var(--success);border:1px solid rgba(39,174,96,.2)} .badge-noexp{background:var(--info-light);color:var(--info);border:1px solid rgba(41,128,185,.2)} .badge-type{background:var(--primary-light);color:var(--primary)} .badge-muted{background:#eee;color:var(--text)} .badge-purple{background:var(--purple-light);color:var(--purple)}
@@ -627,36 +639,55 @@ $total_disposed_value = array_sum(array_map(fn($d) => $d['quantity'] * $d['price
     <div class="tab-panel" id="tab-stocks">
         <div class="section-header">
             <div class="icon-wrap amber">💊</div>
-            <div><h3>Medicine & Supply Stock Overview</h3><p>All batches with expiry status — use the filters to find items needing action</p></div>
+            <div><h3>Medicine & Supply Stock Overview</h3><p>All batches with expiry dates — use the filters to find items needing action</p></div>
         </div>
+
+        <!-- ── Status filter pills (No Expiry removed) ── -->
         <div class="status-pills">
-            <div class="status-pill all active" onclick="filterStocks('all', this)"><span>📋 All</span><span class="pill-count"><?= count($all_stocks) ?></span></div>
-            <div class="status-pill exp"  onclick="filterStocks('expired', this)"><span>🔴 Expired</span><span class="pill-count"><?= count($expired) ?></span></div>
-            <div class="status-pill near" onclick="filterStocks('near_expiry', this)"><span>🟡 Near Expiry</span><span class="pill-count"><?= count($near_expiry) ?></span></div>
-            <div class="status-pill safe" onclick="filterStocks('safe', this)"><span>🟢 Safe</span><span class="pill-count"><?= count($safe) ?></span></div>
-            <div class="status-pill noexp" onclick="filterStocks('no_expiry', this)"><span>🚫 No Expiry</span><span class="pill-count"><?= count($no_expiry) ?></span></div>
+            <div class="status-pill all active" onclick="filterStocks('all', this)">
+                <span>📋 All</span><span class="pill-count"><?= count($all_stocks) ?></span>
+            </div>
+            <div class="status-pill exp" onclick="filterStocks('expired', this)">
+                <span>🔴 Expired</span><span class="pill-count"><?= count($expired) ?></span>
+            </div>
+            <div class="status-pill near" onclick="filterStocks('near_expiry', this)">
+                <span>🟡 Near Expiry</span><span class="pill-count"><?= count($near_expiry) ?></span>
+            </div>
+            <div class="status-pill safe" onclick="filterStocks('safe', this)">
+                <span>🟢 Safe</span><span class="pill-count"><?= count($safe) ?></span>
+            </div>
         </div>
+
         <div class="filter-bar">
             <input type="text" id="stockSearch" placeholder="Search by item name or batch no…" oninput="liveSearchStocks()">
         </div>
+
         <div class="table-wrapper">
             <?php if (empty($all_stocks)): ?>
                 <div class="empty-state"><div class="empty-icon">📭</div><p>No stock records found.</p></div>
             <?php else: ?>
                 <table class="data-table" id="stocksTable">
                     <thead>
-                        <tr><th>#</th><th>Item Name</th><th>Qty (pcs)</th><th>Batch No</th><th>Expiration Date</th><th>Status</th><th>Action</th></tr>
+                        <tr>
+                            <th>#</th>
+                            <th>Item Name</th>
+                            <th>Qty (pcs)</th>
+                            <th>Batch No</th>
+                            <th>Expiration Date</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
                     </thead>
                     <tbody>
                         <?php $rowNum = 1; foreach ($all_stocks as $row):
                             switch ($row['status']) {
-                                case 'Expired':    $rc='row-expired';  $bc='badge-expired'; $bl='🔴 Expired';     $fa='expired';    break;
-                                case 'Near Expiry':$rc='row-near';     $bc='badge-near';    $bl='🟡 Near Expiry'; $fa='near_expiry';break;
-                                case 'No Expiry':  $rc='row-noexpiry'; $bc='badge-noexp';   $bl='🚫 No Expiry';   $fa='no_expiry';  break;
-                                default:           $rc='row-safe';     $bc='badge-safe';    $bl='🟢 Safe';        $fa='safe';
+                                case 'Expired':     $rc = 'row-expired'; $bc = 'badge-expired'; $bl = '🔴 Expired';     $fa = 'expired';     break;
+                                case 'Near Expiry': $rc = 'row-near';    $bc = 'badge-near';    $bl = '🟡 Near Expiry'; $fa = 'near_expiry'; break;
+                                default:            $rc = 'row-safe';    $bc = 'badge-safe';    $bl = '🟢 Safe';        $fa = 'safe';
                             }
                         ?>
-                        <tr class="stock-row <?= $rc ?>" data-status="<?= $fa ?>"
+                        <tr class="stock-row <?= $rc ?>"
+                            data-status="<?= $fa ?>"
                             data-name="<?= strtolower(htmlspecialchars($row['item_name'])) ?>"
                             data-batch="<?= strtolower(htmlspecialchars($row['batch_no'])) ?>">
                             <td style="color:var(--text);font-size:.8rem;"><?= $rowNum++ ?></td>
@@ -664,13 +695,11 @@ $total_disposed_value = array_sum(array_map(fn($d) => $d['quantity'] * $d['price
                             <td><span class="badge badge-type"><?= number_format($row['quantity']) ?></span></td>
                             <td><span class="badge badge-muted" style="font-family:monospace;"><?= htmlspecialchars($row['batch_no']) ?></span></td>
                             <td>
-                                <?php if ($row['status'] === 'No Expiry'): ?>
-                                    <span style="color:var(--text);font-style:italic;">—</span>
-                                <?php else: ?>
-                                    <?= date('M d, Y', strtotime($row['expiration_date'])) ?>
-                                    <?php if (!empty($row['days_left'])): ?>
-                                        <div class="days-left <?= $row['days_left'] <= 7 ? 'urgent' : '' ?>"><?= $row['days_left'] ?> day(s) remaining</div>
-                                    <?php endif; ?>
+                                <?= date('M d, Y', strtotime($row['expiration_date'])) ?>
+                                <?php if (!empty($row['days_left'])): ?>
+                                    <div class="days-left <?= $row['days_left'] <= 7 ? 'urgent' : '' ?>">
+                                        <?= $row['days_left'] ?> day(s) remaining
+                                    </div>
                                 <?php endif; ?>
                             </td>
                             <td><span class="badge <?= $bc ?>"><?= $bl ?></span></td>
@@ -715,7 +744,16 @@ $total_disposed_value = array_sum(array_map(fn($d) => $d['quantity'] * $d['price
             <div class="table-wrapper">
                 <table class="data-table" id="disposedTable">
                     <thead>
-                        <tr><th>#</th><th>Batch ID</th><th>Item Name</th><th>Qty Disposed</th><th>Price</th><th>Total Loss</th><th>Expiration Date</th><th>Disposed At</th></tr>
+                        <tr>
+                            <th>#</th>
+                            <th>Batch ID</th>
+                            <th>Item Name</th>
+                            <th>Qty Disposed</th>
+                            <th>Price</th>
+                            <th>Total Loss</th>
+                            <th>Expiration Date</th>
+                            <th>Disposed At</th>
+                        </tr>
                     </thead>
                     <tbody>
                         <?php $i = 1; foreach ($disposed as $row): ?>
@@ -769,7 +807,7 @@ $total_disposed_value = array_sum(array_map(fn($d) => $d['quantity'] * $d['price
 </div>
 
 <script>
-// Category → Types map (passed from PHP, no AI needed)
+// Category → Types map (passed from PHP)
 const categoryTypeMap = <?= json_encode($category_type_map, JSON_HEX_TAG) ?>;
 
 // When the category dropdown changes, fill the Item Type dropdown
