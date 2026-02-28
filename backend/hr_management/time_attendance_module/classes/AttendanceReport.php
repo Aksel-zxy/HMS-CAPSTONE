@@ -6,16 +6,19 @@ class AttendanceReport {
         $this->conn = $conn;
     }
 
-    public function getAttendanceSummary($start_date, $end_date) {
+    public function getAttendanceSummary($start_date, $end_date, $search = null) {
+
         $sql = "SELECT 
                     e.employee_id,
                     CONCAT(e.first_name, ' ',
-                           IFNULL(e.middle_name,''), ' ',
-                           e.last_name,
-                           IF(e.suffix_name IS NOT NULL AND e.suffix_name != '', CONCAT(' ', e.suffix_name), '')
+                        IFNULL(e.middle_name,''), ' ',
+                        e.last_name,
+                        IF(e.suffix_name IS NOT NULL AND e.suffix_name != '', CONCAT(' ', e.suffix_name), '')
                     ) AS full_name,
+                    e.profession,
+                    e.role,
 
-                    -- Days Present (including Late, Undertime, Overtime)
+                    -- Days Present
                     SUM(CASE 
                             WHEN a.status IN ('Present','Late','Undertime','Overtime') THEN 1
                             WHEN a.status='Half Day' THEN 0.5
@@ -44,15 +47,47 @@ class AttendanceReport {
 
                 FROM hr_employees e
                 LEFT JOIN hr_daily_attendance a 
-                       ON e.employee_id = a.employee_id
-                       AND a.attendance_date BETWEEN ? AND ?
+                    ON e.employee_id = a.employee_id
+                    AND a.attendance_date BETWEEN ? AND ?
                 WHERE e.status='Active'
-                GROUP BY e.employee_id
+        ";
+
+        // 🔎 SEARCH CONDITION
+        if (!empty($search)) {
+            $sql .= " AND (
+                        e.employee_id LIKE ? OR
+                        CONCAT(e.first_name, ' ',
+                            IFNULL(e.middle_name,''), ' ',
+                            e.last_name,
+                            IF(e.suffix_name IS NOT NULL AND e.suffix_name != '', CONCAT(' ', e.suffix_name), '')
+                        ) LIKE ? OR
+                        e.role LIKE ? OR
+                        e.profession LIKE ?
+                    )";
+        }
+
+        $sql .= " GROUP BY e.employee_id
                 ORDER BY e.employee_id ASC";
 
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param('ss', $start_date, $end_date);
+
+        if (!empty($search)) {
+            $searchParam = "%{$search}%";
+            $stmt->bind_param(
+                "ssssss",
+                $start_date,
+                $end_date,
+                $searchParam,
+                $searchParam,
+                $searchParam,
+                $searchParam
+            );
+        } else {
+            $stmt->bind_param("ss", $start_date, $end_date);
+        }
+
         $stmt->execute();
         return $stmt->get_result();
     }
+
 }

@@ -20,7 +20,7 @@ class LeaveCredit {
      * Get all leave credits for the year
      * Supports Half Day leave calculation
      */
-    public function getAllLeaveCredits($year) {
+    public function getAllLeaveCredits($year, $search = null) {
         $sql = "
             SELECT 
                 e.employee_id, 
@@ -43,7 +43,7 @@ class LeaveCredit {
                         THEN CASE 
                                 WHEN h.leave_duration = 'Half Day' THEN 0.5
                                 ELSE DATEDIFF(h.leave_end_date, h.leave_start_date) + 1
-                             END
+                            END
                         ELSE 0 
                     END
                 ), 0) AS used_days
@@ -54,6 +54,25 @@ class LeaveCredit {
             LEFT JOIN hr_leave h 
                 ON e.employee_id = h.employee_id
                 AND h.leave_type = lc.leave_type
+            WHERE 1=1
+        ";
+
+        // 🔎 Add Search Condition
+        if (!empty($search)) {
+            $sql .= " AND (
+                e.employee_id LIKE ? OR
+                CONCAT(
+                    e.first_name, ' ',
+                    IFNULL(e.middle_name, ''), ' ',
+                    e.last_name, 
+                    IF(e.suffix_name IS NOT NULL AND e.suffix_name != '', CONCAT(' ', e.suffix_name), '')
+                ) LIKE ? OR
+                e.role LIKE ? OR
+                e.profession LIKE ?
+            )";
+        }
+
+        $sql .= "
             GROUP BY 
                 e.employee_id, e.first_name, e.middle_name, e.last_name, e.suffix_name,
                 e.profession, e.role, e.gender, lc.leave_type, lc.allocated_days
@@ -61,7 +80,14 @@ class LeaveCredit {
         ";
 
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("ii", $year, $year);
+
+        if (!empty($search)) {
+            $searchParam = "%{$search}%";
+            $stmt->bind_param("iissss", $year, $year, $searchParam, $searchParam, $searchParam, $searchParam);
+        } else {
+            $stmt->bind_param("ii", $year, $year);
+        }
+
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -70,7 +96,6 @@ class LeaveCredit {
             if ($row['leave_type'] === "Maternity Leave" && $row['gender'] !== "Female") continue;
             if ($row['leave_type'] === "Paternity Leave" && $row['gender'] !== "Male") continue;
 
-            // Ensure used_days and allocated_days are float
             $row['used_days'] = (float)$row['used_days'];
             $row['allocated_days'] = (float)$row['allocated_days'];
 

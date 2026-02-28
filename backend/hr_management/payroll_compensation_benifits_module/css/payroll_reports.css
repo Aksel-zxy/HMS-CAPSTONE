@@ -103,44 +103,40 @@
 }
 
 /* ---------- Payroll Reports Nav-Link ---------- */
-.payrollreports-nav-inline {
+.payroll-nav-inline {
     display: flex;
     justify-content: center; 
     align-items: center;    
     gap: 15px;            
+    margin-bottom: 30px;
+    flex-wrap: wrap;   
 }
 
-.payrollreports-nav-inline label {
+.payroll-nav-inline label {
     font-weight: 500;
     margin-right: 5px;
 }
 
-.payrollreports-nav-inline input[type="date"] {
-    padding: 8px;
-    border: 1px solid #ccc;
+.payroll-nav-inline input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid #ced4da;
     border-radius: 5px;
     font-size: 14px;
-    outline: none;
 }
 
-.payrollreports-nav-inline button {
-    background: #0047ab;
+.payroll-nav-inline .nav-btn {
+    background-color: #0047ab;
     color: white;
     border: none;
-    padding: 8px 15px;
+    padding: 6px 12px;
     border-radius: 5px;
     cursor: pointer;
-    font-size: 14px;
     font-weight: bold;
-    width: 100px;
-    transition: background-color 0.3s;
 }
 
-.payrollreports-nav-inline button:hover {
+.payroll-nav-inline .nav-btn:hover {
     background-color: #0096c7;
-    font-weight: bold;
     transition: background-color 0.3s;
-    box-shadow: 10px 10px 10px rgba(0, 0, 0, 1);
 }
 
 /* ---------- Table Style ---------- */
@@ -157,7 +153,7 @@ table {
     border-collapse: collapse;
     margin: auto;
     border: 2px solid #404040;
-    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 1);
 }
 
 th, td {

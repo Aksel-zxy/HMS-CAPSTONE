@@ -7,10 +7,11 @@ class PayrollReports {
     }
 
     /**
-     * Get all payrolls marked as 'Paid', optionally filtered by date range
+     * Get all payrolls marked as 'Paid', optionally filtered by date range and search
      *
      * @param string $start Start date (YYYY-MM-DD)
      * @param string $end End date (YYYY-MM-DD)
+     * @param string $search Search term (Employee ID, Name, Role, Profession, Department)
      * @return array
      */
     public function getPayrolls($start = '', $end = '', $search = '') {
@@ -25,6 +26,7 @@ class PayrollReports {
                     COALESCE(e.suffix_name, '')
                 )) AS employee_name,
                 e.profession,
+                e.role,
                 e.department,
                 p.pay_period_start,
                 p.pay_period_end,
@@ -37,55 +39,40 @@ class PayrollReports {
             WHERE p.status = 'Paid'
         ";
 
-        $params = [];
-        $types = "";
-
-        // DATE FILTER
+        // -------------------- DATE FILTER --------------------
         if (!empty($start) && !empty($end)) {
             $sql .= " AND p.pay_period_start >= ? AND p.pay_period_end <= ?";
-            $params[] = $start;
-            $params[] = $end;
-            $types .= "ss";
         }
 
-        // SEARCH FILTER
+        // -------------------- SEARCH FILTER --------------------
         if (!empty($search)) {
-            $words = explode(' ', $search);
-            $sql .= " AND (";
-
-            foreach ($words as $index => $word) {
-                $word = trim($word);
-                if ($word === '') continue;
-
-                if ($index > 0) $sql .= " AND "; // all words must match somewhere
-
-                $sql .= "(
-                    e.first_name LIKE ?
-                    OR e.middle_name LIKE ?
-                    OR e.last_name LIKE ?
-                    OR e.suffix_name LIKE ?
-                    OR e.profession LIKE ?
-                    OR e.role LIKE ?
-                    OR e.department LIKE ?
-                )";
-
-                // Add params for this word (7s columns now)
-                $searchTerm = "%{$word}%";
-                for ($i = 0; $i < 7; $i++) {
-                    $params[] = $searchTerm;
-                    $types .= "s";
-                }
-            }
-
-            $sql .= ")";
+            $sql .= " AND (
+                        e.employee_id LIKE ? OR
+                        TRIM(CONCAT(
+                            COALESCE(e.first_name, ''), ' ',
+                            COALESCE(e.middle_name, ''), ' ',
+                            COALESCE(e.last_name, ''), ' ',
+                            COALESCE(e.suffix_name, '')
+                        )) LIKE ? OR
+                        e.role LIKE ? OR
+                        e.profession LIKE ? OR
+                        e.department LIKE ?
+                    )";
         }
 
         $sql .= " ORDER BY p.date_generated DESC";
 
         $stmt = $this->conn->prepare($sql);
 
-        if (!empty($params)) {
-            $stmt->bind_param($types, ...$params);
+        // -------------------- BIND PARAMETERS --------------------
+        if (!empty($start) && !empty($end) && !empty($search)) {
+            $searchParam = "%{$search}%";
+            $stmt->bind_param("sssssss", $start, $end, $searchParam, $searchParam, $searchParam, $searchParam, $searchParam);
+        } elseif (!empty($start) && !empty($end)) {
+            $stmt->bind_param("ss", $start, $end);
+        } elseif (!empty($search)) {
+            $searchParam = "%{$search}%";
+            $stmt->bind_param("sssss", $searchParam, $searchParam, $searchParam, $searchParam, $searchParam);
         }
 
         $stmt->execute();
@@ -105,9 +92,6 @@ class PayrollReports {
 
     /**
      * Get payroll summary totals
-     *
-     * @param array $payrolls Array of payroll rows
-     * @return array ['total_gross' => , 'total_deductions' => , 'total_net' => ]
      */
     public function getSummaryTotals($payrolls) {
         $totalGross = $totalDeductions = $totalNet = 0;
@@ -127,9 +111,6 @@ class PayrollReports {
 
     /**
      * Format totals for display
-     *
-     * @param float $amount
-     * @return string
      */
     public function formatCurrency($amount) {
         return number_format($amount, 2);
