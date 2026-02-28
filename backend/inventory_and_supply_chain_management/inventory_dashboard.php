@@ -44,11 +44,7 @@ $recentStmt = $pdo->query("
 ");
 $recent_items = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// ══════════════════════════════════════
-//   ASSET VALUE TRACKING QUERIES
-// ══════════════════════════════════════
-
-// --- WEEKLY: last 7 days, grouped by day ---
+// --- WEEKLY ---
 $weekly_stmt = $pdo->query("
     SELECT 
         DATE_FORMAT(received_at, '%a %d') AS label,
@@ -63,7 +59,7 @@ $weekly_stmt = $pdo->query("
 ");
 $weekly_data = $weekly_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// --- MONTHLY: last 12 months, grouped by month ---
+// --- MONTHLY ---
 $monthly_stmt = $pdo->query("
     SELECT 
         DATE_FORMAT(received_at, '%b %Y') AS label,
@@ -78,7 +74,7 @@ $monthly_stmt = $pdo->query("
 ");
 $monthly_data = $monthly_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// --- YEARLY: last 5 years, grouped by year ---
+// --- YEARLY ---
 $yearly_stmt = $pdo->query("
     SELECT 
         DATE_FORMAT(received_at, '%Y') AS label,
@@ -106,12 +102,10 @@ $item_types_json  = json_encode($item_types);
 $values_json      = json_encode($total_values);
 $quantities_json  = json_encode($total_quantities);
 
-// Asset tracking chart JSON
 $weekly_json  = json_encode($weekly_data);
 $monthly_json = json_encode($monthly_data);
 $yearly_json  = json_encode($yearly_data);
 
-// Compute week-over-week change
 $current_week  = array_sum(array_column($weekly_data, 'value'));
 $prev_week_stmt = $pdo->query("
     SELECT COALESCE(SUM(quantity * price), 0) AS value
@@ -122,7 +116,6 @@ $prev_week_stmt = $pdo->query("
 $prev_week = (float)$prev_week_stmt->fetchColumn();
 $week_change = $prev_week > 0 ? round((($current_week - $prev_week) / $prev_week) * 100, 1) : 0;
 
-// Month over month
 $current_month_stmt = $pdo->query("
     SELECT COALESCE(SUM(quantity * price), 0) AS value
     FROM inventory
@@ -139,7 +132,6 @@ $prev_month_stmt = $pdo->query("
 $prev_month = (float)$prev_month_stmt->fetchColumn();
 $month_change = $prev_month > 0 ? round((($current_month - $prev_month) / $prev_month) * 100, 1) : 0;
 
-// Year over year
 $current_year_stmt = $pdo->query("
     SELECT COALESCE(SUM(quantity * price), 0) AS value
     FROM inventory
@@ -318,7 +310,6 @@ body {
     overflow: hidden;
     margin-bottom: 26px;
 }
-
 .tracker-header {
     padding: 18px 24px 16px;
     border-bottom: 1px solid var(--border);
@@ -348,65 +339,45 @@ body {
     padding: 7px 18px; border-radius: 6px; border: none;
     font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700;
     color: rgba(255,255,255,.45); background: transparent; cursor: pointer;
-    transition: background .15s, color .15s;
-    letter-spacing: .04em;
+    transition: background .15s, color .15s; letter-spacing: .04em;
 }
-.period-tab.active {
-    background: var(--amber);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(199,123,10,.4);
-}
+.period-tab.active { background: var(--amber); color: #fff; box-shadow: 0 2px 8px rgba(199,123,10,.4); }
 .period-tab:hover:not(.active) { color: rgba(255,255,255,.8); background: rgba(255,255,255,.08); }
 
 /* Summary stat row */
-.tracker-stats {
-    display: flex; gap: 0;
-    border-bottom: 1px solid var(--border);
-}
-.tstat {
-    flex: 1; padding: 16px 24px;
-    border-right: 1px solid var(--border);
-    display: flex; align-items: center; gap: 12px;
-}
+.tracker-stats { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+.tstat { flex: 1; padding: 16px 24px; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
 .tstat:last-child { border-right: none; }
-.tstat-icon {
-    width: 36px; height: 36px; border-radius: var(--radius-sm);
-    display: flex; align-items: center; justify-content: center; font-size: 16px;
-    flex-shrink: 0;
-}
-.tstat-num {
-    font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700;
-    color: var(--text-1); line-height: 1;
-}
+.tstat-icon { width: 36px; height: 36px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.tstat-num { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 700; color: var(--text-1); line-height: 1; }
 .tstat-lbl { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); margin-top: 2px; }
-.tstat-change {
-    margin-left: auto; font-size: 12px; font-weight: 700;
-    padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0;
-}
+.tstat-change { margin-left: auto; font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
 .tc-up   { background: var(--green-light); color: var(--green); }
 .tc-down { background: var(--red-light);   color: var(--red);   }
 .tc-flat { background: var(--surface-3);   color: var(--text-3); }
 
-/* Chart area */
+/* ══════════════════════════════════════
+   CHART BODY — WHITE BACKGROUND (CHANGED)
+══════════════════════════════════════*/
 .tracker-body {
     padding: 24px 24px 20px;
     position: relative;
-    /* Dark background to make the chart pop */
-    background: #0d1117;
+    background: #ffffff;          /* ← CHANGED: was #0d1117 */
+    border-top: 1px solid var(--border);
 }
 .tracker-period-panel { display: none; }
 .tracker-period-panel.active { display: block; animation: fadePanel .25s ease; }
 @keyframes fadePanel { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
 
-/* No-data state */
+/* No-data: dark text on white */
 .no-data-msg {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 48px 24px; color: rgba(255,255,255,.3); text-align: center;
+    padding: 48px 24px; color: var(--text-3); text-align: center;
 }
 .no-data-msg i { font-size: 36px; margin-bottom: 10px; opacity: .4; }
 .no-data-msg p { font-size: 13px; font-weight: 600; }
 
-/* ── CHART CARDS (original) ── */
+/* ── CHART CARDS ── */
 .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 26px; }
 .chart-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; }
 .chart-card-header { padding: 16px 22px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%); }
@@ -536,16 +507,12 @@ body {
         </div>
     </div>
 
-    <!-- ══════════════════════════════════════
-         ASSET VALUE TRACKER
-    ══════════════════════════════════════ -->
+    <!-- ── Asset Value Tracker ── -->
     <div class="section-title">
         <i class="bi bi-graph-up-arrow" style="color:var(--amber);"></i> Asset Value Tracker
     </div>
 
     <div class="tracker-card">
-
-        <!-- Dark header with period tabs -->
         <div class="tracker-header">
             <div class="tracker-hdr-left">
                 <div class="tracker-hdr-icon"><i class="bi bi-cash-stack"></i></div>
@@ -561,7 +528,7 @@ body {
             </div>
         </div>
 
-        <!-- Summary stats row -->
+        <!-- Summary stats -->
         <div class="tracker-stats">
             <div class="tstat">
                 <div class="tstat-icon" style="background:var(--amber-light);color:var(--amber);">
@@ -614,51 +581,34 @@ body {
             </div>
         </div>
 
-        <!-- Chart panels — dark background -->
+        <!-- Chart panels — white background -->
         <div class="tracker-body">
-
-            <!-- WEEKLY PANEL -->
             <div class="tracker-period-panel active" id="panel-weekly">
                 <?php if (!empty($weekly_data)): ?>
                 <canvas id="weeklyChart" height="110"></canvas>
                 <?php else: ?>
-                <div class="no-data-msg">
-                    <i class="bi bi-calendar-x"></i>
-                    <p>No inventory added in the last 7 days.</p>
-                </div>
+                <div class="no-data-msg"><i class="bi bi-calendar-x"></i><p>No inventory added in the last 7 days.</p></div>
                 <?php endif; ?>
             </div>
-
-            <!-- MONTHLY PANEL -->
             <div class="tracker-period-panel" id="panel-monthly">
                 <?php if (!empty($monthly_data)): ?>
                 <canvas id="monthlyChart" height="110"></canvas>
                 <?php else: ?>
-                <div class="no-data-msg">
-                    <i class="bi bi-calendar-x"></i>
-                    <p>No inventory data for the last 12 months.</p>
-                </div>
+                <div class="no-data-msg"><i class="bi bi-calendar-x"></i><p>No inventory data for the last 12 months.</p></div>
                 <?php endif; ?>
             </div>
-
-            <!-- YEARLY PANEL -->
             <div class="tracker-period-panel" id="panel-yearly">
                 <?php if (!empty($yearly_data)): ?>
                 <canvas id="yearlyChart" height="110"></canvas>
                 <?php else: ?>
-                <div class="no-data-msg">
-                    <i class="bi bi-calendar-x"></i>
-                    <p>No inventory data for the last 5 years.</p>
-                </div>
+                <div class="no-data-msg"><i class="bi bi-calendar-x"></i><p>No inventory data for the last 5 years.</p></div>
                 <?php endif; ?>
             </div>
-
         </div>
     </div>
 
     <!-- ── Category Charts ── -->
     <div class="section-title"><i class="bi bi-bar-chart-fill" style="color:var(--blue);"></i> Inventory Analysis</div>
-
     <div class="chart-grid">
         <div class="chart-card">
             <div class="chart-card-header">
@@ -670,9 +620,7 @@ body {
                     <span class="chart-legend-dot" style="background:var(--blue);"></span>₱ Value
                 </div>
             </div>
-            <div class="chart-card-body">
-                <canvas id="assetValueChart" height="220"></canvas>
-            </div>
+            <div class="chart-card-body"><canvas id="assetValueChart" height="220"></canvas></div>
         </div>
         <div class="chart-card">
             <div class="chart-card-header">
@@ -684,9 +632,7 @@ body {
                     <span class="chart-legend-dot" style="background:var(--teal);"></span>Units
                 </div>
             </div>
-            <div class="chart-card-body">
-                <canvas id="assetQuantityChart" height="220"></canvas>
-            </div>
+            <div class="chart-card-body"><canvas id="assetQuantityChart" height="220"></canvas></div>
         </div>
     </div>
 
@@ -701,10 +647,7 @@ body {
                 <div class="ri-name"><?= htmlspecialchars($ri['item_name']) ?></div>
                 <div class="ri-type"><?= htmlspecialchars($ri['item_type'] ?? 'Supply') ?></div>
             </div>
-            <div class="ri-qty">
-                <?= number_format($ri['quantity']) ?>
-                <small>units</small>
-            </div>
+            <div class="ri-qty"><?= number_format($ri['quantity']) ?><small>units</small></div>
         </div>
         <?php endforeach; ?>
     </div>
@@ -762,35 +705,25 @@ body {
 </div><!-- /main-content -->
 
 <script>
-/* ── Chart defaults ── */
+/* ── Global Chart defaults ── */
 Chart.defaults.font.family = "'Sora', sans-serif";
 Chart.defaults.font.size   = 12;
 Chart.defaults.color       = '#8b93ad';
-const gridColor = 'rgba(227,231,240,0.7)';
+
+const gridColor = 'rgba(227,231,240,0.8)';
 const tickColor = '#8b93ad';
 
-/* ── PHP data → JS ── */
+/* ── PHP → JS ── */
 const itemTypes  = <?= $item_types_json ?>;
 const values     = <?= $values_json ?>;
 const quantities = <?= $quantities_json ?>;
-
 const weeklyData  = <?= $weekly_json ?>;
 const monthlyData = <?= $monthly_json ?>;
 const yearlyData  = <?= $yearly_json ?>;
 
 /* ══════════════════════════════════════
-   ASSET TRACKER — GRADIENT AREA CHART
-   Proper line chart with:
-   - Smooth bezier curves (tension 0.4)
-   - Gradient fill from accent color → transparent
-   - Glowing accent line (3px + shadow plugin)
-   - Circular data points with white border
-   - Crosshair tooltip on dark background
-   - Quantity as a secondary subtle dashed line
-   - Clean dark-themed axes with no border
+   CROSSHAIR PLUGIN (dark line on white)
 ══════════════════════════════════════*/
-
-// Crosshair plugin — draws a vertical line on hover
 const crosshairPlugin = {
     id: 'crosshair',
     afterDraw(chart) {
@@ -800,7 +733,7 @@ const crosshairPlugin = {
         ctx.beginPath();
         ctx.moveTo(chart._crosshairX, top);
         ctx.lineTo(chart._crosshairX, bottom);
-        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.strokeStyle = 'rgba(0,0,0,0.10)';  /* dark on white */
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 4]);
         ctx.stroke();
@@ -808,16 +741,14 @@ const crosshairPlugin = {
     },
     afterEvent(chart, args) {
         const { event } = args;
-        if (event.type === 'mousemove') {
-            chart._crosshairX = event.x;
-            chart.draw();
-        } else if (event.type === 'mouseout') {
-            chart._crosshairX = null;
-            chart.draw();
-        }
+        if (event.type === 'mousemove') { chart._crosshairX = event.x; chart.draw(); }
+        else if (event.type === 'mouseout') { chart._crosshairX = null; chart.draw(); }
     }
 };
 
+/* ══════════════════════════════════════
+   TRACKER CHART BUILDER — WHITE BG
+══════════════════════════════════════*/
 function buildTrackerChart(canvasId, data, accentHex, label) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !data.length) return null;
@@ -827,12 +758,12 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
     const vals   = data.map(d => parseFloat(d.value));
     const qty    = data.map(d => parseInt(d.qty));
 
-    // Build vertical gradient: accent color at top → transparent at bottom
+    /* Softer gradient on white */
     const gradHeight = canvas.parentElement.offsetHeight || 260;
     const grad = ctx.createLinearGradient(0, 0, 0, gradHeight);
-    grad.addColorStop(0,   hexToRgba(accentHex, 0.35));
-    grad.addColorStop(0.5, hexToRgba(accentHex, 0.12));
-    grad.addColorStop(1,   hexToRgba(accentHex, 0.0));
+    grad.addColorStop(0,    hexToRgba(accentHex, 0.18));
+    grad.addColorStop(0.55, hexToRgba(accentHex, 0.06));
+    grad.addColorStop(1,    hexToRgba(accentHex, 0.0));
 
     return new Chart(canvas, {
         type: 'line',
@@ -841,7 +772,6 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
             labels,
             datasets: [
                 {
-                    // Primary: Asset Value — filled area line
                     label: 'Asset Value (₱)',
                     data: vals,
                     borderColor: accentHex,
@@ -860,20 +790,20 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
                     order: 1,
                 },
                 {
-                    // Secondary: Quantity — thin dashed line, no fill
+                    /* Secondary dashed line — visible muted grey on white */
                     label: 'Units Added',
                     data: qty,
-                    borderColor: 'rgba(255,255,255,0.2)',
+                    borderColor: 'rgba(139,147,173,0.5)',
                     borderWidth: 1.5,
                     borderDash: [5, 4],
                     backgroundColor: 'transparent',
                     fill: false,
                     tension: 0.42,
-                    pointBackgroundColor: 'rgba(255,255,255,0.35)',
+                    pointBackgroundColor: 'rgba(139,147,173,0.55)',
                     pointBorderColor: 'transparent',
                     pointRadius: 3,
                     pointHoverRadius: 6,
-                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBackgroundColor: '#8b93ad',
                     yAxisID: 'y2',
                     order: 2,
                 }
@@ -889,11 +819,9 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
                     position: 'top',
                     align: 'end',
                     labels: {
-                        boxWidth: 10,
-                        boxHeight: 10,
-                        borderRadius: 5,
-                        useBorderRadius: true,
-                        color: 'rgba(255,255,255,0.5)',
+                        boxWidth: 10, boxHeight: 10,
+                        borderRadius: 5, useBorderRadius: true,
+                        color: '#4b5675',          /* dark legend text on white */
                         font: { size: 11, weight: '600' },
                         padding: 18,
                     }
@@ -902,10 +830,9 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
                     enabled: true,
                     mode: 'index',
                     intersect: false,
-                    backgroundColor: 'rgba(13,17,23,0.95)',
+                    backgroundColor: 'rgba(13,17,23,0.90)',
                     titleColor: '#ffffff',
-                    bodyColor: 'rgba(255,255,255,0.55)',
-                    footerColor: 'rgba(255,255,255,0.3)',
+                    bodyColor: 'rgba(255,255,255,0.65)',
                     borderColor: 'rgba(255,255,255,0.08)',
                     borderWidth: 1,
                     padding: { top: 12, right: 16, bottom: 12, left: 16 },
@@ -926,10 +853,10 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
             },
             scales: {
                 x: {
-                    grid: { display: false },
+                    grid: { display: true, color: 'rgba(227,231,240,0.8)' },
                     border: { display: false },
                     ticks: {
-                        color: 'rgba(255,255,255,0.3)',
+                        color: '#8b93ad',          /* readable on white */
                         font: { size: 11, weight: '600' },
                         maxRotation: 0,
                     }
@@ -937,13 +864,10 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
                 y: {
                     beginAtZero: true,
                     position: 'left',
-                    grid: {
-                        color: 'rgba(255,255,255,0.05)',
-                        drawBorder: false,
-                    },
+                    grid: { color: 'rgba(227,231,240,0.9)', drawBorder: false },
                     border: { display: false, dash: [4, 4] },
                     ticks: {
-                        color: 'rgba(255,255,255,0.35)',
+                        color: '#8b93ad',
                         font: { size: 11 },
                         padding: 8,
                         callback: v => {
@@ -959,7 +883,7 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
                     grid: { display: false },
                     border: { display: false },
                     ticks: {
-                        color: 'rgba(255,255,255,0.2)',
+                        color: '#b0b8cc',
                         font: { size: 10 },
                         callback: v => Number.isInteger(v) ? v + ' u' : ''
                     }
@@ -969,7 +893,6 @@ function buildTrackerChart(canvasId, data, accentHex, label) {
     });
 }
 
-// Helper: hex color → rgba string
 function hexToRgba(hex, alpha) {
     hex = hex.replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
@@ -979,12 +902,12 @@ function hexToRgba(hex, alpha) {
     return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// Build all three — each with a different accent color
-buildTrackerChart('weeklyChart',  weeklyData,  '#f59e0b', 'Weekly');   // amber
-buildTrackerChart('monthlyChart', monthlyData, '#3b82f6', 'Monthly');  // blue
-buildTrackerChart('yearlyChart',  yearlyData,  '#10b981', 'Yearly');   // emerald
+/* Build tracker charts */
+buildTrackerChart('weeklyChart',  weeklyData,  '#f59e0b', 'Weekly');
+buildTrackerChart('monthlyChart', monthlyData, '#3b82f6', 'Monthly');
+buildTrackerChart('yearlyChart',  yearlyData,  '#10b981', 'Yearly');
 
-/* ── Period tab switcher ── */
+/* Period tab switcher */
 function switchPeriod(period, btn) {
     document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
@@ -995,22 +918,16 @@ function switchPeriod(period, btn) {
 /* ══════════════════════════════════════
    CATEGORY CHARTS
 ══════════════════════════════════════*/
-
-// Asset Value Line Chart
 new Chart(document.getElementById('assetValueChart'), {
     type: 'line',
     data: {
         labels: itemTypes,
         datasets: [{
-            label: 'Asset Value (₱)',
-            data: values,
-            borderColor: '#1b56f5',
-            backgroundColor: 'rgba(27,86,245,0.15)',
+            label: 'Asset Value (₱)', data: values,
+            borderColor: '#1b56f5', backgroundColor: 'rgba(27,86,245,0.15)',
             fill: true, tension: 0.4,
-            pointBackgroundColor: '#1b56f5',
-            pointBorderColor: '#ffffff',
-            pointBorderWidth: 2,
-            pointRadius: 5, pointHoverRadius: 7
+            pointBackgroundColor: '#1b56f5', pointBorderColor: '#ffffff',
+            pointBorderWidth: 2, pointRadius: 5, pointHoverRadius: 7
         }]
     },
     options: {
@@ -1030,21 +947,16 @@ new Chart(document.getElementById('assetValueChart'), {
     }
 });
 
-// Quantity Line Chart
 new Chart(document.getElementById('assetQuantityChart'), {
     type: 'line',
     data: {
         labels: itemTypes,
         datasets: [{
-            label: 'Quantity',
-            data: quantities,
-            borderColor: '#0580a4',
-            backgroundColor: 'rgba(5,128,164,0.15)',
+            label: 'Quantity', data: quantities,
+            borderColor: '#0580a4', backgroundColor: 'rgba(5,128,164,0.15)',
             fill: true, tension: 0.4,
-            pointBackgroundColor: '#0580a4',
-            pointBorderColor: '#ffffff',
-            pointBorderWidth: 2,
-            pointRadius: 5, pointHoverRadius: 7
+            pointBackgroundColor: '#0580a4', pointBorderColor: '#ffffff',
+            pointBorderWidth: 2, pointRadius: 5, pointHoverRadius: 7
         }]
     },
     options: {
