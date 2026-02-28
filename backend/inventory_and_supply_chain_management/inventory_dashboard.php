@@ -308,7 +308,7 @@ body {
 .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ══════════════════════════════════════
-   ASSET VALUE TRACKER  ← NEW
+   ASSET VALUE TRACKER
 ══════════════════════════════════════*/
 .tracker-card {
     background: var(--surface);
@@ -391,6 +391,8 @@ body {
 .tracker-body {
     padding: 24px 24px 20px;
     position: relative;
+    /* Dark background to make the chart pop */
+    background: #0d1117;
 }
 .tracker-period-panel { display: none; }
 .tracker-period-panel.active { display: block; animation: fadePanel .25s ease; }
@@ -399,7 +401,7 @@ body {
 /* No-data state */
 .no-data-msg {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 48px 24px; color: var(--text-3); text-align: center;
+    padding: 48px 24px; color: rgba(255,255,255,.3); text-align: center;
 }
 .no-data-msg i { font-size: 36px; margin-bottom: 10px; opacity: .4; }
 .no-data-msg p { font-size: 13px; font-weight: 600; }
@@ -535,7 +537,7 @@ body {
     </div>
 
     <!-- ══════════════════════════════════════
-         ASSET VALUE TRACKER — NEW SECTION
+         ASSET VALUE TRACKER
     ══════════════════════════════════════ -->
     <div class="section-title">
         <i class="bi bi-graph-up-arrow" style="color:var(--amber);"></i> Asset Value Tracker
@@ -561,7 +563,6 @@ body {
 
         <!-- Summary stats row -->
         <div class="tracker-stats">
-            <!-- This week -->
             <div class="tstat">
                 <div class="tstat-icon" style="background:var(--amber-light);color:var(--amber);">
                     <i class="bi bi-calendar-week-fill"></i>
@@ -575,7 +576,6 @@ body {
                     <?= abs($week_change) ?>%
                 </span>
             </div>
-            <!-- This month -->
             <div class="tstat">
                 <div class="tstat-icon" style="background:var(--blue-light);color:var(--blue);">
                     <i class="bi bi-calendar-month-fill"></i>
@@ -589,7 +589,6 @@ body {
                     <?= abs($month_change) ?>%
                 </span>
             </div>
-            <!-- This year -->
             <div class="tstat">
                 <div class="tstat-icon" style="background:var(--green-light);color:var(--green);">
                     <i class="bi bi-calendar-check-fill"></i>
@@ -603,7 +602,6 @@ body {
                     <?= abs($year_change) ?>%
                 </span>
             </div>
-            <!-- Total all time -->
             <div class="tstat">
                 <div class="tstat-icon" style="background:var(--indigo-light);color:var(--indigo);">
                     <i class="bi bi-bank2"></i>
@@ -616,13 +614,13 @@ body {
             </div>
         </div>
 
-        <!-- Chart panels -->
+        <!-- Chart panels — dark background -->
         <div class="tracker-body">
 
             <!-- WEEKLY PANEL -->
             <div class="tracker-period-panel active" id="panel-weekly">
                 <?php if (!empty($weekly_data)): ?>
-                <canvas id="weeklyChart" height="120"></canvas>
+                <canvas id="weeklyChart" height="110"></canvas>
                 <?php else: ?>
                 <div class="no-data-msg">
                     <i class="bi bi-calendar-x"></i>
@@ -634,7 +632,7 @@ body {
             <!-- MONTHLY PANEL -->
             <div class="tracker-period-panel" id="panel-monthly">
                 <?php if (!empty($monthly_data)): ?>
-                <canvas id="monthlyChart" height="120"></canvas>
+                <canvas id="monthlyChart" height="110"></canvas>
                 <?php else: ?>
                 <div class="no-data-msg">
                     <i class="bi bi-calendar-x"></i>
@@ -646,7 +644,7 @@ body {
             <!-- YEARLY PANEL -->
             <div class="tracker-period-panel" id="panel-yearly">
                 <?php if (!empty($yearly_data)): ?>
-                <canvas id="yearlyChart" height="120"></canvas>
+                <canvas id="yearlyChart" height="110"></canvas>
                 <?php else: ?>
                 <div class="no-data-msg">
                     <i class="bi bi-calendar-x"></i>
@@ -781,59 +779,109 @@ const monthlyData = <?= $monthly_json ?>;
 const yearlyData  = <?= $yearly_json ?>;
 
 /* ══════════════════════════════════════
-   ASSET TRACKER CHARTS
+   ASSET TRACKER — GRADIENT AREA CHART
+   Proper line chart with:
+   - Smooth bezier curves (tension 0.4)
+   - Gradient fill from accent color → transparent
+   - Glowing accent line (3px + shadow plugin)
+   - Circular data points with white border
+   - Crosshair tooltip on dark background
+   - Quantity as a secondary subtle dashed line
+   - Clean dark-themed axes with no border
 ══════════════════════════════════════*/
 
-// Shared config builder for tracker charts
-function buildTrackerChart(canvasId, data, color, label) {
+// Crosshair plugin — draws a vertical line on hover
+const crosshairPlugin = {
+    id: 'crosshair',
+    afterDraw(chart) {
+        if (!chart._crosshairX) return;
+        const { ctx, chartArea: { top, bottom } } = chart;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(chart._crosshairX, top);
+        ctx.lineTo(chart._crosshairX, bottom);
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.restore();
+    },
+    afterEvent(chart, args) {
+        const { event } = args;
+        if (event.type === 'mousemove') {
+            chart._crosshairX = event.x;
+            chart.draw();
+        } else if (event.type === 'mouseout') {
+            chart._crosshairX = null;
+            chart.draw();
+        }
+    }
+};
+
+function buildTrackerChart(canvasId, data, accentHex, label) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !data.length) return null;
 
+    const ctx    = canvas.getContext('2d');
     const labels = data.map(d => d.label);
     const vals   = data.map(d => parseFloat(d.value));
-    const items  = data.map(d => parseInt(d.items));
     const qty    = data.map(d => parseInt(d.qty));
 
+    // Build vertical gradient: accent color at top → transparent at bottom
+    const gradHeight = canvas.parentElement.offsetHeight || 260;
+    const grad = ctx.createLinearGradient(0, 0, 0, gradHeight);
+    grad.addColorStop(0,   hexToRgba(accentHex, 0.35));
+    grad.addColorStop(0.5, hexToRgba(accentHex, 0.12));
+    grad.addColorStop(1,   hexToRgba(accentHex, 0.0));
+
     return new Chart(canvas, {
-        type: 'bar',
+        type: 'line',
+        plugins: [crosshairPlugin],
         data: {
             labels,
             datasets: [
                 {
-                    type: 'bar',
+                    // Primary: Asset Value — filled area line
                     label: 'Asset Value (₱)',
                     data: vals,
-                    backgroundColor: color + '22',
-                    borderColor: color,
-                    borderWidth: 2,
-                    borderRadius: 6,
-                    borderSkipped: false,
-                    barPercentage: 0.6,
-                    categoryPercentage: 0.7,
+                    borderColor: accentHex,
+                    borderWidth: 3,
+                    backgroundColor: grad,
+                    fill: true,
+                    tension: 0.42,
+                    pointBackgroundColor: accentHex,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2.5,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    pointHoverBorderWidth: 3,
+                    pointHoverBackgroundColor: accentHex,
                     yAxisID: 'y',
-                    order: 2,
+                    order: 1,
                 },
                 {
-                    type: 'line',
-                    label: 'Items Added',
-                    data: items,
-                    borderColor: '#5046e5',
-                    backgroundColor: 'rgba(80,70,229,0.08)',
-                    borderWidth: 2.5,
+                    // Secondary: Quantity — thin dashed line, no fill
+                    label: 'Units Added',
+                    data: qty,
+                    borderColor: 'rgba(255,255,255,0.2)',
+                    borderWidth: 1.5,
+                    borderDash: [5, 4],
+                    backgroundColor: 'transparent',
                     fill: false,
-                    tension: 0.4,
-                    pointBackgroundColor: '#5046e5',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
+                    tension: 0.42,
+                    pointBackgroundColor: 'rgba(255,255,255,0.35)',
+                    pointBorderColor: 'transparent',
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#fff',
                     yAxisID: 'y2',
-                    order: 1,
+                    order: 2,
                 }
             ]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: true,
             interaction: { mode: 'index', intersect: false },
             plugins: {
                 legend: {
@@ -841,27 +889,37 @@ function buildTrackerChart(canvasId, data, color, label) {
                     position: 'top',
                     align: 'end',
                     labels: {
-                        boxWidth: 10, boxHeight: 10,
+                        boxWidth: 10,
+                        boxHeight: 10,
                         borderRadius: 5,
                         useBorderRadius: true,
+                        color: 'rgba(255,255,255,0.5)',
                         font: { size: 11, weight: '600' },
-                        padding: 16,
+                        padding: 18,
                     }
                 },
                 tooltip: {
-                    backgroundColor: '#0d1117',
-                    titleColor: '#fff',
-                    bodyColor: '#8b93ad',
-                    padding: 14,
-                    cornerRadius: 10,
-                    borderColor: 'rgba(255,255,255,.06)',
+                    enabled: true,
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(13,17,23,0.95)',
+                    titleColor: '#ffffff',
+                    bodyColor: 'rgba(255,255,255,0.55)',
+                    footerColor: 'rgba(255,255,255,0.3)',
+                    borderColor: 'rgba(255,255,255,0.08)',
                     borderWidth: 1,
+                    padding: { top: 12, right: 16, bottom: 12, left: 16 },
+                    cornerRadius: 10,
+                    titleFont: { size: 12, weight: '700' },
+                    bodyFont:  { size: 12, weight: '500' },
                     callbacks: {
+                        title: items => items[0]?.label ?? '',
                         label: ctx => {
                             if (ctx.dataset.yAxisID === 'y') {
-                                return '  ₱ ' + ctx.parsed.y.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+                                const v = ctx.parsed.y;
+                                return '  ₱ ' + v.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                             }
-                            return '  ' + ctx.parsed.y + ' items added';
+                            return '  ' + ctx.parsed.y.toLocaleString() + ' units added';
                         }
                     }
                 }
@@ -870,16 +928,29 @@ function buildTrackerChart(canvasId, data, color, label) {
                 x: {
                     grid: { display: false },
                     border: { display: false },
-                    ticks: { font: { size: 11, weight: '600' }, color: tickColor }
+                    ticks: {
+                        color: 'rgba(255,255,255,0.3)',
+                        font: { size: 11, weight: '600' },
+                        maxRotation: 0,
+                    }
                 },
                 y: {
                     beginAtZero: true,
                     position: 'left',
-                    grid: { color: gridColor },
-                    border: { display: false, dash: [4,4] },
+                    grid: {
+                        color: 'rgba(255,255,255,0.05)',
+                        drawBorder: false,
+                    },
+                    border: { display: false, dash: [4, 4] },
                     ticks: {
-                        color: tickColor,
-                        callback: v => v >= 1000 ? '₱' + (v/1000).toFixed(0) + 'K' : '₱' + v
+                        color: 'rgba(255,255,255,0.35)',
+                        font: { size: 11 },
+                        padding: 8,
+                        callback: v => {
+                            if (v >= 1_000_000) return '₱' + (v / 1_000_000).toFixed(1) + 'M';
+                            if (v >= 1_000)     return '₱' + (v / 1_000).toFixed(0) + 'K';
+                            return '₱' + v;
+                        }
                     }
                 },
                 y2: {
@@ -888,8 +959,9 @@ function buildTrackerChart(canvasId, data, color, label) {
                     grid: { display: false },
                     border: { display: false },
                     ticks: {
-                        color: '#5046e5',
-                        callback: v => Number.isInteger(v) ? v + ' items' : ''
+                        color: 'rgba(255,255,255,0.2)',
+                        font: { size: 10 },
+                        callback: v => Number.isInteger(v) ? v + ' u' : ''
                     }
                 }
             }
@@ -897,24 +969,31 @@ function buildTrackerChart(canvasId, data, color, label) {
     });
 }
 
-// Build all three tracker charts
-buildTrackerChart('weeklyChart',  weeklyData,  '#c77b0a', 'Weekly');
-buildTrackerChart('monthlyChart', monthlyData, '#1b56f5', 'Monthly');
-buildTrackerChart('yearlyChart',  yearlyData,  '#0d9f6b', 'Yearly');
+// Helper: hex color → rgba string
+function hexToRgba(hex, alpha) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    const r = parseInt(hex.slice(0,2), 16);
+    const g = parseInt(hex.slice(2,4), 16);
+    const b = parseInt(hex.slice(4,6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Build all three — each with a different accent color
+buildTrackerChart('weeklyChart',  weeklyData,  '#f59e0b', 'Weekly');   // amber
+buildTrackerChart('monthlyChart', monthlyData, '#3b82f6', 'Monthly');  // blue
+buildTrackerChart('yearlyChart',  yearlyData,  '#10b981', 'Yearly');   // emerald
 
 /* ── Period tab switcher ── */
 function switchPeriod(period, btn) {
-    // Update active tab
     document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-
-    // Show correct panel
     document.querySelectorAll('.tracker-period-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + period).classList.add('active');
 }
 
 /* ══════════════════════════════════════
-   CATEGORY CHARTS (original)
+   CATEGORY CHARTS
 ══════════════════════════════════════*/
 
 // Asset Value Line Chart
