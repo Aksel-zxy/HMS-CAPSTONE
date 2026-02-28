@@ -15,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'doctor_id'        => $_POST["doctor"] ?? '',
         'appointment_date' => $_POST["appointment_date"] ?? '',
         'purpose'          => $_POST["purpose"] ?? '',
+        'bed_id'           => $_POST["bed_id"] ?? '',
         'status'           => $_POST["status"] ?? '',
         'notes'            => $_POST["notes"] ?? '',
     ];
@@ -79,21 +80,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 3️⃣ Insert appointment
     $stmt = $conn->prepare("
         INSERT INTO p_appointments 
-        (patient_id, doctor_id, appointment_date, purpose, status, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (patient_id, doctor_id, appointment_date, purpose, status, notes, bed_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
     $stmt->bind_param(
-        "iissss",
+        "iissssi",
         $data['patient_id'],
         $doctor_id,
         $appointment_date,
         $data['purpose'],
         $data['status'],
-        $data['notes']
+        $data['notes'],
+        $data['bed_id']
     );
 
     $success = $stmt->execute();
+    
+    if ($success && !empty($data['bed_id'])) {
 
+    $updateBed = $conn->prepare("
+        UPDATE p_beds 
+        SET status = 'occupied' 
+        WHERE bed_id = ?
+    ");
+
+    $updateBed->bind_param("i", $data['bed_id']);
+    $updateBed->execute();
+}
     // ✅ 4️⃣ LOG AFTER SUCCESSFUL INSERT
     if ($success) {
         $user_id = $_SESSION['user_id'] ?? null;

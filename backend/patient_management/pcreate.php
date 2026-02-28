@@ -12,6 +12,8 @@ $doctors = $getDoctors->getDoctors();
 $patientObj = new Patient($conn);
 $patients = $patientObj->getAllPatients();
 
+$admission = new PatientAdmission($conn);
+
 ?>
 
 
@@ -83,6 +85,21 @@ $patients = $patientObj->getAllPatients();
                                     readonly>
                             </div>
 
+                            <!-- Bed Selection -->
+                            <div class="mb-3">
+                                <label class="col-form-label">Select Bed</label>
+                                <div class="col-sm-12">
+                                    <select name="bed_id" class="form-select" required>
+                                        <option value="">-- Choose Available Bed --</option>
+                                        <?php
+                                        $beds = $admission->getAvailableBeds();
+                                        while ($bed = $beds->fetch_assoc()) {
+                                            echo "<option value='{$bed['bed_id']}'>{$bed['bed_number']}</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                            </div>
                             <!-- Status -->
                             <div class="mb-3">
                                 <label for="status" class="form-label">Status</label>
@@ -96,6 +113,7 @@ $patients = $patientObj->getAllPatients();
                                 <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
                                 <p class="text-muted small">Please indicate what test is taken</p>
                             </div>
+
 
                         </div>
 
@@ -129,17 +147,6 @@ $patients = $patientObj->getAllPatients();
     </div>
 </div>
 <script>
-const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-const dayLabels = {
-    mon: 'Monday',
-    tue: 'Tuesday',
-    wed: 'Wednesday',
-    thu: 'Thursday',
-    fri: 'Friday',
-    sat: 'Saturday',
-    sun: 'Sunday'
-};
-
 document.getElementById('doctor').addEventListener('change', function() {
     const doctorId = this.value;
     const panel = document.getElementById('doctor-schedule-panel');
