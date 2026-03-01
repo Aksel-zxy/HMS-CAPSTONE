@@ -23,6 +23,12 @@ $paymongoClient = new Client([
 ]);
 
 /* =====================================================
+   SOURCE PAGE — detect if we came from inpatient billing
+===================================================== */
+$from_inpatient = !empty($_GET['from']) && $_GET['from'] === 'inpatient';
+$highlight_cash = !empty($_GET['cash']) && $_GET['cash'] === '1';
+
+/* =====================================================
    RESOLVE billing_id FROM URL ONLY
    patient_id is only used as a last-resort fallback to
    find the billing_id — all DB writes use billing_id only.
@@ -58,7 +64,29 @@ $stmt = $conn->prepare("
 $stmt->bind_param("i", $billing_id);
 $stmt->execute();
 $billing = $stmt->get_result()->fetch_assoc();
-if (!$billing) die("Billing record #$billing_id not found.");
+
+/*
+ * Fallback: if billing_records used patient_id from inpatient_registration,
+ * patientinfo JOIN may fail. In that case fetch from patient_billing directly.
+ */
+if (!$billing) {
+    $stmt2 = $conn->prepare("
+        SELECT pb.billing_id, pb.patient_id AS pid, pb.amount_due AS grand_total,
+               pb.gross_total AS total_amount, pb.payment_status AS status,
+               pb.bill_number AS transaction_id, pb.notes,
+               CONCAT(ir.first_name,' ',IFNULL(ir.middle_name,''),' ',ir.last_name) AS full_name,
+               ir.contact_no AS phone_number, ir.address,
+               NULL AS paymongo_link_id, NULL AS paymongo_payment_id,
+               NULL AS paymongo_reference_number, pb.billing_date
+        FROM patient_billing pb
+        JOIN inpatient_registration ir ON ir.patient_id = pb.patient_id
+        WHERE pb.billing_id = ?
+    ");
+    $stmt2->bind_param("i", $billing_id);
+    $stmt2->execute();
+    $billing = $stmt2->get_result()->fetch_assoc();
+    if (!$billing) die("Billing record #$billing_id not found.");
+}
 
 $patient_id     = (int)$billing['pid'];   // resolved from the record itself
 $status         = $billing['status'];
@@ -84,7 +112,10 @@ if ($existing_link && $status !== 'Paid') {
             $s->bind_param("si", $existing_link, $billing_id);
             $s->execute();
 
-            /* ── UPSERT by billing_id — never fails on unique_active_billing ── */
+            /* Also update patient_billing if it exists */
+            $conn->query("UPDATE patient_billing SET payment_status='Paid' WHERE billing_id=$billing_id");
+
+            /* UPSERT patient_receipt */
             $s2 = $conn->prepare("
                 INSERT INTO patient_receipt
                     (patient_id, billing_id, status, payment_reference, paymongo_reference)
@@ -114,6 +145,7 @@ $receipt = $stmt->get_result()->fetch_assoc();
 
 /* =====================================================
    FETCH BILLING ITEMS — keyed on billing_id
+   Supports both old (dl_services) and new (billing_services) item schemas.
 ===================================================== */
 $items    = [];
 $subtotal = 0;
@@ -132,28 +164,38 @@ foreach ($raw_items as $item) {
     $name = 'Billing Item';
     $desc = '';
 
-    $ns = $conn->prepare("SELECT serviceName, description FROM dl_services WHERE price = ? LIMIT 1");
-    $ns->bind_param("d", $item['unit_price']);
-    $ns->execute();
-    $svc = $ns->get_result()->fetch_assoc();
-    if ($svc) { $name = $svc['serviceName']; $desc = $svc['description'] ?? ''; }
+    /* Try billing_services (inpatient system) first */
+    $bs = $conn->prepare("SELECT name AS serviceName, category AS description FROM billing_services WHERE service_id = (SELECT service_id FROM billing_items WHERE item_id=? LIMIT 1) LIMIT 1");
+    $bs->bind_param("i", $item['item_id']);
+    $bs->execute();
+    $bsvc = $bs->get_result()->fetch_assoc();
+    if ($bsvc) { $name = $bsvc['serviceName']; $desc = $bsvc['description'] ?? ''; }
 
-    if (!$svc) {
-        $np = $conn->prepare("SELECT procedure_name AS serviceName FROM dnm_procedure_list WHERE price = ? LIMIT 1");
-        $np->bind_param("d", $item['unit_price']);
-        $np->execute();
-        $prc = $np->get_result()->fetch_assoc();
-        if ($prc) { $name = $prc['serviceName']; $desc = 'Procedure'; }
-    }
+    /* Fallback to old dl_services lookup by price */
+    if (!$bsvc) {
+        $ns = $conn->prepare("SELECT serviceName, description FROM dl_services WHERE price = ? LIMIT 1");
+        $ns->bind_param("d", $item['unit_price']);
+        $ns->execute();
+        $svc = $ns->get_result()->fetch_assoc();
+        if ($svc) { $name = $svc['serviceName']; $desc = $svc['description'] ?? ''; }
 
-    if (!$svc && !isset($prc)) {
-        $nm = $conn->prepare("SELECT med_name AS serviceName, dosage FROM pharmacy_inventory WHERE unit_price = ? LIMIT 1");
-        $nm->bind_param("d", $item['unit_price']);
-        $nm->execute();
-        $med = $nm->get_result()->fetch_assoc();
-        if ($med) {
-            $name = $med['serviceName'] . ($med['dosage'] ? ' ('.$med['dosage'].')' : '');
-            $desc = 'Medicine';
+        if (!$svc) {
+            $np = $conn->prepare("SELECT procedure_name AS serviceName FROM dnm_procedure_list WHERE price = ? LIMIT 1");
+            $np->bind_param("d", $item['unit_price']);
+            $np->execute();
+            $prc = $np->get_result()->fetch_assoc();
+            if ($prc) { $name = $prc['serviceName']; $desc = 'Procedure'; }
+        }
+
+        if (!$svc && !isset($prc)) {
+            $nm = $conn->prepare("SELECT med_name AS serviceName, dosage FROM pharmacy_inventory WHERE unit_price = ? LIMIT 1");
+            $nm->bind_param("d", $item['unit_price']);
+            $nm->execute();
+            $med = $nm->get_result()->fetch_assoc();
+            if ($med) {
+                $name = $med['serviceName'] . ($med['dosage'] ? ' ('.$med['dosage'].')' : '');
+                $desc = 'Medicine';
+            }
         }
     }
 
@@ -176,6 +218,7 @@ if ($receipt) {
     $out_of_pocket     = (float)($receipt['total_out_of_pocket'] ?? $grand_total);
 } else {
     $insurance_covered = (float)($billing['insurance_covered'] ?? 0);
+    /* For inpatient bills, use amount_due from patient_billing if billing_records doesn't have the right value */
     $grand_total       = (float)($billing['grand_total']       ?? $subtotal);
     $out_of_pocket     = $grand_total;
 }
@@ -184,15 +227,12 @@ if ($grand_total   < 0) $grand_total   = 0;
 
 /* =====================================================
    AUTO-MARK PAID IF FULLY COVERED BY INSURANCE
-   Keyed entirely on billing_id — safe for patients
-   who have multiple bills.
 ===================================================== */
 $auto_paid_by_insurance = false;
 if ($grand_total <= 0 && $status !== 'Paid') {
     $ins_ref        = 'INS-COVERED-' . $billing_id;
     $covered_amount = $subtotal;
 
-    /* Update billing_records by billing_id */
     $s = $conn->prepare("
         UPDATE billing_records
         SET status='Paid', payment_method='Insurance', payment_date=NOW(), paid_amount=?
@@ -201,14 +241,10 @@ if ($grand_total <= 0 && $status !== 'Paid') {
     $s->bind_param("di", $covered_amount, $billing_id);
     $s->execute();
 
-    /*
-     * UPSERT patient_receipt by billing_id.
-     * Using INSERT ... ON DUPLICATE KEY UPDATE means:
-     *   • First visit  → inserts the row (no crash)
-     *   • Return visit → updates in place (no duplicate-key error)
-     * This completely replaces the old UPDATE-only approach that
-     * caused "Duplicate entry '42-Paid' for key 'unique_active_billing'".
-     */
+    /* Also update patient_billing */
+    $conn->query("UPDATE patient_billing SET payment_status='Paid' WHERE billing_id=$billing_id");
+    $conn->query("UPDATE inpatient_registration SET billing_status='Paid' WHERE patient_id=$patient_id");
+
     $s2 = $conn->prepare("
         INSERT INTO patient_receipt
             (patient_id, billing_id, status, payment_method, payment_reference)
@@ -240,6 +276,7 @@ if (isset($_POST['payment_method']) && $_POST['payment_method'] === 'cash' && $g
     $s->bind_param("sdsii", $cash_ref, $grand_total, $desc, $billing_id, $patient_id);
     $s->execute();
 
+    /* Update billing_records */
     $s2 = $conn->prepare("
         UPDATE billing_records
         SET status='Paid', payment_method='Cash', payment_date=NOW(),
@@ -249,7 +286,13 @@ if (isset($_POST['payment_method']) && $_POST['payment_method'] === 'cash' && $g
     $s2->bind_param("sdi", $cash_ref, $grand_total, $billing_id);
     $s2->execute();
 
-    /* UPSERT patient_receipt by billing_id — never crashes */
+    /* Update patient_billing */
+    $conn->query("UPDATE patient_billing SET payment_status='Paid' WHERE billing_id=$billing_id");
+
+    /* Update inpatient_registration billing_status */
+    $conn->query("UPDATE inpatient_registration SET billing_status='Paid' WHERE patient_id=$patient_id");
+
+    /* UPSERT patient_receipt */
     $s3 = $conn->prepare("
         INSERT INTO patient_receipt
             (patient_id, billing_id, status, payment_method, payment_reference)
@@ -262,7 +305,13 @@ if (isset($_POST['payment_method']) && $_POST['payment_method'] === 'cash' && $g
     $s3->bind_param("iis", $patient_id, $billing_id, $cash_ref);
     $s3->execute();
 
-    header("Location: patient_billing.php?success=cash_payment"); exit;
+    /* Redirect based on where we came from */
+    if ($from_inpatient) {
+        header("Location: billing_summary.php?billing_id=$billing_id&patient_id=$patient_id&from=inpatient&cash_paid=1");
+    } else {
+        header("Location: patient_billing.php?success=cash_payment");
+    }
+    exit;
 }
 
 /* =====================================================
@@ -313,7 +362,7 @@ if ($grand_total > 0 && $status !== 'Paid') {
                 $s2->bind_param("ssi", $link_id, $transaction_id, $billing_id);
                 $s2->execute();
 
-                /* UPSERT patient_receipt — safe against unique constraint */
+                /* UPSERT patient_receipt */
                 $s3 = $conn->prepare("
                     INSERT INTO patient_receipt
                         (patient_id, billing_id, status, paymongo_reference, payment_reference)
@@ -355,6 +404,9 @@ if (!$receipt_id) {
     $r = $chk->get_result()->fetch_assoc();
     $receipt_id = $r['receipt_id'] ?? null;
 }
+
+/* Flash: cash payment just completed */
+$cash_just_paid = !empty($_GET['cash_paid']) && $_GET['cash_paid'] === '1';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -415,6 +467,21 @@ body {
 .btn-view-receipt { display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--navy);color:var(--white);border:none;border-radius:var(--radius-sm);font-family:var(--ff-body);font-size:.83rem;font-weight:600;text-decoration:none;transition:all .15s; }
 .btn-view-receipt:hover { background:var(--navy-mid); }
 
+/* INPATIENT SOURCE BANNER */
+.inpatient-source-bar { background:var(--navy);border-radius:var(--radius);padding:12px 20px;display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap; }
+.isb-icon { width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8);font-size:.95rem;flex-shrink:0; }
+.isb-text { flex:1;font-size:.8rem;color:rgba(255,255,255,.75); }
+.isb-text strong { color:#fff; }
+.isb-back { display:inline-flex;align-items:center;gap:5px;padding:6px 14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:var(--radius-sm);font-size:.78rem;font-weight:700;text-decoration:none;transition:all .15s;font-family:var(--ff-body); }
+.isb-back:hover { background:rgba(255,255,255,.2);color:#fff; }
+
+/* CASH PAID FLASH */
+.cash-paid-flash { background:linear-gradient(135deg,#059669,#10b981);border-radius:var(--radius);padding:18px 24px;display:flex;align-items:center;gap:14px;margin-bottom:20px;color:#fff;box-shadow:0 6px 24px rgba(5,150,105,.25);animation:popIn .35s cubic-bezier(.34,1.56,.64,1); }
+@keyframes popIn { from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)} }
+.cpf-ico { width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0; }
+.cpf-title { font-family:var(--ff-head);font-size:1.1rem; }
+.cpf-sub { font-size:.8rem;color:rgba(255,255,255,.8);margin-top:2px; }
+
 /* PATIENT BANNER */
 .patient-banner { background:var(--navy);border-radius:var(--radius);padding:20px 28px;display:flex;align-items:center;gap:16px;margin-bottom:24px;box-shadow:var(--shadow-md);position:relative;overflow:hidden; }
 .patient-banner::after { content:'';position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:rgba(14,124,123,.18);pointer-events:none; }
@@ -472,12 +539,16 @@ body {
 
 /* PAYMENT METHODS */
 .pay-grid { display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:24px; }
+
+/* Cash card gets special highlight when coming from inpatient */
 .pay-option { border:2px solid var(--gray-200);border-radius:var(--radius);padding:28px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;transition:all .2s ease;cursor:pointer;background:var(--white);text-decoration:none;color:inherit; }
 .pay-option:hover { transform:translateY(-3px);box-shadow:var(--shadow-md);text-decoration:none; }
 .pay-option.online { background:linear-gradient(150deg,var(--navy) 0%,var(--navy-mid) 100%);border-color:var(--navy);color:var(--white); }
 .pay-option.online:hover { border-color:#2563eb;box-shadow:0 8px 28px rgba(11,29,58,.25); }
 .pay-option.cash { border-color:var(--green); }
 .pay-option.cash:hover { background:var(--green-bg); }
+.pay-option.cash.highlight { border-color:var(--green);border-width:3px;box-shadow:0 0 0 4px rgba(5,150,105,.15);background:var(--green-bg); }
+.pay-option.cash.highlight::before { content:'⭐ Recommended';display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--green);background:rgba(5,150,105,.1);border-radius:999px;padding:3px 10px;margin-bottom:-4px; }
 .pay-ico { width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem; }
 .online .pay-ico { background:rgba(255,255,255,.12);color:var(--white); }
 .cash   .pay-ico { background:var(--green-bg);color:var(--green); }
@@ -516,6 +587,7 @@ body {
     .top-nav { flex-direction:column;align-items:stretch;text-align:center; }
     .fully-paid-banner { flex-direction:column; }
     .paid-banner-badge { margin-left:0; }
+    .inpatient-source-bar { flex-direction:column;align-items:flex-start; }
 }
 @media(max-width:480px) { .billing-center { padding:0; } }
 </style>
@@ -529,9 +601,15 @@ body {
 
     <!-- TOP NAV -->
     <div class="top-nav">
+        <?php if ($from_inpatient): ?>
+        <a href="inpatient_billing.php?view=patients" class="btn-back">
+            <i class="bi bi-arrow-left"></i> Back to Inpatient List
+        </a>
+        <?php else: ?>
         <a href="patient_billing.php" class="btn-back">
             <i class="bi bi-arrow-left"></i> Back to Billing
         </a>
+        <?php endif; ?>
         <div class="page-title-block">
             <div class="title">Billing Summary</div>
             <div class="subtitle">Review charges and complete payment</div>
@@ -544,6 +622,37 @@ body {
         <div style="width:120px;"></div>
         <?php endif; ?>
     </div>
+
+    <!-- INPATIENT SOURCE BANNER — shown when navigated from inpatient_billing.php -->
+    <?php if ($from_inpatient && $status !== 'Paid'): ?>
+    <div class="inpatient-source-bar">
+        <div class="isb-icon"><i class="bi bi-hospital-fill"></i></div>
+        <div class="isb-text">
+            <strong>Inpatient Billing</strong> — This bill was generated from the Inpatient module.
+            Please confirm payment below, then return to the Inpatient List.
+        </div>
+        <a href="inpatient_billing.php?view=patients" class="isb-back">
+            <i class="bi bi-arrow-left"></i> Inpatient List
+        </a>
+    </div>
+    <?php endif; ?>
+
+    <!-- CASH PAID FLASH -->
+    <?php if ($cash_just_paid): ?>
+    <div class="cash-paid-flash">
+        <div class="cpf-ico"><i class="bi bi-check-circle-fill"></i></div>
+        <div>
+            <div class="cpf-title">Cash Payment Confirmed!</div>
+            <div class="cpf-sub">
+                <?= htmlspecialchars($patient_name) ?>'s bill has been marked as <strong>Paid</strong>.
+                Billing #<?= str_pad($billing_id, 6, '0', STR_PAD_LEFT) ?> is now settled.
+            </div>
+        </div>
+        <a href="inpatient_billing.php?view=patients" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.35);border-radius:8px;font-family:var(--ff-body);font-size:.82rem;font-weight:700;text-decoration:none;">
+            <i class="bi bi-clipboard-pulse"></i> Inpatient List
+        </a>
+    </div>
+    <?php endif; ?>
 
     <!-- PATIENT BANNER -->
     <div class="patient-banner">
@@ -581,9 +690,15 @@ body {
                 No additional payment is required. Billing #<?= str_pad($billing_id, 6, '0', STR_PAD_LEFT) ?>
                 has been automatically marked as <strong>Paid</strong> and removed from the pending queue.
             </div>
+            <?php if ($from_inpatient): ?>
+            <a href="inpatient_billing.php?view=patients" class="btn-back-billing">
+                <i class="bi bi-clipboard-pulse"></i> Return to Inpatient List
+            </a>
+            <?php else: ?>
             <a href="patient_billing.php" class="btn-back-billing">
                 <i class="bi bi-arrow-left"></i> Return to Patient Billing
             </a>
+            <?php endif; ?>
         </div>
         <span class="paid-banner-badge"><i class="bi bi-check-circle-fill"></i> Auto-Settled</span>
     </div>
@@ -596,9 +711,15 @@ body {
             <div class="paid-banner-sub">
                 This bill has already been settled. Insurance covered the entire amount — no payment needed.
             </div>
+            <?php if ($from_inpatient): ?>
+            <a href="inpatient_billing.php?view=patients" class="btn-back-billing">
+                <i class="bi bi-clipboard-pulse"></i> Return to Inpatient List
+            </a>
+            <?php else: ?>
             <a href="patient_billing.php" class="btn-back-billing">
                 <i class="bi bi-arrow-left"></i> Return to Patient Billing
             </a>
+            <?php endif; ?>
         </div>
         <span class="paid-banner-badge"><i class="bi bi-check-circle-fill"></i> Settled</span>
     </div>
@@ -612,9 +733,15 @@ body {
                 Billing #<?= str_pad($billing_id, 6, '0', STR_PAD_LEFT) ?> has already been paid and settled.
                 No further action is required.
             </div>
+            <?php if ($from_inpatient): ?>
+            <a href="inpatient_billing.php?view=patients" class="btn-back-billing">
+                <i class="bi bi-clipboard-pulse"></i> Return to Inpatient List
+            </a>
+            <?php else: ?>
             <a href="patient_billing.php" class="btn-back-billing">
                 <i class="bi bi-arrow-left"></i> Return to Patient Billing
             </a>
+            <?php endif; ?>
         </div>
         <span class="paid-banner-badge"><i class="bi bi-check-circle-fill"></i> Paid</span>
     </div>
@@ -696,6 +823,26 @@ body {
         </div>
         <div class="pay-grid">
 
+            <!-- CASH — highlighted when arriving from inpatient billing with cash=1 -->
+            <div class="pay-option cash<?= $highlight_cash ? ' highlight' : '' ?>">
+                <form method="POST"
+                      onsubmit="return confirm('Confirm cash payment of ₱<?= number_format($grand_total, 2) ?> for <?= htmlspecialchars(addslashes($patient_name)) ?>?');">
+                    <input type="hidden" name="payment_method" value="cash">
+                    <?php if ($from_inpatient): ?>
+                    <input type="hidden" name="from" value="inpatient">
+                    <?php endif; ?>
+                    <button type="submit">
+                        <div class="pay-ico"><i class="bi bi-cash-coin"></i></div>
+                        <div class="pay-label">Pay with Cash</div>
+                        <div class="pay-amt">₱<?= number_format($grand_total, 2) ?></div>
+                        <div class="pay-note">
+                            Present at the cashier or billing office
+                            <?= $from_inpatient ? '<br><strong style="color:var(--green);">← Confirm here for inpatient</strong>' : '' ?>
+                        </div>
+                    </button>
+                </form>
+            </div>
+
             <!-- ONLINE -->
             <?php if ($payLinkUrl): ?>
             <a href="<?= htmlspecialchars($payLinkUrl) ?>" target="_blank" class="pay-option online">
@@ -711,20 +858,6 @@ body {
                 <div class="pay-note">Payment link unavailable.<br>Please use cash payment.</div>
             </div>
             <?php endif; ?>
-
-            <!-- CASH -->
-            <div class="pay-option cash">
-                <form method="POST"
-                      onsubmit="return confirm('Confirm cash payment of ₱<?= number_format($grand_total, 2) ?> for <?= htmlspecialchars(addslashes($patient_name)) ?>?');">
-                    <input type="hidden" name="payment_method" value="cash">
-                    <button type="submit">
-                        <div class="pay-ico"><i class="bi bi-cash-coin"></i></div>
-                        <div class="pay-label">Pay with Cash</div>
-                        <div class="pay-amt">₱<?= number_format($grand_total, 2) ?></div>
-                        <div class="pay-note">Present at the cashier<br>or billing office</div>
-                    </button>
-                </form>
-            </div>
 
         </div>
     </div>
