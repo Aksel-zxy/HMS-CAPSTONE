@@ -1,0 +1,132 @@
+.custom-tabs .nav-link {
+  border: none;
+  color: #555;
+  font-weight: 500;
+  padding: 10px 20px;
+  transition: all 0.3s ease;
+}
+
+.custom-tabs .nav-link:hover {
+  background-color: #f8f9fa; /* light hover */
+  color: #0d6efd; /* bootstrap primary color */
+  border-radius: 5px 5px 0 0;
+}
+
+.custom-tabs .nav-link.active {
+  color: #0d6efd;
+  border-bottom: 2px solid #0d6efd;
+  background-color: #fff;
+  font-weight: 600;
+}
+
+.notif-badge {
+  position: absolute;
+  top: 1px;
+  right: 110px;
+  background: red;
+  color: white;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 50%;
+}
+
+.notif-dot {
+  position: absolute;
+  top: 5px;
+  right: 118px;
+  height: 10px;
+  width: 10px;
+  background-color: red;
+  border-radius: 50%;
+}
+.expiry-dot {
+  position: absolute;
+  top: 5px;
+  right: 50px; /* adjust depending on sidebar text length */
+  height: 10px;
+  width: 10px;
+  background-color: red;
+  border-radius: 50%;
+}
+/* Modal width - bigger than XL but not fullscreen */
+.modal-custom {
+  max-width: 1800px; /* wider than xl */
+  width: 95%;
+}
+
+/* Scrollable table inside modal */
+.table-responsive {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Tabs style */
+#recordTabs .nav-link {
+  font-weight: 500;
+  color: #495057;
+  transition: all 0.3s;
+}
+#recordTabs .nav-link.active {
+  background-color: #0d6efd;
+  color: #fff;
+  border-radius: 0.25rem 0.25rem 0 0;
+}
+#recordTabs .nav-link:hover:not(.active) {
+  background-color: #e9ecef;
+  color: #0d6efd;
+}
+
+/* Table style */
+.table th,
+.table td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.table-hover tbody tr:hover {
+  background-color: #f1f5f9;
+  cursor: pointer;
+}
+.table thead {
+  background-color: #0d6efd;
+  color: #fff;
+}
+.table-sm th,
+.table-sm td {
+  padding: 0.5rem;
+}
+
+/* Scrollbar for responsive tables */
+.table-responsive::-webkit-scrollbar {
+  width: 8px;
+}
+.table-responsive::-webkit-scrollbar-thumb {
+  background-color: #0d6efd;
+  border-radius: 4px;
+}
+
+/* Modal header */
+.modal-header {
+  border-bottom: 2px solid #0d6efd;
+}
+
+/* Prescription Note Button */
+.btn-info.btn-sm {
+  background-color: #0dcaf0;
+  border-color: #0dcaf0;
+}
+.btn-info.btn-sm:hover {
+  background-color: #31d2f2;
+  border-color: #31d2f2;
+}
+
+/* Modal title icon spacing */
+.modal-title i {
+  margin-right: 8px;
+}
+
+/* Responsive text wrap */
+.tab-pane table td {
+  word-wrap: break-word;
+  max-width: 200px;
+}
