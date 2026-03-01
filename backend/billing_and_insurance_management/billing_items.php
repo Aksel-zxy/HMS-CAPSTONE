@@ -524,7 +524,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_inpat_service']))
     $svc_id = (int)$_POST['inpat_service_id'];
     $qty    = max(1, (int)($_POST['inpat_qty'] ?? 1));
     if ($svc_id > 0) {
-        $s = $conn->prepare("SELECT service_id,name,base_price,category,unit FROM billing_services WHERE service_id=? AND is_active=1 LIMIT 1");
+        $s = $conn->prepare("SELECT id as service_id,name,base_price,category,unit FROM billing_services WHERE id=? AND is_active=1 LIMIT 1");
         $s->bind_param("i", $svc_id);
         $s->execute();
         $svc = $s->get_result()->fetch_assoc();
@@ -810,7 +810,7 @@ if ($seeded_ids) {
 $medicines = [];
 while ($m = $med_res->fetch_assoc()) $medicines[] = $m;
 
-$inpat_services_res = $conn->query("SELECT service_id,category,name,base_price,unit FROM billing_services WHERE is_active=1 ORDER BY category,name");
+$inpat_services_res = $conn->query("SELECT id as service_id,category,name,base_price,unit FROM billing_services WHERE is_active=1 ORDER BY category,name");
 $inpat_services_by_cat = [];
 while ($is = $inpat_services_res->fetch_assoc()) $inpat_services_by_cat[$is['category']][] = $is;
 
