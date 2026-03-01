@@ -471,7 +471,7 @@ if (isset($_POST['submit_otc'])) {
                                         <select name="payment_method" class="form-select" required>
                                             <option value="">-- Select Payment Method --</option>
                                             <option value="cash">Cash</option>
-                                            <option value="card">Card</option>
+
                                         </select>
                                     </div>
                                 </div>
