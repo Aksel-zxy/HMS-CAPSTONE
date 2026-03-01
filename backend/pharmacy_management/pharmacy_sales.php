@@ -148,12 +148,26 @@ $total_profit = $total_revenue - $total_cost;
 $profit_margin = $total_revenue > 0 ? ($total_profit / $total_revenue) * 100 : 0;
 
 // 🔔 Pending prescriptions count
-$notif_sql = "SELECT COUNT(*) AS pending FROM pharmacy_prescription WHERE status = 'Pending'";
+$notif_sql = "SELECT COUNT(*) AS pending 
+              FROM pharmacy_prescription 
+              WHERE status = 'Pending'";
 $notif_res = $conn->query($notif_sql);
+
 $pendingCount = 0;
 if ($notif_res && $notif_res->num_rows > 0) {
     $notif_row = $notif_res->fetch_assoc();
-    $pendingCount = $notif_row['pending'];
+    $pendingCount += (int)$notif_row['pending'];
+}
+
+// 🔔 Pending Scheduled prescriptions count
+$sched_notif_sql = "SELECT COUNT(*) AS pending 
+                    FROM scheduled_medications 
+                    WHERE status IN ('pending', 'ongoing')";
+$sched_notif_res = $conn->query($sched_notif_sql);
+
+if ($sched_notif_res && $sched_notif_res->num_rows > 0) {
+    $sched_notif_row = $sched_notif_res->fetch_assoc();
+    $pendingCount += (int)$sched_notif_row['pending'];
 }
 
 // 🔴 Expiry count
