@@ -8,6 +8,32 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
     echo "User ID is not set in session.";
     exit();
 }
+
+// ---- AJAX Endpoint for fetching employee's patient reports ----
+if (isset($_GET['fetch_reports_for_employee'])) {
+    header('Content-Type: application/json');
+    $emp_id = (int)$_GET['fetch_reports_for_employee'];
+    
+    $reports_sql = "
+        SELECT r.*, p.fname, p.lname 
+        FROM daily_medical_reports r
+        JOIN patientinfo p ON r.patient_id = p.patient_id
+        WHERE r.employee_id = ?
+        ORDER BY r.created_at DESC
+    ";
+    $stmt = $conn->prepare($reports_sql);
+    $stmt->bind_param("i", $emp_id);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $data = [];
+    while($row = $res->fetch_assoc()) {
+        $data[] = $row;
+    }
+    echo json_encode($data);
+    exit();
+}
+// -------------------------------------------------------------
+
 $query = "SELECT * FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
@@ -312,13 +338,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reassign_duty'])) {
                                 <div class="badge bg-light text-primary border mb-3">
                                     <?php echo count($my_duties); ?> Active Duties
                                 </div>
-                                <button class="btn btn-primary w-100 rounded-pill view-duties-btn"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#dutyModal"
-                                    data-staff-name="<?php echo htmlspecialchars(($doc['profession'] === 'Doctor' ? 'Dr. ' : 'Nurse ') . $doc['first_name'] . ' ' . $doc['last_name']); ?>"
-                                    data-duties='<?php echo htmlspecialchars(json_encode($my_duties), ENT_QUOTES, 'UTF-8'); ?>'>
-                                    View Duties
-                                </button>
+                                <div class="d-flex justify-content-center flex-wrap gap-2">
+                                    <button class="btn btn-primary btn-sm rounded-pill shadow-sm"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#dutyModal"
+                                        data-staff-name="<?php echo htmlspecialchars(($doc['profession'] === 'Doctor' ? 'Dr. ' : 'Nurse ') . $doc['first_name'] . ' ' . $doc['last_name']); ?>"
+                                        data-duties='<?php echo htmlspecialchars(json_encode($my_duties), ENT_QUOTES, 'UTF-8'); ?>'>
+                                        <i class="fas fa-eye me-1"></i> View Duties
+                                    </button>
+                                    <button class="btn btn-info btn-sm rounded-pill shadow-sm text-dark" onclick="loadEmployeeReports(<?= $doc['employee_id'] ?>, '<?= htmlspecialchars(addslashes($doc['first_name'] . ' ' . $doc['last_name'])) ?>')">
+                                        <i class="fas fa-file-medical me-1"></i> Reports
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     <?php endwhile; ?>
@@ -495,6 +526,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reassign_duty'])) {
                     </div>
                 </div>
             </div>
+
+            <!-- Patient Reports Modal -->
+            <div class="modal fade" id="patientReportsModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+                    <div class="modal-content" style="border-radius:15px; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                        <div class="modal-header bg-info text-dark" style="border-radius:15px 15px 0 0;">
+                            <h5 class="modal-title fw-bold" id="reportsModalTitle"><i class="fas fa-file-medical me-2"></i>Patient Reports</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body p-4 text-start" id="reportsModalBody">
+                            <div class="text-center text-muted my-3"><i class="fas fa-spinner fa-spin fa-2x"></i> <br> Loading reports...</div>
+                        </div>
+                        <div class="modal-footer bg-light" style="border-radius:0 0 15px 15px;">
+                            <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- END CODING HERE -->
             <!----- End of Main Content ----->
         </div>
@@ -604,6 +654,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reassign_duty'])) {
                 // Show new modal
                 const reassignModal = new bootstrap.Modal(document.getElementById('reassignDutyModal'));
                 reassignModal.show();
+            }
+
+            // Function to fetch and show reports for a specific employee
+            function loadEmployeeReports(employeeId, employeeName) {
+                const reportsModal = new bootstrap.Modal(document.getElementById('patientReportsModal'));
+                document.getElementById('reportsModalTitle').innerHTML = `<i class="fas fa-file-medical me-2"></i>Reports by ${employeeName}`;
+                const bodyElement = document.getElementById('reportsModalBody');
+                bodyElement.innerHTML = '<div class="text-center text-muted my-3"><i class="fas fa-spinner fa-spin fa-2x"></i> <br> Loading reports...</div>';
+                reportsModal.show();
+
+                fetch(`duty_assignment.php?fetch_reports_for_employee=${employeeId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.length === 0) {
+                            bodyElement.innerHTML = '<div class="alert alert-info text-center"><i class="fas fa-info-circle me-1"></i> No patient reports submitted by this staff member yet.</div>';
+                            return;
+                        }
+
+                        let html = '';
+                        data.forEach(report => {
+                            const dateObj = new Date(report.created_at);
+                            const formattedDate = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                            
+                            let statusColor = 'bg-secondary';
+                            const statusText = (report.patient_status || '').toLowerCase();
+                            if (statusText.includes('stable') || statusText.includes('improving')) statusColor = 'bg-success';
+                            else if (statusText.includes('critical') || statusText.includes('worse')) statusColor = 'bg-danger';
+                            else if (statusText.includes('monitoring') || statusText.includes('discomfort')) statusColor = 'bg-warning text-dark';
+
+                            html += `
+                                <div class="card mb-3 border-0 shadow-sm" style="border-left: 4px solid #0dcaf0 !important;">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0 fw-bold text-dark">Patient: ${report.fname} ${report.lname}</h6>
+                                            <span class="badge ${statusColor}">${report.patient_status}</span>
+                                        </div>
+                                        <p class="small text-muted mb-2"><i class="fas fa-clock me-1"></i> ${formattedDate} &nbsp;|&nbsp; <span class="badge bg-light text-dark border"><i class="fas fa-calendar-day me-1"></i>${report.shift}</span></p>
+                                        
+                                        ${report.interventions ? `
+                                            <div class="mb-2">
+                                                <small class="fw-bold text-primary">Interventions:</small>
+                                                <div class="bg-light p-2 rounded small text-dark mt-1">${report.interventions.replace(/\n/g, '<br>')}</div>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        ${report.tasks_done ? `
+                                            <div>
+                                                <small class="fw-bold text-success">Tasks Done:</small>
+                                                <div class="bg-light p-2 rounded small text-dark mt-1">${report.tasks_done.replace(/\n/g, '<br>')}</div>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        bodyElement.innerHTML = html;
+                    })
+                    .catch(e => {
+                        console.error("Fetch Error:", e);
+                        bodyElement.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-1"></i> Error loading reports.</div>';
+                    });
             }
         </script>
         <script src="../assets/Bootstrap/all.min.js"></script>

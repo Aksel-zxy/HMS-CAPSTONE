@@ -52,7 +52,9 @@ class Dashboard {
     public function getAllEmployees() {
         $sql = "SELECT employee_id, 
                     COALESCE(CONCAT_WS(' ', first_name, middle_name, last_name, suffix_name), 'No Name') AS full_name
-                FROM hr_employees 
+                FROM hr_employees
+                WHERE status = 'Active'
+                AND profession IN ('Doctor','Nurse','Pharmacist','Laboratorist','Accountant') 
                 ORDER BY employee_id ASC";
         $result = $this->conn->query($sql);
         $employees = [];
