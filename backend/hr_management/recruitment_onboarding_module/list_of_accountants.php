@@ -348,7 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <br />
 
                 <center>
-                    <h4 style="font-weight: bold;">License and Education</h4> 
+                    <h4 style="font-weight: bold;">Education</h4> 
                 </center>
 
                 <label for="educational_status"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Educational Status:</label>
@@ -418,6 +418,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Transcription of Records:</label>
                 <input type="file" name="tor" accept=".pdf,.jpg,.jpeg,.png">
 
+                <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>NBI Clearance / Police Clearance:</label>
+                <input type="file" name="nbi_clearance" accept=".pdf,.jpg,.jpeg,.png">
+
                 <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>2x2 Formal Picture:</label>
                 <input type="file" name="id_picture" accept=".pdf,.jpg,.jpeg,.png">
 
@@ -440,7 +443,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const rows = table.querySelectorAll("tbody tr");
             const pagination = document.getElementById("pagination");
 
-            let rowsPerPage = 10;
+            let rowsPerPage = 50;
             let currentPage = 1;
             let totalPages = Math.ceil(rows.length / rowsPerPage);
 

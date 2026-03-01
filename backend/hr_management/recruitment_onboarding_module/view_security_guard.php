@@ -2,7 +2,7 @@
 require '../../../SQL/config.php';
 require_once '../classes/Auth.php';
 require_once '../classes/User.php';
-require_once 'classes/Pharmacist.php';
+require_once 'classes/SecurityGuard.php';
 
 Auth::checkHR();
 
@@ -22,36 +22,34 @@ if (!$employeeId) {
     die("No Employee ID provided.");
 }
 
-$pharmacistObj = new Pharmacist($conn);
-$employee = $pharmacistObj->getByEmployeeId($employeeId);
+$securityGuardObj = new SecurityGuard($conn);
+$employee = $securityGuardObj->getByEmployeeId($employeeId);
 
 if (!$employee) {
     die("Employee not found.");
 }
 
-// ✅ Get all uploaded documents (BLOBs)
-$documentsResult = $pharmacistObj->getEmployeeDocuments($employeeId);
+// ✅ Get all uploaded documents (with BLOBs)
+$documentsResult = $securityGuardObj->getEmployeeDocuments($employeeId);
 $documents = $documentsResult->fetch_all(MYSQLI_ASSOC);
 
 $uploadedDocs = [];
 foreach ($documents as $doc) {
-    if (!empty($doc['document_type']) && !empty($doc['file_blob'])) {
-        $uploadedDocs[$doc['document_type']] = $doc['file_blob'];
-    }
+    $uploadedDocs[$doc['document_type']] = $doc['file_blob'];
 }
 
-// ✅ Prepare ID Picture
+// ✅ Prepare ID picture
 $docType = 'ID Picture';
-$photoSrc = 'css/pics/favicon.ico'; // default image
+$photoSrc = 'css/pics/favicon.ico'; // default
 
-if (isset($uploadedDocs[$docType])) {
-    // detect MIME type
+if (isset($uploadedDocs[$docType]) && !empty($uploadedDocs[$docType])) {
+    // Detect image type from binary (optional enhancement)
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
     $mime = finfo_buffer($finfo, $uploadedDocs[$docType]);
     finfo_close($finfo);
 
+    // If it's an image, convert to base64
     if (strpos($mime, 'image') !== false) {
-        // convert to base64 for inline display
         $base64 = base64_encode($uploadedDocs[$docType]);
         $photoSrc = "data:$mime;base64,$base64";
     }
@@ -91,7 +89,7 @@ if (isset($uploadedDocs[$docType])) {
                 <div class="topbars">
 
                     <div class="link-bar">
-                        <a href="list_of_pharmacists.php" style="color:black;">
+                        <a href="list_of_security_guards.php" style="color:black;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="35px" height="35px" fill="currentColor" class="bi bi-arrow-left-circle" viewBox="0 0 16 16">
                                 <path fill-rule="evenodd" d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8m15 0A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-4.5-.5a.5.5 0 0 1 0 1H5.707l2.147 2.146a.5.5 0 0 1-.708.708l-3-3a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L5.707 7.5z"/>
                             </svg>
@@ -104,18 +102,18 @@ if (isset($uploadedDocs[$docType])) {
                     </div>
                 </div>
 
-
                 <div class="employee-header">
                     
                     <!-- ----- Left: Employee Photo ----- -->
                     <div class="employee-photo-section">
-                        <img src="<?= htmlspecialchars($photoSrc); ?>"
+                        <img src="<?= htmlspecialchars($photoSrc ?? '') ?>"
                             alt="Employee Photo" 
                             class="employee-photo">
 
                         <?php
-                            $statusClass = 'status-' . strtolower($employee['status']);
-                            echo "<span class='status-badge {$statusClass}'>{$employee['status']}</span>";
+                            $status = $employee['status'] ?? '';
+                            $statusClass = 'status-' . strtolower($status);
+                            echo "<span class='status-badge {$statusClass}'>" . htmlspecialchars($status) . "</span>";
                         ?>
 
                         <div class="employee-photo-buttons">
@@ -149,7 +147,6 @@ if (isset($uploadedDocs[$docType])) {
                     </div>
                 </div>
 
-
                 <!-- ----- Two Column Layout ----- -->
                 <div class="two-column-layout">
                         
@@ -158,40 +155,30 @@ if (isset($uploadedDocs[$docType])) {
                         <div class="card">
                             <h2 class="card-heading">Address Information</h2>
                             <div class="info-grid">
-                                <div><strong>House No.:</strong> <?= htmlspecialchars($employee['house_no'] ?? ''); ?></div>
-                                <div><strong>Barangay:</strong> <?= htmlspecialchars($employee['barangay'] ?? ''); ?></div>
-                                <div><strong>City:</strong> <?= htmlspecialchars($employee['city'] ?? ''); ?></div>
-                                <div><strong>Province:</strong> <?= htmlspecialchars($employee['province'] ?? ''); ?></div>
-                                <div><strong>Region:</strong> <?= htmlspecialchars($employee['region'] ?? ''); ?></div>
-                            </div>
-                        </div>
-
-                        <div class="card">
-                            <h2 class="card-heading">License Information</h2>
-                            <div class="info-grid">
-                                <div><strong>License Type:</strong> <?= htmlspecialchars($employee['license_type'] ?? ''); ?></div>
-                                <div><strong>License Number:</strong> <?= htmlspecialchars($employee['license_number'] ?? ''); ?></div>
-                                <div><strong>License Issued:</strong> <?= htmlspecialchars($employee['license_issued'] ?? ''); ?></div>
-                                <div><strong>License Expiry:</strong> <?= htmlspecialchars($employee['license_expiry'] ?? ''); ?></div>
+                                <div><strong>House No.:</strong> <?= htmlspecialchars($employee['house_no'] ?? '') ?></div>
+                                <div><strong>Barangay:</strong> <?= htmlspecialchars($employee['barangay'] ?? '') ?></div>
+                                <div><strong>City:</strong> <?= htmlspecialchars($employee['city'] ?? '') ?></div>
+                                <div><strong>Province:</strong> <?= htmlspecialchars($employee['province'] ?? '') ?></div>
+                                <div><strong>Region:</strong> <?= htmlspecialchars($employee['region'] ?? '') ?></div>
                             </div>
                         </div>
 
                         <div class="card">
                             <h2 class="card-heading">Emergency Contact</h2>
                             <div class="info-grid">
-                                <div><strong>Name:</strong> <?= htmlspecialchars($employee['eg_name'] ?? ''); ?></div>
-                                <div><strong>Relationship:</strong> <?= htmlspecialchars($employee['eg_relationship'] ?? ''); ?></div>
-                                <div><strong>Contact Number:</strong> <?= htmlspecialchars($employee['eg_cn'] ?? ''); ?></div>
+                                <div><strong>Name:</strong> <?= htmlspecialchars($employee['eg_name'] ?? '') ?></div>
+                                <div><strong>Relationship:</strong> <?= htmlspecialchars($employee['eg_relationship'] ?? '') ?></div>
+                                <div><strong>Contact Number:</strong> <?= htmlspecialchars($employee['eg_cn'] ?? '') ?></div>
                             </div>
                         </div>
 
                         <div class="card">
                             <h2 class="card-heading">System Information</h2>
                             <div class="info-grid">
-                                <div><strong>Username:</strong> <?= htmlspecialchars($employee['username'] ?? ''); ?></div>
-                                <div><strong>Password (hashed):</strong> <?= htmlspecialchars($employee['password'] ?? ''); ?></div>
-                                <div><strong>Created At:</strong> <?= htmlspecialchars($employee['created_at'] ?? ''); ?></div>
-                                <div><strong>Updated At:</strong> <?= htmlspecialchars($employee['update_at'] ?? ''); ?></div>
+                                <div><strong>Username:</strong> <?= htmlspecialchars($employee['username'] ?? '') ?></div>
+                                <div><strong>Password (hashed):</strong> <?= htmlspecialchars($employee['password'] ?? '') ?></div>
+                                <div><strong>Created At:</strong> <?= htmlspecialchars($employee['created_at'] ?? '') ?></div>
+                                <div><strong>Updated At:</strong> <?= htmlspecialchars($employee['update_at'] ?? '') ?></div>
                             </div>
                         </div>
                     </div>
@@ -201,23 +188,20 @@ if (isset($uploadedDocs[$docType])) {
                         <div class="card">
                             <h2 class="card-heading">Job Information</h2>
                             <div class="info-grid">
-                                <div><strong>Hire Date:</strong> <?= htmlspecialchars($employee['hire_date'] ?? ''); ?></div>
-                                <div><strong>Profession:</strong> <?= htmlspecialchars($employee['profession'] ?? ''); ?></div>
-                                <div><strong>Role:</strong> <?= htmlspecialchars($employee['role'] ?? ''); ?></div>
-                                <div><strong>Department:</strong> <?= htmlspecialchars($employee['department'] ?? ''); ?></div>
-                                <div><strong>Specialization:</strong> <?= htmlspecialchars($employee['specialization'] ?? ''); ?></div>
-                                <div><strong>Employment Type:</strong> <?= htmlspecialchars($employee['employment_type'] ?? ''); ?></div>
-                                <div><strong>Status:</strong> <?= htmlspecialchars($employee['status'] ?? ''); ?></div>
+                                <div><strong>Hire Date:</strong> <?= htmlspecialchars($employee['hire_date'] ?? '') ?></div>
+                                <div><strong>Profession:</strong> <?= htmlspecialchars($employee['profession'] ?? '') ?></div>
+                                <div><strong>Department:</strong> <?= htmlspecialchars($employee['department'] ?? '') ?></div>
+                                <div><strong>Status:</strong> <?= htmlspecialchars($employee['status'] ?? '') ?></div>
                             </div>
                         </div>
 
                         <div class="card">
                             <h2 class="card-heading">Education Information</h2>
                             <div class="info-grid">
-                                <div><strong>Educational Status:</strong> <?= htmlspecialchars($employee['educational_status'] ?? ''); ?></div>
-                                <div><strong>Degree Type:</strong> <?= htmlspecialchars($employee['degree_type'] ?? ''); ?></div>
-                                <div><strong>Medical School:</strong> <?= htmlspecialchars($employee['medical_school'] ?? ''); ?></div>
-                                <div><strong>Graduation Year:</strong> <?= htmlspecialchars($employee['graduation_year'] ?? ''); ?></div>
+                                <div><strong>Educational Status:</strong> <?= htmlspecialchars($employee['educational_status'] ?? '') ?></div>
+                                <div><strong>Degree Type:</strong> <?= htmlspecialchars($employee['degree_type'] ?? '') ?></div>
+                                <div><strong>School:</strong> <?= htmlspecialchars($employee['medical_school'] ?? '') ?></div>
+                                <div><strong>Graduation Year:</strong> <?= htmlspecialchars($employee['graduation_year'] ?? '') ?></div>
                             </div>
                         </div>
 
@@ -227,8 +211,6 @@ if (isset($uploadedDocs[$docType])) {
                                 <?php
                                 $requiredDocs = [
                                     'Resume',
-                                    'License ID',
-                                    'Board Rating & Certificate of Passing',
                                     'Diploma',
                                     'Government ID',
                                     'Application Letter',
@@ -241,7 +223,7 @@ if (isset($uploadedDocs[$docType])) {
                                 if (!empty($documents)) {
                                     foreach ($documents as $doc) {
                                         if (!empty($doc['document_type']) && !empty($doc['file_blob'])) {
-                                            // store document_id to generate view link
+                                            // Store by document type, include document_id for view link
                                             $uploadedDocs[$doc['document_type']] = $doc['document_id'];
                                         }
                                     }
@@ -252,6 +234,7 @@ if (isset($uploadedDocs[$docType])) {
                                     <div>
                                         <strong><?= htmlspecialchars($docType); ?>:</strong>
                                         <?php if (isset($uploadedDocs[$docType])): ?>
+                                            <!-- ✅ Link to file viewer -->
                                             <a href="view_document.php?id=<?= urlencode($uploadedDocs[$docType]); ?>" target="_blank">
                                                 View Document
                                             </a>
@@ -276,7 +259,7 @@ if (isset($uploadedDocs[$docType])) {
                     <h3 style="font-weight: bold;">Edit Employee Information</h3> 
                 </center>
 
-                <form action="update_pharmacist.php" method="post" enctype="multipart/form-data">
+                <form action="update_security_guard.php" method="post" enctype="multipart/form-data">
                     <input type="hidden" name="employee_id" value="<?= htmlspecialchars($employee['employee_id'] ?? '') ?>">
 
                     <br />
@@ -336,130 +319,88 @@ if (isset($uploadedDocs[$docType])) {
 
                     <label for="region">Region:</label>
                     <select id="region" name="region" required>
-                        <?php
+                        <?php 
                         $regions = [
-                            "Region 1 - Ilocos Region","Region 2 - Cagayan Valley","Region 3 - Central Luzon",
-                            "Region 4A - CALABARZON","Region 4B - MIMAROPA","Region 5 - Bicol Region",
-                            "Region 6 - Western Visayas","Region 7 - Central Visayas","Region 8 - Eastern Visayas",
-                            "Region 9 - Zamboanga Peninsula","Region 10 - Northern Mindanao","Region 11 - Davao Region",
-                            "Region 12 - SOCCSKSARGEN","Region 13 - Caraga","CAR - Cordillera Administrative Region",
-                            "NCR - National Capital Region","ARMM - Autonomous Region in Muslim Mindanao",
-                            "BARMM - Bangsamoro Autonomous Region"
+                            'Region 1 - Ilocos Region','Region 2 - Cagayan Valley','Region 3 - Central Luzon','Region 4A - CALABARZON',
+                            'Region 4B - MIMAROPA','Region 5 - Bicol Region','Region 6 - Western Visayas','Region 7 - Central Visayas',
+                            'Region 8 - Eastern Visayas','Region 9 - Zamboanga Peninsula','Region 10 - Northern Mindanao','Region 11 - Davao Region',
+                            'Region 12 - SOCCSKSARGEN','Region 13 - Caraga','CAR - Cordillera Administrative Region','NCR - National Capital Region',
+                            'ARMM - Autonomous Region in Muslim Mindanao','BARMM - Bangsamoro Autonomous Region'
                         ];
-                        foreach ($regions as $r) {
-                            $selected = ($employee['region'] ?? '') == $r ? 'selected' : '';
-                            echo "<option value=\"$r\" $selected>$r</option>";
-                        }
-                        ?>
+                        foreach ($regions as $r) : ?>
+                            <option value="<?= $r ?>" <?= ($employee['region'] ?? '') == $r ? 'selected' : '' ?>><?= $r ?></option>
+                        <?php endforeach; ?>
                     </select>
 
                     <br />
                     <br />
 
                     <center>
-                        <h4 style="font-weight: bold;">Role and Employment</h4>
+                        <h4 style="font-weight: bold;">Role and Employment</h4> 
                     </center>
 
                     <label for="profession">Profession:</label>
                     <select id="profession" name="profession" required>
-                        <option value="Pharmacist" <?= ($employee['profession'] ?? '') == 'Pharmacist' ? 'selected' : '' ?>>Pharmacist</option>
-                    </select>
-
-                    <label for="role">Role:</label>
-                    <select id="role" name="role" required>
-                        <?php
-                        $roles = ["Resident Pharmacist","Clinical Pharmacist","Senior Pharmacist","Pharmacy Supervisor","Chief Pharmacist"];
-                        foreach ($roles as $r) {
-                            $selected = ($employee['role'] ?? '') == $r ? 'selected' : '';
-                            echo "<option value=\"$r\" $selected>$r</option>";
-                        }
-                        ?>
+                        <option value="Security Guard" <?= ($employee['profession'] ?? '') == 'Security Guard' ? 'selected' : '' ?>>Security Guard</option>
                     </select>
 
                     <label for="department">Department:</label>
                     <select id="department" name="department" required>
-                        <option value="Pharmacy" <?= ($employee['department'] ?? '') == 'Pharmacy' ? 'selected' : '' ?>>Pharmacy</option>
-                    </select>
-
-                    <br />
-
-                    <label for="specialization">Specialization:</label>
-                    <select id="specialization" name="specialization" required>
-                        <?php
-                        $specializations = ["Clinical Pharmacist","Hospital Pharmacist","Compounding Pharmacist","Dispensing Pharmacist"];
-                        foreach ($specializations as $s) {
-                            $selected = ($employee['specialization'] ?? '') == $s ? 'selected' : '';
-                            echo "<option value=\"$s\" $selected>$s</option>";
-                        }
-                        ?>
+                        <?php 
+                        $departments = ['Facilities & Maintenance'];
+                        foreach ($departments as $d) : ?>
+                            <option value="<?= $d ?>" <?= ($employee['department'] ?? '') == $d ? 'selected' : '' ?>><?= $d ?></option>
+                        <?php endforeach; ?>
                     </select>
 
                     <label for="employment_type">Employment Type:</label>
                     <select id="employment_type" name="employment_type" required>
-                        <?php
-                        $employmentTypes = ['Full-Time','Part-Time','Contractual','Consultant'];
-                        foreach ($employmentTypes as $type) {
-                            $selected = ($employee['employment_type'] ?? '') == $type ? 'selected' : '';
-                            echo "<option value=\"$type\" $selected>$type</option>";
-                        }
-                        ?>
+                        <?php 
+                        $employment_types = ['Full-Time'];
+                        foreach ($employment_types as $et) : ?>
+                            <option value="<?= $et ?>" <?= ($employee['employment_type'] ?? '') == $et ? 'selected' : '' ?>><?= $et ?></option>
+                        <?php endforeach; ?>
                     </select>
 
                     <label>Status:</label>
                     <select name="status">
-                        <?php
+                        <?php 
                         $statuses = ['Active','Inactive','Resigned'];
-                        foreach ($statuses as $status) {
-                            $selected = ($employee['status'] ?? '') == $status ? 'selected' : '';
-                            echo "<option value=\"$status\" $selected>$status</option>";
-                        }
-                        ?>
+                        foreach ($statuses as $s) : ?>
+                            <option value="<?= $s ?>" <?= ($employee['status'] ?? '') == $s ? 'selected' : '' ?>><?= $s ?></option>
+                        <?php endforeach; ?>
                     </select>
 
                     <br />
                     <br />
 
                     <center>
-                        <h4 style="font-weight: bold;">License and Education</h4>
+                        <h4 style="font-weight: bold;">Education</h4> 
                     </center>
 
                     <label for="educational_status">Educational Status:</label>
                     <select id="educational_status" name="educational_status" required>
-                        <option value="Graduate" <?= ($employee['educational_status'] ?? '') == 'Graduate' ? 'selected' : '' ?>>Graduate</option>
-                        <option value="Post Graduate" <?= ($employee['educational_status'] ?? '') == 'Post Graduate' ? 'selected' : '' ?>>Post Graduate</option>
+                        <?php 
+                        $edu_status = ['High School Graduate','College Level','College Graduate'];
+                        foreach ($edu_status as $es) : ?>
+                            <option value="<?= $es ?>" <?= ($employee['educational_status'] ?? '') == $es ? 'selected' : '' ?>><?= $es ?></option>
+                        <?php endforeach; ?>
                     </select>
 
                     <label for="degree_type">Degree Type:</label>
-                    <select id="degree_type" name="degree_type" required>
-                        <option value="Bachelor of Science in Pharmacy (BS Pharmacy)" <?= ($employee['degree_type'] ?? '') == 'Bachelor of Science in Pharmacy (BS Pharmacy)' ? 'selected' : '' ?>>Bachelor of Science in Pharmacy (BS Pharmacy)</option>
-                        <option value="Doctor of Pharmacy (PharmD)" <?= ($employee['degree_type'] ?? '') == 'Doctor of Pharmacy (PharmD)' ? 'selected' : '' ?>>Doctor of Pharmacy (PharmD)</option>
-                    </select>
+                    <input type="text" name="degree_type" value="<?= htmlspecialchars($employee['degree_type'] ?? '') ?>">
 
-                    <label for="medical_school">Medical School:</label>
+                    <label for="medical_school">School:</label>
                     <input type="text" id="medical_school" name="medical_school" value="<?= htmlspecialchars($employee['medical_school'] ?? '') ?>">
 
                     <label for="graduation_year">Graduation Year:</label>
-                    <input type="number" name="graduation_year" min="1980" max="<?= date('Y'); ?>" value="<?= htmlspecialchars($employee['graduation_year'] ?? '') ?>">
-
-                    <label>License Type:</label>
-                    <select id="license_type" name="license_type">
-                        <option value="Registered Pharmacist (RPh)" <?= ($employee['license_type'] ?? '') == 'Registered Pharmacist (RPh)' ? 'selected' : '' ?>>Registered Pharmacist (RPh)</option>
-                    </select>
-
-                    <label>License Number:</label>
-                    <input type="text" name="license_number" value="<?= htmlspecialchars($employee['license_number'] ?? '') ?>">
-
-                    <label>License Issued:</label>
-                    <input type="date" name="license_issued" value="<?= htmlspecialchars($employee['license_issued'] ?? '') ?>">
-
-                    <label>License Expiry:</label>
-                    <input type="date" name="license_expiry" value="<?= htmlspecialchars($employee['license_expiry'] ?? '') ?>">
+                    <input type="number" name="graduation_year" id="graduation_year" min="1980" max="<?= date('Y'); ?>" value="<?= htmlspecialchars($employee['graduation_year'] ?? '') ?>">
 
                     <br />
                     <br />
 
                     <center>
-                        <h4 style="font-weight: bold;">Emergency Contact</h4>
+                        <h4 style="font-weight: bold;">Emergency Contact</h4> 
                     </center>
 
                     <label>Name:</label>
@@ -474,6 +415,7 @@ if (isset($uploadedDocs[$docType])) {
                     <br />
                     <br />
 
+
                     <center>
                         <h4 style="font-weight: bold;">Uploaded Documents</h4> 
                     </center>
@@ -482,8 +424,6 @@ if (isset($uploadedDocs[$docType])) {
                     <?php
                         $requiredDocs = [
                             'Resume',
-                            'License ID',
-                            'Board Rating & Certificate of Passing',
                             'Diploma',
                             'Government ID',
                             'Application Letter',
@@ -536,12 +476,6 @@ if (isset($uploadedDocs[$docType])) {
 
                     <label>Resume:</label>
                     <input type="file" name="resume" accept=".pdf,.jpg,.jpeg,.png">
-
-                    <label>License ID:</label>
-                    <input type="file" name="license_id" accept=".pdf,.jpg,.jpeg,.png">
-
-                    <label>Board Rating & Certificate of Passing:</label>
-                    <input type="file" name="board_certificate" accept=".pdf,.jpg,.jpeg,.png">        
                         
                     <label>Diploma:</label>
                     <input type="file" name="diploma" accept=".pdf,.jpg,.jpeg,.png">

@@ -3,7 +3,7 @@ require '../../../SQL/config.php';
 include '../includes/FooterComponent.php';
 require_once '../classes/Auth.php';
 require_once '../classes/User.php';
-require_once 'classes/Pharmacist.php';
+require_once 'classes/SecurityGuard.php';
 require_once 'classes/FileUploader.php';
 
 Auth::checkHR();
@@ -21,27 +21,27 @@ if (!$user) {
     die("User not found.");
 }
 
-$pharmacist = new Pharmacist($conn);
+$securityguard = new SecurityGuard($conn);
 $uploader = new FileUploader($conn);
 
 $search = $_GET['search'] ?? '';
 $status = $_GET['status'] ?? '';
-$pharmacists = $pharmacist->getPharmacists($search, $status);
+$securityguards = $securityguard->getSecurityGuards($search, $status);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = $_POST;
     $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
 
-    if ($pharmacist->employeeExists($data['employee_id'])) {
+    if ($securityguard->employeeExists($data['employee_id'])) {
         echo "<script>alert('Error: Employee ID already exists!'); history.back();</script>";
         exit;
     }
 
-    if ($pharmacist->addPharmacist($data)) {
+    if ($securityguard->addSecurityGuard($data)) {
         $uploader->uploadDocuments($data['employee_id'], $_FILES);
-        echo "<script>alert('Pharmacist registered successfully!'); window.location='list_of_pharmacits.php';</script>";
+        echo "<script>alert('Security Guard registered successfully!'); window.location='list_of_security_guards.php';</script>";
     } else {
-        echo "<script>alert('Error registering Pharmacist!');</script>";
+        echo "<script>alert('Error registering Security Guard!');</script>";
     }
 }
 
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <!-- ----- Serach Bar ----- -->
             <div class="search-bar">
-                <form method="GET" action="list_of_pharmacists.php">
+                <form method="GET" action="list_of_security_guards.php">
                     <input type="text" name="search" placeholder="Search by Employee ID..." value="<?= htmlspecialchars($search); ?>">
                         <select name="status">
                             <option value="">All Status</option>
@@ -101,36 +101,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         </div>
 
-        <!-- ----- Add Pharmacists ----- -->
+        <!-- ----- Add Security Guard ----- -->
         <center>
-            <button class="hahaha" onclick="openForm()">Add Pharmacist</button>
+            <button class="hahaha" onclick="openForm()">Add Security Guard</button>
         </center>
 
         <!-- ----- Table ----- -->
         <div class="employees">
-            <p style="text-align: center;font-size: 35px;font-weight: bold;padding-bottom: 20px;color: #0047ab;">Pharmacists List</p>
-            <table id="PharmacistsTable">
+            <p style="text-align: center;font-size: 35px;font-weight: bold;padding-bottom: 20px;color: #0047ab;">Security Guard List</p>
+            <table id="SecurityGuardsTable">
                 <thead>
                     <tr>
                         <th>#</th>
                         <th>Employee ID</th>
-                        <th>License Number</th>
                         <th>Full Name</th>
                         <th>Department</th> 
-                        <th>Specialization</th> 
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($pharmacists && $pharmacists->num_rows > 0): 
+                    <?php if ($securityguards && $securityguards->num_rows > 0): 
                         $i = 1;
-                        while ($row = $pharmacists->fetch_assoc()): 
+                        while ($row = $securityguards->fetch_assoc()): 
                     ?>
                     <tr>
                         <td><?= $i++ ?></td>
                         <td><?= htmlspecialchars($row['employee_id'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($row['license_number'] ?? '') ?></td>
                         <td>
                             <?php
                                 $fullName = trim(
@@ -143,29 +140,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ?>
                         </td>
                         <td><?= htmlspecialchars($row['department'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($row['specialization'] ?? '') ?></td>
                         <td>
                             <?php
-                                $rawStatus   = $row['status'] ?? '';
-                                $statusText  = htmlspecialchars($rawStatus);
-                                $statusClass = 'status-' . strtolower($rawStatus);
+                                $statusText  = htmlspecialchars($row['status'] ?? '');
+                                $statusClass = 'status-' . strtolower($row['status'] ?? '');
                             ?>
                             <span class="status-badge <?= $statusClass ?>"><?= $statusText ?></span>
                         </td>
                         <td>
                             <center>
-                                <a href="view_pharmacist.php?employee_id=<?= htmlspecialchars($row['employee_id'] ?? '') ?>" class="view-link">
+                                <a href="view_security_guard.php?employee_id=<?= htmlspecialchars($row['employee_id'] ?? '') ?>" class="view-link">
                                     View Details
                                 </a>
                             </center>
                         </td>
                     </tr>
-
                     <?php endwhile; 
                         else: 
                     ?>
                         <tr>
-                            <td colspan="8" style="text-align:center;">No Doctor found</td>
+                            <td colspan="8" style="text-align:center;">No Security Guard found</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -175,12 +169,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div id="pagination" class="pagination"></div>
         </div>
 
-        <!-- ----- Pop-Up Form (Add Pharmacists) ----- -->
+        <!-- ----- Pop-Up Form (Add Security Guard) ----- -->
         <div id="popupForm" class="popup-form">
             <div class="form-container">
                 <bttn class="close-btn" onclick="closeForm()">X</bttn>
                 <center>
-                    <h3 style="font-weight: bold;">Add Pharmacist</h3> 
+                    <h3 style="font-weight: bold;">Add Security Guard</h3> 
                 </center>
                 <form action="" method="post" enctype="multipart/form-data">
 
@@ -200,16 +194,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label for="employee_id"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Employee ID:</label>
                 <input type="text" id="employee_id" name="employee_id" required pattern="^\d{3}$" title="Employee ID must be exactly 3 digits." oninput="updateUsername()">
                 <center>
-                    <span id="employee_idError" style="color: red;font-size: 15px;"></span>
+                    <span id="employee_idError" style="color: red;font-size: 15px;font-weight: bold;"></span>
                 </center>
                 <br />
 
-                <label for="username"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Username: &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: red;font-weight: bold;">(p + Employee ID)</span></label>
+                <label for="username"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Username: &nbsp;&nbsp;&nbsp;&nbsp;<span style="color: red;font-weight: bold;">(a + Employee ID)</span></label>
                 <div style="display: flex; align-items: center;">
                     <input type="text" id="username" name="username" required style="flex: 1;" readonly>
                 </div>
                 <center>
-                  <span id="usernameError" style="color: red;font-size: 15px;font-weight: bold;"></span>
+                  <span id="usernameError" style="color: red;font-size: 15px;"></span>
                 </center>
                 <br />
 
@@ -323,42 +317,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <label for="profession"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Profession:</label>
                 <select id="profession" name="profession" required>
-                    <option value="Pharmacist">Pharmacist</option>
+                    <option value="Security Guard">Security Guard</option>
                 </select>
                 <br />
 
-                <label for="role"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Role:</label>
-                <select id="role" name="role" required>
-                    <option value="">--- Select Role ---</option>
-                    <option value="Resident Pharmacist">Resident Pharmacist</option>
-                    <option value="Clinical Pharmacist">Clinical Pharmacist</option>
-                    <option value="Senior Pharmacist">Senior Pharmacist</option>
-                    <option value="Pharmacy Supervisor">Pharmacy Supervisor</option>
-                    <option value="Chief Pharmacist">Chief Pharmacist</option>            
+                <label for="department"><span style="color: red; font-weight: bold; font-size: 15px;">*</span>Department:</label>
+                <select id="department" name="department" required>
+                    <option value="Security Personnel">Security Personnel</option>
                 </select>
                 <br />
-
-                <label for="pharmacyDepartment"><span style="color: red; font-weight: bold; font-size: 15px;">*</span>Department:</label>
-                <select id="pharmacyDepartment" name="pharmacyDepartment" required>
-                    <option value="Pharmacy">Pharmacy</option>
-                </select>
-
-                <label for="pharmacySpecialization"><span style="color: red; font-weight: bold; font-size: 15px;">*</span>Specialization:</label>
-                <select id="pharmacySpecialization" name="pharmacySpecialization" required>
-                    <option value="">--- Select Specialization ---</option>
-                    <option value="Clinical Pharmacist">Clinical Pharmacist</option>
-                    <option value="Hospital Pharmacist">Hospital Pharmacist</option>
-                    <option value="Compounding Pharmacist">Compounding Pharmacist</option>
-                    <option value="Dispensing Pharmacist">Dispensing Pharmacist</option>
-                </select>
 
                 <label for="employment_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Employment Type:</label>
                 <select id="employment_type" name="employment_type" required>
-                    <option value="">--- Select Employment Type ---</option>
                     <option value="Full-Time">Full-Time</option>
-                    <option value="Part-Time">Part-Time</option>
-                    <option value="Contractual">Contractual</option>
-                    <option value="Consultant">Consultant</option>
                 </select>
                 <br />
 
@@ -370,50 +341,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <br />
 
                 <center>
-                    <h4 style="font-weight: bold;">License and Education</h4> 
+                    <h4 style="font-weight: bold;">Education</h4> 
                 </center>
 
                 <label for="educational_status"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Educational Status:</label>
                 <select id="educational_status" name="educational_status" required>
                     <option value="">--- Select Educational Status ---</option>
-                    <option value="Graduate">Graduate</option>
-                    <option value="Post Graduate">Post Graduate</option>
-                <select>
-                <br />
-
-                <label for="degree_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Degree Type:</label>
-                <select id="degree_type" name="degree_type" required>
-                    <option value="">--- Select Degree Type ---</option>
-                    <option value="Bachelor of Science in Pharmacy (BS Pharmacy)">Bachelor of Science in Pharmacy (BS Pharmacy)</option>
-                    <option value="Doctor of Pharmacy (PharmD)">Doctor of Pharmacy (PharmD)</option>
+                    <option value="High School Graduate">High School Graduate</option>
+                    <option value="College Level">College Level</option>
+                    <option value="College Graduate">College Graduate</option>
                 </select>
                 <br />
 
-                <label for="medical_school"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Medical School:</label>
+                <label for="degree_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Degree Type:</label>
+                <input type="text" id="degree_type" name="degree_type" placeholder="N/A if not available" required>
+                <br />
+
+                <label for="medical_school"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>School:</label>
                 <input type="text" id="medical_school" name="medical_school" required>
                 <br />
 
                 <label for="graduation_year"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Graduation Year:</label>
                 <input type="number" name="graduation_year" min="1980" max="<?php echo date('Y'); ?>" placeholder="Enter the graduation year">
-                <br />
-
-                <label for="license_type"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>License Type:</label>
-                <select id="license_type" name="license_type" required>
-                    <option value="Registered Pharmacist (RPh)">Registered Pharmacist (RPh)</option>
-                <select>
-                <br />
-
-                <label for="license_number"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>License Number:</label>
-                <input type="text" id="license_number" name="license_number" required pattern="^\d{7}$" title="License Number must be exactly 7 digits.">
-                <br />
-
-                <label for="license_issued"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>License Issued:</label>
-                <input type="date" id="license_issued" name="license_issued" required>
-                <br />
-
-                <label for="license_expiry"><span style="color: red;font-weight: bold;font-size: 15px;">*</span>License Expiry:</label>
-                <input type="date" id="license_expiry" name="license_expiry" required>
-                <br />
                 <br />
 
                 <center>
@@ -441,12 +390,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Resume:</label>
                 <input type="file" name="resume" accept=".pdf,.jpg,.jpeg,.png">
 
-                <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>License ID:</label>
-                <input type="file" name="license_id" accept=".pdf,.jpg,.jpeg,.png">
-
-                <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Board Rating & Certificate of Passing:</label>
-                <input type="file" name="board_certification" accept=".pdf,.jpg,.jpeg,.png">
-
                 <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Diploma:</label>
                 <input type="file" name="diploma" accept=".pdf,.jpg,.jpeg,.png">
 
@@ -458,7 +401,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Transcription of Records:</label>
                 <input type="file" name="tor" accept=".pdf,.jpg,.jpeg,.png">
-                
+
                 <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>NBI Clearance / Police Clearance:</label>
                 <input type="file" name="nbi_clearance" accept=".pdf,.jpg,.jpeg,.png">
 
@@ -480,7 +423,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         });
 
         document.addEventListener("DOMContentLoaded", function () {
-            const table = document.getElementById("PharmacistsTable");
+            const table = document.getElementById("SecurityGuardsTable");
             const rows = table.querySelectorAll("tbody tr");
             const pagination = document.getElementById("pagination");
 
@@ -542,7 +485,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             let usernameField = document.getElementById("username");
             
             if (/^\n{3}$/.test(employeeId)) {
-                usernameField.value = "p" + employeeId;
+                usernameField.value = "sg" + employeeId;
             } else {
                 usernameField.value = "";
             }
@@ -552,7 +495,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             let employeeId = document.getElementById("employee_id").value;
             let usernameField = document.getElementById("username");
         
-            usernameField.value = "p" + employeeId;
+            usernameField.value = "sg" + employeeId;
         }
 
         document.getElementById('employee_id').addEventListener('input', function() {

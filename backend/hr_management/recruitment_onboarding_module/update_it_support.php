@@ -24,10 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $employee = $employeeObj->getById($employeeId);
     if (!$employee) {
-        echo "<script>alert('Nurse not found.'); window.history.back();</script>";
+        echo "<script>alert('IT Support not found.'); window.history.back();</script>";
         exit;
     }
 
+    // ✅ Collect all employee info
     $fields = [
         'first_name', 'middle_name', 'last_name', 'suffix_name', 'gender', 'date_of_birth',
         'contact_number', 'email', 'citizenship', 'house_no', 'barangay', 'city',
@@ -42,36 +43,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $data[$field] = $conn->real_escape_string($_POST[$field] ?? '');
     }
 
-    // Handle "Others" specialization
-    $specialization = $_POST['specialization'] ?? '';
-    if ($specialization === "Others") {
-        $specialization = $_POST['otherSpecialization'] ?? '';
-    }
-    $data['specialization'] = $conn->real_escape_string($specialization);
-
     $updateSuccess = $employeeObj->update($employeeId, $data);
 
+    // ✅ Define document types
     $documentTypes = [
-        'resume'              => 'Resume',
-        'license_id'          => 'License ID',
-        'board_certificate'   => 'Board Rating & Certificate of Passing',
-        'diploma'             => 'Diploma',
-        'government_id'       => 'Government ID',
-        'application_letter'  => 'Application Letter',
-        'tor'                 => 'Transcript of Records',
-        'id_picture'          => 'ID Picture',
-        'nbi_clearance'       => 'NBI Clearance / Police Clearance'
+        'resume'             => 'Resume',
+        'diploma'            => 'Diploma',
+        'government_id'      => 'Government ID',
+        'application_letter' => 'Application Letter',
+        'tor'                => 'Transcript of Records',
+        'id_picture'         => 'ID Picture',
+        'nbi_clearance'      => 'NBI Clearance / Police Clearance'
+        
     ];
 
+    // ✅ Save uploaded documents as BLOB
     foreach ($documentTypes as $fieldName => $docType) {
         if (!empty($_FILES[$fieldName]['name']) && $_FILES[$fieldName]['error'] === 0) {
             $fileTmp  = $_FILES[$fieldName]['tmp_name'];
             $fileSize = $_FILES[$fieldName]['size'];
 
-            // Optional: limit file size to 5MB
+            // limit 5MB
             if ($fileSize > 5242880) continue;
 
-            // Read file as binary
             $fileData = file_get_contents($fileTmp);
 
             $stmt = $conn->prepare("
@@ -80,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ON DUPLICATE KEY UPDATE file_blob = VALUES(file_blob)
             ");
 
-            $null = NULL; // placeholder for blob
+            $null = NULL; // for blob binding
             $stmt->bind_param("ssb", $employeeId, $docType, $null);
             $stmt->send_long_data(2, $fileData);
             $stmt->execute();
@@ -89,9 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($updateSuccess) {
-        echo "<script>alert('Nurse and documents updated successfully!'); window.location.href = 'view_nurse.php?employee_id=$employeeId';</script>";
+        echo "<script>alert('IT Support and documents updated successfully!'); window.location.href = 'view_it_support.php?employee_id=$employeeId';</script>";
     } else {
-        echo "<script>alert('Error updating nurse. Please try again.'); window.history.back();</script>";
+        echo "<script>alert('Error updating IT Support. Please try again.'); window.history.back();</script>";
     }
 }
 
