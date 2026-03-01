@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <!-- ----- Serach Bar ----- -->
             <div class="search-bar">
                 <form method="GET" action="list_of_laboratorist.php">
-                    <input type="text" name="search" placeholder="Search by Employee ID..." value="<?= htmlspecialchars($search); ?>">
+                    <input type="text" name="search" placeholder="Search Employee ID/Name.." value="<?= htmlspecialchars($search); ?>">
                         <select name="status">
                             <option value="">All Status</option>
                             <option value="Active" <?= ($status === 'Active') ? 'selected' : ''; ?>>Active</option>
@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <th>#</th>
                         <th>Employee ID</th>
                         <th>License Number</th>
-                        <th>Full Name</th>
+                        <th>Employee Name</th>
                         <th>Department</th> 
                         <th>Specialization</th> 
                         <th>Status</th>
