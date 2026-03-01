@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_duty'])) {
 
     $insert_qry = "INSERT INTO duty_assignments 
         (patient_id, doctor_id, shift1_nurse_id, shift2_nurse_id, shift3_nurse_id, bed_id, appointment_id, nurse_assistant, `procedure`, notes, equipment, tools, status, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, NULL, 'Pending', NOW())";
+        VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, '', '', '', 'Pending', NOW())";
     
     $ins_stmt = $conn->prepare($insert_qry);
     $ins_stmt->bind_param("iiiiiis", $p_id, $d_id, $n1_id, $n2_id, $n3_id, $bed_id, $procedure);
