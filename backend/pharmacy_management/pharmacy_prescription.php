@@ -100,7 +100,7 @@ if ($expiry_res && $expiry_res->num_rows > 0) {
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
-            <div class="menu-title">Pharmacy Management | Prescription Records</div>
+            <div class="menu-title">Pharmacy Management | Prescription</div>
 
             <!----- Sidebar Navigation ----->
 
