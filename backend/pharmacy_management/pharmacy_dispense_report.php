@@ -131,12 +131,26 @@ $summary_result = $stmt_summary->get_result();
 $summary = $summary_result->fetch_assoc();
 
 // 🔔 Pending prescriptions count
-$notif_sql = "SELECT COUNT(*) AS pending FROM pharmacy_prescription WHERE status = 'Pending'";
+$notif_sql = "SELECT COUNT(*) AS pending 
+              FROM pharmacy_prescription 
+              WHERE status = 'Pending'";
 $notif_res = $conn->query($notif_sql);
+
 $pendingCount = 0;
 if ($notif_res && $notif_res->num_rows > 0) {
     $notif_row = $notif_res->fetch_assoc();
-    $pendingCount = $notif_row['pending'];
+    $pendingCount += (int)$notif_row['pending'];
+}
+
+// 🔔 Pending Scheduled prescriptions count
+$sched_notif_sql = "SELECT COUNT(*) AS pending 
+                    FROM scheduled_medications 
+                    WHERE status IN ('pending', 'ongoing')";
+$sched_notif_res = $conn->query($sched_notif_sql);
+
+if ($sched_notif_res && $sched_notif_res->num_rows > 0) {
+    $sched_notif_row = $sched_notif_res->fetch_assoc();
+    $pendingCount += (int)$sched_notif_row['pending'];
 }
 
 // 🔴 Expiry count
@@ -937,7 +951,9 @@ $notifCount = $notif->notifCount;
                                             <td><?php echo htmlspecialchars($medicine['category']); ?></td>
                                             <td class="numeric"><?php echo $medicine['total_dispensed']; ?></td>
                                             <td class="numeric"><?php echo $medicine['unique_patients']; ?></td>
-                                            <td class="numeric"><?php echo number_format($medicine['avg_qty_per_dispensing'], 2); ?></td>
+                                            <td class="numeric">
+                                                <?php echo number_format((float)($medicine['avg_qty_per_dispensing'] ?? 0), 2); ?>
+                                            </td>
                                             <td class="numeric">₱<?php echo number_format($medicine['total_cost'], 2); ?></td>
                                         </tr>
                                     <?php endforeach; ?>

@@ -203,7 +203,7 @@ if (isset($_POST['submit_otc'])) {
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
-            <div class="menu-title">Pharmacy Management | Dashboard</div>
+            <div class="menu-title">Pharmacy Management |<br> Over The Counter</div>
 
             <!----- Sidebar Navigation ----->
 

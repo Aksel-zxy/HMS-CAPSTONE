@@ -312,7 +312,7 @@ if (isset($_POST['clear_recent'])) {
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
             </div>
 
-            <div class="menu-title">Pharmacy Management | Dashboard</div>
+            <div class="menu-title">Pharmacy Management | <br>Search And Locate</div>
 
             <!----- Sidebar Navigation ----->
 
