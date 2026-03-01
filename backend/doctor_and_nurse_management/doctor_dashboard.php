@@ -44,10 +44,10 @@ $dashboard = new DoctorDashboard($conn);
 $user = $dashboard->user;
 
 $query = "
-    SELECT profession, COUNT(*) AS total
+    SELECT role, COUNT(*) AS total
     FROM hr_employees
-    WHERE profession IN ('Doctor', 'Nurse')
-    GROUP BY profession
+    WHERE role IN ('Resident Doctor', 'Chief Resident', 'Non-Resident Doctor', 'Staff Nurse', 'Head Nurse')
+    GROUP BY role
 ";
 $result = $conn->query($query);
 
@@ -56,13 +56,29 @@ $nurseCount  = 0;
 
 if ($result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
-        if (strtolower($row['profession']) === 'doctor') {
-            $doctorCount = $row['total'];
-        } elseif (strtolower($row['profession']) === 'nurse') {
-            $nurseCount = $row['total'];
+        $role = strtolower($row['role']);
+        if (strpos($role, 'doctor') !== false || strpos($role, 'resident') !== false) {
+            $doctorCount += $row['total'];
+        } elseif (strpos($role, 'nurse') !== false) {
+            $nurseCount += $row['total'];
         }
     }
 }
+
+// Fetch a top doctor placeholder
+$topDoctorQuery = "SELECT first_name, last_name FROM hr_employees WHERE profession = 'Doctor' LIMIT 1";
+$topDoctorResult = $conn->query($topDoctorQuery);
+$topDoctor = $topDoctorResult->fetch_assoc();
+$topDoctorName = $topDoctor ? $topDoctor['first_name'] . ' ' . $topDoctor['last_name'] : 'N/A';
+$topDoctorInitials = $topDoctor ? strtoupper(substr($topDoctor['first_name'], 0, 1) . substr($topDoctor['last_name'], 0, 1)) : 'NA';
+
+// Fetch a top nurse placeholder
+$topNurseQuery = "SELECT first_name, last_name FROM hr_employees WHERE profession = 'Nurse' LIMIT 1";
+$topNurseResult = $conn->query($topNurseQuery);
+$topNurse = $topNurseResult->fetch_assoc();
+$topNurseName = $topNurse ? $topNurse['first_name'] . ' ' . $topNurse['last_name'] : 'N/A';
+$topNurseInitials = $topNurse ? strtoupper(substr($topNurse['first_name'], 0, 1) . substr($topNurse['last_name'], 0, 1)) : 'NA';
+
 ?>
 
 <!DOCTYPE html>
@@ -75,6 +91,175 @@ if ($result->num_rows > 0) {
     <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f4f7fa;
+        }
+        .dashboard-wrapper {
+            animation: fadeIn 0.6s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Premium Cards */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08);
+        }
+
+        /* Vibrant Gradients */
+        .gradient-primary {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        .gradient-success {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: #1a4a38;
+        }
+        .gradient-warning {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+        }
+        .gradient-info {
+            background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+        }
+
+        /* Stat Numbers */
+        .stat-number {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -1px;
+        }
+
+        /* Icon Wrapper */
+        .icon-wrapper {
+            width: 55px;
+            height: 55px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 16px;
+            font-size: 24px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(5px);
+        }
+
+        /* Progress Bars */
+        .progress-thin {
+            height: 8px;
+            border-radius: 10px;
+            background-color: #edf2f9;
+            overflow: visible;
+        }
+        .progress-bar-glow-primary {
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+            border-radius: 10px;
+            position: relative;
+        }
+        .progress-bar-glow-primary::after {
+            content: '';
+            position: absolute;
+            right: -6px;
+            top: -3px;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border: 3px solid #00f2fe;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(0,242,254,0.8);
+        }
+
+        .progress-bar-glow-success {
+            background: linear-gradient(90deg, #43e97b, #38f9d7);
+            box-shadow: 0 0 10px rgba(56, 249, 215, 0.5);
+            border-radius: 10px;
+            position: relative;
+        }
+        .progress-bar-glow-success::after {
+            content: '';
+            position: absolute;
+            right: -6px;
+            top: -3px;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border: 3px solid #38f9d7;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(56,249,215,0.8);
+        }
+
+        /* Buttons */
+        .btn-modern {
+            padding: 12px 28px;
+            border-radius: 50px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            border: none;
+        }
+        .btn-modern::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            transition: opacity 0.3s ease;
+            opacity: 0;
+        }
+        .btn-modern:hover::before {
+            opacity: 1;
+        }
+        .btn-modern:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            color: white;
+        }
+        .btn-modern-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-modern-primary::before {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+        .btn-modern-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+        .btn-modern-success::before {
+            background: linear-gradient(135deg, #38ef7d 0%, #11998e 100%);
+        }
+
+        /* Avatar */
+        .avatar-circle {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+            border: 3px solid white;
+        }
+    </style>
 </head>
 
 <body>
@@ -220,30 +405,180 @@ if ($result->num_rows > 0) {
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:25px;">
-                <!-- Doctors Box -->
-                <div style="background:#fff; border-radius:14px; padding:25px; box-shadow:0 3px 10px rgba(0,0,0,0.06); text-align:center;">
-                    <h2 style="font-size:18px; color:#333; margin-bottom:10px;">Doctors</h2>
-                    <p style="color:#888; font-size:13px; margin-bottom:20px;">Total number of doctors</p>
-                    <div style="font-size:48px; font-weight:700; color:#0d6efd;">
-                        <?php echo $doctorCount; ?>
+            <div class="dashboard-wrapper mt-4 px-3">
+                
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2 class="fw-bolder text-dark mb-1" style="letter-spacing: -0.5px;">Dashboard Overview</h2>
+                        <p class="text-muted mb-0">Welcome back, here's what's happening today.</p>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-white text-dark border px-3 py-2 rounded-pill shadow-sm"><i class="fas fa-calendar-day text-primary me-2"></i> <?php echo date('F j, Y'); ?></span>
                     </div>
                 </div>
 
-                <!-- Nurses Box -->
-                <div style="background:#fff; border-radius:14px; padding:25px; box-shadow:0 3px 10px rgba(0,0,0,0.06); text-align:center;">
-                    <h2 style="font-size:18px; color:#333; margin-bottom:10px;">Nurses</h2>
-                    <p style="color:#888; font-size:13px; margin-bottom:20px;">Total number of nurses</p>
-                    <div style="font-size:48px; font-weight:700; color:#198754;">
-                        <?php echo $nurseCount; ?>
+                <!-- Summary & Leaderboard Row -->
+                <div class="row g-4 mb-4">
+                    <!-- Total Doctors -->
+                    <div class="col-md-3">
+                        <div class="card glass-card gradient-primary border-0 h-100 rounded-4 p-4 position-relative overflow-hidden">
+                            <div class="position-absolute opacity-25" style="bottom: -20px; right: -20px; font-size: 140px; transform: rotate(-15deg);">
+                                <i class="fas fa-user-md"></i>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-start mb-4 position-relative z-1">
+                                <span class="badge bg-white text-primary rounded-pill px-3 py-1 fw-bold border-0 shadow-sm">Doctors</span>
+                                <div class="icon-wrapper">
+                                    <i class="fas fa-stethoscope"></i>
+                                </div>
+                            </div>
+                            <h3 class="stat-number mb-1 position-relative z-1"><?php echo $doctorCount; ?></h3>
+                            <p class="mb-0 text-white-50 fw-medium position-relative z-1" style="font-size: 14px;">Total Active Professionals</p>
+                        </div>
+                    </div>
+                    <!-- Total Nurses -->
+                    <div class="col-md-3">
+                        <div class="card glass-card gradient-success border-0 h-100 rounded-4 p-4 position-relative overflow-hidden">
+                            <div class="position-absolute opacity-25" style="bottom: -15px; right: -15px; font-size: 130px; transform: rotate(10deg);">
+                                <i class="fas fa-user-nurse text-white"></i>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-start mb-4 position-relative z-1">
+                                <span class="badge bg-white text-success rounded-pill px-3 py-1 fw-bold border-0 shadow-sm">Nurses</span>
+                                <div class="icon-wrapper">
+                                    <i class="fas fa-heartbeat text-white"></i>
+                                </div>
+                            </div>
+                            <h3 class="stat-number text-dark mb-1 position-relative z-1"><?php echo $nurseCount; ?></h3>
+                            <p class="mb-0 opacity-75 text-dark fw-medium position-relative z-1" style="font-size: 14px;">Total Dedicated Staff</p>
+                        </div>
+                    </div>
+                    <!-- Top Doctor -->
+                    <div class="col-md-3">
+                        <div class="card glass-card border-0 h-100 rounded-4 p-4 text-center">
+                            <div class="d-flex justify-content-center mb-3">
+                                <div class="avatar-circle gradient-warning">
+                                    <?php echo $topDoctorInitials; ?>
+                                </div>
+                            </div>
+                            <span class="badge bg-light text-warning border border-warning px-3 py-1 rounded-pill mb-2"><i class="fas fa-star me-1"></i>Top Doctor</span>
+                            <h5 class="fw-bolder mb-1 text-dark text-truncate">Dr. <?php echo htmlspecialchars($topDoctor['last_name'] ?? 'N/A'); ?></h5>
+                            <div class="d-flex justify-content-center align-items-center gap-2 mt-2">
+                                <span class="text-success fw-bold p-1 bg-success bg-opacity-10 rounded px-2" style="font-size: 12px;"><i class="fas fa-arrow-up me-1"></i>98% Success</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Top Nurse -->
+                    <div class="col-md-3">
+                        <div class="card glass-card border-0 h-100 rounded-4 p-4 text-center">
+                            <div class="d-flex justify-content-center mb-3">
+                                <div class="avatar-circle gradient-info">
+                                    <?php echo $topNurseInitials; ?>
+                                </div>
+                            </div>
+                            <span class="badge bg-light text-info border border-info px-3 py-1 rounded-pill mb-2"><i class="fas fa-award me-1"></i>Top Nurse</span>
+                            <h5 class="fw-bolder mb-1 text-dark text-truncate">Nurse <?php echo htmlspecialchars($topNurse['first_name'] ?? 'N/A'); ?></h5>
+                            <div class="d-flex justify-content-center align-items-center gap-2 mt-2">
+                                <span class="text-success fw-bold p-1 bg-success bg-opacity-10 rounded px-2" style="font-size: 12px;"><i class="fas fa-arrow-up me-1"></i>95% Complete</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts & Attendance Row -->
+                <div class="row g-4 mb-4">
+                    <!-- Task Analytics -->
+                    <div class="col-lg-8">
+                        <div class="card glass-card border-0 rounded-4 h-100">
+                            <div class="card-header bg-transparent border-0 pt-4 pb-0 px-4 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="fw-bolder text-dark mb-0">Task Analytics</h5>
+                                    <small class="text-muted">Completion vs Pending Tasks</small>
+                                </div>
+                                <select class="form-select form-select-sm border-0 bg-light fw-medium w-auto shadow-sm rounded-pill px-3">
+                                    <option>This Week</option>
+                                    <option>This Month</option>
+                                    <option>This Year</option>
+                                </select>
+                            </div>
+                            <div class="card-body px-4 pb-4 position-relative mt-2">
+                                <canvas id="taskChart" style="max-height: 290px; width: 100%;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Attendance Tracker -->
+                    <div class="col-lg-4">
+                        <div class="card glass-card border-0 rounded-4 h-100">
+                            <div class="card-header bg-transparent border-0 pt-4 pb-0 px-4 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="fw-bolder text-dark mb-0">Live Attendance</h5>
+                                    <small class="text-muted">Today's active personnel</small>
+                                </div>
+                                <button class="btn btn-sm btn-light border shadow-sm rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="Refresh Data"><i class="fas fa-sync-alt text-secondary"></i></button>
+                            </div>
+                            <div class="card-body px-4 pt-4 d-flex flex-column justify-content-around">
+                                <!-- Doctors Attendance -->
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between align-items-end mb-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="icon-wrapper bg-primary bg-opacity-10 text-primary" style="width: 35px; height: 35px; font-size: 14px;">
+                                                <i class="fas fa-user-md"></i>
+                                            </div>
+                                            <span class="fw-bold text-dark h6 mb-0">Doctors</span>
+                                        </div>
+                                        <h4 class="fw-bolder text-primary mb-0">85%</h4>
+                                    </div>
+                                    <div class="progress progress-thin">
+                                        <div class="progress-bar progress-bar-glow-primary" role="progressbar" style="width: 85%" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-2">
+                                        <small class="text-muted fw-medium">Active: <span class="text-dark fw-bold"><?php echo floor($doctorCount * 0.85); ?></span></small>
+                                        <small class="text-muted fw-medium">Total: <span class="text-dark fw-bold"><?php echo $doctorCount; ?></span></small>
+                                    </div>
+                                </div>
+
+                                <!-- Nurses Attendance -->
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-end mb-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="icon-wrapper bg-success bg-opacity-10 text-success" style="width: 35px; height: 35px; font-size: 14px;">
+                                                <i class="fas fa-user-nurse"></i>
+                                            </div>
+                                            <span class="fw-bold text-dark h6 mb-0">Nurses</span>
+                                        </div>
+                                        <h4 class="fw-bolder text-success mb-0">92%</h4>
+                                    </div>
+                                    <div class="progress progress-thin">
+                                        <div class="progress-bar progress-bar-glow-success" role="progressbar" style="width: 92%" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-2">
+                                        <small class="text-muted fw-medium">Active: <span class="text-dark fw-bold"><?php echo floor($nurseCount * 0.92); ?></span></small>
+                                        <small class="text-muted fw-medium">Total: <span class="text-dark fw-bold"><?php echo $nurseCount; ?></span></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="row mb-5">
+                    <div class="col-12">
+                        <div class="card glass-card border-0 rounded-4 p-4 text-center d-flex flex-column align-items-center justify-content-center bg-white shadow-sm position-relative overflow-hidden">
+                            <i class="fas fa-users fa-5x position-absolute opacity-10" style="bottom: -20px; right: 20px;"></i>
+                            <h4 class="fw-bolder text-dark mb-2 position-relative z-1">Need to request a replacement?</h4>
+                            <p class="text-muted mb-4 max-w-500 mx-auto position-relative z-1">Fill out a replacement request form to swiftly find cover for missing or required medical personnel.</p>
+                            <div class="d-flex flex-wrap justify-content-center gap-3 position-relative z-1">
+                                <button type="button" class="btn btn-modern btn-modern-primary d-flex align-items-center gap-2" onclick="openModal('doctorsModal')">
+                                    <i class="fas fa-stethoscope"></i> Request Doctor
+                                </button>
+                                <button type="button" class="btn btn-modern btn-modern-success d-flex align-items-center gap-2" onclick="openModal('nursesModal')">
+                                    <i class="fas fa-heartbeat"></i> Request Nurse
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <center style="margin-top: 40px;">
-                <button class="hahaha" onclick="openModal('doctorsModal')">Request Employee for Doctor</button> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                <button class="hahaha" onclick="openModal('nursesModal')">Request Employee for Nurse</button>
-            </center>
 
             <!-- Doctors Modal -->
             <div id="doctorsModal" class="bastabubukas">
@@ -374,6 +709,110 @@ if ($result->num_rows > 0) {
             </div>
 
 
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const ctx = document.getElementById('taskChart').getContext('2d');
+                    
+                    // Create gradient for completed tasks
+                    let gradientCompleted = ctx.createLinearGradient(0, 0, 0, 400);
+                    gradientCompleted.addColorStop(0, 'rgba(13, 110, 253, 0.9)');
+                    gradientCompleted.addColorStop(1, 'rgba(13, 110, 253, 0.4)');
+
+                    // Create gradient for pending tasks
+                    let gradientPending = ctx.createLinearGradient(0, 0, 0, 400);
+                    gradientPending.addColorStop(0, 'rgba(25, 135, 84, 0.9)');
+                    gradientPending.addColorStop(1, 'rgba(25, 135, 84, 0.4)');
+
+                    new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Doctors', 'Nurses'],
+                            datasets: [
+                                {
+                                    label: 'Completed Tasks',
+                                    data: [120, 350],
+                                    backgroundColor: gradientCompleted,
+                                    borderRadius: 8,
+                                    barPercentage: 0.5,
+                                    categoryPercentage: 0.8
+                                },
+                                {
+                                    label: 'Pending Tasks',
+                                    data: [35, 80],
+                                    backgroundColor: gradientPending,
+                                    borderRadius: 8,
+                                    barPercentage: 0.5,
+                                    categoryPercentage: 0.8
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                    align: 'end',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 20,
+                                        font: {
+                                            family: "'Inter', sans-serif",
+                                            size: 13,
+                                            weight: '500'
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                    titleColor: '#333',
+                                    bodyColor: '#666',
+                                    borderColor: 'rgba(0,0,0,0.05)',
+                                    borderWidth: 1,
+                                    padding: 15,
+                                    boxPadding: 6,
+                                    titleFont: { size: 14, weight: 'bold' },
+                                    bodyFont: { size: 13 },
+                                    cornerRadius: 10,
+                                    displayColors: true,
+                                    elevation: 5
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    grid: {
+                                        color: 'rgba(0, 0, 0, 0.04)',
+                                        drawBorder: false,
+                                        borderDash: [5, 5]
+                                    },
+                                    ticks: {
+                                        font: { size: 12, family: "'Inter', sans-serif" },
+                                        color: '#888',
+                                        padding: 10
+                                    }
+                                },
+                                x: {
+                                    grid: {
+                                        display: false,
+                                        drawBorder: false
+                                    },
+                                    ticks: {
+                                        font: { size: 14, weight: '600', family: "'Inter', sans-serif" },
+                                        color: '#444',
+                                        padding: 10
+                                    }
+                                }
+                            },
+                            animation: {
+                                duration: 1500,
+                                easing: 'easeOutQuart'
+                            }
+                        }
+                    });
+                });
+            </script>
             <!-- END CODING HERE -->
         </div>
         <!----- End of Main Content ----->

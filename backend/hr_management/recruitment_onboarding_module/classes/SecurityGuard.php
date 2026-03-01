@@ -13,9 +13,15 @@ class SecurityGuard {
         $types = '';
 
         if (!empty($search)) {
-            $conditions[] = "employee_id LIKE ?";
-            $params[] = "%{$search}%";
-            $types .= 's';
+            $conditions[] = "(
+                employee_id LIKE ? OR
+                CONCAT_WS(' ', first_name, middle_name, last_name, suffix_name) LIKE ?
+            )";
+
+            $searchTerm = "%{$search}%";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $types .= 'ss';
         }
 
         if (!empty($status)) {
@@ -32,6 +38,7 @@ class SecurityGuard {
         if (!empty($params)) {
             $stmt->bind_param($types, ...$params);
         }
+
         $stmt->execute();
         return $stmt->get_result();
     }

@@ -19,6 +19,8 @@ class Salary {
                 profession,
                 role
             FROM hr_employees
+            WHERE status = 'Active'
+            AND profession IN ('Doctor','Nurse','Pharmacist','Laboratorist','Accountant')
             ORDER BY employee_id
         ");
         $stmt->execute();

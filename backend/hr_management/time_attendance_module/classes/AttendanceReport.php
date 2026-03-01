@@ -49,7 +49,7 @@ class AttendanceReport {
                 LEFT JOIN hr_daily_attendance a 
                     ON e.employee_id = a.employee_id
                     AND a.attendance_date BETWEEN ? AND ?
-                WHERE e.status='Active'
+                WHERE 1=1
         ";
 
         // 🔎 SEARCH CONDITION

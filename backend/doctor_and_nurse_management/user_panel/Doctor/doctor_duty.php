@@ -121,7 +121,8 @@ class Duty
         $sql = "
         SELECT 
             d.*,
-            CONCAT(pat.fname, ' ', pat.lname) AS patient_name,
+            COALESCE(CONCAT(p1.fname, ' ', p1.lname), CONCAT(p2.fname, ' ', p2.lname)) AS patient_name,
+            COALESCE(p1.patient_id, p2.patient_id) AS resolved_pat_id,
             r.resultID,
             r.result AS lab_result,
             r.status AS lab_status,
@@ -129,9 +130,10 @@ class Duty
             r.received_by AS lab_received_by,
             r.scheduleID
         FROM duty_assignments d
-        INNER JOIN p_appointments a ON d.appointment_id = a.appointment_id
-        INNER JOIN patientinfo pat ON a.patient_id = pat.patient_id
-        LEFT JOIN dl_results r ON r.patientID = pat.patient_id
+        LEFT JOIN p_appointments a ON d.appointment_id = a.appointment_id
+        LEFT JOIN patientinfo p1 ON a.patient_id = p1.patient_id
+        LEFT JOIN patientinfo p2 ON d.patient_id = p2.patient_id
+        LEFT JOIN dl_results r ON r.patientID = COALESCE(p1.patient_id, p2.patient_id)
         WHERE d.status != 'Completed'
         ";
 
@@ -997,17 +999,40 @@ if (class_exists('Prescription')) {
                                             <?php
                                             // Show nurse assistant full name using OOP
                                             $nurseName = '';
-                                            if (!empty($duty['nurse_assistant'])) {
+                                            date_default_timezone_set('Asia/Manila');
+                                            $currentHour = (int)date('G'); // 0-23
+                                            $activeNurseId = null;
+
+                                            // Determine active shift based on time rules.
+                                            // Shift 1: 08:00 AM – 04:00 PM (8 -> 15)
+                                            // Shift 2: 04:00 PM – 12:00 AM (16 -> 23)
+                                            // Shift 3: 12:00 AM – 08:00 AM (0 -> 7)
+                                            if (!empty($duty['shift1_nurse_id']) || !empty($duty['shift2_nurse_id']) || !empty($duty['shift3_nurse_id'])) {
+                                                if ($currentHour >= 8 && $currentHour < 16) {
+                                                    $activeNurseId = $duty['shift1_nurse_id'] ?? null;
+                                                } elseif ($currentHour >= 16) {
+                                                    $activeNurseId = $duty['shift2_nurse_id'] ?? null;
+                                                } else {
+                                                    $activeNurseId = $duty['shift3_nurse_id'] ?? null;
+                                                }
+                                            }
+
+                                            // Fallback to legacy field if not a 3-shift setup or shift nurse is missing
+                                            if (empty($activeNurseId) && !empty($duty['nurse_assistant'])) {
+                                                $activeNurseId = $duty['nurse_assistant'];
+                                            }
+
+                                            if (!empty($activeNurseId)) {
                                                 // Use the controller's getAllNurses() to map ID to full name
                                                 foreach ($nurses as $nurse) {
-                                                    if ($nurse['employee_id'] == $duty['nurse_assistant']) {
+                                                    if ($nurse['employee_id'] == $activeNurseId) {
                                                         $nurseName = htmlspecialchars($nurse['full_name']);
                                                         break;
                                                     }
                                                 }
                                             }
                                             ?>
-                                            <td><?= $nurseName ?: '<span class="text-muted">N/A</span>'; ?></td>
+                                            <td><?= $nurseName ? $nurseName . '<br><small class="text-info fw-bold">Active Shift</small>' : '<span class="text-muted">N/A</span>'; ?></td>
                                             <td><?= htmlspecialchars($duty['procedure']); ?></td>
                                             <td>
                                                 <button class="btn btn-info btn-sm" data-bs-toggle="modal"
@@ -1055,10 +1080,15 @@ if (class_exists('Prescription')) {
                                             </td>
                                             <td><?= htmlspecialchars($duty['status']); ?></td>
                                             <td>
+                                                <a href="patient_notes.php?patient_id=<?= urlencode($duty['resolved_pat_id'] ?? $duty['patient_id']); ?>"
+                                                    class="btn btn-primary btn-sm mb-1"
+                                                    title="View or Add Patient Medical Notes">
+                                                    <i class="fas fa-notes-medical"></i> Patient Notes
+                                                </a><br>
                                                 <a href="doctor_duty.php?complete_duty_id=<?= urlencode($duty['duty_id']); ?>"
-                                                    class="btn btn-success btn-sm"
+                                                    class="btn btn-success btn-sm mt-1"
                                                     onclick="return confirm('Mark this duty as completed?');">
-                                                    Mark as Completed
+                                                    <i class="fas fa-check"></i> Complete
                                                 </a>
                                             </td>
                                         </tr>

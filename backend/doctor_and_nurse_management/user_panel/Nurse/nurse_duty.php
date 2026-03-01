@@ -46,19 +46,31 @@ $dutyQuery = "
     SELECT 
         d.duty_id,
         d.doctor_id,
-        CONCAT(e.first_name, ' ', e.middle_name, ' ', e.last_name, ' ', e.suffix_name) AS doctor_name,
+        CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+        COALESCE(p1.fname, p2.fname) AS patient_fname,
+        COALESCE(p1.lname, p2.lname) AS patient_lname,
+        COALESCE(p1.patient_id, p2.patient_id) AS resolved_patient_id,
         d.bed_id,
         d.nurse_assistant,
+        d.shift1_nurse_id,
+        d.shift2_nurse_id,
+        d.shift3_nurse_id,
         d.`procedure`,
         d.equipment,
         d.tools,
-        d.notes
+        d.notes,
+        d.created_at
     FROM duty_assignments AS d
     LEFT JOIN hr_employees AS e ON d.doctor_id = e.employee_id
-    WHERE d.nurse_assistant = ? AND (d.status = 'Pending' OR d.status IS NULL)
+    LEFT JOIN p_appointments a ON d.appointment_id = a.appointment_id
+    LEFT JOIN patientinfo p1 ON a.patient_id = p1.patient_id
+    LEFT JOIN patientinfo p2 ON d.patient_id = p2.patient_id
+    WHERE (d.nurse_assistant = ? OR d.shift1_nurse_id = ? OR d.shift2_nurse_id = ? OR d.shift3_nurse_id = ?) 
+      AND d.status != 'Completed'
+    ORDER BY d.created_at DESC
 ";
 $dutyStmt = $conn->prepare($dutyQuery);
-$dutyStmt->bind_param("i", $nurse_id);
+$dutyStmt->bind_param("iiii", $nurse_id, $nurse_id, $nurse_id, $nurse_id);
 $dutyStmt->execute();
 $dutyResult = $dutyStmt->get_result();
 
@@ -216,37 +228,48 @@ $dutyStmt->close();
                     <table class="table table-bordered table-hover duty-table">
                         <thead class="table-info">
                             <tr>
-                                <th>Doctor</th>
-                                <th>Bed/Patient</th>
+                                <th>Patient</th>
+                                <th>Shift Time</th>
+                                <th>Attending Doctor</th>
+                                <th>Bed ID</th>
                                 <th>Procedure</th>
+                                <th>Assigned At</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (!empty($duties)): ?>
-                                <?php foreach ($duties as $duty): ?>
+                                <?php foreach ($duties as $duty): 
+                                    $shift_label = 'Standard Assignment';
+                                    if ($duty['shift1_nurse_id'] == $nurse_id) $shift_label = 'Shift 1 (08:00 AM – 04:00 PM)';
+                                    elseif ($duty['shift2_nurse_id'] == $nurse_id) $shift_label = 'Shift 2 (04:00 PM – 12:00 AM)';
+                                    elseif ($duty['shift3_nurse_id'] == $nurse_id) $shift_label = 'Shift 3 (12:00 AM – 08:00 AM)';
+                                ?>
                                     <tr id="row-<?= $duty['duty_id'] ?>">
-                                        <td><?= htmlspecialchars($duty['doctor_name']?? '') ?></td>
-                                        <td><?= htmlspecialchars($duty['bed_id']) ?></td>
+                                        <td><strong><?= htmlspecialchars($duty['patient_fname'] . ' ' . $duty['patient_lname']) ?></strong><br><small class="text-muted">ID: <?= htmlspecialchars($duty['resolved_patient_id']) ?></small></td>
+                                        <td><span class="badge bg-secondary"><?= $shift_label ?></span></td>
+                                        <td><?= htmlspecialchars($duty['doctor_name'] ? 'Dr. ' . $duty['doctor_name'] : 'N/A') ?></td>
+                                        <td><?= htmlspecialchars($duty['bed_id'] ? 'Bed ' . $duty['bed_id'] : 'None') ?></td>
                                         <td><?= htmlspecialchars($duty['procedure']) ?></td>
+                                        <td><?= date('M d, Y h:i A', strtotime($duty['created_at'])) ?></td>
                                         <td>
-                                            <button type="button" class="btn btn-primary btn-sm view-details-btn"
+                                            <a href="../Doctor/patient_notes.php?patient_id=<?= urlencode($duty['resolved_patient_id']) ?>" class="btn btn-primary btn-sm mb-1"><i class="fas fa-notes-medical"></i> Notes</a><br>
+                                            <button type="button" class="btn btn-success btn-sm view-details-btn mt-1"
                                                 data-id="<?= $duty['duty_id'] ?>"
                                                 data-doctor="<?= htmlspecialchars($duty['doctor_name']) ?>"
                                                 data-bed="<?= htmlspecialchars($duty['bed_id']) ?>"
                                                 data-proc="<?= htmlspecialchars($duty['procedure']) ?>"
                                                 data-notes="<?= htmlspecialchars($duty['notes']) ?>"
-                                                data-tools="<?= htmlspecialchars($duty['tools']) ?>"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#dutyModal">
-                                                View & Complete
+                                                <i class="fas fa-check"></i> Complete
                                             </button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted">No pending duties. Good job!</td>
+                                    <td colspan="7" class="text-center text-muted py-4">No active duties assigned to you.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
