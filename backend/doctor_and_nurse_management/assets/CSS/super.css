@@ -41,6 +41,11 @@ a {
 }
 
 #sidebar {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 1000;
   max-width: 264px;
   min-width: 264px;
   transition: all 0.35s ease-in-out;

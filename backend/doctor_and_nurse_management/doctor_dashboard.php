@@ -79,6 +79,27 @@ $topNurse = $topNurseResult->fetch_assoc();
 $topNurseName = $topNurse ? $topNurse['first_name'] . ' ' . $topNurse['last_name'] : 'N/A';
 $topNurseInitials = $topNurse ? strtoupper(substr($topNurse['first_name'], 0, 1) . substr($topNurse['last_name'], 0, 1)) : 'NA';
 
+// Fetch Attendance Reports
+$dailyReportsQuery = "SELECT * FROM daily_attendance_report ORDER BY reportDate DESC LIMIT 10";
+$dailyReports = $conn->query($dailyReportsQuery);
+
+$monthlyReportsQuery = "SELECT * FROM month_attendance_report ORDER BY year DESC, month DESC LIMIT 10";
+$monthlyReports = $conn->query($monthlyReportsQuery);
+
+$yearlyReportsQuery = "SELECT * FROM year_attendance_report ORDER BY year DESC LIMIT 5";
+$yearlyReports = $conn->query($yearlyReportsQuery);
+
+// Fetch Detailed Personnel Logs (Doctors & Nurses)
+$detailedLogsQuery = "
+    SELECT a.*, e.first_name, e.last_name, e.role, e.profession 
+    FROM hr_daily_attendance a
+    JOIN hr_employees e ON a.employee_id = e.employee_id
+    WHERE e.profession IN ('Doctor', 'Nurse') OR e.role IN ('Resident Doctor', 'Chief Resident', 'Non-Resident Doctor', 'Staff Nurse', 'Head Nurse')
+    ORDER BY a.attendance_date DESC, a.time_in DESC
+    LIMIT 20
+";
+$detailedLogs = $conn->query($detailedLogsQuery);
+
 ?>
 
 <!DOCTYPE html>
@@ -578,6 +599,200 @@ $topNurseInitials = $topNurse ? strtoupper(substr($topNurse['first_name'], 0, 1)
                         </div>
                     </div>
                 </div>
+
+                <!-- Attendance Logs & Reports -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card glass-card border-0 rounded-4 shadow-sm overflow-hidden">
+                            <div class="card-header bg-white border-0 pt-4 pb-3 px-4 d-flex justify-content-between align-items-center border-bottom">
+                                <div>
+                                    <h4 class="fw-bolder text-dark mb-0">Attendance Logs & Reports</h4>
+                                    <p class="text-muted mb-0 small">Review daily, monthly, and yearly personnel attendance metrics.</p>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul class="nav nav-tabs nav-tabs-modern px-4 pt-3 border-bottom" id="attendanceTab" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active fw-semibold pb-3" id="daily-tab" data-bs-toggle="tab" data-bs-target="#daily" type="button" role="tab" aria-controls="daily" aria-selected="true"><i class="fas fa-calendar-day me-2"></i>Daily Overview</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link fw-semibold pb-3" id="detailed-tab" data-bs-toggle="tab" data-bs-target="#detailed" type="button" role="tab" aria-controls="detailed" aria-selected="false"><i class="fas fa-users me-2"></i>Detailed Employee Logs</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link fw-semibold pb-3" id="monthly-tab" data-bs-toggle="tab" data-bs-target="#monthly" type="button" role="tab" aria-controls="monthly" aria-selected="false"><i class="fas fa-calendar-alt me-2"></i>Monthly Overview</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link fw-semibold pb-3" id="yearly-tab" data-bs-toggle="tab" data-bs-target="#yearly" type="button" role="tab" aria-controls="yearly" aria-selected="false"><i class="fas fa-calendar me-2"></i>Yearly Overview</button>
+                                    </li>
+                                </ul>
+                                <div class="tab-content" id="attendanceTabContent">
+                                    <!-- Daily Overview -->
+                                    <div class="tab-pane fade show active" id="daily" role="tabpanel" aria-labelledby="daily-tab">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th class="text-secondary fw-semibold ps-4">Date</th>
+                                                        <th class="text-secondary fw-semibold text-center">Present</th>
+                                                        <th class="text-secondary fw-semibold text-center">Absent</th>
+                                                        <th class="text-secondary fw-semibold text-center">Late</th>
+                                                        <th class="text-secondary fw-semibold text-center">Leave</th>
+                                                        <th class="text-secondary fw-semibold text-center">Undertime</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php if ($dailyReports && $dailyReports->num_rows > 0): ?>
+                                                        <?php while ($row = $dailyReports->fetch_assoc()): ?>
+                                                            <tr>
+                                                                <td class="ps-4 fw-medium text-dark"><i class="far fa-calendar-check text-primary me-2"></i><?php echo date('M j, Y', strtotime($row['reportDate'])); ?></td>
+                                                                <td class="text-center"><span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1"><?php echo $row['present']; ?></span></td>
+                                                                <td class="text-center"><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1"><?php echo $row['absent']; ?></span></td>
+                                                                <td class="text-center"><span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-1"><?php echo $row['late']; ?></span></td>
+                                                                <td class="text-center"><span class="badge bg-info bg-opacity-10 text-info rounded-pill px-3 py-1"><?php echo $row['leave']; ?></span></td>
+                                                                <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-3 py-1"><?php echo $row['underTime']; ?></span></td>
+                                                            </tr>
+                                                        <?php endwhile; ?>
+                                                    <?php else: ?>
+                                                        <tr><td colspan="6" class="text-center py-4 text-muted">No daily attendance reports found.</td></tr>
+                                                    <?php endif; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <!-- Detailed Personnel Logs -->
+                                    <div class="tab-pane fade" id="detailed" role="tabpanel" aria-labelledby="detailed-tab">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th class="text-secondary fw-semibold ps-4">Personnel</th>
+                                                        <th class="text-secondary fw-semibold">Role</th>
+                                                        <th class="text-secondary fw-semibold">Date</th>
+                                                        <th class="text-secondary fw-semibold">Time In</th>
+                                                        <th class="text-secondary fw-semibold">Time Out</th>
+                                                        <th class="text-secondary fw-semibold">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php if ($detailedLogs && $detailedLogs->num_rows > 0): ?>
+                                                        <?php while ($row = $detailedLogs->fetch_assoc()): ?>
+                                                            <tr>
+                                                                <td class="ps-4 fw-bold text-dark">
+                                                                    <div class="d-flex align-items-center">
+                                                                        <div class="avatar-sm rounded-circle text-white d-flex align-items-center justify-content-center me-3" style="width: 35px; height: 35px; background: <?php echo ($row['profession'] == 'Doctor') ? 'var(--bs-primary)' : 'var(--bs-success)'; ?>;">
+                                                                            <?php echo strtoupper(substr($row['first_name'], 0, 1) . substr($row['last_name'], 0, 1)); ?>
+                                                                        </div>
+                                                                        <div>
+                                                                            <span class="d-block text-dark"><?php echo htmlspecialchars($row['first_name'] . ' ' . $row['last_name']); ?></span>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+                                                                <td><span class="badge bg-light text-dark border"><?php echo htmlspecialchars($row['role']); ?></span></td>
+                                                                <td><?php echo date('M j, Y', strtotime($row['attendance_date'])); ?></td>
+                                                                <td><span class="fw-medium text-dark"><i class="far fa-clock text-muted me-1"></i><?php echo $row['time_in'] ? date('h:i A', strtotime($row['time_in'])) : '--:--'; ?></span></td>
+                                                                <td><span class="fw-medium text-dark"><i class="far fa-clock text-muted me-1"></i><?php echo $row['time_out'] ? date('h:i A', strtotime($row['time_out'])) : '--:--'; ?></span></td>
+                                                                <td>
+                                                                    <?php
+                                                                        $statusClass = 'bg-secondary';
+                                                                        switch ($row['status']) {
+                                                                            case 'Present': $statusClass = 'bg-success'; break;
+                                                                            case 'Late': $statusClass = 'bg-warning text-dark'; break;
+                                                                            case 'Absent': $statusClass = 'bg-danger'; break;
+                                                                            case 'On Leave': $statusClass = 'bg-info text-dark'; break;
+                                                                            case 'Undertime': $statusClass = 'bg-secondary'; break;
+                                                                        }
+                                                                    ?>
+                                                                    <span class="badge <?php echo $statusClass; ?> rounded-pill px-3"><?php echo htmlspecialchars($row['status']); ?></span>
+                                                                </td>
+                                                            </tr>
+                                                        <?php endwhile; ?>
+                                                    <?php else: ?>
+                                                        <tr><td colspan="6" class="text-center py-4 text-muted">No personnel records found.</td></tr>
+                                                    <?php endif; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <!-- Monthly Overview -->
+                                    <div class="tab-pane fade" id="monthly" role="tabpanel" aria-labelledby="monthly-tab">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th class="text-secondary fw-semibold ps-4">Month/Year</th>
+                                                        <th class="text-secondary fw-semibold text-center">Present</th>
+                                                        <th class="text-secondary fw-semibold text-center">Absent</th>
+                                                        <th class="text-secondary fw-semibold text-center">Late</th>
+                                                        <th class="text-secondary fw-semibold text-center">Leave</th>
+                                                        <th class="text-secondary fw-semibold text-center">Undertime</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php if ($monthlyReports && $monthlyReports->num_rows > 0): ?>
+                                                        <?php while ($row = $monthlyReports->fetch_assoc()): ?>
+                                                            <?php $monthName = date("F", mktime(0, 0, 0, $row['month'], 10)); ?>
+                                                            <tr>
+                                                                <td class="ps-4 fw-bold text-dark text-primary"><?php echo $monthName . ' ' . $row['year']; ?></td>
+                                                                <td class="text-center"><span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1"><?php echo $row['present']; ?></span></td>
+                                                                <td class="text-center"><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1"><?php echo $row['absent']; ?></span></td>
+                                                                <td class="text-center"><span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-3 py-1"><?php echo $row['late']; ?></span></td>
+                                                                <td class="text-center"><span class="badge bg-info bg-opacity-10 text-info rounded-pill px-3 py-1"><?php echo $row['leave_count']; ?></span></td>
+                                                                <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-secondary rounded-pill px-3 py-1"><?php echo $row['undertime']; ?></span></td>
+                                                            </tr>
+                                                        <?php endwhile; ?>
+                                                    <?php else: ?>
+                                                        <tr><td colspan="6" class="text-center py-4 text-muted">No monthly attendance reports found.</td></tr>
+                                                    <?php endif; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <!-- Yearly Overview -->
+                                    <div class="tab-pane fade" id="yearly" role="tabpanel" aria-labelledby="yearly-tab">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="bg-light">
+                                                    <tr>
+                                                        <th class="text-secondary fw-semibold ps-4">Year</th>
+                                                        <th class="text-secondary fw-semibold text-center">Attendance Rate</th>
+                                                        <th class="text-secondary fw-semibold text-center">Total Present</th>
+                                                        <th class="text-secondary fw-semibold text-center">Total Absent</th>
+                                                        <th class="text-secondary fw-semibold text-center">Total Late</th>
+                                                        <th class="text-secondary fw-semibold text-center">Total Leave</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <?php if ($yearlyReports && $yearlyReports->num_rows > 0): ?>
+                                                        <?php while ($row = $yearlyReports->fetch_assoc()): ?>
+                                                            <tr>
+                                                                <td class="ps-4 fw-bolder text-dark fs-5"><?php echo $row['year']; ?></td>
+                                                                <td class="text-center">
+                                                                    <div class="d-flex align-items-center justify-content-center gap-2">
+                                                                        <div class="progress flex-grow-1" style="height: 8px; max-width: 100px;">
+                                                                            <div class="progress-bar bg-success" role="progressbar" style="width: <?php echo $row['attendanceRate']; ?>%;" aria-valuenow="<?php echo $row['attendanceRate']; ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                                                        </div>
+                                                                        <span class="fw-bold text-success"><?php echo $row['attendanceRate']; ?>%</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td class="text-center"><span class="fw-bold text-dark"><?php echo $row['present']; ?></span></td>
+                                                                <td class="text-center"><span class="fw-bold text-danger"><?php echo $row['absent']; ?></span></td>
+                                                                <td class="text-center"><span class="fw-bold text-warning"><?php echo $row['late']; ?></span></td>
+                                                                <td class="text-center"><span class="fw-bold text-info"><?php echo $row['leave_count']; ?></span></td>
+                                                            </tr>
+                                                        <?php endwhile; ?>
+                                                    <?php else: ?>
+                                                        <tr><td colspan="6" class="text-center py-4 text-muted">No yearly attendance reports found.</td></tr>
+                                                    <?php endif; ?>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <!-- Doctors Modal -->
