@@ -59,7 +59,14 @@ $query = "SELECT e.employee_id, e.first_name, e.last_name, e.profession FROM hr_
 $doctors_result = $conn->query($query);
 
 // Fetch details for the assignment modal
-$admitted_patients = $conn->query("SELECT patient_id, fname, lname FROM patientinfo");
+// Only fetch patients who are NOT currently actively assigned a duty (i.e. status != 'Completed')
+$admitted_patients = $conn->query("
+    SELECT p.patient_id, p.fname, p.lname 
+    FROM patientinfo p
+    WHERE p.patient_id NOT IN (
+        SELECT patient_id FROM duty_assignments WHERE status != 'Completed' AND patient_id IS NOT NULL
+    )
+");
 $modal_doctors = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Doctor'");
 $modal_nurses_res = $conn->query("SELECT employee_id, first_name, last_name FROM hr_employees WHERE profession = 'Nurse'");
 $nurse_list = [];
