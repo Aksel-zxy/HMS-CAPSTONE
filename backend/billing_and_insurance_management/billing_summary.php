@@ -165,7 +165,7 @@ foreach ($raw_items as $item) {
     $desc = '';
 
     /* Try billing_services (inpatient system) first */
-    $bs = $conn->prepare("SELECT name AS serviceName, category AS description FROM billing_services WHERE service_id = (SELECT service_id FROM billing_items WHERE item_id=? LIMIT 1) LIMIT 1");
+    $bs = $conn->prepare("SELECT name AS serviceName, category AS description FROM billing_services WHERE id = (SELECT service_id FROM billing_items WHERE item_id=? LIMIT 1) LIMIT 1");
     $bs->bind_param("i", $item['item_id']);
     $bs->execute();
     $bsvc = $bs->get_result()->fetch_assoc();

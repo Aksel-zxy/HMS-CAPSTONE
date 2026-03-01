@@ -714,7 +714,7 @@ if (isset($_GET['finalize']) && $_GET['finalize'] == 1) {
         $u->execute();
     } else {
         $i = $conn->prepare("INSERT INTO patient_billing(patient_id,bill_number,billing_date,room_type_id,hours_stay,room_total,services_total,medicines_total,supplies_total,gross_total,discount_amount,amount_due,payment_status,finalized,created_by) VALUES(?,?,NOW(),?,?,?,?,?,?,?,?,?,'Pending',1,'admin')");
-        $i->bind_param("isiddddddddd", $patient_id, $bill_no, $rt_id_f, $hours_f, $room_total_f, $svc_tot, $med_tot, $lab_tot, $grand_f, $discount_f, $grand_f);
+        $i->bind_param("isidddddddd", $patient_id, $bill_no, $rt_id_f, $hours_f, $room_total_f, $svc_tot, $med_tot, $lab_tot, $grand_f, $discount_f, $grand_f);
         $i->execute();
     }
 
