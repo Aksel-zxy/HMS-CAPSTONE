@@ -151,7 +151,7 @@ $items    = [];
 $subtotal = 0;
 
 $stmt = $conn->prepare("
-    SELECT bi.item_id, bi.quantity, bi.unit_price, bi.total_price
+    SELECT bi.item_id, bi.quantity, bi.unit_price, bi.total_price, bi.service_id
     FROM billing_items bi
     WHERE bi.billing_id = ?
     ORDER BY bi.item_id ASC
@@ -164,15 +164,47 @@ foreach ($raw_items as $item) {
     $name = 'Billing Item';
     $desc = '';
 
-    /* Try billing_services (inpatient system) first */
-    $bs = $conn->prepare("SELECT name AS serviceName, category AS description FROM billing_services WHERE id = (SELECT service_id FROM billing_items WHERE item_id=? LIMIT 1) LIMIT 1");
-    $bs->bind_param("i", $item['item_id']);
-    $bs->execute();
-    $bsvc = $bs->get_result()->fetch_assoc();
-    if ($bsvc) { $name = $bsvc['serviceName']; $desc = $bsvc['description'] ?? ''; }
+    /* Try billing_services (inpatient system) first — only if service_id is set */
+    if (!empty($item['service_id'])) {
+        $bs = $conn->prepare("SELECT name AS serviceName, category AS description FROM billing_services WHERE id = ? LIMIT 1");
+        $bs->bind_param("i", $item['service_id']);
+        $bs->execute();
+        $bsvc = $bs->get_result()->fetch_assoc();
+        if ($bsvc) { $name = $bsvc['serviceName']; $desc = $bsvc['description'] ?? ''; }
 
-    /* Fallback to old dl_services lookup by price */
-    if (!$bsvc) {
+        /* If not found in billing_services, try dl_services */
+        if (!$bsvc) {
+            $ds = $conn->prepare("SELECT serviceName, description FROM dl_services WHERE serviceID = ? LIMIT 1");
+            $ds->bind_param("i", $item['service_id']);
+            $ds->execute();
+            $dsvc = $ds->get_result()->fetch_assoc();
+            if ($dsvc) { $name = $dsvc['serviceName']; $desc = $dsvc['description'] ?? 'Lab Service'; }
+        }
+
+        /* If not found, try dnm_procedure_list */
+        if (!$bsvc && !isset($dsvc)) {
+            $ps = $conn->prepare("SELECT procedure_name AS serviceName FROM dnm_procedure_list WHERE procedure_id = ? LIMIT 1");
+            $ps->bind_param("i", $item['service_id']);
+            $ps->execute();
+            $psvc = $ps->get_result()->fetch_assoc();
+            if ($psvc) { $name = $psvc['serviceName']; $desc = 'Procedure'; }
+        }
+
+        /* If not found, try pharmacy_inventory */
+        if (!$bsvc && !isset($dsvc) && !isset($psvc)) {
+            $ms = $conn->prepare("SELECT med_name AS serviceName, dosage FROM pharmacy_inventory WHERE med_id = ? LIMIT 1");
+            $ms->bind_param("i", $item['service_id']);
+            $ms->execute();
+            $msvc = $ms->get_result()->fetch_assoc();
+            if ($msvc) {
+                $name = $msvc['serviceName'] . ($msvc['dosage'] ? ' ('.$msvc['dosage'].')' : '');
+                $desc = 'Medicine';
+            }
+        }
+    }
+
+    /* Fallback to price-based lookup if still not found */
+    if ($name === 'Billing Item') {
         $ns = $conn->prepare("SELECT serviceName, description FROM dl_services WHERE price = ? LIMIT 1");
         $ns->bind_param("d", $item['unit_price']);
         $ns->execute();

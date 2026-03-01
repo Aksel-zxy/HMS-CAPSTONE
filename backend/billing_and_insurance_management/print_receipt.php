@@ -201,7 +201,7 @@ $bis = $conn->prepare("
     SELECT bi.quantity, bi.unit_price, bi.total_price,
            bs.name, bs.category, bs.unit
     FROM billing_items bi
-    JOIN billing_services bs ON bs.service_id = bi.service_id
+    JOIN billing_services bs ON bs.id = bi.service_id
     WHERE bi.billing_id = ?
       AND bi.finalized = 1
     ORDER BY bi.item_id ASC
@@ -227,10 +227,10 @@ if ($bis) {
 $fallback_stmt = $conn->prepare("
     SELECT bi.item_id, bi.quantity, bi.unit_price, bi.total_price, bi.service_id
     FROM billing_items bi
-    LEFT JOIN billing_services bs ON bs.service_id = bi.service_id
+    LEFT JOIN billing_services bs ON bs.id = bi.service_id
     WHERE bi.billing_id = ?
       AND bi.finalized = 1
-      AND bs.service_id IS NULL
+      AND bs.id IS NULL
     ORDER BY bi.item_id ASC
 ");
 if ($fallback_stmt) {
