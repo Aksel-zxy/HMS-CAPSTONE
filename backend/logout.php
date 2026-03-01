@@ -30,7 +30,7 @@ session_destroy();
                     </div>
                 </div>
 
-                <h3>See you again !</h3>
+                <!-- <h3>See you again !</h3> -->
 
                 <p class="text-muted font-13"> You are now successfully sign out. </p>
             </div>

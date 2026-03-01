@@ -25,6 +25,22 @@ if (!$patient) {
     echo "Schedule not found.";
     exit();
 }
+
+$machineQuery = $conn->query("SELECT machine_id, machine_name, machine_type FROM machine_equipments WHERE status = 'Available' AND machine_name LIKE '%X-ray%' ORDER BY machine_name ASC");
+$machineItems = [];
+if ($machineQuery) {
+    while ($row = $machineQuery->fetch_assoc()) {
+        $machineItems[] = $row;
+    }
+}
+
+$inventoryQuery = $conn->query("SELECT item_id, item_name, quantity, unit_type, price FROM inventory WHERE quantity > 0 ORDER BY item_name ASC");
+$inventoryItems = [];
+if ($inventoryQuery) {
+    while ($row = $inventoryQuery->fetch_assoc()) {
+        $inventoryItems[] = $row;
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -95,6 +111,14 @@ if (!$patient) {
                         <input class="form-control" type="file" name="xray_image" accept="image/*" required>
                     </div>
 
+                    <hr>
+                    <h5>Tools & Equipment Used (For Billing/Record)</h5>
+                    <div id="tools-container">
+                        <!-- Tools will be appended here -->
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addToolRow()">+ Add Tool/Equipment</button>
+                    <br>
+
                     <button type="submit" class="btn btn-save">Save Result</button>
                     <a href="sample_processing.php" class="btn btn-secondary">Cancel</a>
                 </form>
@@ -103,6 +127,81 @@ if (!$patient) {
     </div>
 
     <script src="../../assets/Bootstrap/bootstrap.bundle.min.js"></script>
+    <script>
+        const machineItems = <?= json_encode($machineItems) ?>;
+        const inventoryItems = <?= json_encode($inventoryItems) ?>;
+        function addToolRow() {
+            const container = document.getElementById('tools-container');
+            const row = document.createElement('div');
+            row.className = 'row g-2 mb-2 align-items-center tool-row';
+            
+            let options = '<option value="">Select Tool / Equipment...</option>';
+            options += '<optgroup label="Laboratory Equipment">';
+            machineItems.forEach(item => {
+                options += `<option value="mac_${item.machine_id}">
+                    [Equipment] ${item.machine_name} (${item.machine_type})
+                </option>`;
+            });
+            options += '</optgroup>';
+
+            options += '<optgroup label="Inventory & Consumables">';
+            inventoryItems.forEach(item => {
+                options += `<option value="inv_${item.item_id}" data-price="${item.price}" data-max="${item.quantity}">
+                    [Supply] ${item.item_name} (Stock: ${item.quantity} ${item.unit_type}) - ₱${parseFloat(item.price).toFixed(2)}
+                </option>`;
+            });
+            options += '</optgroup>';
+
+            row.innerHTML = `
+                <div class="col-md-5">
+                    <select name="tool_id[]" class="form-select tool-select" required onchange="updateToolName(this)">
+                        ${options}
+                    </select>
+                    <input type="hidden" name="tool_name[]" class="tool-name">
+                    <input type="hidden" name="tool_price[]" class="tool-price">
+                </div>
+                <div class="col-md-4">
+                    <input type="number" name="tool_qty[]" class="form-control tool-qty" placeholder="Qty" min="1" required>
+                    <small class="text-muted tool-max-text"></small>
+                </div>
+                <div class="col-md-3">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.tool-row').remove()"><i class="fas fa-trash"></i> Remove</button>
+                </div>
+            `;
+            container.appendChild(row);
+        }
+
+        function updateToolName(select) {
+            const selectedOption = select.options[select.selectedIndex];
+            const row = select.closest('.tool-row');
+            const nameInput = row.querySelector('.tool-name');
+            const qtyInput = row.querySelector('.tool-qty');
+            const priceInput = row.querySelector('.tool-price');
+            const maxText = row.querySelector('.tool-max-text');
+            
+            if (selectedOption.value.startsWith('inv_')) {
+                nameInput.value = selectedOption.text.split(' (Stock')[0].replace('[Supply] ', '').trim();
+                priceInput.value = selectedOption.getAttribute('data-price');
+                qtyInput.max = selectedOption.getAttribute('data-max');
+                qtyInput.readOnly = false;
+                maxText.innerText = 'Max: ' + qtyInput.max;
+            } else if (selectedOption.value.startsWith('mac_')) {
+                nameInput.value = selectedOption.text.split(' (')[0].replace('[Equipment] ', '').trim();
+                priceInput.value = '0';
+                qtyInput.value = '1';
+                qtyInput.readOnly = true;
+                qtyInput.removeAttribute('max');
+                maxText.innerText = 'N/A';
+            } else {
+                nameInput.value = '';
+                priceInput.value = '';
+                qtyInput.value = '';
+                qtyInput.readOnly = false;
+                qtyInput.removeAttribute('max');
+                maxText.innerText = '';
+            }
+        }
+    </script>
 </body>
 
 </html>
