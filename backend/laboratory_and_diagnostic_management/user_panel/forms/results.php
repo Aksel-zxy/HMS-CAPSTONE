@@ -47,6 +47,48 @@ function markScheduleCompleted($conn, $scheduleID)
 }
 
 
+function saveToolsUsed($conn, $scheduleID, $patientID) {
+    if (!empty($_POST['tool_id']) && is_array($_POST['tool_id'])) {
+        $tool_ids = $_POST['tool_id'];
+        $tool_names = $_POST['tool_name'] ?? [];
+        $tool_prices = $_POST['tool_price'] ?? [];
+        $tool_qtys = $_POST['tool_qty'] ?? [];
+
+        $stmtInv = $conn->prepare("INSERT INTO dl_lab_tools_used (scheduleID, patientID, item_id, item_name, quantity, price, item_type) VALUES (?, ?, ?, ?, ?, ?, 'Inventory')");
+        $updateInv = $conn->prepare("UPDATE inventory SET quantity = quantity - ? WHERE item_id = ?");
+        
+        $stmtMac = $conn->prepare("INSERT INTO dl_lab_tools_used (scheduleID, patientID, item_id, item_name, quantity, price, item_type) VALUES (?, ?, ?, ?, 1, 0, 'Equipment')");
+
+        for ($i = 0; $i < count($tool_ids); $i++) {
+            $raw_id = $tool_ids[$i];
+            if (strpos($raw_id, 'inv_') === 0) {
+                $id = intval(substr($raw_id, 4));
+                $qty = intval($tool_qtys[$i] ?? 0);
+                if ($id > 0 && $qty > 0) {
+                    $name = $tool_names[$i] ?? '';
+                    $price = floatval($tool_prices[$i] ?? 0);
+                    
+                    $stmtInv->bind_param("iiisid", $scheduleID, $patientID, $id, $name, $qty, $price);
+                    $stmtInv->execute();
+
+                    $updateInv->bind_param("ii", $qty, $id);
+                    $updateInv->execute();
+                }
+            } elseif (strpos($raw_id, 'mac_') === 0) {
+                $id = intval(substr($raw_id, 4));
+                if ($id > 0) {
+                    $name = $tool_names[$i] ?? '';
+                    $stmtMac->bind_param("iiis", $scheduleID, $patientID, $id, $name);
+                    $stmtMac->execute();
+                }
+            }
+        }
+        if ($stmtInv) $stmtInv->close();
+        if ($updateInv) $updateInv->close();
+        if ($stmtMac) $stmtMac->close();
+    }
+}
+
 function getImageBlob($fileInputName)
 {
     if (!empty($_FILES[$fileInputName]['tmp_name'])) {
@@ -103,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         );
 
         if ($stmt->execute()) {
+            saveToolsUsed($conn, $scheduleID, $patientID);
             markScheduleCompleted($conn, $scheduleID);
             echo "<script>alert('CBC result saved successfully!'); window.location.href='../sample_processing.php';</script>";
         } else {
@@ -158,6 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($stmt->execute()) {
+            saveToolsUsed($conn, $scheduleID, $patientID);
             markScheduleCompleted($conn, $scheduleID);
             echo "<script>alert('$testType result saved successfully!'); window.location.href='../sample_processing.php';</script>";
         } else {
