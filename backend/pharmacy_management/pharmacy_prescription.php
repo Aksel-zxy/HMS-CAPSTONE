@@ -34,9 +34,23 @@ $notif_res = $conn->query($notif_sql);
 $pendingCount = 0;
 if ($notif_res && $notif_res->num_rows > 0) {
     $notif_row = $notif_res->fetch_assoc();
-    $pendingCount = $notif_row['pending'];
+    $pendingCount += (int)$notif_row['pending'];
 }
 
+// 🔔 Pending Scheduled prescriptions count
+$sched_notif_sql = "SELECT COUNT(*) AS pending 
+                    FROM scheduled_medications 
+                    WHERE status IN ('pending', 'ongoing')";
+$sched_notif_res = $conn->query($sched_notif_sql);
+
+if ($sched_notif_res && $sched_notif_res->num_rows > 0) {
+    $sched_notif_row = $sched_notif_res->fetch_assoc();
+    $pendingCount += (int)$sched_notif_row['pending'];
+}
+
+$notif = new Notification($conn);
+$latestNotifications = $notif->load();
+$notifCount = $notif->notifCount;
 // 🔴 Expiry (Near Expiry or Expired) count
 $expiry_sql = "SELECT COUNT(*) AS expiry 
                FROM pharmacy_stock_batches 
@@ -49,9 +63,7 @@ if ($expiry_res && $expiry_res->num_rows > 0) {
     $expiryCount = $expiry_row['expiry'];
 }
 
-$notif = new Notification($conn);
-$latestNotifications = $notif->load();
-$notifCount = $notif->notifCount;
+
 
 
 ?>
@@ -67,6 +79,15 @@ $notifCount = $notif->notifCount;
     <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
     <link rel="stylesheet" href="assets/CSS/super.css">
     <link rel="stylesheet" href="assets/CSS/med_inventory.css">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="assets/Bootstrap/all.min.css">
+    <link rel="stylesheet" href="assets/Bootstrap/fontawesome.min.css">
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+
     <link rel="stylesheet" href="assets/CSS/prescription.css">
 </head>
 
@@ -272,9 +293,11 @@ $notifCount = $notif->notifCount;
                     </div>
                 </div>
             </div>
+            <div id="alertContainer"></div>
             <!-- START CODING HERE -->
             <div class="content">
-                <div class="title-container">
+                <div class="title-container d-flex justify-content-between align-items-center mb-3">
+
                     <!-- Tabs -->
                     <ul class="nav nav-tabs custom-tabs" id="prescriptionTabs" role="tablist">
                         <li class="nav-item" role="presentation">
@@ -284,22 +307,30 @@ $notifCount = $notif->notifCount;
                                 data-bs-target="#prescription"
                                 type="button" role="tab">
                                 <i class="fa-solid fa-capsules"></i>
-
                                 <span>Prescription</span>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link d-flex align-items-center gap-2"
-                                id="record-tab"
+                                id="scheduled-tab"
                                 data-bs-toggle="tab"
-                                data-bs-target="#record"
+                                data-bs-target="#scheduled"
                                 type="button" role="tab">
-                                <i class="fa-solid fa-notes-medical"></i>
-                                <span>Records</span>
+                                <i class="fa-solid fa-calendar-check"></i>
+                                <span>Scheduled</span>
                             </button>
                         </li>
                     </ul>
+
+                    <!-- View Records Button on Right -->
+                    <div>
+                        <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#recordsModal">
+                            <i class="fa-solid fa-notes-medical"></i> View Records
+                        </button>
+                    </div>
+
                 </div>
+
 
 
 
@@ -422,215 +453,346 @@ $notifCount = $notif->notifCount;
                         </nav>
                     </div>
 
+                    <!-- Scheduled Medications Tab -->
+                    <div class="tab-pane fade" id="scheduled" role="tabpanel">
 
 
-                    <!-- Record Tab -->
-                    <div class="tab-pane fade" id="record" role="tabpanel">
 
-                        <!-- 🔍 Search Bar -->
-                        <div class="d-flex justify-content-end mb-3">
-                            <input type="text" id="recordSearchInput" class="form-control w-25" placeholder="Search by Patient Name...">
-                        </div>
-
-                        <table class="table" id="recordTable">
-                            <thead>
+                        <table class="table table-striped table-hover" id="scheduledTable">
+                            <thead class="table">
                                 <tr>
-                                    <th>Prescription ID</th>
-                                    <th>Doctor</th>
+                                    <th>Schedule ID</th>
                                     <th>Patient</th>
-                                    <th>Medicines</th>
-                                    <th>Total Quantity</th>
-                                    <th>Quantity Dispensed</th>
-                                    <th>Status</th>
-                                    <th>Payment Type</th>
-                                    <th>Note</th>
-                                    <th>Dispensed Date</th>
-                                    <th>Download</th>
-                                    <th>Dispensed By</th>
+                                    <th>Doctor</th>
+                                    <th>Medicine</th>
+                                    <th>Dosage</th>
+                                    <th>Frequency</th>
+                                    <th>Route</th>
+                                    <th>Duration</th>
+                                    <th>Start</th>
+                                    <th>End</th>
+                                    <th>Doses</th>
+                                    <th>Action</th>
+                                    <th>Instructions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php
-                                $sql_records = "
-SELECT 
-    p.prescription_id,
-    CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
-    CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
-    GROUP_CONCAT(
-        CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed)
-        SEPARATOR '<br>'
-    ) AS medicines_list,
-    SUM(i.quantity_prescribed) AS total_quantity,
-    SUM(i.quantity_dispensed) AS total_dispensed,
-    MAX(p.status) AS status,
-    GROUP_CONCAT(
-        DISTINCT 
-        CASE 
-            WHEN i.dispensed_role = 'admin' THEN CONCAT(u.fname, ' ', u.lname)
-            WHEN i.dispensed_role = 'pharmacist' THEN CONCAT(h.first_name, ' ', h.last_name)
-            ELSE NULL
-        END
-        SEPARATOR ', '
-    ) AS staff_name,
-    MAX(p.payment_type) AS payment_type,
-    MAX(p.note) AS note,
-    DATE_FORMAT(MAX(i.dispensed_date), '%b %e, %Y %l:%i%p') AS dispensed_date
-FROM pharmacy_prescription p
-JOIN patientinfo pi ON p.patient_id = pi.patient_id
-JOIN hr_employees e ON p.doctor_id = e.employee_id
-JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id
-JOIN pharmacy_inventory m ON i.med_id = m.med_id
-LEFT JOIN users u ON i.dispensed_by = u.user_id AND i.dispensed_role = 'admin'
-LEFT JOIN hr_employees h ON i.dispensed_by = h.employee_id AND i.dispensed_role = 'pharmacist'
-WHERE p.status IN ('Dispensed', 'Cancelled')
-GROUP BY p.prescription_id
-ORDER BY MAX(i.dispensed_date) DESC
-";
+                                $sql_scheduled = "
+        SELECT 
+            sm.*,
+            CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
+            CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+            CONCAT(m.generic_name, ' (', m.brand_name, ')') AS medicine_name,
+            m.stock_quantity,
+            IFNULL(COUNT(sml.log_id),0) AS doses_given
+        FROM scheduled_medications sm
+        JOIN patientinfo pi ON sm.patient_id = pi.patient_id
+        JOIN hr_employees e ON sm.doctor_id = e.employee_id
+        JOIN pharmacy_inventory m ON sm.med_id = m.med_id
+        LEFT JOIN scheduled_medication_logs sml ON sm.schedule_id = sml.schedule_id
+        GROUP BY sm.schedule_id
+        ORDER BY sm.start_date ASC
+        ";
 
-                                $records_result = $conn->query($sql_records);
 
-                                if ($records_result && $records_result->num_rows > 0) {
-                                    while ($row = $records_result->fetch_assoc()) {
-                                        $noteId = "noteModal" . $row['prescription_id'];
-                                        $prescriptionId = $row['prescription_id'];
-                                        $status = $row['status'];
+                                $scheduled_result = $conn->query($sql_scheduled);
+
+                                if ($scheduled_result && $scheduled_result->num_rows > 0) {
+                                    while ($row = $scheduled_result->fetch_assoc()) {
+
+                                        $frequency = strtolower(trim($row['frequency']));
+                                        $duration = (int)$row['duration_days'];
+                                        $doses_given = (int)$row['doses_given'];
+                                        $stock_quantity = (int)$row['stock_quantity'];
+
+                                        $doses_per_day = 1; // default
+
+                                        // -----------------------------
+                                        // 1️⃣ Specific times of day (e.g., "9 AM & 9 PM")
+                                        // -----------------------------
+                                        if (preg_match_all('/(\d{1,2}\s*(am|pm))/i', $frequency, $matches)) {
+                                            $doses_per_day = count($matches[0]);
+
+                                            // -----------------------------
+                                            // 2️⃣ Interval-based (e.g., "every 6 hours")
+                                            // -----------------------------
+                                        } elseif (preg_match('/every\s+(\d+)\s*hours?/', $frequency, $matches)) {
+                                            $hours = (int)$matches[1];
+                                            $doses_per_day = ($hours > 0 && $hours <= 24) ? floor(24 / $hours) : 1;
+
+                                            // -----------------------------
+                                            // 3️⃣ X times a day (e.g., "5x a day", "twice a day")
+                                            // -----------------------------
+                                        } elseif (preg_match('/^(\d+)\s*(x|times)\s*(a day|per day)$/i', $frequency, $matches)) {
+                                            $doses_per_day = (int)$matches[1];
+
+                                            // -----------------------------
+                                            // 4️⃣ Fallback phrases
+                                            // -----------------------------
+                                        } else {
+                                            switch ($frequency) {
+                                                case 'twice a day':
+                                                    $doses_per_day = 2;
+                                                    break;
+                                                case 'three times a day':
+                                                    $doses_per_day = 3;
+                                                    break;
+                                                default:
+                                                    $doses_per_day = 1;
+                                                    break;
+                                            }
+                                        }
+
+                                        // Total doses = doses per day × duration
+                                        $total_doses = $doses_per_day * $duration;
+                                        $remaining = $total_doses - $doses_given;
+
+                                        // Next dose timing (simplified for X per day / interval-based)
+                                        $interval_hours = ($doses_per_day > 0) ? 24 / $doses_per_day : 24;
+                                        $start_timestamp = strtotime($row['start_date']);
+                                        $next_dose_time = strtotime("+" . ($doses_given * $interval_hours) . " hours", $start_timestamp);
+                                        $allow_time = strtotime("-5 minutes", $next_dose_time);
+                                        $current_time = time();
+
+                                        $can_dispense = ($remaining > 0 && $stock_quantity > 0 && $current_time >= $allow_time);
                                 ?>
-                                        <tr style="opacity:0.6;">
-                                            <td><?= $row['prescription_id']; ?></td>
-                                            <td><?= $row['doctor_name']; ?></td>
-                                            <td><?= $row['patient_name']; ?></td>
-                                            <td><?= $row['medicines_list']; ?></td>
-                                            <td><?= $row['total_quantity']; ?></td>
-                                            <td><?= $row['total_dispensed']; ?></td>
-                                            <td><?= $row['status']; ?></td>
-                                            <td><?= ucfirst(str_replace('_', ' ', $row['payment_type'])); ?></td>
+                                        <tr>
+                                            <td><?= $row['schedule_id']; ?></td>
+                                            <td><?= htmlspecialchars($row['patient_name']); ?></td>
+                                            <td><?= htmlspecialchars($row['doctor_name']); ?></td>
+                                            <td><?= htmlspecialchars($row['medicine_name']); ?></td>
+                                            <td><?= htmlspecialchars($row['dosage']); ?></td>
+                                            <td><?= htmlspecialchars($row['frequency']); ?></td>
+                                            <td><?= htmlspecialchars($row['route']); ?></td>
+                                            <td><?= $duration; ?> days</td>
+                                            <td><?= date('M d, Y h:i A', strtotime($row['start_date'])); ?></td>
+                                            <td><?= date('M d, Y h:i A', strtotime($row['end_date'])); ?></td>
                                             <td>
-                                                <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $noteId; ?>">View Note</button>
+                                                <strong><?= $doses_given; ?></strong> / <?= $total_doses; ?><br>
+                                                <small class="text-muted">Remaining: <?= $remaining; ?></small>
                                             </td>
-                                            <td><?= $row['dispensed_date']; ?></td>
                                             <td>
-                                                <a href="download_prescription.php?id=<?= $prescriptionId; ?>" class="btn btn-info btn-sm" target="_blank">
-                                                    <i class="fa-solid fa-download"></i>
-                                                </a>
+                                                <?php if ($remaining <= 0): ?>
+                                                    <span class="badge bg-success">Completed</span>
+                                                <?php elseif (!$can_dispense): ?>
+                                                    <button class="btn btn-secondary btn-sm" disabled>Not Yet Time</button>
+                                                <?php elseif ($stock_quantity <= 0): ?>
+                                                    <button class="btn btn-danger btn-sm" disabled>No Stock</button>
+                                                <?php else: ?>
+                                                    <button type="button" class="btn btn-success btn-sm" onclick="dispenseScheduled(<?= $row['schedule_id']; ?>, this)">
+                                                        Dispense Dose
+                                                    </button>
+                                                <?php endif; ?>
                                             </td>
-                                            <td><?= $row['staff_name'] ?? 'N/A'; ?></td>
+                                            <td>
+                                                <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#modal<?= $row['schedule_id']; ?>">View</button>
+                                            </td>
                                         </tr>
 
-                                        <!-- Modal for prescription note -->
-                                        <div class="modal fade" id="<?= $noteId; ?>" tabindex="-1">
-                                            <div class="modal-dialog">
+                                        <!-- Instructions Modal -->
+                                        <div class="modal fade" id="modal<?= $row['schedule_id']; ?>" tabindex="-1">
+                                            <div class="modal-dialog modal-dialog-scrollable">
                                                 <div class="modal-content">
                                                     <div class="modal-header">
-                                                        <h5 class="modal-title">Prescription Note</h5>
+                                                        <h5 class="modal-title">Special Instructions</h5>
                                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                                     </div>
                                                     <div class="modal-body">
-                                                        <p><?= nl2br(htmlspecialchars($row['note'])); ?></p>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                        <p><?= nl2br(htmlspecialchars($row['special_instructions'])); ?></p>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+
                                 <?php
-                                    }
+                                    } // end while
                                 } else {
-                                    echo "<tr><td colspan='12' class='text-center'>No prescriptions found</td></tr>";
+                                    echo "<tr><td colspan='14' class='text-center'>No scheduled medications found</td></tr>";
                                 }
                                 ?>
                             </tbody>
                         </table>
-                        <!-- Pagination -->
-                        <nav aria-label="Record pagination">
-                            <ul class="pagination justify-content-center" id="recordPagination"></ul>
-                        </nav>
+
                     </div>
+                    <div class="modal fade" id="recordsModal" tabindex="-1">
+                        <div class="modal-dialog modal-custom modal-dialog-scrollable">
+                            <div class="modal-content">
+
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Pharmacy Records</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+
+                                <div class="modal-body">
+
+                                    <!-- Inner Tabs -->
+                                    <ul class="nav nav-tabs mb-3" id="recordTabs">
+                                        <li class="nav-item">
+                                            <button class="nav-link active"
+                                                data-bs-toggle="tab"
+                                                data-bs-target="#prescriptionRecords">
+                                                Prescription Records
+                                            </button>
+                                        </li>
+                                        <li class="nav-item">
+                                            <button class="nav-link"
+                                                data-bs-toggle="tab"
+                                                data-bs-target="#scheduledRecords">
+                                                Scheduled Prescription Records
+                                            </button>
+                                        </li>
+                                    </ul>
+
+                                    <div class="tab-content">
+
+                                        <!-- ===================== -->
+                                        <!-- PRESCRIPTION RECORDS -->
+                                        <!-- ===================== -->
+                                        <div class="tab-pane fade show active" id="prescriptionRecords" style="text-wrap: nowrap;">
+
+                                            <table class="table" id="recordTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Prescription ID</th>
+                                                        <th>Doctor</th>
+                                                        <th>Patient</th>
+                                                        <th>Medicines</th>
+                                                        <th>Total Quantity</th>
+                                                        <th>Quantity Dispensed</th>
+                                                        <th>Status</th>
+                                                        <th>Payment Type</th>
+                                                        <th>Note</th>
+                                                        <th>Dispensed Date</th>
+                                                        <th>Download</th>
+                                                        <th>Dispensed By</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody> <?php $sql_records = "SELECT p.prescription_id, CONCAT(e.first_name, ' ', e.last_name) AS doctor_name, CONCAT(pi.fname, ' ', pi.lname) AS patient_name, GROUP_CONCAT( CONCAT(m.med_name, ' (', i.dosage, ') - Qty: ', i.quantity_prescribed) SEPARATOR '<br>' ) AS medicines_list, SUM(i.quantity_prescribed) AS total_quantity, SUM(i.quantity_dispensed) AS total_dispensed, MAX(p.status) AS status, GROUP_CONCAT( DISTINCT CASE WHEN i.dispensed_role = 'admin' THEN CONCAT(u.fname, ' ', u.lname) WHEN i.dispensed_role = 'pharmacist' THEN CONCAT(h.first_name, ' ', h.last_name) ELSE NULL END SEPARATOR ', ' ) AS staff_name, MAX(p.payment_type) AS payment_type, MAX(p.note) AS note, DATE_FORMAT(MAX(i.dispensed_date), '%b %e, %Y %l:%i%p') AS dispensed_date FROM pharmacy_prescription p JOIN patientinfo pi ON p.patient_id = pi.patient_id JOIN hr_employees e ON p.doctor_id = e.employee_id JOIN pharmacy_prescription_items i ON p.prescription_id = i.prescription_id JOIN pharmacy_inventory m ON i.med_id = m.med_id LEFT JOIN users u ON i.dispensed_by = u.user_id AND i.dispensed_role = 'admin' LEFT JOIN hr_employees h ON i.dispensed_by = h.employee_id AND i.dispensed_role = 'pharmacist' WHERE p.status IN ('Dispensed', 'Cancelled') GROUP BY p.prescription_id ORDER BY MAX(i.dispensed_date) DESC";
+                                                        $records_result = $conn->query($sql_records);
+                                                        if ($records_result && $records_result->num_rows > 0) {
+                                                            while ($row = $records_result->fetch_assoc()) {
+                                                                $noteId = "noteModal" . $row['prescription_id'];
+                                                                $prescriptionId = $row['prescription_id'];
+                                                                $status = $row['status']; ?> <tr style="opacity:0.6;">
+                                                                <td><?= $row['prescription_id']; ?></td>
+                                                                <td><?= $row['doctor_name']; ?></td>
+                                                                <td><?= $row['patient_name']; ?></td>
+                                                                <td><?= $row['medicines_list']; ?></td>
+                                                                <td><?= $row['total_quantity']; ?></td>
+                                                                <td><?= $row['total_dispensed']; ?></td>
+                                                                <td><?= $row['status']; ?></td>
+                                                                <td><?= ucfirst(str_replace('_', ' ', $row['payment_type'])); ?></td>
+                                                                <td> <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $noteId; ?>">View Note</button> </td>
+                                                                <td><?= $row['dispensed_date']; ?></td>
+                                                                <td> <a href="download_prescription.php?id=<?= $prescriptionId; ?>" class="btn btn-info btn-sm" target="_blank"> <i class="fa-solid fa-download"></i> </a> </td>
+                                                                <td><?= $row['staff_name'] ?? 'N/A'; ?></td>
+                                                            </tr> <!-- Modal for prescription note -->
+                                                            <div class="modal fade" id="<?= $noteId; ?>" tabindex="-1">
+                                                                <div class="modal-dialog">
+                                                                    <div class="modal-content">
+                                                                        <div class="modal-header">
+                                                                            <h5 class="modal-title">Prescription Note</h5> <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                        </div>
+                                                                        <div class="modal-body">
+                                                                            <p><?= nl2br(htmlspecialchars($row['note'])); ?></p>
+                                                                        </div>
+                                                                        <div class="modal-footer"> <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button> </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div> <?php }
+                                                            } else {
+                                                                echo "<tr><td colspan='12' class='text-center'>No prescriptions found</td></tr>";
+                                                            } ?>
+                                                </tbody>
+                                            </table>
+
+                                        </div>
+
+                                        <!-- =============================== -->
+                                        <!-- SCHEDULED PRESCRIPTION RECORDS -->
+                                        <!-- =============================== -->
+                                        <div class="tab-pane fade" id="scheduledRecords">
+
+                                            <table class="table table-bordered table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Schedule ID</th>
+                                                        <th>Patient</th>
+                                                        <th>Doctor</th>
+                                                        <th>Medicine</th>
+                                                        <th>Frequency</th>
+                                                        <th>Duration</th>
+                                                        <th>Doses Given</th>
+                                                        <th>Status</th>
+                                                        <th>Start</th>
+                                                        <th>End</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+
+                                                    <?php
+                                                    $sql_sched_records = "
+SELECT 
+    sm.schedule_id,
+    CONCAT(pi.fname,' ',pi.lname) AS patient_name,
+    CONCAT(e.first_name,' ',e.last_name) AS doctor_name,
+    m.med_name,
+    sm.frequency,
+    sm.duration_days,
+    sm.status,
+    sm.start_date,
+    sm.end_date,
+    COUNT(sml.log_id) AS doses_given
+FROM scheduled_medications sm
+JOIN patientinfo pi ON sm.patient_id = pi.patient_id
+JOIN hr_employees e ON sm.doctor_id = e.employee_id
+JOIN pharmacy_inventory m ON sm.med_id = m.med_id
+LEFT JOIN scheduled_medication_logs sml 
+    ON sm.schedule_id = sml.schedule_id
+WHERE sm.status IN ('completed','cancelled')
+GROUP BY sm.schedule_id
+ORDER BY sm.start_date ASC
+";
+
+                                                    $schedResult = $conn->query($sql_sched_records);
+
+                                                    if ($schedResult && $schedResult->num_rows > 0) {
+                                                        while ($row = $schedResult->fetch_assoc()) {
+                                                    ?>
+                                                            <tr>
+                                                                <td><?= $row['schedule_id']; ?></td>
+                                                                <td><?= $row['patient_name']; ?></td>
+                                                                <td><?= $row['doctor_name']; ?></td>
+                                                                <td><?= $row['med_name']; ?></td>
+                                                                <td><?= $row['frequency']; ?></td>
+                                                                <td><?= $row['duration_days']; ?> days</td>
+                                                                <td><?= $row['doses_given']; ?></td>
+                                                                <td><?= ucfirst($row['status']); ?></td>
+                                                                <td><?= date('M d, Y h:i A', strtotime($row['start_date'])); ?></td>
+                                                                <td><?= date('M d, Y h:i A', strtotime($row['end_date'])); ?></td>
+                                                            </tr>
+                                                    <?php
+                                                        }
+                                                    } else {
+                                                        echo "<tr><td colspan='10' class='text-center'>No scheduled records found</td></tr>";
+                                                    }
+                                                    ?>
+
+                                                </tbody>
+                                            </table>
+
+                                        </div>
+
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
-                <!-- 🔎 Search Script -->
-                <script>
-                    document.getElementById("recordSearchInput").addEventListener("keyup", function() {
-                        const searchValue = this.value.toLowerCase();
-                        const rows = document.querySelectorAll("#recordTable tbody tr");
 
-                        rows.forEach(row => {
-                            const patientName = row.cells[2].textContent.toLowerCase(); // Patient column
-                            row.style.display = patientName.includes(searchValue) ? "" : "none";
-                        });
-                    });
-
-                    function setupPagination(tableId, paginationId, rowsPerPage = 15) {
-                        let currentPage = 1;
-
-                        function paginate() {
-                            const table = document.getElementById(tableId);
-                            const rows = table.querySelectorAll("tbody tr");
-                            const totalRows = rows.length;
-                            const totalPages = Math.ceil(totalRows / rowsPerPage);
-
-                            // Hide all rows
-                            rows.forEach(row => row.style.display = "none");
-
-                            // Show only rows for current page
-                            const start = (currentPage - 1) * rowsPerPage;
-                            const end = start + rowsPerPage;
-                            for (let i = start; i < end && i < totalRows; i++) {
-                                rows[i].style.display = "";
-                            }
-
-                            // Build pagination
-                            const pagination = document.getElementById(paginationId);
-                            pagination.innerHTML = "";
-
-                            // Prev button
-                            const prev = document.createElement("li");
-                            prev.className = "page-item" + (currentPage === 1 ? " disabled" : "");
-                            prev.innerHTML = `<a class="page-link" href="#">&laquo;</a>`;
-                            prev.addEventListener("click", e => {
-                                e.preventDefault();
-                                if (currentPage > 1) {
-                                    currentPage--;
-                                    paginate();
-                                }
-                            });
-                            pagination.appendChild(prev);
-
-                            // Page numbers
-                            for (let i = 1; i <= totalPages; i++) {
-                                const li = document.createElement("li");
-                                li.className = "page-item" + (i === currentPage ? " active" : "");
-                                li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
-                                li.addEventListener("click", e => {
-                                    e.preventDefault();
-                                    currentPage = i;
-                                    paginate();
-                                });
-                                pagination.appendChild(li);
-                            }
-
-                            // Next button
-                            const next = document.createElement("li");
-                            next.className = "page-item" + (currentPage === totalPages ? " disabled" : "");
-                            next.innerHTML = `<a class="page-link" href="#">&raquo;</a>`;
-                            next.addEventListener("click", e => {
-                                e.preventDefault();
-                                if (currentPage < totalPages) {
-                                    currentPage++;
-                                    paginate();
-                                }
-                            });
-                            pagination.appendChild(next);
-                        }
-
-                        paginate();
-                    }
-
-                    // Initialize for both tabs
-                    document.addEventListener("DOMContentLoaded", function() {
-                        setupPagination("prescriptionTable", "prescriptionPagination", 15);
-                        setupPagination("recordTable", "recordPagination", 15);
-                    });
-                </script>
 
 
 
@@ -642,13 +804,97 @@ ORDER BY MAX(i.dispensed_date) DESC
     </div>
     <!----- End of Main Content ----->
     </div>
+    <!-- 🔎 Search Script -->
+    <script>
+        document.getElementById("recordSearchInput").addEventListener("keyup", function() {
+            const searchValue = this.value.toLowerCase();
+            const rows = document.querySelectorAll("#recordTable tbody tr");
+
+            rows.forEach(row => {
+                const patientName = row.cells[2].textContent.toLowerCase(); // Patient column
+                row.style.display = patientName.includes(searchValue) ? "" : "none";
+            });
+        });
+
+        function setupPagination(tableId, paginationId, rowsPerPage = 15) {
+            let currentPage = 1;
+
+            function paginate() {
+                const table = document.getElementById(tableId);
+                const rows = table.querySelectorAll("tbody tr");
+                const totalRows = rows.length;
+                const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+                // Hide all rows
+                rows.forEach(row => row.style.display = "none");
+
+                // Show only rows for current page
+                const start = (currentPage - 1) * rowsPerPage;
+                const end = start + rowsPerPage;
+                for (let i = start; i < end && i < totalRows; i++) {
+                    rows[i].style.display = "";
+                }
+
+                // Build pagination
+                const pagination = document.getElementById(paginationId);
+                pagination.innerHTML = "";
+
+                // Prev button
+                const prev = document.createElement("li");
+                prev.className = "page-item" + (currentPage === 1 ? " disabled" : "");
+                prev.innerHTML = `<a class="page-link" href="#">&laquo;</a>`;
+                prev.addEventListener("click", e => {
+                    e.preventDefault();
+                    if (currentPage > 1) {
+                        currentPage--;
+                        paginate();
+                    }
+                });
+                pagination.appendChild(prev);
+
+                // Page numbers
+                for (let i = 1; i <= totalPages; i++) {
+                    const li = document.createElement("li");
+                    li.className = "page-item" + (i === currentPage ? " active" : "");
+                    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+                    li.addEventListener("click", e => {
+                        e.preventDefault();
+                        currentPage = i;
+                        paginate();
+                    });
+                    pagination.appendChild(li);
+                }
+
+                // Next button
+                const next = document.createElement("li");
+                next.className = "page-item" + (currentPage === totalPages ? " disabled" : "");
+                next.innerHTML = `<a class="page-link" href="#">&raquo;</a>`;
+                next.addEventListener("click", e => {
+                    e.preventDefault();
+                    if (currentPage < totalPages) {
+                        currentPage++;
+                        paginate();
+                    }
+                });
+                pagination.appendChild(next);
+            }
+
+            paginate();
+        }
+
+        // Initialize for both tabs
+        document.addEventListener("DOMContentLoaded", function() {
+            setupPagination("prescriptionTable", "prescriptionPagination", 15);
+            setupPagination("recordTable", "recordPagination", 15);
+        });
+    </script>
     <script>
         function handleStatusChange(selectEl, prescriptionId, oldStatus) {
             const newStatus = selectEl.value;
 
             // 1️⃣ Prevent changing if already Dispensed or Cancelled
             if (oldStatus === 'Dispensed' || oldStatus === 'Cancelled') {
-                alert("Status cannot be changed once it is Dispensed or Cancelled.");
+                Swal.fire('Cannot Change', "Status cannot be changed once it is Dispensed or Cancelled.", 'warning');
                 selectEl.value = oldStatus;
                 return;
             }
@@ -657,75 +903,98 @@ ORDER BY MAX(i.dispensed_date) DESC
             if (newStatus === oldStatus) return;
 
             // 3️⃣ Confirm change
-            if (!confirm(`Are you sure you want to change status to "${newStatus}"?`)) {
-                selectEl.value = oldStatus;
-                return;
-            }
+            Swal.fire({
+                title: 'Change Status?',
+                text: `Are you sure you want to change status to "${newStatus}"?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#00acc1',
+                cancelButtonColor: '#6e768e',
+                confirmButtonText: 'Yes, change it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Updating...',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
 
-            // 4️⃣ Send update to backend
-            fetch('update_prescription.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: `prescription_id=${prescriptionId}&status=${newStatus}`
-                })
-                .then(res => res.json())
-                .then(data => {
-                    const row = selectEl.closest('tr');
+                    // 4️⃣ Send update to backend
+                    fetch('update_prescription.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: `prescription_id=${prescriptionId}&status=${newStatus}`
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            const row = selectEl.closest('tr');
 
-                    if (data.error) {
-                        alert(data.error);
-                        selectEl.value = oldStatus;
-                        return;
-                    }
+                            if (data.error) {
+                                Swal.fire('Error', data.error, 'error');
+                                selectEl.value = oldStatus;
+                                return;
+                            }
 
-                    // 5️⃣ Show success + warnings if any
-                    let message = data.success || "Status updated successfully.";
-                    if (data.warnings && data.warnings.length > 0) {
-                        message += "\n\nWarnings:\n- " + data.warnings.join("\n- ");
-                    }
-                    alert(message);
+                            // 5️⃣ Show success + warnings if any
+                            let message = data.success || "Status updated successfully.";
+                            let msgIcon = 'success';
+                            if (data.warnings && data.warnings.length > 0) {
+                                message += "<br><br><strong>Warnings:</strong><br><ul class='text-start mb-0'><li>" + data.warnings.join("</li><li>") + "</li></ul>";
+                                msgIcon = 'warning';
+                            }
+                            Swal.fire({
+                                title: 'Updated!',
+                                html: message,
+                                icon: msgIcon,
+                                timer: 2000,
+                                timerProgressBar: true
+                            });
 
-                    // 6️⃣ Update Quantity Dispensed if returned
-                    if (data.dispensed_quantity !== undefined) {
-                        const qtyCell = row.querySelector('td:nth-child(6)');
-                        if (qtyCell) qtyCell.textContent = data.dispensed_quantity;
-                    }
+                            // 6️⃣ Update Quantity Dispensed if returned
+                            if (data.dispensed_quantity !== undefined) {
+                                const qtyCell = row.querySelector('td:nth-child(6)');
+                                if (qtyCell) qtyCell.textContent = data.dispensed_quantity;
+                            }
 
-                    // 7️⃣ Move row between tabs based on new status
-                    if (newStatus === 'Dispensed' || newStatus === 'Cancelled') {
-                        // Disable select
-                        selectEl.disabled = true;
+                            // 7️⃣ Move row between tabs based on new status
+                            if (newStatus === 'Dispensed' || newStatus === 'Cancelled') {
+                                // Disable select
+                                selectEl.disabled = true;
 
-                        // Replace payment type select with text
-                        const paymentCell = row.querySelector('td:nth-child(8)');
-                        const paymentSelect = paymentCell?.querySelector('select');
-                        if (paymentSelect) {
-                            paymentCell.textContent = paymentSelect.value.charAt(0).toUpperCase() + paymentSelect.value.slice(1);
-                        }
+                                // Replace payment type select with text
+                                const paymentCell = row.querySelector('td:nth-child(8)');
+                                const paymentSelect = paymentCell?.querySelector('select');
+                                if (paymentSelect) {
+                                    paymentCell.textContent = paymentSelect.value.charAt(0).toUpperCase() + paymentSelect.value.slice(1);
+                                }
 
-                        // Move to Record tab
-                        const recordTable = document.querySelector("#record table tbody");
-                        if (recordTable) {
-                            row.parentNode.removeChild(row);
-                            recordTable.appendChild(row);
-                            row.style.opacity = "0.8";
-                        }
-                    } else if (newStatus === 'Pending') {
-                        // Move back to Prescription tab if status reverted
-                        const prescriptionTable = document.querySelector("#prescription table tbody");
-                        if (prescriptionTable && row.closest("#record")) {
-                            row.parentNode.removeChild(row);
-                            prescriptionTable.appendChild(row);
-                            row.style.opacity = "1";
-                        }
-                    }
-                })
-                .catch(err => {
-                    alert("An error occurred: " + err);
+                                // Move to Record tab
+                                const recordTable = document.querySelector("#record table tbody");
+                                if (recordTable) {
+                                    row.parentNode.removeChild(row);
+                                    recordTable.appendChild(row);
+                                    row.style.opacity = "0.8";
+                                }
+                            } else if (newStatus === 'Pending') {
+                                // Move back to Prescription tab if status reverted
+                                const prescriptionTable = document.querySelector("#prescription table tbody");
+                                if (prescriptionTable && row.closest("#record")) {
+                                    row.parentNode.removeChild(row);
+                                    prescriptionTable.appendChild(row);
+                                    row.style.opacity = "1";
+                                }
+                            }
+                        })
+                        .catch(err => {
+                            Swal.fire('Error', "An error occurred: " + err, 'error');
+                            selectEl.value = oldStatus;
+                        });
+                } else {
                     selectEl.value = oldStatus;
-                });
+                }
+            });
         }
 
         function handlePaymentTypeChange(selectEl, prescriptionId) {
@@ -734,36 +1003,171 @@ ORDER BY MAX(i.dispensed_date) DESC
 
             if (newType === oldType) return;
 
-            if (!confirm("Are you sure you want to change payment type to " + newType + "?")) {
-                selectEl.value = oldType;
-                return;
-            }
+            Swal.fire({
+                title: 'Change Payment Type?',
+                text: "Are you sure you want to change payment type to " + newType + "?",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#00acc1',
+                cancelButtonColor: '#6e768e',
+                confirmButtonText: 'Yes, change it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Updating...',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
 
-            fetch('update_prescription.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: 'prescription_id=' + prescriptionId + '&payment_type=' + newType
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.error) {
-                        alert(data.error);
-                        selectEl.value = oldType;
-                    } else if (data.success) {
-                        alert(data.success);
-                        selectEl.setAttribute('data-old', newType);
-                    }
-                })
-                .catch(err => {
-                    alert("An error occurred: " + err);
+                    fetch('update_prescription.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: 'prescription_id=' + prescriptionId + '&payment_type=' + newType
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.error) {
+                                Swal.fire('Error', data.error, 'error');
+                                selectEl.value = oldType;
+                            } else if (data.success) {
+                                Swal.fire({
+                                    title: 'Updated!',
+                                    text: data.success,
+                                    icon: 'success',
+                                    timer: 2000,
+                                    timerProgressBar: true
+                                });
+                                selectEl.setAttribute('data-old', newType);
+                            }
+                        })
+                        .catch(err => {
+                            Swal.fire('Error', "An error occurred: " + err, 'error');
+                            selectEl.value = oldType;
+                        });
+                } else {
                     selectEl.value = oldType;
-                });
+                }
+            });
         }
     </script>
 
+    <script>
+        function dispenseScheduled(scheduleId, btnEl) {
+            Swal.fire({
+                title: 'Dispense Medication?',
+                text: "Are you sure you want to dispense this scheduled dose now?",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#00acc1',
+                cancelButtonColor: '#6e768e',
+                confirmButtonText: 'Yes, Dispense',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Dispensing...',
+                        text: 'Please wait while we process the dispense.',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading()
+                        }
+                    });
 
+                    fetch('dispensed_scheduled.php', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: 'schedule_id=' + scheduleId
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                Swal.fire({
+                                    title: 'Dispensed!',
+                                    html: `${data.success}<br><br><strong>Doses Given:</strong> ${data.doses_given} / ${data.total_doses}`,
+                                    icon: 'success',
+                                    confirmButtonColor: '#00acc1',
+                                    timer: 2000,
+                                    timerProgressBar: true
+                                });
+
+                                // Dynamically update the DOM without reloading!
+                                const row = btnEl.closest('tr');
+                                if (row) {
+                                    // Update Doses cell (11th column = index 10)
+                                    const dosesCell = row.cells[10];
+                                    if (dosesCell) {
+                                        dosesCell.innerHTML = `<strong>${data.doses_given}</strong> / ${data.total_doses}<br><small class="text-muted">Remaining: ${data.total_doses - data.doses_given}</small>`;
+                                    }
+
+                                    if (data.status === 'completed') {
+                                        // Update action cell with badge
+                                        const actionCell = row.cells[11];
+                                        if (actionCell) {
+                                            actionCell.innerHTML = '<span class="badge bg-success">Completed</span>';
+                                        }
+
+                                        // Move to scheduled records tab
+                                        const recordTableBody = document.querySelector("#scheduledRecords table tbody");
+                                        if (recordTableBody) {
+                                            // The scheduled records table has different columns than the main table, so we extract and create a new row
+                                            const newRow = document.createElement('tr');
+                                            newRow.innerHTML = `
+                                                <td>${row.cells[0].textContent}</td> <!-- Schedule ID -->
+                                                <td>${row.cells[1].textContent}</td> <!-- Patient -->
+                                                <td>${row.cells[2].textContent}</td> <!-- Doctor -->
+                                                <td>${row.cells[3].textContent}</td> <!-- Medicine -->
+                                                <td>${row.cells[5].textContent}</td> <!-- Frequency -->
+                                                <td>${row.cells[7].textContent}</td> <!-- Duration -->
+                                                <td>${data.doses_given}</td>         <!-- Doses Given -->
+                                                <td>Completed</td>                   <!-- Status -->
+                                                <td>${row.cells[8].textContent}</td> <!-- Start Date -->
+                                                <td>${row.cells[9].textContent}</td> <!-- End Date -->
+                                            `;
+                                            recordTableBody.appendChild(newRow);
+                                            row.remove(); // Remove from Pending Scheduled tab
+                                        }
+                                    } else {
+                                        // Not yet completed, but current dose was taken.
+                                        // Update button to "Not Yet Time" to prevent double clicking until time passes.
+                                        btnEl.disabled = true;
+                                        btnEl.className = "btn btn-secondary btn-sm";
+                                        btnEl.textContent = "Not Yet Time";
+                                    }
+                                }
+                            } else if (data.error) {
+                                let iconType = 'error';
+                                // Determine if this is a timing or stock issue based on the message
+                                if (data.error.toLowerCase().includes('stock') || data.error.toLowerCase().includes('expire')) {
+                                    iconType = 'warning';
+                                } else if (data.error.toLowerCase().includes('not yet time')) {
+                                    iconType = 'info';
+                                }
+
+                                Swal.fire({
+                                    title: 'Cannot Dispense',
+                                    text: data.error,
+                                    icon: iconType,
+                                    confirmButtonColor: '#00acc1'
+                                });
+                            }
+                        })
+                        .catch(error => {
+                            Swal.fire({
+                                title: 'Error!',
+                                text: 'A network or server error occurred: ' + error,
+                                icon: 'error',
+                                confirmButtonColor: '#00acc1'
+                            });
+                        });
+                }
+            });
+
+        }
+    </script>
 
 
 

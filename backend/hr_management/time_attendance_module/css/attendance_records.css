@@ -76,19 +76,19 @@
     font-size: 14px;
 }
 
-.attendance-nav-inline button {
-    padding: 8px 16px;
+.attendance-nav-inline .nav-btn {
     background-color: #0047ab;
-    color: #fff;
+    color: white;
     border: none;
+    padding: 6px 12px;
     border-radius: 5px;
     cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.3s ease;
+    font-weight: bold;
 }
 
-.attendance-nav-inline button:hover {
+.attendance-nav-inline .nav-btn:hover {
     background-color: #0096c7;
+    transition: background-color 0.3s;
 }
 
 /* ---------- Table Style ---------- */

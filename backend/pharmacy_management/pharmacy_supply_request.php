@@ -108,6 +108,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->rollBack();
         $error = $e->getMessage();
     }
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add_supplier') {
+    try {
+        $name    = trim($_POST['supplier_name'] ?? '');
+        $contact = trim($_POST['contact_person'] ?? '');
+        $phone   = trim($_POST['phone'] ?? '');
+        $email   = trim($_POST['email'] ?? '');
+        $address = trim($_POST['address'] ?? '');
+
+        if (empty($name)) {
+            throw new Exception("Supplier Name is required.");
+        }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO pharmacy_suppliers 
+            (supplier_name, contact_person, phone, email, address)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$name, $contact, $phone, $email, $address]);
+        $success = "Supplier successfully added!";
+    } catch (Exception $e) {
+        $error = "Failed to add supplier: " . $e->getMessage();
+    }
 }
 
 /* =====================================================
@@ -116,6 +138,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $request_stmt = $pdo->prepare("SELECT * FROM department_request WHERE user_id = ? ORDER BY created_at DESC");
 $request_stmt->execute([$user_id]);
 $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+/* =====================================================
+   📦 FETCH SUPPLIERS
+=====================================================*/
+$supplier_stmt = $pdo->prepare("SELECT * FROM pharmacy_suppliers ORDER BY supplier_name ASC");
+$supplier_stmt->execute();
+$suppliers = $supplier_stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -834,6 +863,11 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php endif; ?>
                 </button>
             </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#suppliers" role="tab">
+                    <i class="bi bi-truck me-1"></i> Suppliers Directory
+                </button>
+            </li>
         </ul>
 
         <div class="tab-content">
@@ -988,6 +1022,58 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
             </div>
 
+            <!-- TAB 3 — SUPPLIERS -->
+            <div class="tab-pane fade" id="suppliers" role="tabpanel">
+                <div class="pr-card">
+                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+                        <h5 class="m-0" style="color:var(--navy);font-weight:700;"><i class="bi bi-truck me-2"></i>Approved Suppliers</h5>
+                        <button class="btn-submit-pr btn-sm px-3 py-2" style="min-height:auto; font-size:.85rem;" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+                            <i class="bi bi-plus-circle me-1"></i> Add Supplier
+                        </button>
+                    </div>
+
+                    <div class="req-table-wrap">
+                        <table class="req-table">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left;">Supplier Name</th>
+                                    <th style="text-align:left;">Contact Person</th>
+                                    <th>Phone</th>
+                                    <th>Email</th>
+                                    <th>Address</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($suppliers)): ?>
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted py-4">No suppliers found in directory.</td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach ($suppliers as $sp): ?>
+                                        <tr>
+                                            <td style="text-align:left; font-weight:700; color:var(--navy);"><?= htmlspecialchars($sp['supplier_name']) ?></td>
+                                            <td style="text-align:left;"><?= htmlspecialchars($sp['contact_person'] ?? '—') ?></td>
+                                            <td><?= htmlspecialchars($sp['phone'] ?? '—') ?></td>
+                                            <td><?= htmlspecialchars($sp['email'] ?? '—') ?></td>
+                                            <td><?= htmlspecialchars($sp['address'] ?? '—') ?></td>
+                                            <td>
+                                                <?php $spStatus = strtolower($sp['status'] ?? 'active'); ?>
+                                                <?php if ($spStatus === 'active'): ?>
+                                                    <span class="badge-approved">Active</span>
+                                                <?php else: ?>
+                                                    <span class="badge-rejected">Inactive</span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </div><!-- end tab-content -->
     </div><!-- end page-wrap -->
 
@@ -1023,6 +1109,51 @@ $my_requests = $request_stmt->fetchAll(PDO::FETCH_ASSOC);
                         </table>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL — Add Supplier -->
+    <div class="modal fade" id="addSupplierModal" tabindex="-1" aria-labelledby="addSupplierModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addSupplierModalLabel">
+                        <i class="bi bi-building-add me-2"></i>Add New Supplier
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_supplier">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" style="font-size: .85rem; color: var(--navy);">Supplier Name <span class="text-danger">*</span></label>
+                            <input type="text" name="supplier_name" class="form-control" required placeholder="e.g. PharmaCorp Inc.">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold" style="font-size: .85rem; color: var(--navy);">Contact Person</label>
+                                <input type="text" name="contact_person" class="form-control" placeholder="e.g. Jane Smith">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold" style="font-size: .85rem; color: var(--navy);">Phone Number</label>
+                                <input type="text" name="phone" class="form-control" placeholder="e.g. 09123456789">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" style="font-size: .85rem; color: var(--navy);">Email Address</label>
+                            <input type="email" name="email" class="form-control" placeholder="e.g. sales@pharmacorp.com">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold" style="font-size: .85rem; color: var(--navy);">Physical Address</label>
+                            <textarea name="address" class="form-control" rows="2" placeholder="Full business address..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="border-top: 1px solid var(--border); background: var(--surface);">
+                        <button type="button" class="btn btn-light border" style="font-size: .85rem; font-weight: 700;" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn-submit-pr btn-sm m-0 px-4 py-2" style="min-height:auto; font-size:.85rem;">Save Supplier</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

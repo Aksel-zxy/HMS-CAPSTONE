@@ -38,7 +38,18 @@ $notif_res = $conn->query($notif_sql);
 $pendingCount = 0;
 if ($notif_res && $notif_res->num_rows > 0) {
     $notif_row = $notif_res->fetch_assoc();
-    $pendingCount = $notif_row['pending'];
+    $pendingCount += (int)$notif_row['pending'];
+}
+
+// 🔔 Pending Scheduled prescriptions count
+$sched_notif_sql = "SELECT COUNT(*) AS pending 
+                    FROM scheduled_medications 
+                    WHERE status IN ('pending', 'ongoing')";
+$sched_notif_res = $conn->query($sched_notif_sql);
+
+if ($sched_notif_res && $sched_notif_res->num_rows > 0) {
+    $sched_notif_row = $sched_notif_res->fetch_assoc();
+    $pendingCount += (int)$sched_notif_row['pending'];
 }
 
 // 🔴 Expiry (Near Expiry or Expired) count
@@ -256,9 +267,9 @@ if (isset($_POST['submit_otc'])) {
                     <span style="font-size: 18px;">Reports</span>
                 </a>
 
-                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse show" data-bs-parent="#sidebar">
+                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="pharmacy_inventory_report.php" class="sidebar-link active">Inventory Report</a>
+                        <a href="pharmacy_inventory_report.php" class="sidebar-link">Inventory Report</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="pharmacy_sales.php" class="sidebar-link">Financial Report</a>
@@ -471,7 +482,7 @@ if (isset($_POST['submit_otc'])) {
                                         <select name="payment_method" class="form-select" required>
                                             <option value="">-- Select Payment Method --</option>
                                             <option value="cash">Cash</option>
-                                            <option value="card">Card</option>
+
                                         </select>
                                     </div>
                                 </div>

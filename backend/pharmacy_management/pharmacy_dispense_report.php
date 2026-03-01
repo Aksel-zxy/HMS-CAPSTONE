@@ -64,23 +64,21 @@ $daily_data = $daily_result->fetch_all(MYSQLI_ASSOC);
 
 // Fetch Inpatient Medication Report Data
 $inpatient_query = "
-    SELECT
-        pp.patient_id,
-        CONCAT(p.fname, ' ', COALESCE(p.mname, ''), ' ', p.lname) as patient_name,
-        p.gender,
-        p.age,
-        COUNT(DISTINCT ppi.item_id) as total_medications,
-        SUM(ppi.quantity_dispensed) as total_qty,
-        SUM(ppi.total_price) as total_meds_cost,
-        MAX(DATE(ppi.dispensed_date)) as latest_dispensed
-    FROM pharmacy_prescription_items ppi
-    JOIN pharmacy_prescription pp ON ppi.prescription_id = pp.prescription_id
-    JOIN patientinfo p ON pp.patient_id = p.patient_id
-    WHERE DATE(ppi.dispensed_date) BETWEEN ? AND ?
-    AND ppi.quantity_dispensed IS NOT NULL
-    AND p.admission_type = 'Inpatient'
-    GROUP BY pp.patient_id, p.fname, p.mname, p.lname, p.gender, p.age
-    ORDER BY total_meds_cost DESC
+    SELECT 
+        sm.*,
+        CONCAT(pi.fname, ' ', pi.lname) AS patient_name,
+        CONCAT(e.first_name, ' ', e.last_name) AS doctor_name,
+        CONCAT(m.generic_name, ' (', m.brand_name, ')') AS medicine_name,
+        m.stock_quantity,
+        IFNULL(COUNT(sml.log_id),0) AS doses_given
+    FROM scheduled_medications sm
+    JOIN patientinfo pi ON sm.patient_id = pi.patient_id
+    JOIN hr_employees e ON sm.doctor_id = e.employee_id
+    JOIN pharmacy_inventory m ON sm.med_id = m.med_id
+    LEFT JOIN scheduled_medication_logs sml ON sm.schedule_id = sml.schedule_id
+    WHERE DATE(sm.start_date) BETWEEN ? AND ?
+    GROUP BY sm.schedule_id
+    ORDER BY sm.start_date ASC
 ";
 $stmt_inpatient = $conn->prepare($inpatient_query);
 $stmt_inpatient->bind_param("ss", $start_date, $end_date);
@@ -872,27 +870,38 @@ $notifCount = $notif->notifCount;
                             <table class="report-table">
                                 <thead>
                                     <tr>
-                                        <th>Patient ID</th>
+                                        <th>Schedule ID</th>
                                         <th>Patient Name</th>
-                                        <th>Gender</th>
-                                        <th class="numeric">Age</th>
-                                        <th class="numeric">Total Medications</th>
-                                        <th class="numeric">Total Qty</th>
-                                        <th class="numeric">Total Cost (₱)</th>
-                                        <th>Latest Dispensed</th>
+                                        <th>Doctor</th>
+                                        <th>Medicine</th>
+                                        <th>Dosage</th>
+                                        <th>Frequency</th>
+                                        <th>Route</th>
+                                        <th class="numeric">Duration</th>
+                                        <th class="numeric">Doses Given</th>
+                                        <th>Status</th>
+                                        <th>Start Date</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($inpatient_data as $inpatient): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($inpatient['patient_id']); ?></td>
+                                            <td><?php echo htmlspecialchars($inpatient['schedule_id']); ?></td>
                                             <td><?php echo htmlspecialchars($inpatient['patient_name']); ?></td>
-                                            <td><?php echo htmlspecialchars($inpatient['gender']); ?></td>
-                                            <td class="numeric"><?php echo $inpatient['age']; ?></td>
-                                            <td class="numeric"><?php echo $inpatient['total_medications']; ?></td>
-                                            <td class="numeric"><?php echo $inpatient['total_qty']; ?></td>
-                                            <td class="numeric">₱<?php echo number_format($inpatient['total_meds_cost'], 2); ?></td>
-                                            <td><?php echo date('M d, Y', strtotime($inpatient['latest_dispensed'])); ?></td>
+                                            <td><?php echo htmlspecialchars($inpatient['doctor_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($inpatient['medicine_name']); ?></td>
+                                            <td><?php echo htmlspecialchars($inpatient['dosage']); ?></td>
+                                            <td><?php echo htmlspecialchars($inpatient['frequency']); ?></td>
+                                            <td><?php echo htmlspecialchars($inpatient['route']); ?></td>
+                                            <td class="numeric"><?php echo $inpatient['duration_days']; ?> days</td>
+                                            <td class="numeric"><?php echo $inpatient['doses_given']; ?></td>
+                                            <td>
+                                                <?php
+                                                $status = strtolower($inpatient['status'] ?? 'pending');
+                                                echo ucfirst($status);
+                                                ?>
+                                            </td>
+                                            <td><?php echo date('M d, Y', strtotime($inpatient['start_date'])); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>

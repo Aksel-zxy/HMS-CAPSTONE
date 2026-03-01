@@ -233,55 +233,40 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 
                 <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Payroll Reports</p>
 
-                <!-- ----- TopBar ----- -->
-                <div class="topbars" style="margin-bottom: 20px;">
-                    <div class="search-bar">
-                        <form method="GET">
+                <form method="GET" class="payroll-nav-inline" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 1100px; margin-left: auto; margin-right: auto; flex-wrap: wrap;">
 
-                            <!-- Preserve date filters -->
-                            <input type="hidden" name="start" value="<?= htmlspecialchars($start) ?>">
-                            <input type="hidden" name="end" value="<?= htmlspecialchars($end) ?>">
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <label for="start_date">Start Date:</label>
+                        <input type="date" id="start_date" name="start_date" value="<?= $start_date ?>">
 
-                            <input type="text"
-                                name="search"
-                                placeholder="Search employee, position, department..."
-                                value="<?= htmlspecialchars($search) ?>"
-                                style="padding:8px; width:250px;">
+                        <label for="end_date">End Date:</label>
+                        <input type="date" id="end_date" name="end_date" value="<?= $end_date ?>">
 
-                            <input type="submit" value="Search">
-
-                        </form>
-
-                        <form method="GET" class="payrollreports-nav-inline">
-
-                            <label>Start Date:</label>
-                            <input type="date" name="start" value="<?= htmlspecialchars($start) ?>">
-
-                            <label>End Date:</label>
-                            <input type="date" name="end" value="<?= htmlspecialchars($end) ?>">
-
-                            <!-- Preserve search value -->
-                            <input type="hidden" name="search" value="<?= htmlspecialchars($search) ?>">
-
-                            <button type="submit">Filter</button>
-
-                            <a href="payroll_reports.php"
-                            style="text-decoration:none; padding:8px 16px; background:#404040; color:white; border-radius:5px;">
-                            Reset
-                            </a>
-                        </form>
-
+                        <button type="submit"  class="nav-btn">
+                            📅 Filter
+                        </button>
                     </div>
-                </div>
+
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="text" name="search" id="payrollSearch" placeholder="Search Employee ID/Name..." value="<?= $_GET['search'] ?? '' ?>" style="padding: 8px 12px; width: 250px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;">
+
+                        <button type="submit" name="search_btn" class="nav-btn">
+                            🔍 Search
+                        </button>
+                    </div>
+
+                </form>
+
+                <br />
 
                 <!-- PAYROLL TABLE -->
                 <div>
-                    <table>
+                    <table id="PayrollTable">
                         <thead>
                             <tr>
-                                <th>#</th>
                                 <th>Employee</th>
                                 <th>Position</th>
+                                <th>Role</th>
                                 <th>Department</th>
                                 <th>Pay Period</th>
                                 <th>Gross Pay</th>
@@ -295,9 +280,9 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                             <?php if (!empty($payrolls)): ?>
                                 <?php $i = 1; foreach ($payrolls as $row): ?>
                                     <tr>
-                                        <td><?= $i++ ?></td>
                                         <td><?= htmlspecialchars($row['employee_name']) ?></td>
                                         <td><?= htmlspecialchars($row['profession']) ?></td>
+                                        <td><?= htmlspecialchars($row['role']) ?></td>
                                         <td><?= htmlspecialchars($row['department']) ?></td>
                                         <td>
                                             <?= $row['pay_period_start'] ?>
@@ -322,6 +307,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                             <?php endif; ?>
                         </tbody>
                     </table>
+
+                <!-- ----- Pagination Controls ----- -->
+                <div id="pagination" class="pagination"></div>
+
                 </div>
             </div>
             <!-- END CODING HERE -->
@@ -346,6 +335,57 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
         toggler.addEventListener("click", function() {
             document.querySelector("#sidebar").classList.toggle("collapsed");
         });
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const table = document.getElementById("PayrollTable");
+            const rows = table.querySelectorAll("tbody tr");
+            const pagination = document.getElementById("pagination");
+
+            let rowsPerPage = 20;
+            let currentPage = 1;
+            let totalPages = Math.ceil(rows.length / rowsPerPage);
+
+            function displayRows() {
+                rows.forEach((row, index) => {
+                    row.style.display =
+                    index >= (currentPage - 1) * rowsPerPage && index < currentPage * rowsPerPage
+                    ? ""
+                    : "none";
+                });
+            }
+
+            function updatePagination() {
+                pagination.innerHTML = ""; 
+
+                const createButton = (text, page, isDisabled = false, isActive = false) => {
+                    const button = document.createElement("button");
+                    button.textContent = text;
+                    if (isDisabled) button.disabled = true;
+                    if (isActive) button.classList.add("active");
+
+                    button.addEventListener("click", function () {
+                        currentPage = page;
+                        displayRows();
+                        updatePagination();
+                    });
+                    return button;
+                };
+
+                pagination.appendChild(createButton("First", 1, currentPage === 1));
+                pagination.appendChild(createButton("Previous", currentPage - 1, currentPage === 1));
+
+                for (let i = 1; i <= totalPages; i++) {
+                    pagination.appendChild(createButton(i, i, false, i === currentPage));
+                }
+
+                pagination.appendChild(createButton("Next", currentPage + 1, currentPage === totalPages));
+                pagination.appendChild(createButton("Last", totalPages, currentPage === totalPages));
+            }
+
+            displayRows();
+            updatePagination();
+        });
+
     </script>
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
