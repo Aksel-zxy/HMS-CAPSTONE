@@ -93,6 +93,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_duty'])) {
         echo "<script>alert('Error assigning duty: " . $conn->error . "');</script>";
     }
 }
+
+// Handle Duty Re-assignment
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reassign_duty'])) {
+    $duty_id = $_POST['duty_id'];
+    $d_id = $_POST['doctor_id'];
+    $n1_id = $_POST['shift1_nurse_id'];
+    $n2_id = $_POST['shift2_nurse_id'];
+    $n3_id = $_POST['shift3_nurse_id'];
+
+    $upd_qry = "UPDATE duty_assignments 
+                SET doctor_id = ?, shift1_nurse_id = ?, shift2_nurse_id = ?, shift3_nurse_id = ? 
+                WHERE duty_id = ?";
+    
+    $upd_stmt = $conn->prepare($upd_qry);
+    $upd_stmt->bind_param("iiiii", $d_id, $n1_id, $n2_id, $n3_id, $duty_id);
+    
+    if ($upd_stmt->execute()) {
+        echo "<script>alert('Duty re-assigned successfully!'); window.location.href='duty_assignment.php';</script>";
+        exit;
+    } else {
+        echo "<script>alert('Error re-assigning duty: " . $conn->error . "');</script>";
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -401,6 +424,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_duty'])) {
                     </div>
                 </div>
             </div>
+
+            <!-- Re-assign Duty Modal -->
+            <div class="modal fade" id="reassignDutyModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content" style="border-radius:15px; border:none; box-shadow: 0 10px 30px rgba(0,0,0,0.1);">
+                        <div class="modal-header bg-warning text-dark" style="border-radius:15px 15px 0 0;">
+                            <h5 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Edit / Re-assign Duty</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="">
+                            <div class="modal-body p-4 text-start">
+                                <input type="hidden" name="reassign_duty" value="1">
+                                <input type="hidden" name="duty_id" id="reassign_duty_id" value="">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label text-muted small fw-bold"><i class="fas fa-user-nurse me-1"></i>Update Attending Doctor</label>
+                                    <select class="form-select" name="doctor_id" id="reassign_doctor_id" required>
+                                        <option value="" disabled>-- Choose Doctor --</option>
+                                        <?php if ($modal_doctors): ?>
+                                            <?php $modal_doctors->data_seek(0); while($d = $modal_doctors->fetch_assoc()): ?>
+                                                <option value="<?= $d['employee_id'] ?>">Dr. <?= htmlspecialchars($d['first_name'] . ' ' . $d['last_name']) ?></option>
+                                            <?php endwhile; ?>
+                                        <?php endif; ?>
+                                    </select>
+                                </div>
+                                
+                                <h6 class="text-success mt-4 mb-3 border-bottom pb-2 fw-bold"><i class="fas fa-clock me-2"></i>Update Nurse Shift Assignments</h6>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label text-muted small fw-bold text-primary">Shift 1 (08:00 AM – 04:00 PM)</label>
+                                    <select class="form-select border-primary" name="shift1_nurse_id" id="reassign_shift1" required>
+                                        <option value="" disabled>-- Select Nurse --</option>
+                                        <?php foreach($nurse_list as $n): ?>
+                                            <option value="<?= $n['employee_id'] ?>"><?= htmlspecialchars($n['first_name'] . ' ' . $n['last_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-muted small fw-bold text-warning">Shift 2 (04:00 PM – 12:00 AM)</label>
+                                    <select class="form-select border-warning" name="shift2_nurse_id" id="reassign_shift2" required>
+                                        <option value="" disabled>-- Select Nurse --</option>
+                                        <?php foreach($nurse_list as $n): ?>
+                                            <option value="<?= $n['employee_id'] ?>"><?= htmlspecialchars($n['first_name'] . ' ' . $n['last_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label text-muted small fw-bold text-info">Shift 3 (12:00 AM – 08:00 AM)</label>
+                                    <select class="form-select border-info" name="shift3_nurse_id" id="reassign_shift3" required>
+                                        <option value="" disabled>-- Select Nurse --</option>
+                                        <?php foreach($nurse_list as $n): ?>
+                                            <option value="<?= $n['employee_id'] ?>"><?= htmlspecialchars($n['first_name'] . ' ' . $n['last_name']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light" style="border-radius:0 0 15px 15px;">
+                                <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-warning fw-bold rounded-pill px-4 text-dark">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
             <!-- END CODING HERE -->
             <!----- End of Main Content ----->
         </div>
@@ -455,6 +542,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_duty'])) {
                                     <th>Bed</th>
                                     <th>Status</th>
                                     <th>Date</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>`;
@@ -472,6 +560,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_duty'])) {
                                 <td><span class="badge bg-secondary">Bed ${duty.bed_id}</span></td>
                                 <td><span class="badge ${statusBadge}">${duty.status}</span></td>
                                 <td>${dateObj.toLocaleDateString()}</td>
+                                <td>
+                                    <button class="btn btn-warning btn-sm" onclick="openReassignModal(${duty.duty_id}, ${duty.doctor_id || 0}, ${duty.shift1_nurse_id || 0}, ${duty.shift2_nurse_id || 0}, ${duty.shift3_nurse_id || 0})">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                </td>
                             </tr>`;
                             });
 
@@ -485,6 +578,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['assign_duty'])) {
                     });
                 }
             });
+
+            function openReassignModal(dutyId, doctorId, shift1Id, shift2Id, shift3Id) {
+                // Close the current modal
+                const currentModal = bootstrap.Modal.getInstance(document.getElementById('dutyModal'));
+                if (currentModal) {
+                    currentModal.hide();
+                }
+
+                // Pre-fill values
+                document.getElementById('reassign_duty_id').value = dutyId;
+                
+                if (doctorId > 0) document.getElementById('reassign_doctor_id').value = doctorId;
+                if (shift1Id > 0) document.getElementById('reassign_shift1').value = shift1Id;
+                if (shift2Id > 0) document.getElementById('reassign_shift2').value = shift2Id;
+                if (shift3Id > 0) document.getElementById('reassign_shift3').value = shift3Id;
+
+                // Show new modal
+                const reassignModal = new bootstrap.Modal(document.getElementById('reassignDutyModal'));
+                reassignModal.show();
+            }
         </script>
         <script src="../assets/Bootstrap/all.min.js"></script>
         <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
