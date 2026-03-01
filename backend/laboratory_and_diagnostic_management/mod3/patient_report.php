@@ -374,13 +374,10 @@ if ($res_p) {
                     <div class="card-body">
                         <h5 class="card-title text-muted mb-3">Laboratory Tests History</h5>
                         
-                        <form id="billingForm" action="send_to_billing.php" method="POST">
-                            <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
                             <div class="table-responsive">
                                 <table class="table table-hover">
                                     <thead style="background:#f1f5f9;">
                                         <tr>
-                                            <th style="width: 40px;"><input type="checkbox" id="selectAllTests" class="form-check-input"></th>
                                             <th style="color: #0d6efd;">Test Name</th>
                                             <th style="color: #0d6efd;">Completed Date</th>
                                             <th style="color: #0d6efd;">Remarks</th>
@@ -392,18 +389,11 @@ if ($res_p) {
                                     <tbody>
                                         <?php if (empty($tests)): ?>
                                             <tr>
-                                                <td colspan="7" class="text-center text-muted py-3">No laboratory tests found for this patient.</td>
+                                                <td colspan="6" class="text-center text-muted py-3">No laboratory tests found for this patient.</td>
                                             </tr>
                                         <?php else: ?>
                                             <?php foreach ($tests as $t): ?>
                                                 <tr>
-                                                    <td class="align-middle">
-                                                        <?php if ($t['is_billed'] > 0): ?>
-                                                            <i class="fas fa-check-circle text-success" title="Already Billed"></i>
-                                                        <?php else: ?>
-                                                            <input type="checkbox" name="schedules[]" value="<?= $t['scheduleID'] ?>" class="form-check-input test-checkbox">
-                                                        <?php endif; ?>
-                                                    </td>
                                                     <td class="align-middle fw-bold"><?= htmlspecialchars($t['serviceName']) ?></td>
                                                     <td class="align-middle"><?= $t['completed_at'] ? date("M d, Y h:i A", strtotime($t['completed_at'])) : "N/A" ?></td>
                                                     <td class="align-middle"><?= htmlspecialchars($t['remarks']) ?></td>
@@ -435,16 +425,6 @@ if ($res_p) {
                                     </tbody>
                                 </table>
                             </div>
-                            
-                            <?php if (!empty($tests)): ?>
-                            <div class="mt-3 text-end d-flex justify-content-end align-items-center">
-                                <span id="selectedCount" class="text-muted me-3" style="display: none;">0 tests selected</span>
-                                <button type="submit" id="btnSendBilling" class="btn btn-warning shadow-sm" style="display: none;">
-                                    <i class="fas fa-file-invoice-dollar me-2"></i> Send to Billing
-                                </button>
-                            </div>
-                            <?php endif; ?>
-                        </form>
                     </div>
                 </div>
                 <?php elseif ($patient_id > 0): ?>
@@ -543,80 +523,6 @@ if ($res_p) {
                 });
             }
 
-            document.addEventListener('DOMContentLoaded', function() {
-                const selectAll = document.getElementById('selectAllTests');
-                const checkboxes = document.querySelectorAll('.test-checkbox');
-                const btnSend = document.getElementById('btnSendBilling');
-                const selectedCount = document.getElementById('selectedCount');
-
-                function updateSelection() {
-                    let checked = 0;
-                    checkboxes.forEach(cb => {
-                        if (cb.checked) checked++;
-                    });
-                    
-                    if (checked > 0) {
-                        selectedCount.textContent = checked + (checked === 1 ? ' test selected' : ' tests selected');
-                        selectedCount.style.display = 'inline';
-                        btnSend.style.display = 'inline-block';
-                    } else {
-                        selectedCount.style.display = 'none';
-                        btnSend.style.display = 'none';
-                    }
-
-                    if (selectAll) {
-                        selectAll.checked = (checked === checkboxes.length && checkboxes.length > 0);
-                    }
-                }
-
-                if (selectAll) {
-                    selectAll.addEventListener('change', function() {
-                        const isChecked = this.checked;
-                        checkboxes.forEach(cb => {
-                            cb.checked = isChecked;
-                        });
-                        updateSelection();
-                    });
-                }
-
-                checkboxes.forEach(cb => {
-                    cb.addEventListener('change', updateSelection);
-                });
-
-                const billingForm = document.getElementById('billingForm');
-                if (billingForm) {
-                    billingForm.addEventListener('submit', function(e) {
-                        e.preventDefault();
-                        
-                        btnSend.disabled = true;
-                        btnSend.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Sending...';
-
-                        const formData = new FormData(billingForm);
-
-                        fetch('send_to_billing.php', {
-                            method: 'POST',
-                            body: formData
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                alert(data.message);
-                                window.location.reload();
-                            } else {
-                                alert('Error: ' + data.message);
-                                btnSend.disabled = false;
-                                btnSend.innerHTML = '<i class="fas fa-file-invoice-dollar me-2"></i> Send to Billing';
-                            }
-                        })
-                        .catch(err => {
-                            console.error('Error:', err);
-                            alert('An unexpected error occurred.');
-                            btnSend.disabled = false;
-                            btnSend.innerHTML = '<i class="fas fa-file-invoice-dollar me-2"></i> Send to Billing';
-                        });
-                    });
-                }
-            });
         </script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
         <script src="../assets/Bootstrap/all.min.js"></script>

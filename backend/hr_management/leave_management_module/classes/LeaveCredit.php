@@ -12,6 +12,8 @@ class LeaveCredit {
     public function getAllEmployees() {
         $sql = "SELECT employee_id, first_name, middle_name, last_name, suffix_name, role, profession, gender 
                 FROM hr_employees 
+                WHERE status = 'Active'
+                AND profession IN ('Doctor','Nurse','Pharmacist','Laboratorist','Accountant')
                 ORDER BY employee_id ASC";
         return $this->conn->query($sql);
     }
@@ -54,7 +56,8 @@ class LeaveCredit {
             LEFT JOIN hr_leave h 
                 ON e.employee_id = h.employee_id
                 AND h.leave_type = lc.leave_type
-            WHERE 1=1
+            WHERE e.status = 'Active'
+            AND profession IN ('Doctor','Nurse','Pharmacist','Laboratorist','Accountant')
         ";
 
         // 🔎 Add Search Condition

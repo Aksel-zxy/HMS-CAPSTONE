@@ -99,7 +99,7 @@ $notifCount = $notif->notifCount;
             </div>
 
             <div class="menu-title">
-                Pharmacy Management | <span>Expiry Tracking</span>
+                Pharmacy Management | <br><span>Drug Expiry Tracking</span>
             </div>
 
             <!----- Sidebar Navigation ----->
