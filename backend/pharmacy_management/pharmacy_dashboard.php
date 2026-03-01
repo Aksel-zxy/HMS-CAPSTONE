@@ -288,7 +288,7 @@ for ($i = 1; $i <= 12; $i++) {
 <body>
     <div class="d-flex">
         <!----- Sidebar ----->
-        <aside id="sidebar" class="sidebar-toggle">
+        <aside id="sidebar" class="sidebar-toggle d-flex flex-column vh-100 position-sticky top-0">
 
             <div class="sidebar-logo mt-3">
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
@@ -388,6 +388,11 @@ for ($i = 1; $i <= 12; $i++) {
                 </a>
             </li>
 
+            <div class="sidebar-item px-3 mt-auto mb-3">
+                <button class="btn btn-primary w-100 d-flex justify-content-center align-items-center gap-2 shadow-sm rounded-3 py-2" data-bs-toggle="modal" data-bs-target="#pharmacyModal" style="background: linear-gradient(135deg, #6366f1, #4f46e5); border: none;">
+                    <i class="fa-solid fa-user-plus"></i> <span class="d-none d-sm-inline">Request Replacement</span>
+                </button>
+            </div>
 
         </aside>
         <!----- End of Sidebar ----->
@@ -493,9 +498,11 @@ for ($i = 1; $i <= 12; $i++) {
             <div class="container-fluid py-4">
 
                 <!-- PAGE TITLE -->
-                <div class="d-flex align-items-center mb-4">
-                    <i class="fa-solid fa-chart-simple fs-4 me-2"></i>
-                    <h3 class="mb-0 fw-bold">Dashboard</h3>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-chart-simple fs-4 me-2"></i>
+                        <h3 class="mb-0 fw-bold">Dashboard</h3>
+                    </div>
                 </div>
 
                 <!-- KPI CARDS -->
@@ -745,51 +752,68 @@ for ($i = 1; $i <= 12; $i++) {
                     </div>
                 </div>
 
-                <center>
-                    <button class="hahaha" onclick="openModal('pharmacyModal')">Request Employee for <br /> Pharmacy Dept.</button>
-                </center>
-
                 <!-- Pharmacy Modal -->
-                <div id="pharmacyModal" class="bastabubukas">
-                    <div class="lalagyanannya">
-                        <bttn class="close-btn" onclick="closeModal('pharmacyModal')">X</bttn>
-                        <center>
-                            <h3 style="font-weight: bold;">Pharmacy Department Replacement Request</h3>
-                        </center>
-                        <br />
+                <div class="modal fade" id="pharmacyModal" tabindex="-1" aria-labelledby="pharmacyModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 shadow-lg border-0">
+                            <div class="modal-header border-bottom-0 pb-0 mt-2 mx-2">
+                                <h5 class="modal-title fw-bold" id="pharmacyModalLabel">
+                                    <i class="fa-solid fa-user-doctor text-primary me-2 shadow-sm rounded-circle p-2 bg-primary bg-opacity-10"></i> Replacement Request
+                                </h5>
+                                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                <p class="text-muted mb-4 small">Submit a request to replace a leaving pharmacist in the Pharmacy Department.</p>
+                                <form action="submit_replacement_request.php" method="POST">
+                                    <input type="hidden" name="profession" value="Pharmacist" required>
 
-                        <form action="submit_replacement_request.php" method="POST">
-                            <input type="hidden" name="profession" value="Pharmacist" required>
+                                    <div class="mb-3">
+                                        <label for="department" class="form-label fw-semibold small">Department</label>
+                                        <select id="department" name="department" class="form-select bg-light border-0 shadow-sm" required>
+                                            <option value="Pharmacy" selected>Pharmacy</option>
+                                        </select>
+                                    </div>
 
-                            <label for="department">Department:</label>
-                            <select id="department" name="department" required>
-                                <option value="Pharmacy">Pharmacy</option>
-                            </select>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Pharmacist Type to Replace</label>
+                                        <select name="position" class="form-select bg-light border-0 shadow-sm" required>
+                                            <option value="" disabled selected>--- Select Pharmacist Type ---</option>
+                                            <option value="Clinical Pharmacist">Clinical Pharmacist</option>
+                                            <option value="Hospital Pharmacist">Hospital Pharmacist</option>
+                                            <option value="Compounding Pharmacist">Compounding Pharmacist</option>
+                                            <option value="Dispensing Pharmacist">Dispensing Pharmacist</option>
+                                        </select>
+                                    </div>
 
-                            <!-- Specialist Dropdown -->
-                            <label>Pharmacist Type to Replace</label>
-                            <select name="position" required>
-                                <option value="">--- Select Pharmacist Type ---</option>
-                                <option value="Clinical Pharmacist">Clinical Pharmacist</option>
-                                <option value="Hospital Pharmacist">Hospital Pharmacist</option>
-                                <option value="Compounding Pharmacist">Compounding Pharmacist</option>
-                                <option value="Dispensing Pharmacist">Dispensing Pharmacist</option>
-                            </select>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold small">Leaving Employee Name</label>
+                                            <input type="text" name="leaving_employee_name" class="form-control bg-light border-0 shadow-sm" placeholder="e.g. John Doe">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold small">Leaving Employee ID</label>
+                                            <input type="text" name="leaving_employee_id" class="form-control bg-light border-0 shadow-sm" placeholder="e.g. EMP-1234">
+                                        </div>
+                                    </div>
 
-                            <label>Leaving Employee Name</label>
-                            <input type="text" name="leaving_employee_name">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Reason for Leaving</label>
+                                        <textarea name="reason_for_leaving" class="form-control bg-light border-0 shadow-sm" rows="3" placeholder="Provide a brief explanation..."></textarea>
+                                    </div>
 
-                            <label>Leaving Employee ID</label>
-                            <input type="text" name="leaving_employee_id">
+                                    <div class="mb-4">
+                                        <label class="form-label fw-semibold small">Requested By</label>
+                                        <input type="text" name="requested_by" class="form-control bg-light border-0 shadow-sm" placeholder="Your Name" required>
+                                    </div>
 
-                            <label>Reason for Leaving</label>
-                            <textarea name="reason_for_leaving"></textarea>
-
-                            <label>Requested By</label>
-                            <input type="text" name="requested_by" required>
-
-                            <button type="submit">Submit Request</button>
-                        </form>
+                                    <div class="d-grid mt-2">
+                                        <button type="submit" class="btn btn-primary py-2 fw-bold" style="background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; border-radius: 8px;">
+                                            Submit Request <i class="fa-solid fa-paper-plane ms-1"></i>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
