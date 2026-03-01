@@ -228,11 +228,6 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <center>
-                <a href="leave_approve_history.php" class="hahaha">Approved Leaves</a> 
-                <a href="leave_reject_history.php" class="hahaha">Rejected Leaves</a>
-            </center>
-
             <div class="summary">
                 <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Leave Reports — Summary by Employee</p>
 
@@ -297,7 +292,8 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <thead>
                         <tr>
                             <th>Employee ID</th>
-                            <th>Full Name</th>
+                            <th>Employee Name</th>
+                            <th>Profession</th>
                             <th>Leave Type</th>
                             <th>Start Date</th>
                             <th>End Date</th>
@@ -316,6 +312,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                 <tr>
                                     <td><?= htmlspecialchars($row['employee_id']) ?></td>
                                     <td><?= htmlspecialchars($row['full_name']) ?></td>
+                                    <td><?= htmlspecialchars($row['profession']) ?></td>
                                     <td><?= htmlspecialchars($row['leave_type']) ?></td>
                                     <td><?= htmlspecialchars($row['leave_start_date']) ?></td>
                                     <td><?= htmlspecialchars($row['leave_end_date']) ?></td>

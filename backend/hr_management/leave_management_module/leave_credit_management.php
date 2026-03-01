@@ -275,7 +275,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                                         ($emp['suffix_name'] ?? ''));
                                     ?>
                                         <option value="<?= $emp['employee_id'] ?>" data-gender="<?= $emp['gender'] ?>">
-                                            <?= htmlspecialchars($fullName) ?> &nbsp;&nbsp;&nbsp; (<?= htmlspecialchars($emp['employee_id']) ?>) &nbsp;&nbsp;&nbsp; (<?= htmlspecialchars($emp['profession']) ?>)
+                                            <?= htmlspecialchars($fullName) ?> &nbsp;&nbsp;&nbsp; (ID: <?= htmlspecialchars($emp['employee_id']) ?>) &nbsp;&nbsp;&nbsp; (<?= htmlspecialchars($emp['profession']) ?>)
                                         </option>
                                     <?php endwhile; ?>
                                 </select>
@@ -330,8 +330,9 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <thead>
                         <tr>
                             <th>Employee ID</th>
-                            <th>Full Name</th>
+                            <th>Employee Name</th>
                             <th>Profession</th>
+                            <th>Role</th>
                             <th>Leave Type</th>
                             <th>Allocated Days</th>
                             <th>Used Days</th>
@@ -356,6 +357,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                             <td rowspan="<?= $rowCount ?>"><?= $rec['employee_id'] ?></td>
                                             <td rowspan="<?= $rowCount ?>"><?= htmlspecialchars($rec['full_name']) ?></td>
                                             <td rowspan="<?= $rowCount ?>"><?= htmlspecialchars($rec['profession']) ?></td>
+                                            <td rowspan="<?= $rowCount ?>"><?= htmlspecialchars($rec['role']) ?></td>
                                         <?php $firstRow = false; endif; ?>
 
                                         <td><?= htmlspecialchars($rec['leave_type'] ?? '') ?></td>
