@@ -17,7 +17,8 @@ class FileUploader {
             'government_id' => 'Government ID',
             'application_letter' => 'Application Letter',
             'tor' => 'Transcript of Records',
-            'id_picture' => 'ID Picture'
+            'id_picture' => 'ID Picture',
+            'nbi_clearance' => 'NBI Clearance / Police Clearance'
         ];
 
         foreach ($allowedDocuments as $field => $type) {

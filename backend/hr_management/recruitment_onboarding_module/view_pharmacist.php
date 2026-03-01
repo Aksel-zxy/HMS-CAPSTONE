@@ -233,7 +233,8 @@ if (isset($uploadedDocs[$docType])) {
                                     'Government ID',
                                     'Application Letter',
                                     'Transcript of Records',
-                                    'ID Picture'
+                                    'ID Picture',
+                                    'NBI Clearance / Police Clearance'
                                 ];
 
                                 $uploadedDocs = [];
@@ -487,7 +488,8 @@ if (isset($uploadedDocs[$docType])) {
                             'Government ID',
                             'Application Letter',
                             'Transcript of Records',
-                            'ID Picture'
+                            'ID Picture',
+                            'NBI Clearance / Police Clearance'
                         ];
 
                         $uploadedDocs = [];
@@ -552,6 +554,9 @@ if (isset($uploadedDocs[$docType])) {
 
                     <label>Transcription of Records:</label>
                     <input type="file" name="tor" accept=".pdf,.jpg,.jpeg,.png">
+                    
+                    <label>NBI Clearance / Police Clearance:</label>
+                    <input type="file" name="nbi_clearance" accept=".pdf,.jpg,.jpeg,.png">
 
                     <label>2x2 Formal Picture:</label>
                     <input type="file" name="id_picture" accept=".pdf,.jpg,.jpeg,.png">
