@@ -196,8 +196,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dispose_id'], $_POST[
         $price     = $batch['price']     ?? 0;
         $item_name = $batch['item_name'] ?? 'Unknown';
 
-        $pdo->prepare("INSERT INTO disposed_medicines (batch_id, batch_no, item_id, item_name, quantity, price, expiration_date) VALUES (?, ?, ?, ?, ?, ?, ?)")
-            ->execute([$batch['id'], $batch['batch_no'], $batch['item_id'], $item_name, $dispose_qty, $price, $batch['expiration_date']]);
+        // ── FIX: Get next ID manually in case AUTO_INCREMENT is not set on disposed_medicines ──
+        $maxId = $pdo->query("SELECT COALESCE(MAX(id), 0) + 1 FROM disposed_medicines")->fetchColumn();
+
+        $pdo->prepare("
+            INSERT INTO disposed_medicines
+                (id, batch_id, batch_no, item_id, item_name, quantity, price, expiration_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ")->execute([
+            $maxId,
+            $batch['id'],
+            $batch['batch_no'],
+            $batch['item_id'],
+            $item_name,
+            $dispose_qty,
+            $price,
+            $batch['expiration_date']
+        ]);
 
         $new_qty = $batch['quantity'] - $dispose_qty;
         if ($new_qty > 0) {

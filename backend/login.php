@@ -54,10 +54,10 @@ require_once 'assets/oop/off_otp.php';
                 <input type="password" id="password" name="password" placeholder="Enter your password" required>
 
                 <!-- ✅ Remember Me styled nicely -->
-                <div class="remember-me">
+                <!-- <div class="remember-me">
                     <input type="checkbox" id="remember_me" name="remember_me" value="1">
                     <label for="remember_me">Remember this device</label>
-                </div>
+                </div> -->
 
                 <button type="submit">Log In</button>
             </form>

@@ -1,6 +1,21 @@
 <?php
 include '../../SQL/config.php';
 
+// make sure the department_request table has an estimated_delivery column
+try {
+    $colStmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS \
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'department_request' \
+        AND COLUMN_NAME = 'estimated_delivery'");
+    $colStmt->execute();
+    if ((int) $colStmt->fetchColumn() === 0) {
+        // using DATE since the form submits a date value; allow NULL for backwards compatibility
+        $pdo->exec("ALTER TABLE department_request ADD COLUMN estimated_delivery DATE NULL");
+    }
+} catch (PDOException $e) {
+    // if the ALTER fails (for example lack of permissions), just continue; other pages
+    // that rely on this column will gracefully handle null values.
+}
+
 /* =====================================================
    SAFE DEFAULTS
 =====================================================*/
