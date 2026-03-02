@@ -16,7 +16,7 @@ $stmt = $conn->prepare("
         pr.*,
         pi.fname, pi.mname, pi.lname,
         pi.phone_number, pi.address, pi.attending_doctor,
-        pi.dob, pi.gender,
+        pi.dob, pi.gender, pi.admission_type,
         br.total_amount    AS billing_total,
         br.grand_total     AS billing_grand,
         br.status          AS billing_status,
@@ -42,91 +42,304 @@ $full_name = trim(
 );
 
 $contact = $billing['phone_number'] ?? 'N/A';
+$is_inpatient = in_array($billing['admission_type'] ?? '', ['Inpatient','Confinement','Emergency','Surgery']);
 
 /* ===============================
-   BILLING ITEMS
-   NOTE: items were inserted with unit_price & total_price only.
-   We try to join dl_services by unit_price as fallback, but
-   primarily show what's stored in billing_items directly.
+   BUILD BILLING ITEMS
+   Strategy: reconstruct from all original source tables
+   using the same logic as billing_items.php, then fall back
+   to billing_items rows for any remainder.
 ================================ */
-$stmt = $conn->prepare("
-    SELECT
-        bi.item_id,
-        bi.quantity,
-        bi.unit_price,
-        bi.total_price,
-        bi.finalized
+$billing_items = [];
+
+/* ── 1. ROOM CHARGE (from patient_billing) ── */
+$pb_stmt = $conn->prepare("
+    SELECT pb.room_type_id, pb.room_total, pb.hours_stay,
+           brt.name AS room_name, brt.price_per_day, brt.capacity,
+           ir.room_no, ir.admission_date, ir.discharge_date
+    FROM patient_billing pb
+    LEFT JOIN billing_room_types brt ON brt.id = pb.room_type_id
+    LEFT JOIN inpatient_registration ir ON ir.patient_id = pb.patient_id
+    WHERE pb.patient_id = ?
+    ORDER BY pb.billing_id DESC LIMIT 1
+");
+if ($pb_stmt) {
+    $pb_stmt->bind_param("i", $patient_id);
+    $pb_stmt->execute();
+    $pb = $pb_stmt->get_result()->fetch_assoc();
+    if ($pb && (float)($pb['room_total'] ?? 0) > 0) {
+        $hours = round((float)($pb['hours_stay'] ?? 0), 1);
+        $days  = $hours > 0 ? ceil($hours / 24) : 1;
+        $desc_parts = [];
+        if (!empty($pb['capacity']))       $desc_parts[] = $pb['capacity'];
+        if (!empty($pb['price_per_day']))  $desc_parts[] = '₱' . number_format($pb['price_per_day'], 2) . '/day';
+        if ($days > 0)                     $desc_parts[] = $days . ' day' . ($days > 1 ? 's' : '') . ' (' . $hours . ' hrs)';
+        if (!empty($pb['admission_date'])) $desc_parts[] = date('M d, Y', strtotime($pb['admission_date'])) . ' → ' . (!empty($pb['discharge_date']) ? date('M d, Y', strtotime($pb['discharge_date'])) : 'ongoing');
+        $room_label = ($pb['room_name'] ?? 'Room Accommodation');
+        if (!empty($pb['room_no'])) $room_label .= ' — Rm ' . $pb['room_no'];
+        $billing_items[] = [
+            'category'    => 'room',
+            'serviceName' => $room_label,
+            'description' => implode(' · ', $desc_parts),
+            'quantity'    => 1,
+            'unit_price'  => (float)$pb['room_total'],
+            'total_price' => (float)$pb['room_total'],
+        ];
+    }
+}
+
+/* ── 2. LAB RESULTS ── */
+$ls = $conn->prepare("
+    SELECT dr.resultID, dr.resultDate, dr.result AS serviceName,
+           ds.price, ds.description AS svc_desc
+    FROM dl_results dr
+    LEFT JOIN dl_services ds ON LOWER(TRIM(ds.serviceName)) = LOWER(TRIM(dr.result))
+    WHERE dr.patientID = ?
+      AND dr.status IN ('Completed','Delivered')
+    ORDER BY dr.resultDate ASC
+");
+if ($ls) {
+    $ls->bind_param("i", $patient_id);
+    $ls->execute();
+    foreach ($ls->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $price = (float)($row['price'] ?? 0);
+        /* fallback: match by first keyword */
+        if ($price == 0 && !empty($row['serviceName'])) {
+            $kw = strtolower(trim(preg_replace('/\s*\(.*?\)/', '', $row['serviceName'])));
+            $kw = trim(strtok($kw, ' '));
+            if (strlen($kw) >= 2) {
+                $kws = $conn->prepare("SELECT price FROM dl_services WHERE LOWER(serviceName) LIKE ? LIMIT 1");
+                $like = '%' . $kw . '%';
+                $kws->bind_param("s", $like);
+                $kws->execute();
+                $kwr = $kws->get_result()->fetch_assoc();
+                if ($kwr) $price = (float)$kwr['price'];
+            }
+        }
+        $billing_items[] = [
+            'category'    => 'laboratory',
+            'serviceName' => trim($row['serviceName']) ?: 'Laboratory Service',
+            'description' => 'Lab Result — ' . date('M d, Y', strtotime($row['resultDate'])),
+            'quantity'    => 1,
+            'unit_price'  => $price,
+            'total_price' => $price,
+        ];
+    }
+}
+
+/* ── 3. PROCEDURES (DNM) ── */
+$ds = @$conn->prepare("
+    SELECT dnmr.record_id, dnmr.procedure_name, dnmr.amount, dnmr.created_at,
+           dpl.price AS catalog_price
+    FROM dnm_records dnmr
+    LEFT JOIN dnm_procedure_list dpl
+        ON LOWER(TRIM(dpl.procedure_name)) = LOWER(TRIM(dnmr.procedure_name))
+        AND dpl.status = 'Active'
+    WHERE dnmr.duty_id IN (
+        SELECT da.duty_id
+        FROM dl_results dr
+        JOIN dl_schedule dsch ON dsch.scheduleID = dr.scheduleID
+        JOIN duty_assignments da ON da.appointment_id = dsch.scheduleID
+        WHERE dr.patientID = ?
+    )
+    ORDER BY dnmr.created_at ASC
+");
+if ($ds) {
+    $ds->bind_param("i", $patient_id);
+    $ds->execute();
+    foreach ($ds->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $price = (float)($row['amount'] ?? 0);
+        if ($price == 0) $price = (float)($row['catalog_price'] ?? 0);
+        $billing_items[] = [
+            'category'    => 'service',
+            'serviceName' => $row['procedure_name'] ?: 'Procedure',
+            'description' => 'Procedure — ' . date('M d, Y', strtotime($row['created_at'])),
+            'quantity'    => 1,
+            'unit_price'  => $price,
+            'total_price' => $price,
+        ];
+    }
+}
+
+/* ── 4. DISPENSED MEDICINES (Pharmacy) ── */
+$rs = $conn->prepare("
+    SELECT ppi.item_id, ppi.med_id,
+           ppi.dosage AS rx_dosage, ppi.frequency,
+           ppi.quantity_dispensed, ppi.unit_price, ppi.total_price,
+           pi2.med_name, pi2.dosage AS inv_dosage,
+           pi2.unit_price AS inv_unit_price
+    FROM pharmacy_prescription pp
+    JOIN pharmacy_prescription_items ppi ON ppi.prescription_id = pp.prescription_id
+    JOIN pharmacy_inventory pi2 ON pi2.med_id = ppi.med_id
+    WHERE pp.patient_id = ?
+      AND pp.payment_type = 'post_discharged'
+      AND pp.status = 'Dispensed'
+    ORDER BY ppi.item_id ASC
+");
+if ($rs) {
+    $rs->bind_param("i", $patient_id);
+    $rs->execute();
+    foreach ($rs->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $dose     = trim(($row['rx_dosage'] ?? $row['inv_dosage'] ?? '') . ' ' . ($row['frequency'] ?? ''));
+        $unit     = (float)($row['unit_price'] ?: $row['inv_unit_price'] ?: 0);
+        $qty      = (int)($row['quantity_dispensed'] ?: 1);
+        $rx_total = (float)$row['total_price'];
+        if ($rx_total == 0) $rx_total = round($unit * $qty, 2);
+        $billing_items[] = [
+            'category'    => 'medicine',
+            'serviceName' => $row['med_name'] . ($dose ? ' (' . trim($dose) . ')' : ''),
+            'description' => 'Dispensed Medicine — Qty: ' . $qty . ' × ₱' . number_format($unit, 2),
+            'quantity'    => $qty,
+            'unit_price'  => $unit,
+            'total_price' => $rx_total,
+        ];
+    }
+}
+
+/* ── 5. MANUALLY ADDED INPATIENT SERVICES (billing_services) ── */
+$bis = $conn->prepare("
+    SELECT bi.quantity, bi.unit_price, bi.total_price,
+           bs.name, bs.category, bs.unit
     FROM billing_items bi
+    JOIN billing_services bs ON bs.id = bi.service_id
     WHERE bi.billing_id = ?
+      AND bi.finalized = 1
     ORDER BY bi.item_id ASC
 ");
-$stmt->bind_param("i", $billing_id);
-$stmt->execute();
-$items_raw = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-
-/* Try to match a service name from dl_services by price */
-$billing_items = [];
-$total_charges = 0;
-foreach ($items_raw as $item) {
-    /* Attempt name lookup by unit_price in dl_services */
-    $name_stmt = $conn->prepare("
-        SELECT serviceName, description FROM dl_services
-        WHERE price = ? LIMIT 1
-    ");
-    $name_stmt->bind_param("d", $item['unit_price']);
-    $name_stmt->execute();
-    $svc = $name_stmt->get_result()->fetch_assoc();
-
-    /* Attempt name lookup in dnm_procedure_list */
-    if (!$svc) {
-        $name_stmt2 = $conn->prepare("
-            SELECT procedure_name AS serviceName, '' AS description
-            FROM dnm_procedure_list WHERE price = ? LIMIT 1
-        ");
-        $name_stmt2->bind_param("d", $item['unit_price']);
-        $name_stmt2->execute();
-        $svc = $name_stmt2->get_result()->fetch_assoc();
+if ($bis) {
+    $bis->bind_param("i", $billing_id);
+    $bis->execute();
+    foreach ($bis->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $billing_items[] = [
+            'category'    => 'service',
+            'serviceName' => $row['name'] ?: 'Hospital Service',
+            'description' => ucfirst(strtolower($row['category'] ?? 'Service')) . ' — ' . ($row['unit'] ?? 'unit'),
+            'quantity'    => (int)($row['quantity'] ?: 1),
+            'unit_price'  => (float)$row['unit_price'],
+            'total_price' => (float)$row['total_price'],
+        ];
     }
-
-    /* Attempt name lookup in pharmacy_inventory */
-    if (!$svc) {
-        $name_stmt3 = $conn->prepare("
-            SELECT CONCAT(med_name, IF(dosage != '', CONCAT(' (', dosage, ')'), '')) AS serviceName,
-                   CONCAT('Medicine — Unit Price: ₱', FORMAT(unit_price, 2)) AS description
-            FROM pharmacy_inventory WHERE unit_price = ? LIMIT 1
-        ");
-        $name_stmt3->bind_param("d", $item['unit_price']);
-        $name_stmt3->execute();
-        $svc = $name_stmt3->get_result()->fetch_assoc();
-    }
-
-    $billing_items[] = [
-        'item_id'     => $item['item_id'],
-        'quantity'    => $item['quantity'] ?: 1,
-        'unit_price'  => (float)$item['unit_price'],
-        'total_price' => (float)$item['total_price'],
-        'serviceName' => $svc['serviceName'] ?? 'Billing Service',
-        'description' => $svc['description'] ?? '',
-    ];
-    $total_charges += (float)$item['total_price'];
 }
+
+/* ── 6. FALLBACK: any billing_items rows NOT already covered above ──
+   For items that don't join to billing_services (older records, manual adds, etc.)
+   we attempt a multi-table name lookup. ── */
+$fallback_stmt = $conn->prepare("
+    SELECT bi.item_id, bi.quantity, bi.unit_price, bi.total_price, bi.service_id
+    FROM billing_items bi
+    LEFT JOIN billing_services bs ON bs.id = bi.service_id
+    WHERE bi.billing_id = ?
+      AND bi.finalized = 1
+      AND bs.id IS NULL
+    ORDER BY bi.item_id ASC
+");
+if ($fallback_stmt) {
+    $fallback_stmt->bind_param("i", $billing_id);
+    $fallback_stmt->execute();
+    foreach ($fallback_stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
+        $name = null;
+        $desc = '';
+        $unit_price = (float)$row['unit_price'];
+
+        /* Try dl_services by service_id */
+        $try1 = $conn->prepare("SELECT serviceName, description FROM dl_services WHERE serviceID = ? LIMIT 1");
+        if ($try1) {
+            $try1->bind_param("i", $row['service_id']);
+            $try1->execute();
+            $r1 = $try1->get_result()->fetch_assoc();
+            if ($r1) { $name = $r1['serviceName']; $desc = $r1['description'] ?? ''; }
+        }
+
+        /* Try dnm_procedure_list by procedure_id */
+        if (!$name) {
+            $try2 = $conn->prepare("SELECT procedure_name AS serviceName FROM dnm_procedure_list WHERE procedure_id = ? LIMIT 1");
+            if ($try2) {
+                $try2->bind_param("i", $row['service_id']);
+                $try2->execute();
+                $r2 = $try2->get_result()->fetch_assoc();
+                if ($r2) { $name = $r2['serviceName']; $desc = 'Procedure'; }
+            }
+        }
+
+        /* Try pharmacy_prescription_items by item_id */
+        if (!$name) {
+            $try3 = $conn->prepare("
+                SELECT CONCAT(pi2.med_name, IF(ppi.dosage != '', CONCAT(' (', ppi.dosage, ')'), '')) AS serviceName,
+                       CONCAT('Dispensed — Qty: ', ppi.quantity_dispensed, ' × ₱', FORMAT(ppi.unit_price, 2)) AS svc_desc
+                FROM pharmacy_prescription_items ppi
+                JOIN pharmacy_inventory pi2 ON pi2.med_id = ppi.med_id
+                WHERE ppi.item_id = ? LIMIT 1
+            ");
+            if ($try3) {
+                $try3->bind_param("i", $row['service_id']);
+                $try3->execute();
+                $r3 = $try3->get_result()->fetch_assoc();
+                if ($r3) { $name = $r3['serviceName']; $desc = $r3['svc_desc']; }
+            }
+        }
+
+        /* Try billing_room_types by id */
+        if (!$name) {
+            $try4 = $conn->prepare("SELECT name AS serviceName, capacity FROM billing_room_types WHERE id = ? LIMIT 1");
+            if ($try4) {
+                $try4->bind_param("i", $row['service_id']);
+                $try4->execute();
+                $r4 = $try4->get_result()->fetch_assoc();
+                if ($r4) { $name = 'Room: ' . $r4['serviceName']; $desc = 'Accommodation — ' . ($r4['capacity'] ?? ''); }
+            }
+        }
+
+        /* Last resort: price-based match from dl_services */
+        if (!$name && $unit_price > 0) {
+            $try5 = $conn->prepare("SELECT serviceName, description FROM dl_services WHERE price = ? LIMIT 1");
+            if ($try5) {
+                $try5->bind_param("d", $unit_price);
+                $try5->execute();
+                $r5 = $try5->get_result()->fetch_assoc();
+                if ($r5) { $name = $r5['serviceName']; $desc = $r5['description'] ?? ''; }
+            }
+        }
+
+        if (!$name) $name = 'Hospital Service';
+
+        $billing_items[] = [
+            'category'    => 'service',
+            'serviceName' => $name,
+            'description' => $desc,
+            'quantity'    => (int)($row['quantity'] ?: 1),
+            'unit_price'  => $unit_price,
+            'total_price' => (float)$row['total_price'],
+        ];
+    }
+}
+
+/* ── Deduplicate: remove items with identical serviceName + total_price
+   that may have been picked up by both the source queries and fallback ── */
+$seen = [];
+$deduped = [];
+foreach ($billing_items as $item) {
+    $key = strtolower(trim($item['serviceName'])) . '|' . $item['total_price'];
+    if (!isset($seen[$key])) {
+        $seen[$key] = true;
+        $deduped[] = $item;
+    }
+}
+$billing_items = $deduped;
 
 /* ===============================
    TOTALS — prefer patient_receipt values
 ================================ */
-/* Use patient_receipt totals if available, else fall back to computed */
-$subtotal        = (float)($billing['total_charges'] ?? $billing['billing_total'] ?? $total_charges);
-$total_discount  = (float)($billing['total_discount'] ?? 0);
-$insurance_cov   = (float)($billing['insurance_covered'] ?? 0);
-$grand_total     = (float)($billing['grand_total'] ?? $billing['billing_grand'] ?? $subtotal);
-$out_of_pocket   = (float)($billing['total_out_of_pocket'] ?? max(0, $grand_total - $insurance_cov));
-$is_pwd          = (int)($billing['is_pwd'] ?? 0);
-
-/* If total_charges was stored in receipt, trust it */
-if ((float)($billing['total_charges'] ?? 0) > 0) {
-    $total_charges = (float)$billing['total_charges'];
-    $subtotal      = $total_charges;
-}
+$total_charges  = array_sum(array_column($billing_items, 'total_price'));
+$subtotal       = (float)($billing['total_charges'] ?? 0) > 0
+                    ? (float)$billing['total_charges']
+                    : ((float)($billing['billing_total'] ?? 0) > 0
+                        ? (float)$billing['billing_total']
+                        : $total_charges);
+$total_discount = (float)($billing['total_discount'] ?? 0);
+$insurance_cov  = (float)($billing['insurance_covered'] ?? 0);
+$grand_total    = (float)($billing['grand_total'] ?? $billing['billing_grand'] ?? $subtotal);
+$out_of_pocket  = (float)($billing['total_out_of_pocket'] ?? max(0, $grand_total - $insurance_cov));
+$is_pwd         = (int)($billing['is_pwd'] ?? 0);
 
 $billing_status = $billing['billing_status'] ?? $billing['status'] ?? 'Pending';
 $is_paid        = ($billing_status === 'Paid');
@@ -134,10 +347,23 @@ $is_paid        = ($billing_status === 'Paid');
 $billing_date_raw = $billing['billing_date'] ?? $billing['created_at'] ?? date('Y-m-d');
 $billing_date_fmt = date('F d, Y', strtotime($billing_date_raw));
 
+/* Group items by category for display */
+$items_by_cat = [
+    'room'       => [],
+    'laboratory' => [],
+    'service'    => [],
+    'medicine'   => [],
+];
+foreach ($billing_items as $item) {
+    $cat = $item['category'] ?? 'service';
+    if (!isset($items_by_cat[$cat])) $cat = 'service';
+    $items_by_cat[$cat][] = $item;
+}
+
 /* ===============================
    ATTENDING DOCTOR
 ================================ */
-$doctor_name = 'N/A';
+$doctor_name    = 'N/A';
 $doctor_contact = 'N/A';
 $doctor_spec    = 'N/A';
 if (!empty($billing['attending_doctor'])) {
@@ -184,6 +410,7 @@ $txn_ref = $billing['transaction_id'] ?? $billing['billing_txn'] ?? '—';
     --gold: #c9954c; --gold-light: #fdf4e7;
     --green: #1a7a4a; --green-bg: #e8f6ee;
     --red: #b03a2e; --red-bg: #fdecea;
+    --purple: #5b21b6; --purple-bg: #f5f3ff;
     --gray-100: #f7f8fa; --gray-200: #eef0f3; --gray-300: #d6dae0;
     --gray-500: #8a9099; --gray-700: #4a5261; --gray-900: #1c222d;
     --white: #ffffff;
@@ -202,7 +429,7 @@ body {
 
 /* ACTION BAR */
 .action-bar {
-    max-width: 880px; margin: 0 auto 20px;
+    max-width: 920px; margin: 0 auto 20px;
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
 .action-bar .back-link {
@@ -223,7 +450,7 @@ body {
 
 /* INVOICE CARD */
 .invoice-card {
-    max-width: 880px; margin: 0 auto;
+    max-width: 920px; margin: 0 auto;
     background: var(--white); border-radius: var(--radius);
     box-shadow: var(--shadow-lg); overflow: hidden;
 }
@@ -289,6 +516,19 @@ body {
 .discount-badge { display:inline-flex; align-items:center; gap:4px; background:#d1fae5; color:#065f46; padding:3px 10px; border-radius:50px; font-size:12px; font-weight:700; }
 .insurance-badge { display:inline-flex; align-items:center; gap:5px; background:var(--teal-light); color:var(--teal); padding:3px 10px; border-radius:50px; font-size:12px; font-weight:600; }
 
+/* SECTION HEADERS in items table */
+.cat-section-row td {
+    padding: 9px 16px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1.6px;
+    text-transform: uppercase;
+    border-top: 2px solid var(--gray-200);
+    border-bottom: 1px solid var(--gray-200);
+}
+.cat-room      td { background: #f5f3ff; color: var(--purple); }
+.cat-lab       td { background: #f0fdf9; color: #047857; }
+.cat-service   td { background: #faf5ff; color: #6d28d9; }
+.cat-medicine  td { background: #eff6ff; color: #1d4ed8; }
+
 /* ITEMS TABLE */
 .section-label { font-size:10px; font-weight:600; letter-spacing:1.8px; text-transform:uppercase; color:var(--teal); margin-bottom:14px; }
 .services-table {
@@ -299,7 +539,6 @@ body {
 .services-table thead tr { background:var(--navy); }
 .services-table thead th { padding:13px 16px; font-size:10.5px; font-weight:600; color:rgba(255,255,255,.75); text-transform:uppercase; letter-spacing:1.2px; white-space:nowrap; }
 .services-table thead th:last-child { text-align:right; }
-.services-table tbody tr:nth-child(even) { background:var(--gray-100); }
 .services-table tbody tr:hover { background:var(--teal-light); }
 .services-table td { padding:13px 16px; border-bottom:1px solid var(--gray-200); vertical-align:top; }
 .services-table tbody tr:last-child td { border-bottom:none; }
@@ -309,6 +548,7 @@ body {
 .td-right  { text-align:right; }
 .td-amount { text-align:right; font-weight:700; color:var(--navy); }
 .no-items td { text-align:center; padding:40px; color:var(--gray-500); font-style:italic; }
+.cat-total { float:right; font-weight:800; font-size:11px; }
 
 /* TOTALS */
 .totals-row { display:flex; justify-content:flex-end; margin-bottom:32px; }
@@ -342,6 +582,12 @@ body {
 }
 .stamp-circle.paid-stamp { border-color:var(--green); color:var(--green); background:var(--green-bg); font-size:11px; }
 
+/* Left-border accent colors per category row */
+.row-room     { border-left: 3px solid #a78bfa; }
+.row-lab      { border-left: 3px solid #6ee7b7; }
+.row-service  { border-left: 3px solid #c4b5fd; }
+.row-medicine { border-left: 3px solid #93c5fd; }
+
 /* PRINT */
 @media print {
     *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
@@ -368,6 +614,10 @@ body {
     .invoice-footer { background:#f7f8fa !important; }
     .discount-badge { background:#d1fae5 !important; color:#065f46 !important; }
     .stamp-circle.paid-stamp { border-color:#1a7a4a !important; color:#1a7a4a !important; background:#e8f6ee !important; }
+    .cat-room    td { background:#f5f3ff !important; color:#5b21b6 !important; }
+    .cat-lab     td { background:#f0fdf9 !important; color:#047857 !important; }
+    .cat-service td { background:#faf5ff !important; color:#6d28d9 !important; }
+    .cat-medicine td { background:#eff6ff !important; color:#1d4ed8 !important; }
     .invoice-header,.info-grid,.services-table,.totals-row,.invoice-footer { page-break-inside:avoid; break-inside:avoid; }
 }
 </style>
@@ -417,14 +667,14 @@ body {
     <?php else: ?>
     <div class="status-banner unpaid">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        OUTSTANDING — Amount Due: ₱<?= number_format($out_of_pocket, 2) ?>
+        OUTSTANDING — Amount Due: ₱<?= number_format($out_of_pocket > 0 ? $out_of_pocket : $grand_total, 2) ?>
     </div>
     <?php endif; ?>
 
     <!-- BODY -->
     <div class="invoice-body">
 
-        <!-- PATIENT & DOCTOR INFO -->
+        <!-- PATIENT & BILLING INFO -->
         <div class="info-grid">
             <div class="info-panel">
                 <div class="info-panel-title">Patient Information</div>
@@ -444,6 +694,12 @@ body {
                     <span class="info-key">Address</span>
                     <span class="info-val"><?= htmlspecialchars($billing['address'] ?: 'N/A') ?></span>
                 </div>
+                <?php if ($is_inpatient): ?>
+                <div class="info-row">
+                    <span class="info-key">Admission</span>
+                    <span class="info-val"><?= htmlspecialchars($billing['admission_type']) ?></span>
+                </div>
+                <?php endif; ?>
                 <?php if ($is_pwd): ?>
                 <div class="info-row">
                     <span class="info-key">Discount</span>
@@ -497,31 +753,99 @@ body {
             </div>
         </div>
 
-        <!-- ITEMS TABLE -->
+        <!-- ITEMS TABLE (grouped by category) -->
         <div class="section-label">Services &amp; Charges</div>
         <table class="services-table">
             <thead>
                 <tr>
-                    <th style="width:40%;">Service / Item</th>
-                    <th>Description</th>
-                    <th class="td-center" style="width:8%">Qty</th>
-                    <th class="td-right" style="width:14%">Unit Price</th>
-                    <th class="td-right" style="width:14%">Amount</th>
+                    <th style="width:36%;">Service / Item</th>
+                    <th>Details</th>
+                    <th class="td-center" style="width:7%">Qty</th>
+                    <th class="td-right" style="width:13%">Unit Price</th>
+                    <th class="td-right" style="width:13%">Amount</th>
                 </tr>
             </thead>
             <tbody>
-            <?php if (!empty($billing_items)): ?>
-                <?php foreach ($billing_items as $item): ?>
-                <tr>
-                    <td><div class="service-name"><?= htmlspecialchars($item['serviceName']) ?></div></td>
-                    <td><div class="service-desc"><?= htmlspecialchars($item['description'] ?: '—') ?></div></td>
-                    <td class="td-center"><?= (int)$item['quantity'] ?></td>
-                    <td class="td-right">₱<?= number_format($item['unit_price'], 2) ?></td>
-                    <td class="td-amount">₱<?= number_format($item['total_price'], 2) ?></td>
-                </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr class="no-items"><td colspan="5">No billing items found for this receipt.</td></tr>
+            <?php
+            $any_items = false;
+
+            /* ── Room ── */
+            if (!empty($items_by_cat['room'])):
+                $any_items = true;
+                $cat_sum = array_sum(array_column($items_by_cat['room'], 'total_price'));
+            ?>
+            <tr class="cat-section-row cat-room">
+                <td colspan="5">🏥 Accommodation / Room Charges <span class="cat-total">₱<?= number_format($cat_sum, 2) ?></span></td>
+            </tr>
+            <?php foreach ($items_by_cat['room'] as $item): ?>
+            <tr class="row-room">
+                <td><div class="service-name"><?= htmlspecialchars($item['serviceName']) ?></div></td>
+                <td><div class="service-desc"><?= htmlspecialchars($item['description'] ?: '—') ?></div></td>
+                <td class="td-center"><?= (int)$item['quantity'] ?></td>
+                <td class="td-right">₱<?= number_format($item['unit_price'], 2) ?></td>
+                <td class="td-amount">₱<?= number_format($item['total_price'], 2) ?></td>
+            </tr>
+            <?php endforeach; endif; ?>
+
+            <?php
+            /* ── Laboratory ── */
+            if (!empty($items_by_cat['laboratory'])):
+                $any_items = true;
+                $cat_sum = array_sum(array_column($items_by_cat['laboratory'], 'total_price'));
+            ?>
+            <tr class="cat-section-row cat-lab">
+                <td colspan="5">🧪 Laboratory Results <span class="cat-total">₱<?= number_format($cat_sum, 2) ?></span></td>
+            </tr>
+            <?php foreach ($items_by_cat['laboratory'] as $item): ?>
+            <tr class="row-lab">
+                <td><div class="service-name"><?= htmlspecialchars($item['serviceName']) ?></div></td>
+                <td><div class="service-desc"><?= htmlspecialchars($item['description'] ?: '—') ?></div></td>
+                <td class="td-center"><?= (int)$item['quantity'] ?></td>
+                <td class="td-right">₱<?= number_format($item['unit_price'], 2) ?></td>
+                <td class="td-amount">₱<?= number_format($item['total_price'], 2) ?></td>
+            </tr>
+            <?php endforeach; endif; ?>
+
+            <?php
+            /* ── Services / Procedures ── */
+            if (!empty($items_by_cat['service'])):
+                $any_items = true;
+                $cat_sum = array_sum(array_column($items_by_cat['service'], 'total_price'));
+            ?>
+            <tr class="cat-section-row cat-service">
+                <td colspan="5">🩺 Procedures &amp; Services <span class="cat-total">₱<?= number_format($cat_sum, 2) ?></span></td>
+            </tr>
+            <?php foreach ($items_by_cat['service'] as $item): ?>
+            <tr class="row-service">
+                <td><div class="service-name"><?= htmlspecialchars($item['serviceName']) ?></div></td>
+                <td><div class="service-desc"><?= htmlspecialchars($item['description'] ?: '—') ?></div></td>
+                <td class="td-center"><?= (int)$item['quantity'] ?></td>
+                <td class="td-right">₱<?= number_format($item['unit_price'], 2) ?></td>
+                <td class="td-amount">₱<?= number_format($item['total_price'], 2) ?></td>
+            </tr>
+            <?php endforeach; endif; ?>
+
+            <?php
+            /* ── Medicines ── */
+            if (!empty($items_by_cat['medicine'])):
+                $any_items = true;
+                $cat_sum = array_sum(array_column($items_by_cat['medicine'], 'total_price'));
+            ?>
+            <tr class="cat-section-row cat-medicine">
+                <td colspan="5">💊 Medicines <span class="cat-total">₱<?= number_format($cat_sum, 2) ?></span></td>
+            </tr>
+            <?php foreach ($items_by_cat['medicine'] as $item): ?>
+            <tr class="row-medicine">
+                <td><div class="service-name"><?= htmlspecialchars($item['serviceName']) ?></div></td>
+                <td><div class="service-desc"><?= htmlspecialchars($item['description'] ?: '—') ?></div></td>
+                <td class="td-center"><?= (int)$item['quantity'] ?></td>
+                <td class="td-right">₱<?= number_format($item['unit_price'], 2) ?></td>
+                <td class="td-amount">₱<?= number_format($item['total_price'], 2) ?></td>
+            </tr>
+            <?php endforeach; endif; ?>
+
+            <?php if (!$any_items): ?>
+            <tr class="no-items"><td colspan="5">No billing items found for this receipt.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>
