@@ -1,202 +1,294 @@
-<?php include 'header.php' ?>
+<?php include 'header.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <title>Billing Monthly Report</title>
+    <title>Monthly Billing Report</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <style>
-        body {
-            background: #f7f7f7;
-        }
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
-        .small-text {
-            font-size: .85rem;
-            color: #6c757d;
-        }
-
-        .insight-box {
-            background: #ffffff;
-            border-radius: 10px;
-        }
-    </style>
+    <!-- SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
-<body>
+<style>
+    #sourceChart {
+        width: 300px !important;
+        height: 300px !important;
+        margin: 0 auto;
+        display: block;
+    }
+</style>
+
+<body class="bg-light">
     <div class="d-flex">
 
-        <!-- Sidebar -->
-        <?php include 'sidebar.php' ?>
+        <?php include 'sidebar.php'; ?>
 
         <div class="container py-4">
+            <?php
+            $month = $_GET['month'] ?? 1;
+            $year = $_GET['year'] ?? 2025;
 
-            <!-- HEADER -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="fw-semibold mb-0">Billing Monthly Report</h4>
+            $monthNames = [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ];
+            $monthLabel = $monthNames[$month - 1];
+            ?>
+
+            <h2 class="mb-4 fw-bold text-primary">💳 Billing Report — <?= $monthLabel . " " . $year ?></h2>
+
+            <!-- ======================= SUMMARY CARDS ======================= -->
+            <div class="row g-3 mb-4" id="summaryCards">
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-primary" id="sumBilled">₱0</h4>
+                        <p class="m-0">Total Billed</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-success" id="sumPaid">₱0</h4>
+                        <p class="m-0">Total Paid</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-danger" id="sumPendingTrans">0</h4>
+                        <p class="m-0">Pending Txns</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-warning" id="sumOOP">₱0</h4>
+                        <p class="m-0">OOP Collected</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-info" id="sumInsurance">₱0</h4>
+                        <p class="m-0">Insurance Cov.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-secondary" id="sumPendingAmt">₱0</h4>
+                        <p class="m-0">Pending Amount</p>
+                    </div>
+                </div>
+
             </div>
 
-            <h5 id="headerDate" class="text-secondary mb-4"></h5>
-
-            <!-- SUMMARY CARDS -->
-            <div class="row g-3 mb-4">
-
-                <div class="col-md-3">
-                    <div class="card p-3">
-                        <div class="small-text">Total Billed</div>
-                        <h5 id="totalBilled">₱0</h5>
-                    </div>
+            <!-- ======================= CHART 1 ======================= -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-semibold mb-3">Billing vs Paid</h5>
+                    <canvas id="billingChart" height="120"></canvas>
                 </div>
-
-                <div class="col-md-3">
-                    <div class="card p-3">
-                        <div class="small-text">Total Paid</div>
-                        <h5 id="totalPaid">₱0</h5>
-                    </div>
-                </div>
-
-                <div class="col-md-3">
-                    <div class="card p-3">
-                        <div class="small-text">Pending Transactions</div>
-                        <h5 id="pendingTransactions">0</h5>
-                    </div>
-                </div>
-
-                <div class="col-md-3">
-                    <div class="card p-3">
-                        <div class="small-text">Pending Amount</div>
-                        <h5 id="pendingAmount">₱0</h5>
-                    </div>
-                </div>
-
             </div>
 
-            <!-- CHART -->
-            <div class="card p-4 mb-4" style="height:320px;">
-                <canvas id="billingChart"></canvas>
+            <!-- ======================= CHART 2 ======================= -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-semibold mb-3">OOP vs Insurance Coverage</h5>
+                    <canvas id="sourceChart" height="120"></canvas>
+                </div>
             </div>
 
-            <!-- INSIGHTS -->
-            <div class="card p-4 insight-box">
-                <h6 class="fw-semibold mb-3">Billing Insights</h6>
-                <div id="insightContent" class="small-text"></div>
+            <!-- ======================= AI INSIGHTS ======================= -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-semibold mb-3">🤖 AI Insights & Recommendations</h5>
+                    <div id="insightsContent" class="p-2"></div>
+                </div>
+            </div>
+
+            <!-- ======================= EXPORT BUTTONS ======================= -->
+            <div class="text-end mb-4">
+                <button class="btn btn-success me-2" onclick="exportExcel()">Export to Excel</button>
+                <button class="btn btn-danger" onclick="exportPDF()">Export to PDF</button>
             </div>
 
         </div>
 
-        <script>
-            // API base
-            const apiBase = "https://localhost:7212/journal/getMonthBillingReport";
-
-            const monthNames = [
-                "January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"
-            ];
-
-            let billingChart;
-
-            // Read month/year from URL
-            const params = new URLSearchParams(window.location.search);
-            const month = parseInt(params.get("month"));
-            const year = parseInt(params.get("year"));
-
-            // Validate parameters
-            if (!month || !year) {
-                document.body.innerHTML =
-                    "<h3 class='text-center mt-5 text-danger'>Invalid month or year in URL.</h3>";
-                throw new Error("Missing URL parameters");
-            }
-
-            // Set header
-            document.getElementById("headerDate").innerText =
-                `${monthNames[month - 1]} ${year}`;
-
-            // Load report
-            loadReport();
-
-            function loadReport() {
-
-                fetch(`${apiBase}?month=${month}&year=${year}`)
-                    .then(res => res.json())
-                    .then(data => {
-
-                        // SUMMARY
-                        document.getElementById("totalBilled").innerText =
-                            "₱" + data.total_billed.toLocaleString();
-
-                        document.getElementById("totalPaid").innerText =
-                            "₱" + data.total_paid.toLocaleString();
-
-                        document.getElementById("pendingTransactions").innerText =
-                            data.total_pending_transaction;
-
-                        document.getElementById("pendingAmount").innerText =
-                            "₱" + data.total_pending_amount.toLocaleString();
-
-                        // CHART
-                        if (billingChart) billingChart.destroy();
-
-                        billingChart = new Chart(document.getElementById("billingChart"), {
-                            type: "bar",
-                            data: {
-                                labels: [
-                                    "Total Billed",
-                                    "Total Paid",
-                                    "OOP Collected",
-                                    "Insurance Covered",
-                                    "Pending Amount"
-                                ],
-                                datasets: [{
-                                    label: "₱ Amount",
-                                    data: [
-                                        data.total_billed,
-                                        data.total_paid,
-                                        data.total_oop_collected,
-                                        data.total_insurance_covered,
-                                        data.total_pending_amount
-                                    ],
-                                    backgroundColor: [
-                                        "#0d6efd",
-                                        "#198754",
-                                        "#fd7e14",
-                                        "#6f42c1",
-                                        "#dc3545"
-                                    ]
-                                }]
-                            },
-                            options: {
-                                maintainAspectRatio: false,
-                                scales: {
-                                    y: {
-                                        ticks: {
-                                            callback: v => "₱" + v.toLocaleString()
-                                        }
-                                    }
-                                }
-                            }
-                        });
-
-                        // INSIGHTS
-                        const paidRate = ((data.total_paid / data.total_billed) * 100).toFixed(1);
-                        const pendingRate =
-                            ((data.total_pending_amount / data.total_billed) * 100).toFixed(1);
-
-                        document.getElementById("insightContent").innerHTML = `
-                            • Total billed: <strong>₱${data.total_billed.toLocaleString()}</strong><br>
-                            • Paid coverage: <strong>${paidRate}%</strong><br>
-                            • Pending amount: <strong>₱${data.total_pending_amount.toLocaleString()} (${pendingRate}%)</strong><br>
-                            • OOP collected: <strong>₱${data.total_oop_collected.toLocaleString()}</strong><br>
-                            • Insurance covered: <strong>₱${data.total_insurance_covered.toLocaleString()}</strong><br>
-                        `;
-                    });
-            }
-        </script>
     </div>
+
+    <script>
+        const month = <?= $month ?>;
+        const year = <?= $year ?>;
+
+        const endpoint = `https://localhost:7212/journal/getMonthBillingReport?month=${month}&year=${year}`;
+
+        let chart1 = null;
+        let chart2 = null;
+
+        async function loadBilling() {
+            const res = await fetch(endpoint);
+            const data = await res.json();
+
+            // Populate Summary Cards
+            document.getElementById("sumBilled").innerText = "₱" + data.total_billed.toLocaleString();
+            document.getElementById("sumPaid").innerText = "₱" + data.total_paid.toLocaleString();
+            document.getElementById("sumPendingTrans").innerText = data.total_pending_transaction;
+            document.getElementById("sumOOP").innerText = "₱" + data.total_oop_collected.toLocaleString();
+            document.getElementById("sumInsurance").innerText = "₱" + data.total_insurance_covered.toLocaleString();
+            document.getElementById("sumPendingAmt").innerText = "₱" + data.total_pending_amount.toLocaleString();
+
+            // ==================== BILLING VS PAID CHART ====================
+            const ctx1 = document.getElementById("billingChart").getContext("2d");
+            if (chart1) chart1.destroy();
+
+            chart1 = new Chart(ctx1, {
+                type: "bar",
+                data: {
+                    labels: ["Total Billed", "Total Paid"],
+                    datasets: [{
+                        label: "Amount",
+                        data: [data.total_billed, data.total_paid],
+                        backgroundColor: ["steelblue", "mediumseagreen"]
+                    }]
+                }
+            });
+
+            // ==================== OOP vs INSURANCE (BALANCED DOUGHNUT) ====================
+            const ctx2 = document.getElementById("sourceChart").getContext("2d");
+            if (chart2) chart2.destroy();
+
+            chart2 = new Chart(ctx2, {
+                type: "doughnut",
+                data: {
+                    labels: ["OOP Collected", "Insurance Covered"],
+                    datasets: [{
+                        data: [data.total_oop_collected, data.total_insurance_covered],
+                        backgroundColor: ["orange", "purple"]
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    cutout: "60%", // regular doughnut thickness
+                    plugins: {
+                        legend: {
+                            position: "bottom",
+                            labels: {
+                                boxWidth: 15
+                            }
+                        }
+                    }
+                }
+            });
+
+            // ==================== AI INSIGHTS ====================
+            document.getElementById("insightsContent").innerHTML = generateInsights(data);
+        }
+
+        function generateInsights(d) {
+            let html = "";
+
+            // Billing-to-Paid ratio
+            const collectionRate = Math.round((d.total_paid / d.total_billed) * 100);
+
+            html += `<p>✔ Collection rate for this month: <b>${collectionRate}%</b>.</p>`;
+
+            if (collectionRate < 80) {
+                html += `<p>⚠ Low collection efficiency detected. Review billing follow-up processes.</p>`;
+            } else {
+                html += `<p>✔ Billing team performed efficiently this month.</p>`;
+            }
+
+            if (d.total_pending_transaction > 2) {
+                html += `<p>⚠ High pending transactions: <b>${d.total_pending_transaction}</b>. Identify bottlenecks and delays.</p>`;
+            }
+
+            if (d.total_pending_amount > 5000) {
+                html += `<p>⚠ Large pending amount (₱${d.total_pending_amount.toLocaleString()}). This impacts cash flow.</p>`;
+            }
+
+            html += `
+        <h6 class="fw-bold mt-3">Recommendations:</h6>
+        <ul>
+            <li>Improve tracking of unpaid patient balances.</li>
+            <li>Follow-up pending insurance claims before they expire.</li>
+            <li>Analyze frequent pending cases for root cause (doctor, service type, insurance).</li>
+            <li>Consider auto-notifications for unpaid bills at discharge.</li>
+        </ul>
+        `;
+
+            return html;
+        }
+
+        // ==================== EXPORT FUNCTIONS ====================
+        function exportExcel() {
+            const sheet = XLSX.utils.json_to_sheet([{
+                Total_Billed: document.getElementById("sumBilled").innerText,
+                Total_Paid: document.getElementById("sumPaid").innerText,
+                Pending_Transactions: document.getElementById("sumPendingTrans").innerText,
+                OOP_Collected: document.getElementById("sumOOP").innerText,
+                Insurance_Covered: document.getElementById("sumInsurance").innerText,
+                Pending_Amount: document.getElementById("sumPendingAmt").innerText
+            }]);
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, sheet, "Billing Report");
+            XLSX.writeFile(wb, "Monthly_Billing_Report.xlsx");
+        }
+
+        function exportPDF() {
+            const {
+                jsPDF
+            } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.text("Monthly Billing Report", 14, 15);
+
+            doc.autoTable({
+                head: [
+                    ["Metric", "Value"]
+                ],
+                body: [
+                    ["Total Billed", document.getElementById("sumBilled").innerText],
+                    ["Total Paid", document.getElementById("sumPaid").innerText],
+                    ["Pending Transactions", document.getElementById("sumPendingTrans").innerText],
+                    ["Out-of-Pocket", document.getElementById("sumOOP").innerText],
+                    ["Insurance Covered", document.getElementById("sumInsurance").innerText],
+                    ["Pending Amount", document.getElementById("sumPendingAmt").innerText]
+                ],
+                startY: 20
+            });
+
+            doc.save("Monthly_Billing_Report.pdf");
+        }
+
+        loadBilling();
+    </script>
+
 </body>
 
 </html>

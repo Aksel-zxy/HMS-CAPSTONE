@@ -82,7 +82,7 @@
     </div>
 
     <script>
-        const apiBase = "https://localhost:7212/payroll/getMonthPayrollSummary?month=";
+        const apiBase = "https://bsis-03.keikaizen.xyz/payroll/getMonthPayrollSummary?month=";
 
         const monthNames = [
             "January", "February", "March", "April", "May", "June",

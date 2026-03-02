@@ -1,315 +1,287 @@
-<?php
-include 'header.php';
-?>
+<?php include 'header.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monthly Insurance Report</title>
+    <title>Monthly Insurance Claim Report</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <style>
-        body {
-            background-color: #f8f9fa;
-            font-family: 'Segoe UI', sans-serif;
-        }
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        .card {
-            border-radius: 12px;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-        }
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
-        .insight-box {
-            background: #fff;
-            border-left: 4px solid #0d6efd;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 25px;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-        }
+    <!-- Excel Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-        .badge-approved {
-            background-color: #198754;
-        }
-
-        .badge-denied {
-            background-color: #dc3545;
-        }
-    </style>
 </head>
 
-<body>
-    <div class="d-flex">
+<body class="bg-light">
 
+    <div class="d-flex">
         <?php include 'sidebar.php'; ?>
 
-        <div class="container py-5">
+        <div class="container py-4">
 
-            <h2 class="text-center mb-4" id="reportTitle">Monthly Insurance Report</h2>
+            <h2 class="fw-bold text-primary mb-4">📅 Monthly Insurance Claim Report</h2>
 
-            <!-- Summary -->
-            <div class="row mb-4">
+            <!-- ===================== MONTH & YEAR ===================== -->
+            <div class="alert alert-info">
+                <strong>Viewing Monthly Report:</strong>
+                <span id="monthLabel"></span>
+            </div>
+
+            <!-- ===================== KPI GRID ===================== -->
+            <div class="row g-3" id="kpiGrid">
                 <div class="col-md-4">
-                    <div class="card text-center p-3">
-                        <h6>Total Claims</h6>
-                        <h3 id="totalClaims">-</h3>
+                    <div class="card p-3 text-center shadow-sm">
+                        <h4 id="kpiTotalClaims" class="fw-bold text-primary">0</h4>
+                        <p>Total Claims</p>
                     </div>
                 </div>
 
                 <div class="col-md-4">
-                    <div class="card text-center p-3">
-                        <h6>Approved</h6>
-                        <h3 id="totalApproved">-</h3>
+                    <div class="card p-3 text-center shadow-sm">
+                        <h4 id="kpiApproved" class="fw-bold text-success">0</h4>
+                        <p>Approved Claims</p>
                     </div>
                 </div>
 
                 <div class="col-md-4">
-                    <div class="card text-center p-3">
-                        <h6>Denied</h6>
-                        <h3 id="totalDenied">-</h3>
+                    <div class="card p-3 text-center shadow-sm">
+                        <h4 id="kpiDenied" class="fw-bold text-danger">0</h4>
+                        <p>Denied Claims</p>
+                    </div>
+                </div>
+
+                <!-- Financial -->
+                <div class="col-md-6">
+                    <div class="card p-3 text-center shadow-sm">
+                        <h4 id="kpiApprovedAmount" class="fw-bold text-success">₱0</h4>
+                        <p>Total Approved Amount</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card p-3 text-center shadow-sm">
+                        <h4 id="kpiDeniedAmount" class="fw-bold text-danger">₱0</h4>
+                        <p>Total Denied Amount</p>
                     </div>
                 </div>
             </div>
 
-            <!-- Progress -->
-            <div class="progress mb-4" style="height:25px">
-                <div id="approvedBar" class="progress-bar bg-success"></div>
-                <div id="deniedBar" class="progress-bar bg-danger"></div>
+            <!-- ===================== CHART SECTION ===================== -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm p-3">
+                        <h6 class="fw-semibold">Claim Status Distribution</h6>
+                        <canvas id="claimPieChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card shadow-sm p-3">
+                        <h6 class="fw-semibold">Financial Breakdown</h6>
+                        <canvas id="financialBarChart"></canvas>
+                    </div>
+                </div>
             </div>
 
-            <!-- INSIGHTS -->
-            <div id="insightSection" class="insight-box">
-                <h5 class="fw-bold mb-2">📌 Insights</h5>
-                <div id="insightContent">Loading insights...</div>
+            <!-- ===================== INSIGHTS ===================== -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-body">
+                    <h5 class="fw-bold">📘 Insights</h5>
+                    <div id="insightsContent"></div>
+                </div>
             </div>
 
-            <!-- Table -->
-            <div class="table-responsive mt-4">
-                <table class="table table-hover table-striped align-middle">
-                    <thead>
-                        <tr>
-                            <th>Provider</th>
-                            <th>Contact Person</th>
-                            <th>Contact Number</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>Submitted</th>
-                            <th>Resolved</th>
-                        </tr>
-                    </thead>
-                    <tbody id="claimsTableBody"></tbody>
-                </table>
+            <!-- ===================== AI SUGGESTIONS ===================== -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-body">
+                    <h5 class="fw-bold">🤖 AI Recommendations</h5>
+                    <div id="recommendContent"></div>
+                </div>
             </div>
 
-            <!-- Pagination -->
-            <div class="d-flex justify-content-between align-items-center mt-3">
-                <button class="btn btn-outline-secondary" id="prevBtn">Previous</button>
-                <span id="pageInfo"></span>
-                <button class="btn btn-outline-secondary" id="nextBtn">Next</button>
+            <!-- ===================== EXPORT BUTTONS ===================== -->
+            <div class="text-end mt-3">
+                <button class="btn btn-success me-2" onclick="exportExcel()">Export Excel</button>
+                <button class="btn btn-danger" onclick="exportPDF()">Export PDF</button>
             </div>
 
         </div>
     </div>
 
-    <script>
-        // ---------------------------------------------------------------------
-        // PROVIDER MAPPING
-        // ---------------------------------------------------------------------
-        const providerMap = {
-            1: {
-                name: "PhilHealth",
-                contact_person: "Customer Service",
-                contact_number: "0284417442"
-            },
-            2: {
-                name: "Maxicare Healthcare Corporation",
-                contact_person: "Account Manager",
-                contact_number: "0285821980"
-            },
-            3: {
-                name: "Medicard Philippines",
-                contact_person: "Client Services",
-                contact_number: "0288469999"
-            },
-            4: {
-                name: "Intellicare (Asalus Corporation)",
-                contact_person: "Customer Support",
-                contact_number: "0287894000"
-            },
-            5: {
-                name: "Pacific Cross Philippines",
-                contact_person: "Policy Services",
-                contact_number: "0288766111"
-            },
-            6: {
-                name: "Cocolife Healthcare",
-                contact_person: "Member Services",
-                contact_number: "0281889000"
-            },
-            7: {
-                name: "AXA Philippines",
-                contact_person: "Customer Care",
-                contact_number: "0285811111"
-            },
-            8: {
-                name: "Sun Life Philippines",
-                contact_person: "Client Relations",
-                contact_number: "0284918888"
-            },
-            9: {
-                name: "Manulife Philippines",
-                contact_person: "Policy Support",
-                contact_number: "0288847000"
-            },
-            10: {
-                name: "Prudential Guarantee & Assurance (PGA)",
-                contact_person: "Claims Department",
-                contact_number: "0288192222"
-            },
-            11: {
-                name: "Etiqa Philippines",
-                contact_person: "Customer Relations",
-                contact_number: "0288895800"
-            },
-            12: {
-                name: "Generali Philippines",
-                contact_person: "Member Assistance",
-                contact_number: "0288708888"
-            },
-            13: {
-                name: "Insular Health Care (InLife)",
-                contact_person: "Healthcare Services",
-                contact_number: "0288447000"
-            },
-            14: {
-                name: "ValuCare Health Systems",
-                contact_person: "Provider Relations",
-                contact_number: "0282342000"
-            }
-        };
 
-        // URL PARAMS
-        const params = new URLSearchParams(window.location.search);
-        const month = params.get("month");
-        const year = params.get("year");
+    <script>
+        // Get month & year from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const month = urlParams.get("month");
+        const year = urlParams.get("year");
 
         const monthNames = ["January", "February", "March", "April", "May", "June", "July",
             "August", "September", "October", "November", "December"
         ];
 
-        if (month && year) {
-            reportTitle.innerText = `${monthNames[month - 1]} ${year} Insurance Report`;
-        }
+        document.getElementById("monthLabel").innerText =
+            `${monthNames[month - 1]} ${year}`;
 
-        let currentPage = 1;
-        const pageSize = 5;
-
-        prevBtn.onclick = () => {
-            if (currentPage > 1) {
-                currentPage--;
-                fetchReport();
-            }
-        };
-        nextBtn.onclick = () => {
-            currentPage++;
-            fetchReport();
-        };
-
-        async function fetchReport() {
-            const url = `https://localhost:7212/insurance/getMonthInsuranceReport?month=${month}&year=${year}&page=${currentPage}&size=${pageSize}`;
+        // Fetch API
+        async function loadReport() {
+            const url = `https://bsis-03.keikaizen.xyz/insurance/getMonthInsuranceReport?month=${month}&year=${year}`;
             const res = await fetch(url);
             const data = await res.json();
 
-            totalClaims.innerText = data.totalClaims;
-            totalApproved.innerText = data.totalApprovedClaims;
-            totalDenied.innerText = data.totalDeniedClaims;
-
-            const approvedPct = (data.totalApprovedClaims / data.totalClaims * 100).toFixed(1);
-            const deniedPct = (data.totalDeniedClaims / data.totalClaims * 100).toFixed(1);
-
-            approvedBar.style.width = approvedPct + "%";
-            deniedBar.style.width = deniedPct + "%";
-
-            approvedBar.innerText = `Approved ${approvedPct}%`;
-            deniedBar.innerText = `Denied ${deniedPct}%`;
-
-            pageInfo.innerText = `Page ${currentPage}`;
-
-            renderTable(data.claimsList);
-            generateInsights(data);
+            renderKPI(data);
+            renderCharts(data);
+            renderInsights(data);
+            renderAI(data);
         }
 
-        function renderTable(claims) {
-            claimsTableBody.innerHTML = "";
+        // ======================= KPIs =======================
+        function renderKPI(data) {
+            document.getElementById("kpiTotalClaims").innerText = data.totalClaims;
+            document.getElementById("kpiApproved").innerText = data.totalApprovedClaims;
+            document.getElementById("kpiDenied").innerText = data.totalDeniedClaims;
 
-            claims.forEach(c => {
-                const p = providerMap[c.insurance_provider_id] || {
-                    name: "Unknown",
-                    contact_person: "-",
-                    contact_number: "-"
-                };
-                const statusClass = c.status === "approved" ? "badge-approved" : "badge-denied";
-
-                claimsTableBody.innerHTML += `
-                    <tr>
-                        <td>${p.name}</td>
-                        <td>${p.contact_person}</td>
-                        <td>${p.contact_number}</td>
-                        <td>₱${Number(c.claim_amount).toLocaleString()}</td>
-                        <td><span class="badge ${statusClass}">${c.status}</span></td>
-                        <td>${c.submmited_date}</td>
-                        <td>${c.resolved_date}</td>
-                    </tr>`;
-            });
+            document.getElementById("kpiApprovedAmount").innerText = "₱" + data.totalApprovedAmount.toLocaleString();
+            document.getElementById("kpiDeniedAmount").innerText = "₱" + data.totalDeniedAmount.toLocaleString();
         }
 
-        // ---------------------------------------------------------------------
-        // INSIGHT GENERATOR
-        // ---------------------------------------------------------------------
-        function generateInsights(data) {
-            if (!data || !data.claimsList) return;
+        // ======================= CHARTS =======================
+        let pieChart, barChart;
 
-            const list = data.claimsList;
-            let insights = [];
+        function renderCharts(data) {
+            const ctx1 = document.getElementById("claimPieChart");
+            const ctx2 = document.getElementById("financialBarChart");
 
-            const approvedPct = (data.totalApprovedClaims / data.totalClaims * 100).toFixed(1);
-            const deniedPct = (data.totalDeniedClaims / data.totalClaims * 100).toFixed(1);
+            if (pieChart) pieChart.destroy();
+            if (barChart) barChart.destroy();
 
-            insights.push(`✔ <b>${approvedPct}%</b> of all claims were approved this month.`);
-            insights.push(`✖ <b>${deniedPct}%</b> of claims were denied.`);
-
-            // Top provider by volume
-            let providerCount = {};
-            let largestClaim = 0;
-            let largestProvider = "";
-
-            list.forEach(c => {
-                const provider = providerMap[c.insurance_provider_id]?.name || "Unknown";
-
-                providerCount[provider] = (providerCount[provider] || 0) + 1;
-
-                if (c.claim_amount > largestClaim) {
-                    largestClaim = c.claim_amount;
-                    largestProvider = provider;
+            // PIE CHART
+            pieChart = new Chart(ctx1, {
+                type: "doughnut",
+                data: {
+                    labels: ["Approved", "Denied"],
+                    datasets: [{
+                        data: [data.totalApprovedClaims, data.totalDeniedClaims],
+                        backgroundColor: ["green", "red"]
+                    }]
+                },
+                options: {
+                    cutout: "55%"
                 }
             });
 
-            const topProvider = Object.entries(providerCount).sort((a, b) => b[1] - a[1])[0];
-
-            if (topProvider) {
-                insights.push(`🏆 Most claims this month came from <b>${topProvider[0]}</b>.`);
-            }
-
-            insights.push(`💰 Highest payout request was <b>₱${largestClaim.toLocaleString()}</b> from ${largestProvider}.`);
-
-            document.getElementById("insightContent").innerHTML =
-                insights.map(i => `<p>${i}</p>`).join("");
+            // BAR CHART
+            barChart = new Chart(ctx2, {
+                type: "bar",
+                data: {
+                    labels: ["Approved Amount", "Denied Amount"],
+                    datasets: [{
+                        data: [data.totalApprovedAmount, data.totalDeniedAmount],
+                        backgroundColor: ["green", "red"]
+                    }]
+                }
+            });
         }
 
-        fetchReport();
+        // ======================= INSIGHTS =======================
+        function renderInsights(data) {
+            const denialRate = Math.round((data.totalDeniedClaims / data.totalClaims) * 100);
+            const approvalRate = 100 - denialRate;
+
+            document.getElementById("insightsContent").innerHTML = `
+                <p>✔ Approval Rate: <b>${approvalRate}%</b></p>
+                <p>✔ Denial Rate: <b>${denialRate}%</b></p>
+                <p>✔ Approved Amount: <b>₱${data.totalApprovedAmount.toLocaleString()}</b></p>
+                <p>✔ Denied Amount: <b>₱${data.totalDeniedAmount.toLocaleString()}</b></p>
+                <p>✔ Total Claims Filed: <b>${data.totalClaims}</b></p>
+            `;
+        }
+
+        // ======================= AI RECOMMENDATIONS =======================
+        function renderAI(data) {
+            const denialRate = Math.round((data.totalDeniedClaims / data.totalClaims) * 100);
+            let rec = `<p><b>🤖 Automated System Analysis</b></p>`;
+
+            if (denialRate > 50) {
+                rec += `
+                    <p>⚠ <b>High Denial Rate</b>: ${denialRate}%.  
+                    Recommend reviewing documentation issues, insurance provider patterns,  
+                    and claim justification notes.</p>
+                `;
+            } else if (denialRate < 20) {
+                rec += `
+                    <p>✅ <b>Healthy Approval Rate</b>: ${100 - denialRate}%.  
+                    Current processes are working effectively.</p>
+                `;
+            }
+
+            if (data.totalDeniedAmount > data.totalApprovedAmount) {
+                rec += `
+                    <p>💰 High denied claim amount detected.  
+                    Consider auditing claims that exceed ₱10,000 for accuracy and compliance.</p>
+                `;
+            }
+
+            rec += `
+                <p>📌 Recommendation: Build monthly variance tracking to spot sudden spikes  
+                in denials or insurer behavior changes.</p>
+            `;
+
+            document.getElementById("recommendContent").innerHTML = rec;
+        }
+
+        // ======================= EXPORT =======================
+        function exportExcel() {
+            const wb = XLSX.utils.book_new();
+            const wsData = [
+                ["Metric", "Value"],
+                ["Total Claims", document.getElementById("kpiTotalClaims").innerText],
+                ["Approved Claims", document.getElementById("kpiApproved").innerText],
+                ["Denied Claims", document.getElementById("kpiDenied").innerText],
+                ["Approved Amount", document.getElementById("kpiApprovedAmount").innerText],
+                ["Denied Amount", document.getElementById("kpiDeniedAmount").innerText]
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            XLSX.utils.book_append_sheet(wb, ws, "Monthly Insurance");
+
+            XLSX.writeFile(wb, "Monthly_Insurance_Report.xlsx");
+        }
+
+        function exportPDF() {
+            const {
+                jsPDF
+            } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text("Monthly Insurance Report", 14, 15);
+
+            doc.autoTable({
+                head: [
+                    ["Metric", "Value"]
+                ],
+                body: [
+                    ["Total Claims", document.getElementById("kpiTotalClaims").innerText],
+                    ["Approved Claims", document.getElementById("kpiApproved").innerText],
+                    ["Denied Claims", document.getElementById("kpiDenied").innerText],
+                    ["Approved Amount", document.getElementById("kpiApprovedAmount").innerText],
+                    ["Denied Amount", document.getElementById("kpiDeniedAmount").innerText]
+                ],
+                startY: 20
+            });
+
+            doc.save("Monthly_Insurance_Report.pdf");
+        }
+
+        // Load the report on page start
+        loadReport();
     </script>
 
 </body>

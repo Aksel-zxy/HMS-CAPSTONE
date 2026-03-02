@@ -1,206 +1,260 @@
-<?php
-// month_attendance_report.php
-
-// Get month and year from query parameters
-$month = isset($_GET['month']) ? intval($_GET['month']) : date('n'); // default current month
-$year  = isset($_GET['year'])  ? intval($_GET['year'])  : date('Y'); // default current year
-
-$monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December"
-];
-?>
-
+<?php include 'header.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <title>Monthly Attendance Report</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <style>
-        body {
-            background: #f7f7f7;
-        }
+    <!-- jsPDF & AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
-        .card-metrics {
-            border-radius: 10px;
-        }
+    <!-- SheetJS (Excel export) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-        .small-text {
-            font-size: .85rem;
-            color: #6c757d;
-        }
-
-        canvas {
-            max-height: 300px;
-        }
-
-        #summaryText {
-            font-size: 1rem;
-            margin-top: 1rem;
-            background: #e9ecef;
-            padding: 15px;
-            border-radius: 8px;
-        }
-
-        .back-btn {
-            margin-bottom: 20px;
-        }
-    </style>
 </head>
 
-<body>
-    <div class="container py-4">
+<body class="bg-light">
+    <div class="d-flex">
 
-        <!-- Back Button -->
-        <a href="https://localhost:7212/backend/report_and_analytics/year_attendance_report.php" class="btn btn-secondary back-btn">
-            <i class="bi bi-arrow-left"></i> Back
-        </a>
+        <?php include 'sidebar.php'; ?>
 
-        <h4 class="fw-semibold mb-4 text-center">
-            Attendance Report for <?= $monthNames[$month - 1] ?> <?= $year ?>
-        </h4>
+        <div class="container py-4">
 
-        <!-- TOP SUMMARY -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-2">
-                <div class="card p-3 card-metrics">
-                    <div class="small-text">Present</div>
-                    <h5 id="totalPresent">0</h5>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card p-3 card-metrics">
-                    <div class="small-text">Absent</div>
-                    <h5 id="totalAbsent">0</h5>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card p-3 card-metrics">
-                    <div class="small-text">Late</div>
-                    <h5 id="totalLate">0</h5>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card p-3 card-metrics">
-                    <div class="small-text">Leave</div>
-                    <h5 id="totalLeave">0</h5>
-                </div>
-            </div>
-            <div class="col-md-2">
-                <div class="card p-3 card-metrics">
-                    <div class="small-text">Undertime</div>
-                    <h5 id="totalUndertime">0</h5>
-                </div>
-            </div>
-        </div>
+            <?php
+            $month = $_GET['month'] ?? 1;
+            $year = $_GET['year'] ?? 2025;
 
-        <!-- ATTENDANCE SUMMARY CHART -->
-        <div class="card p-4 mb-4">
-            <canvas id="monthlyChart"></canvas>
-            <div id="summaryText">Loading summary...</div>
-        </div>
-    </div>
+            $monthNames = [
+                "January",
+                "February",
+                "March",
+                "April",
+                "May",
+                "June",
+                "July",
+                "August",
+                "September",
+                "October",
+                "November",
+                "December"
+            ];
+            $monthLabel = $monthNames[$month - 1];
+            ?>
+
+            <h2 class="mb-4 fw-bold text-primary">📅 Attendance Report — <?= $monthLabel . " " . $year ?></h2>
+
+            <!-- ======================= SUMMARY CARDS ======================= -->
+            <div class="row g-3 mb-4" id="summaryCards">
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-success" id="sumPresent">0</h4>
+                        <p class="m-0">Present</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-danger" id="sumAbsent">0</h4>
+                        <p class="m-0">Absent</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-warning" id="sumLate">0</h4>
+                        <p class="m-0">Late</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-info" id="sumLeave">0</h4>
+                        <p class="m-0">Leave</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-secondary" id="sumUnderTime">0</h4>
+                        <p class="m-0">Undertime</p>
+                    </div>
+                </div>
+
+                <div class="col-md-2">
+                    <div class="card shadow-sm text-center p-3">
+                        <h4 class="fw-bold text-primary" id="sumAttendanceRate">0%</h4>
+                        <p class="m-0">Attendance Rate</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======================= CHART ======================= -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-semibold mb-3">Attendance Breakdown</h5>
+                    <canvas id="attendanceChart" height="120"></canvas>
+                </div>
+            </div>
+
+            <!-- ======================= AI INSIGHTS ======================= -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-semibold mb-3">🤖 AI Insights & Recommendations</h5>
+                    <div id="insightsContent" class="p-2"></div>
+                </div>
+            </div>
+
+            <!-- ======================= EXPORT BUTTONS ======================= -->
+            <div class="text-end mb-4">
+                <button class="btn btn-success me-2" onclick="exportExcel()">Export to Excel</button>
+                <button class="btn btn-danger" onclick="exportPDF()">Export to PDF</button>
+            </div>
+
+        </div> <!-- container -->
+    </div> <!-- d-flex -->
 
     <script>
         const month = <?= $month ?>;
         const year = <?= $year ?>;
 
-        const apiUrl = `https://bsis-03.keikaizen.xyz/employee/getMonthAttendanceReport/${month}/${year}`;
+        const url = `https://localhost:7212/employee/getMonthAttendanceReport/${month}/${year}`;
 
-        function updateReport(url) {
-            fetch(url)
-                .then(res => res.json())
-                .then(data => {
+        let chart = null;
 
-                    // Update top metrics
-                    document.getElementById("totalPresent").innerText = data.present;
-                    document.getElementById("totalAbsent").innerText = data.absent;
-                    document.getElementById("totalLate").innerText = data.late;
-                    document.getElementById("totalLeave").innerText = data.leave;
-                    document.getElementById("totalUndertime").innerText = data.underTime;
+        async function loadReport() {
 
-                    // Chart data
-                    const labels = ['Present', 'Absent', 'Late', 'Leave', 'Undertime'];
-                    const totals = [
-                        data.present,
-                        data.absent,
-                        data.late,
-                        data.leave,
-                        data.underTime
-                    ];
-                    const colors = ['#198754', '#dc3545', '#ffc107', '#0dcaf0', '#6f42c1'];
+            const response = await fetch(url);
+            const data = await response.json();
 
-                    const ctx = document.getElementById("monthlyChart").getContext('2d');
+            // SUMMARY VALUES
+            document.getElementById("sumPresent").innerText = data.present;
+            document.getElementById("sumAbsent").innerText = data.absent;
+            document.getElementById("sumLate").innerText = data.late;
+            document.getElementById("sumLeave").innerText = data.leave;
+            document.getElementById("sumUnderTime").innerText = data.underTime;
 
-                    new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: `Attendance Summary`,
-                                data: totals,
-                                backgroundColor: colors
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                },
-                                title: {
-                                    display: true,
-                                    text: `Attendance Summary for <?= $monthNames[$month - 1] ?> <?= $year ?>`
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        stepSize: 1
-                                    }
-                                }
-                            }
-                        }
-                    });
+            const attendanceRate = Math.round((data.present / (data.present + data.absent + data.leave)) * 100);
+            document.getElementById("sumAttendanceRate").innerText = attendanceRate + "%";
 
-                    // Generate text summary
-                    let summary = `In <?= $monthNames[$month - 1] ?> <?= $year ?>: `;
-                    summary += `Most employees (${data.present}) were present. `;
-                    summary += `${data.absent} were absent, `;
-                    summary += `${data.late} were late, `;
-                    summary += `${data.leave} took leave, `;
-                    summary += `and ${data.underTime} had undertime.`;
+            // CHART DATA
+            const ctx = document.getElementById("attendanceChart").getContext("2d");
+            if (chart) chart.destroy();
 
-                    document.getElementById("summaryText").innerText = summary;
+            chart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: ["Present", "Absent", "Late", "Leave", "Undertime"],
+                    datasets: [{
+                        label: "Attendance Count",
+                        data: [
+                            data.present,
+                            data.absent,
+                            data.late,
+                            data.leave,
+                            data.underTime
+                        ],
+                        backgroundColor: [
+                            "green", "red", "orange", "deepskyblue", "gray"
+                        ]
+                    }]
+                }
+            });
 
-                })
-                .catch(err => console.error('Error fetching monthly report:', err));
+            // AI INSIGHTS
+            document.getElementById("insightsContent").innerHTML = generateInsights(data, attendanceRate);
         }
 
-        // Load report automatically
-        updateReport(apiUrl);
+        function generateInsights(d, rate) {
+
+            let insights = "";
+
+            insights += `<p>✔ The attendance rate for this month is <b>${rate}%</b>.</p>`;
+
+            if (d.absent > 5) {
+                insights += `<p>⚠ High number of absences detected (<b>${d.absent}</b>). Consider reviewing staff scheduling or potential burnout.</p>`;
+            } else {
+                insights += `<p>✔ Absences remain within an acceptable range.</p>`;
+            }
+
+            if (d.late > 5) {
+                insights += `<p>⚠ Late arrivals (<b>${d.late}</b>) indicate possible issues with shift timing or transportation.</p>`;
+            }
+
+            if (d.leave > 3) {
+                insights += `<p>⚠ Higher leave count than usual may suggest increased medical or personal leave usage.</p>`;
+            }
+
+            if (d.underTime > 5) {
+                insights += `<p>⚠ Undertime (<b>${d.underTime}</b>) suggests workflow inefficiencies or early shift endings.</p>`;
+            }
+
+            insights += `
+        <h6 class="fw-bold mt-3">Recommendations:</h6>
+        <ul>
+            <li>Review attendance anomalies and cross-check with HR logs.</li>
+            <li>Offer schedule flexibility during high-late months.</li>
+            <li>Monitor departments with recurring undertime trends.</li>
+            <li>Recognize employees with perfect or near-perfect attendance.</li>
+        </ul>
+        `;
+
+            return insights;
+        }
+
+        // EXPORTS
+        function exportExcel() {
+            const wb = XLSX.utils.json_to_sheet([{
+                Present: document.getElementById("sumPresent").innerText,
+                Absent: document.getElementById("sumAbsent").innerText,
+                Late: document.getElementById("sumLate").innerText,
+                Leave: document.getElementById("sumLeave").innerText,
+                Undertime: document.getElementById("sumUnderTime").innerText
+            }]);
+
+            const wbFile = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wbFile, wb, "Attendance Report");
+
+            XLSX.writeFile(wbFile, "Monthly_Attendance_Report.xlsx");
+        }
+
+        function exportPDF() {
+            const {
+                jsPDF
+            } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.text("Monthly Attendance Report", 14, 15);
+
+            doc.autoTable({
+                head: [
+                    ["Metric", "Value"]
+                ],
+                body: [
+                    ["Present", document.getElementById("sumPresent").innerText],
+                    ["Absent", document.getElementById("sumAbsent").innerText],
+                    ["Late", document.getElementById("sumLate").innerText],
+                    ["Leave", document.getElementById("sumLeave").innerText],
+                    ["Undertime", document.getElementById("sumUnderTime").innerText],
+                    ["Attendance Rate", document.getElementById("sumAttendanceRate").innerText]
+                ],
+                startY: 20
+            });
+
+            doc.save("Monthly_Attendance_Report.pdf");
+        }
+
+        loadReport();
     </script>
+
 </body>
 
 </html>

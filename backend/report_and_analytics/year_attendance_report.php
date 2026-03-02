@@ -1,432 +1,426 @@
+<?php include 'header.php'; ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <title>Hospital Management System</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" href="assets/image/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="assets/CSS/bootstrap.min.css">
-    <link rel="stylesheet" href="assets/CSS/super.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <title>Employee Attendance Analytics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- PDF / Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <style>
         body {
-            background: #f7f7f7;
+            background: #f4f6f9;
         }
 
-        .month-card {
+        .layout-wrapper {
+            display: flex;
+            width: 100%;
+        }
+
+        #mainArea {
+            flex-grow: 1;
+            padding: 20px;
+            margin-left: 260px;
+            /* left sidebar */
+        }
+
+        /* Floating AI Button */
+        #aiBtn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #f0ad4e;
+            color: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-weight: bold;
+            border: none;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 9999;
+        }
+
+        /* Sliding AI Drawer */
+        #aiDrawer {
+            position: fixed;
+            top: 0;
+            right: -420px;
+            width: 420px;
+            height: 100vh;
+            background: #fff;
+            border-left: 3px solid #f0ad4e;
+            padding: 25px;
+            overflow-y: auto;
+            transition: right .3s ease;
+            box-shadow: -5px 0 15px rgba(0, 0, 0, 0.2);
+            z-index: 10000;
+        }
+
+        #aiDrawer.open {
+            right: 0;
+        }
+
+        #aiDrawer h4 {
+            background: #f0ad4e;
+            color: white;
+            padding: 10px;
             border-radius: 10px;
         }
 
-        .small-text {
-            font-size: .85rem;
-            color: #6c757d;
+        #closeDrawer {
+            float: right;
+            cursor: pointer;
+            font-size: 20px;
+            color: #fff;
         }
 
-        canvas {
-            max-height: 200px;
+        @media(max-width:992px) {
+            #aiDrawer {
+                width: 100%;
+                right: -100%;
+            }
+
+            #aiDrawer.open {
+                right: 0;
+            }
+
+            #mainArea {
+                margin-left: 0;
+            }
         }
     </style>
 </head>
 
 <body>
-    <div class="d-flex">
 
-        <!-- SIDEBAR -->
-        <aside id="sidebar" class="sidebar-toggle">
-            <div class="sidebar-logo mt-3">
-                <img src="assets/image/logo-dark.png" width="90px" height="20px">
-            </div>
+    <div class="layout-wrapper">
 
-            <div class="menu-title">Navigation</div>
+        <!-- LEFT SIDEBAR -->
+        <?php include 'sidebar.php'; ?>
 
-            <!----- Sidebar Navigation ----->
+        <!-- MAIN REPORT AREA -->
+        <div id="mainArea" class="container-fluid">
 
-            <li class="sidebar-item">
-                <a href="superadmin_dashboard.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cast" viewBox="0 0 16 16">
-                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
-                    </svg>
-                    <span style="font-size: 18px;">Dashboard</span>
-                </a>
-            </li>
+            <h2 class="fw-bold mb-4">📊 Employee Attendance Analytics</h2>
 
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link has-dropdown" data-bs-toggle="collapse" data-bs-target="#auth"
-                    aria-expanded="false" aria-controls="auth">
-
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-people"
-                        viewBox="0 0 18 18" style="margin-bottom: 5px;">
-                        <path
-                            d="M15 14s1 0 1-1-1-4-5-4-5 3-5 4 1 1 1 1zm-7.978-1L7 12.996c.001-.264.167-1.03.76-1.72C8.312 10.629 9.282 10 11 10c1.717 0 2.687.63 3.24 1.276.593.69.758 1.457.76 1.72l-.008.002-.014.002zM11 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4m3-2a3 3 0 1 1-6 0 3 3 0 0 1 6 0M6.936 9.28a6 6 0 0 0-1.23-.247A7 7 0 0 0 5 9c-4 0-5 3-5 4q0 1 1 1h4.216A2.24 2.24 0 0 1 5 13c0-1.01.377-2.042 1.09-2.904.243-.294.526-.569.846-.816M4.92 10A5.5 5.5 0 0 0 4 13H1c0-.26.164-1.03.76-1.724.545-.636 1.492-1.256 3.16-1.275ZM1.5 5.5a3 3 0 1 1 6 0 3 3 0 0 1-6 0" />
-                    </svg>
-                    <span style="font-size: 18px;">HR Management</span>
-                </a>
-                <ul id="auth" class="collapse list-unstyled">
-                    <li class="sidebar-item">
-                        <a href="../HR RECRUITMENT/Job Management/job_management.php" class="sidebar-link">Job Management</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../HR RECRUITMENT/Applicant Tracking/applicant_tracking.php" class="sidebar-link">Applicant Tracking</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../HR RECRUITMENT/Employee Onboarding/employee_onboarding.php" class="sidebar-link">Employee Onboarding</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../HR RECRUITMENT/Employee Registration/employee_registration.php" class="sidebar-link">Employee Registration</a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#gerald"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-vcard"
-                        viewBox="0 0 16 16" style="margin-bottom: 6px;">
-                        <path
-                            d="M5 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4m4-2.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5M9 8a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4A.5.5 0 0 1 9 8m1 2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5" />
-                        <path
-                            d="M2 2a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM1 4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H8.96q.04-.245.04-.5C9 10.567 7.21 9 5 9c-2.086 0-3.8 1.398-3.984 3.181A1 1 0 0 1 1 12z" />
-                    </svg>
-                    <span style="font-size: 18px;">Doctor and Nurse Management</span>
-                </a>
-
-                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../Employee/doctor.php" class="sidebar-link">Doctors</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/nurse.php" class="sidebar-link">Nurses</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../Employee/admin.php" class="sidebar-link">Other Staff</a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#axl"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-building"
-                        viewBox="0 0 16 16" style="margin-bottom: 7px;">
-                        <path
-                            d="M4 2.5a.5.5 0
-             0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM4 5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM7.5 5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM4.5 8a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
-                        <path
-                            d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm11 0H3v14h3v-2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V15h3z" />
-                    </svg>
-                    <span style="font-size: 18px;">Patient Management</span>
-                </a>
-
-                <ul id="axl" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../HR/attendance.php" class="sidebar-link">Attendance</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../HR/leave.php" class="sidebar-link">Leave</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="payroll.php" class="sidebar-link">Payroll</a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#billing"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-building"
-                        viewBox="0 0 16 16" style="margin-bottom: 7px;">
-                        <path
-                            d="M4 2.5a.5.5 0
-             0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM4 5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM7.5 5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM4.5 8a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
-                        <path
-                            d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm11 0H3v14h3v-2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V15h3z" />
-                    </svg>
-                    <span style="font-size: 18px;">Billing and Insurance Management</span>
-                </a>
-
-                <ul id="billing" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../HR/attendance.php" class="sidebar-link">Attendance</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../HR/leave.php" class="sidebar-link">Leave</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="payroll.php" class="sidebar-link">Payroll</a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#labtech"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-building"
-                        viewBox="0 0 16 16" style="margin-bottom: 7px;">
-                        <path
-                            d="M4 2.5a.5.5 0
-             0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM4 5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM7.5 5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM4.5 8a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
-                        <path
-                            d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm11 0H3v14h3v-2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V15h3z" />
-                    </svg>
-                    <span style="font-size: 18px;">Laboratory and Diagnostic Management</span>
-                </a>
-
-                <ul id="labtech" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../HR/attendance.php" class="sidebar-link">Attendance</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../HR/leave.php" class="sidebar-link">Leave</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="payroll.php" class="sidebar-link">Payroll</a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse" data-bs-target="#inventory"
-                    aria-expanded="true" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-building"
-                        viewBox="0 0 16 16" style="margin-bottom: 7px;">
-                        <path
-                            d="M4 2.5a.5.5 0
-             0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM4 5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM7.5 5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM4.5 8a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
-                        <path
-                            d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm11 0H3v14h3v-2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V15h3z" />
-                    </svg>
-                    <span style="font-size: 18px;">Inventory and Supply Chain Management</span>
-                </a>
-
-                <ul id="inventory" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
-                    <li class="sidebar-item">
-                        <a href="../HR/attendance.php" class="sidebar-link">Attendance</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="../HR/leave.php" class="sidebar-link">Leave</a>
-                    </li>
-                    <li class="sidebar-item">
-                        <a href="payroll.php" class="sidebar-link">Payroll</a>
-                    </li>
-                </ul>
-            </li>
-
-            <li class="sidebar-item">
-                <a href="report_dashboard.php" class="sidebar-link">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                        class="bi bi-building" viewBox="0 0 16 16" style="margin-bottom: 7px;">
-                        <path
-                            d="M4 2.5a.5.5 0
-                0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM4 5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM7.5 5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zM4.5 8a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm2.5.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5zm3.5-.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5z" />
-                        <path
-                            d="M2 1a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1zm11 0H3v14h3v-2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V15h3z" />
-                    </svg>
-                    <span style="font-size: 18px;">Report and Analytics</span>
-                </a>
-            </li>
-        </aside>
-
-        <div class="container py-4">
-
-            <!-- HEADER + YEAR SELECT -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="fw-semibold mb-0">Attendance Report</h4>
-                <select id="yearSelector" class="form-select w-auto"></select>
-            </div>
-
-            <!-- TOP SUMMARY -->
-            <div class="row g-3 mb-4">
-                <div class="col-md-4">
-                    <div class="card p-3">
-                        <div class="small-text">Total Present</div>
-                        <h5 id="totalPresent">0</h5>
+            <!-- FILTER -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-body row g-3">
+                    <div class="col-md-3">
+                        <label class="fw-semibold">From Month</label>
+                        <select id="startMonth" class="form-select">
+                            <option value="">Select</option>
+                            <?php for ($i = 1; $i <= 12; $i++): ?>
+                                <option value="<?= $i ?>"><?= date("F", mktime(0, 0, 0, $i, 1)) ?></option>
+                            <?php endfor; ?>
+                        </select>
                     </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card p-3">
-                        <div class="small-text">Total Late</div>
-                        <h5 id="totalLate">0</h5>
+
+                    <div class="col-md-3">
+                        <label class="fw-semibold">From Year</label>
+                        <select id="startYear" class="form-select"></select>
                     </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="card p-3">
-                        <div class="small-text">Total Undertime</div>
-                        <h5 id="totalUndertime">0</h5>
+
+                    <div class="col-md-3">
+                        <label class="fw-semibold">To Month</label>
+                        <select id="endMonth" class="form-select">
+                            <option value="">Select</option>
+                            <?php for ($i = 1; $i <= 12; $i++): ?>
+                                <option value="<?= $i ?>"><?= date("F", mktime(0, 0, 0, $i, 1)) ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="fw-semibold">To Year</label>
+                        <select id="endYear" class="form-select"></select>
+                    </div>
+
+                    <div class="col-12">
+                        <button onclick="loadReport()" class="btn btn-primary w-100">Generate Report</button>
                     </div>
                 </div>
             </div>
 
-            <!-- YEAR ANALYTICS -->
-            <div class="row g-3 mb-4">
-                <div class="col-md-3">
-                    <div class="card p-3">
-                        <div class="small-text">Average Present</div>
-                        <h5 id="avgPresent">0</h5>
+            <!-- SUMMARY -->
+            <div class="row mb-4" id="summaryCards"></div>
+
+            <!-- CHARTS -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card p-3 shadow-sm">
+                        <h6 class="fw-bold">Present vs Absent Trend</h6>
+                        <canvas id="trendChart"></canvas>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="card p-3">
-                        <div class="small-text">Average Absent</div>
-                        <h5 id="avgAbsent">0</h5>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card p-3">
-                        <div class="small-text">Most Late Month</div>
-                        <h5 id="mostLate">-</h5>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card p-3">
-                        <div class="small-text">Most Absent Month</div>
-                        <h5 id="mostAbsent">-</h5>
+
+                <div class="col-md-6">
+                    <div class="card p-3 shadow-sm">
+                        <h6 class="fw-bold">Attendance Breakdown</h6>
+                        <canvas id="statusPie"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- YEARLY CHART -->
-            <div class="card p-4 mb-4" style="height:320px">
-                <canvas id="yearChart"></canvas>
+            <!-- HEATMAP -->
+            <div class="card p-3 mb-4 shadow-sm">
+                <h5 class="fw-bold">Monthly Attendance Heatmap</h5>
+                <div id="heatmap"></div>
             </div>
 
-            <!-- MONTH CARDS -->
-            <div class="row g-3" id="monthCards"></div>
+            <!-- RANKINGS -->
+            <div class="card p-3 mb-4 shadow-sm">
+                <h5 class="fw-bold">Top & Bottom Performing Months</h5>
+                <div id="rankings"></div>
+            </div>
+
+            <!-- TABLE -->
+            <div class="card mb-4 shadow-sm">
+                <div class="table-responsive card-body">
+                    <table class="table table-bordered" id="attendanceTable">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Month</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Late</th>
+                                <th>Leave</th>
+                                <th>Undertime</th>
+                                <th>Attendance %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="text-end" id="exportButtons" style="display:none;">
+                <button onclick="exportExcel()" class="btn btn-success me-2">Export Excel</button>
+                <button onclick="exportPDF()" class="btn btn-danger">Export PDF</button>
+            </div>
 
         </div>
     </div>
 
+    <!-- AI Drawer Button -->
+    <button id="aiBtn">AI</button>
+
+    <!-- AI Drawer -->
+    <div id="aiDrawer">
+        <h4>AI Insights <span id="closeDrawer" onclick="toggleDrawer()">✖</span></h4>
+        <div id="ai_insights" class="mt-3">Run report to load insights...</div>
+        <hr>
+        <h4>AI Recommendations</h4>
+        <div id="ai_reco" class="mt-2"></div>
+        <hr>
+        <h4>Forecast</h4>
+        <div id="ai_forecast" class="mt-2"></div>
+    </div>
+
+
     <script>
-        const baseApi = "https://localhost:7212/employee/getYearAttendanceSummary?year=";
-        const monthNames = [
-            "January", "February", "March", "April", "May", "June",
-            "July", "August", "September", "October", "November", "December"
-        ];
+        /* ==== AI DRAWER ==== */
+        document.getElementById("aiBtn").onclick = toggleDrawer;
 
-        let yearChart;
-
-        const yearSelector = document.getElementById("yearSelector");
-        const currentYear = new Date().getFullYear();
-
-        // Populate year selector (current year selected by default)
-        for (let y = currentYear; y >= currentYear - 5; y--) {
-            yearSelector.innerHTML += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
+        function toggleDrawer() {
+            document.getElementById("aiDrawer").classList.toggle("open");
         }
 
-        yearSelector.addEventListener("change", () => loadReport(yearSelector.value));
-        loadReport(yearSelector.value);
+        /* ==== YEAR POPULATE ==== */
+        function populateYears(id) {
+            const sel = document.getElementById(id);
+            let now = new Date().getFullYear();
+            for (let y = 2015; y <= now + 2; y++)
+                sel.innerHTML += `<option value="${y}">${y}</option>`;
+        }
+        populateYears("startYear");
+        populateYears("endYear");
 
-        function loadReport(year) {
-            fetch(baseApi + year)
-                .then(res => res.json())
-                .then(data => {
+        let rawData = [];
+        let trendChartInstance;
+        let pieChartInstance;
 
-                    // Top totals
-                    document.getElementById("totalPresent").innerText = data.present;
-                    document.getElementById("totalLate").innerText = data.late;
-                    document.getElementById("totalUndertime").innerText = data.underTime;
+        /* ==== LOAD REPORT ==== */
+        async function loadReport() {
+            const url = `https://bsis-03.keikaizen.xyz/employee/monthAttendanceRangeQueryReport?start=${startMonth.value}&startYear=${startYear.value}&endMonth=${endMonth.value}&endYear=${endYear.value}`;
 
-                    // Analytics
-                    const avgPresent = Math.round(data.present / 12);
-                    const totalAbsent = data.monthsReport.reduce((s, m) => s + m.absent, 0);
-                    const avgAbsent = Math.round(totalAbsent / 12);
+            rawData = await fetch(url).then(r => r.json());
 
-                    const mostLate = data.monthsReport.reduce((a, b) => a.late > b.late ? a : b);
-                    const mostAbsent = data.monthsReport.reduce((a, b) => a.absent > b.absent ? a : b);
+            exportButtons.style.display = "block";
+            buildSummary();
+            buildCharts();
+            buildTable();
+            buildHeatmap();
+            buildRankings();
+            buildAI();
+        }
 
-                    document.getElementById("avgPresent").innerText = avgPresent;
-                    document.getElementById("avgAbsent").innerText = avgAbsent;
-                    document.getElementById("mostLate").innerText =
-                        `${monthNames[mostLate.month - 1]} (${mostLate.late})`;
-                    document.getElementById("mostAbsent").innerText =
-                        `${monthNames[mostAbsent.month - 1]} (${mostAbsent.absent})`;
+        /* ==== SUMMARY ==== */
+        function buildSummary() {
+            const d = rawData;
+            const avg = Math.round((d.present / (d.present + d.absent + d.leave_count)) * 100);
 
-                    // YEARLY BAR CHART
-                    const labels = data.monthsReport.map(m => monthNames[m.month - 1]);
-                    const presentData = data.monthsReport.map(m => m.present);
+            summaryCards.innerHTML = `
+    <div class="col-md-2"><div class="card p-3 text-center shadow"><h4>${d.present}</h4><p>Present</p></div></div>
+    <div class="col-md-2"><div class="card p-3 text-center shadow text-danger"><h4>${d.absent}</h4><p>Absent</p></div></div>
+    <div class="col-md-2"><div class="card p-3 text-center shadow text-warning"><h4>${d.late}</h4><p>Late</p></div></div>
+    <div class="col-md-2"><div class="card p-3 text-center shadow text-info"><h4>${d.leave_count}</h4><p>Leave</p></div></div>
+    <div class="col-md-2"><div class="card p-3 text-center shadow text-secondary"><h4>${d.underTime}</h4><p>Undertime</p></div></div>
+    <div class="col-md-2"><div class="card p-3 text-center shadow text-primary"><h4>${avg}%</h4><p>Avg Attendance</p></div></div>`;
+        }
 
-                    if (yearChart) yearChart.destroy();
+        /* ==== CHARTS ==== */
+        function buildCharts() {
 
-                    yearChart = new Chart(document.getElementById("yearChart"), {
-                        type: "bar",
-                        data: {
-                            labels,
-                            datasets: [{
-                                label: "Present",
-                                data: presentData,
-                                backgroundColor: "#0d6efd"
-                            }]
+            const labels = rawData.months.map(m => ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m.month - 1]);
+
+            /* ---- Trend Line ---- */
+            if (trendChartInstance) trendChartInstance.destroy();
+
+            trendChartInstance = new Chart(document.getElementById("trendChart"), {
+                type: "line",
+                data: {
+                    labels,
+                    datasets: [{
+                            label: "Present",
+                            data: rawData.months.map(m => m.present),
+                            borderColor: "green",
+                            borderWidth: 3
                         },
-                        options: {
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    display: false
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true
-                                }
-                            }
+                        {
+                            label: "Absent",
+                            data: rawData.months.map(m => m.absent),
+                            borderColor: "red",
+                            borderWidth: 3
                         }
-                    });
+                    ]
+                }
+            });
 
-                    // MONTH DOUGHNUT CARDS
-                    const container = document.getElementById("monthCards");
-                    container.innerHTML = "";
+            /* ---- Pie Chart ---- */
+            if (pieChartInstance) pieChartInstance.destroy();
 
-                    data.monthsReport.forEach((m, i) => {
-                        const col = document.createElement("div");
-                        col.className = "col-xl-3 col-lg-4 col-md-6";
+            pieChartInstance = new Chart(document.getElementById("statusPie"), {
+                type: "pie",
+                data: {
+                    labels: ["Present", "Absent", "Late", "Leave", "Undertime"],
+                    datasets: [{
+                        data: [
+                            rawData.present,
+                            rawData.absent,
+                            rawData.late,
+                            rawData.leave_count,
+                            rawData.underTime
+                        ]
+                    }]
+                }
+            });
+        }
 
-                        col.innerHTML = `
-                            <div class="card p-3 month-card">
-                                <h6 class="fw-semibold text-center">${monthNames[m.month - 1]}</h6>
-                                <canvas id="monthChart-${i}"></canvas>
-                                <div class="d-flex justify-content-end mt-3">
-                                    <a href="month_attendance_report.php?month=${m.month}&year=${data.year}" 
-                                       class="btn btn-sm btn-outline-primary">
-                                       View
-                                    </a>
-                                </div>
-                            </div>
-                        `;
+        /* ==== TABLE ==== */
+        function buildTable() {
+            tableBody.innerHTML = rawData.months.map(m => {
+                const pct = Math.round((m.present / (m.present + m.absent + m.leave_count)) * 100);
+                const name = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][m.month - 1];
 
-                        container.appendChild(col);
+                return `
+        <tr>
+            <td>${name} ${m.year}</td>
+            <td>${m.present}</td>
+            <td class="text-danger">${m.absent}</td>
+            <td class="text-warning">${m.late}</td>
+            <td class="text-info">${m.leave_count}</td>
+            <td class="text-secondary">${m.underTime}</td>
+            <td class="fw-bold">${pct}%</td>
+        </tr>`;
+            }).join("");
+        }
 
-                        // Create Doughnut chart for this month
-                        new Chart(document.getElementById(`monthChart-${i}`), {
-                            type: "doughnut",
-                            data: {
-                                labels: ["Present", "Absent", "Late", "Leave", "Undertime"],
-                                datasets: [{
-                                    data: [m.present, m.absent, m.late, m.leave_count, m.underTime],
-                                    backgroundColor: ["#198754", "#dc3545", "#ffc107", "#0dcaf0", "#6f42c1"]
-                                }]
-                            },
-                            options: {
-                                plugins: {
-                                    legend: {
-                                        position: "bottom",
-                                        labels: {
-                                            boxWidth: 12
-                                        }
-                                    }
-                                },
-                                maintainAspectRatio: false
-                            }
-                        });
-                    });
-                });
+        /* ==== HEATMAP ==== */
+        function buildHeatmap() {
+            heatmap.innerHTML = rawData.months.map(m => {
+                const color = m.absent >= 8 ? "#ffdddd" :
+                    m.absent >= 5 ? "#fff3cd" : "#d4edda";
+
+                return `
+        <div class="p-2 mb-2" style="background:${color};border-radius:8px;">
+            <b>${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m.month-1]} ${m.year}</b>
+            — Absent: ${m.absent}, Late: ${m.late}
+        </div>`;
+            }).join("");
+        }
+
+        /* ==== RANKINGS ==== */
+        function buildRankings() {
+            const best = rawData.months.reduce((a, b) => a.present > b.present ? a : b);
+            const worst = rawData.months.reduce((a, b) => a.absent > b.absent ? a : b);
+
+            rankings.innerHTML = `
+        <p>🌟 Best Month: <b>${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][best.month-1]} ${best.year}</b></p>
+        <p>⚠ Worst Month: <b>${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][worst.month-1]} ${worst.year}</b></p>
+    `;
+        }
+
+        /* ==== AI INSIGHTS ==== */
+        function buildAI() {
+            const m = rawData.months;
+            const presentTrend = m[m.length - 1].present - m[0].present;
+            const absentTrend = m[m.length - 1].absent - m[0].absent;
+
+            ai_insights.innerHTML = `
+        • Attendance trend: ${presentTrend >= 0 ? "<b class='text-success'>Improving</b>" : "<b class='text-danger'>Declining</b>"}<br>
+        • Absence trend: ${absentTrend >= 0 ? "<b class='text-danger'>Increasing</b>" : "<b class='text-success'>Decreasing</b>"}<br>
+        • Highest late records: <b>${rawData.late}</b><br>
+        • Leave cases: <b>${rawData.leave_count}</b><br>
+    `;
+
+            ai_reco.innerHTML = `
+        • Reward consistent attendance.<br>
+        • Coaching for repeatedly late staff.<br>
+        • Investigate root causes of absences.<br>
+        • Offer flexible schedules during high-leave months.<br>
+    `;
+
+            ai_forecast.innerHTML = `
+        Predicted Present Next Month: <b>${Math.round(rawData.present * 1.03)}</b><br>
+        Expected Absences: <b>${Math.round(rawData.absent*0.9)} - ${Math.round(rawData.absent*1.1)}</b>
+    `;
+        }
+
+        /* ==== EXPORT EXCEL ==== */
+        function exportExcel() {
+            const wb = XLSX.utils.table_to_book(attendanceTable, {
+                sheet: "Attendance Report"
+            });
+            XLSX.writeFile(wb, "Attendance_Report.xlsx");
+        }
+
+        /* ==== EXPORT PDF ==== */
+        function exportPDF() {
+            const {
+                jsPDF
+            } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text("Attendance Report", 14, 15);
+            doc.autoTable({
+                html: "#attendanceTable",
+                startY: 20
+            });
+            doc.save("Attendance_Report.pdf");
         }
     </script>
+
 </body>
 
 </html>

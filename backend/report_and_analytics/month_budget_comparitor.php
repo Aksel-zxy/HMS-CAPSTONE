@@ -187,7 +187,7 @@ include 'header.php';
 
             try {
                 const res = await fetch(
-                    `https://localhost:7212/journal/monthBudgetComparitor?month=${m}&year=${y}&partnerMonth=${pm}&partnerYear=${py}`
+                    `https://bsis-03.keikaizen.xyz/journal/monthBudgetComparitor?month=${m}&year=${y}&partnerMonth=${pm}&partnerYear=${py}`
                 );
 
                 // FIRST: Check HTTP response before parsing JSON

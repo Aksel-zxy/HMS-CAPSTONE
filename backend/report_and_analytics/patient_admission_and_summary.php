@@ -149,7 +149,7 @@ include 'header.php';
         let bedChart;
 
         if (month && year) {
-            const apiUrl = `https://localhost:7212/property/getMonthSummaryAdmissionAndDischargeReport?month=${month}&year=${year}`;
+            const apiUrl = `https://bsis-03.keikaizen.xyz/property/getMonthSummaryAdmissionAndDischargeReport?month=${month}&year=${year}`;
             fetch(apiUrl)
                 .then(res => res.json())
                 .then(data => {
