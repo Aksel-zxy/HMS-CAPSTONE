@@ -51,7 +51,18 @@ $notif_res = $conn->query($notif_sql);
 $pendingCount = 0;
 if ($notif_res && $notif_res->num_rows > 0) {
     $notif_row = $notif_res->fetch_assoc();
-    $pendingCount = $notif_row['pending'];
+    $pendingCount += (int)$notif_row['pending'];
+}
+
+// 🔔 Pending Scheduled prescriptions count
+$sched_notif_sql = "SELECT COUNT(*) AS pending 
+                    FROM scheduled_medications 
+                    WHERE status IN ('pending', 'ongoing')";
+$sched_notif_res = $conn->query($sched_notif_sql);
+
+if ($sched_notif_res && $sched_notif_res->num_rows > 0) {
+    $sched_notif_row = $sched_notif_res->fetch_assoc();
+    $pendingCount += (int)$sched_notif_row['pending'];
 }
 
 // 🔴 Expiry (Near Expiry or Expired) count
@@ -164,17 +175,26 @@ $notifCount = $notif->notifCount;
             </li>
 
             <li class="sidebar-item">
-                <a href="pharmacy_sales.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor"
-                        class="fa-solid fa-chart-line" viewBox="0 0 16 16">
-                        <path
-                            d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
-                        <path
-                            d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse"
+                    data-bs-target="#gerald" aria-expanded="true" aria-controls="auth">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-chart-line" viewBox="0 0 16 16">
+                        <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
+                        <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
-                    <span style="font-size: 18px;">Sales</span>
+                    <span style="font-size: 18px;">Reports</span>
                 </a>
+
+                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="pharmacy_inventory_report.php" class="sidebar-link">Inventory Report</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="pharmacy_sales.php" class="sidebar-link">Financial Report</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="pharmacy_dispense_report.php" class="sidebar-link">Dispensing Report</a>
+                    </li>
+                </ul>
             </li>
             <li class="sidebar-item position-relative">
                 <a href="pharmacy_expiry_tracking.php" class="sidebar-link">

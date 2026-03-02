@@ -269,7 +269,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 <table id="EmployeesTable">
                     <thead>
                         <tr>
-                            <th>Employee</th>
+                            <th>Employee Name</th>
                             <th>Profession</th>
                             <th>Department</th>
                             <th>Leave Type</th>

@@ -110,7 +110,9 @@ $salesPeriod = $_GET['sales_period'] ?? 'week';
 
 
 // Query all medicines
-$query = "SELECT med_name, stock_quantity FROM pharmacy_inventory ORDER BY med_name ASC";
+$query = "SELECT generic_name, brand_name, stock_quantity 
+          FROM pharmacy_inventory 
+          ORDER BY generic_name ASC";
 $result = $conn->query($query);
 
 // Group medicines by stock thresholds
@@ -141,7 +143,18 @@ $notif_res = $conn->query($notif_sql);
 $pendingCount = 0;
 if ($notif_res && $notif_res->num_rows > 0) {
     $notif_row = $notif_res->fetch_assoc();
-    $pendingCount = $notif_row['pending'];
+    $pendingCount += (int)$notif_row['pending'];
+}
+
+// 🔔 Pending Scheduled prescriptions count
+$sched_notif_sql = "SELECT COUNT(*) AS pending 
+                    FROM scheduled_medications 
+                    WHERE status IN ('pending', 'ongoing')";
+$sched_notif_res = $conn->query($sched_notif_sql);
+
+if ($sched_notif_res && $sched_notif_res->num_rows > 0) {
+    $sched_notif_row = $sched_notif_res->fetch_assoc();
+    $pendingCount += (int)$sched_notif_row['pending'];
 }
 
 // 🔴 Expiry (Near Expiry or Expired) count
@@ -275,7 +288,7 @@ for ($i = 1; $i <= 12; $i++) {
 <body>
     <div class="d-flex">
         <!----- Sidebar ----->
-        <aside id="sidebar" class="sidebar-toggle">
+        <aside id="sidebar" class="sidebar-toggle d-flex flex-column vh-100 position-sticky top-0">
 
             <div class="sidebar-logo mt-3">
                 <img src="assets/image/logo-dark.png" width="90px" height="20px">
@@ -337,14 +350,26 @@ for ($i = 1; $i <= 12; $i++) {
 
 
             <li class="sidebar-item">
-                <a href="pharmacy_sales.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
-                    aria-expanded="false" aria-controls="auth">
+                <a href="#" class="sidebar-link collapsed has-dropdown" data-bs-toggle="collapse"
+                    data-bs-target="#gerald" aria-expanded="true" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="fa-solid fa-chart-line" viewBox="0 0 16 16">
                         <path d="m7.646 9.354-3.792 3.792a.5.5 0 0 0 .353.854h7.586a.5.5 0 0 0 .354-.854L8.354 9.354a.5.5 0 0 0-.708 0" />
                         <path d="M11.414 11H14.5a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.5-.5h-13a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h3.086l-1 1H1.5A1.5 1.5 0 0 1 0 10.5v-7A1.5 1.5 0 0 1 1.5 2h13A1.5 1.5 0 0 1 16 3.5v7a1.5 1.5 0 0 1-1.5 1.5h-2.086z" />
                     </svg>
-                    <span style="font-size: 18px;">Sales</span>
+                    <span style="font-size: 18px;">Reports</span>
                 </a>
+
+                <ul id="gerald" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
+                    <li class="sidebar-item">
+                        <a href="pharmacy_inventory_report.php" class="sidebar-link">Inventory Report</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="pharmacy_sales.php" class="sidebar-link">Financial Report</a>
+                    </li>
+                    <li class="sidebar-item">
+                        <a href="pharmacy_dispense_report.php" class="sidebar-link">Dispensing Report</a>
+                    </li>
+                </ul>
             </li>
             <li class="sidebar-item position-relative">
                 <a href="pharmacy_expiry_tracking.php" class="sidebar-link">
@@ -363,6 +388,11 @@ for ($i = 1; $i <= 12; $i++) {
                 </a>
             </li>
 
+            <div class="sidebar-item px-3 mt-auto mb-3">
+                <button class="btn btn-primary w-100 d-flex justify-content-center align-items-center gap-2 shadow-sm rounded-3 py-2" data-bs-toggle="modal" data-bs-target="#pharmacyModal" style="background: linear-gradient(135deg, #6366f1, #4f46e5); border: none;">
+                    <i class="fa-solid fa-user-plus"></i> <span class="d-none d-sm-inline">Request Replacement</span>
+                </button>
+            </div>
 
         </aside>
         <!----- End of Sidebar ----->
@@ -468,9 +498,11 @@ for ($i = 1; $i <= 12; $i++) {
             <div class="container-fluid py-4">
 
                 <!-- PAGE TITLE -->
-                <div class="d-flex align-items-center mb-4">
-                    <i class="fa-solid fa-chart-simple fs-4 me-2"></i>
-                    <h3 class="mb-0 fw-bold">Dashboard</h3>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div class="d-flex align-items-center">
+                        <i class="fa-solid fa-chart-simple fs-4 me-2"></i>
+                        <h3 class="mb-0 fw-bold">Dashboard</h3>
+                    </div>
                 </div>
 
                 <!-- KPI CARDS -->
@@ -565,7 +597,118 @@ for ($i = 1; $i <= 12; $i++) {
                     </div>
 
                 </div>
+                <!-- STOCK STATUS CARDS -->
+                <div class="row g-3 mb-4">
 
+                    <!-- HIGH STOCK -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card shadow-sm rounded-4 p-3 h-100 border-start border-4 border-success">
+                            <h6 class="fw-bold text-success mb-3">
+                                <i class="fa-solid fa-circle-check me-2"></i> HIGH STOCK
+                            </h6>
+
+                            <ul class="list-group list-group-flush small" style="max-height:250px; overflow-y:auto;">
+                                <?php if (!empty($highStock)): ?>
+                                    <?php foreach ($highStock as $med): ?>
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong><?= htmlspecialchars($med['generic_name']) ?></strong><br>
+                                                <small class="text-muted"><?= htmlspecialchars($med['brand_name']) ?></small>
+                                            </div>
+                                            <span class="badge bg-success">
+                                                <?= number_format($med['stock_quantity']) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <li class="list-group-item text-muted">No medicines</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- NEAR LOW -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card shadow-sm rounded-4 p-3 h-100 border-start border-4 border-info">
+                            <h6 class="fw-bold text-info mb-3">
+                                <i class="fa-solid fa-circle-info me-2"></i> NEAR LOW
+                            </h6>
+
+                            <ul class="list-group list-group-flush small" style="max-height:250px; overflow-y:auto;">
+                                <?php if (!empty($nearLowStock)): ?>
+                                    <?php foreach ($nearLowStock as $med): ?>
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong><?= htmlspecialchars($med['generic_name']) ?></strong><br>
+                                                <small class="text-muted"><?= htmlspecialchars($med['brand_name']) ?></small>
+                                            </div>
+                                            <span class="badge bg-info text-dark">
+                                                <?= number_format($med['stock_quantity']) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <li class="list-group-item text-muted">No medicines</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- LOW STOCK -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card shadow-sm rounded-4 p-3 h-100 border-start border-4 border-warning">
+                            <h6 class="fw-bold text-warning mb-3">
+                                <i class="fa-solid fa-triangle-exclamation me-2"></i> LOW STOCK
+                            </h6>
+
+                            <ul class="list-group list-group-flush small" style="max-height:250px; overflow-y:auto;">
+                                <?php if (!empty($lowStock)): ?>
+                                    <?php foreach ($lowStock as $med): ?>
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong><?= htmlspecialchars($med['generic_name']) ?></strong><br>
+                                                <small class="text-muted"><?= htmlspecialchars($med['brand_name']) ?></small>
+                                            </div>
+                                            <span class="badge bg-warning text-dark">
+                                                <?= number_format($med['stock_quantity']) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <li class="list-group-item text-muted">No medicines</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- NO STOCK -->
+                    <div class="col-md-6 col-lg-3">
+                        <div class="card shadow-sm rounded-4 p-3 h-100 border-start border-4 border-danger">
+                            <h6 class="fw-bold text-danger mb-3">
+                                <i class="fa-solid fa-circle-xmark me-2"></i> NO STOCK
+                            </h6>
+
+                            <ul class="list-group list-group-flush small" style="max-height:250px; overflow-y:auto;">
+                                <?php if (!empty($noStock)): ?>
+                                    <?php foreach ($noStock as $med): ?>
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <strong><?= htmlspecialchars($med['generic_name']) ?></strong><br>
+                                                <small class="text-muted"><?= htmlspecialchars($med['brand_name']) ?></small>
+                                            </div>
+                                            <span class="badge bg-danger">
+                                                <?= number_format($med['stock_quantity']) ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <li class="list-group-item text-muted">No medicines</li>
+                                <?php endif; ?>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
                 <!-- MAIN CHART ROW -->
                 <div class="row mb-4">
                     <!-- SALES PERFORMANCE -->
@@ -607,56 +750,70 @@ for ($i = 1; $i <= 12; $i++) {
                             <div id="revenueChart"></div>
                         </div>
                     </div>
-
-
-
                 </div>
 
-                <center>
-                    <button class="hahaha" onclick="openModal('pharmacyModal')">Request Employee for <br /> Pharmacy Dept.</button>
-                </center>
-
                 <!-- Pharmacy Modal -->
-                <div id="pharmacyModal" class="bastabubukas">
-                    <div class="lalagyanannya">
-                        <bttn class="close-btn" onclick="closeModal('pharmacyModal')">X</bttn>
-                        <center>
-                            <h3 style="font-weight: bold;">Pharmacy Department Replacement Request</h3> 
-                        </center>
-                        <br />
+                <div class="modal fade" id="pharmacyModal" tabindex="-1" aria-labelledby="pharmacyModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content rounded-4 shadow-lg border-0">
+                            <div class="modal-header border-bottom-0 pb-0 mt-2 mx-2">
+                                <h5 class="modal-title fw-bold" id="pharmacyModalLabel">
+                                    <i class="fa-solid fa-user-doctor text-primary me-2 shadow-sm rounded-circle p-2 bg-primary bg-opacity-10"></i> Replacement Request
+                                </h5>
+                                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body p-4">
+                                <p class="text-muted mb-4 small">Submit a request to replace a leaving pharmacist in the Pharmacy Department.</p>
+                                <form action="submit_replacement_request.php" method="POST">
+                                    <input type="hidden" name="profession" value="Pharmacist" required>
 
-                        <form action="submit_replacement_request.php" method="POST">
-                            <input type="hidden" name="profession" value="Pharmacist" required>
+                                    <div class="mb-3">
+                                        <label for="department" class="form-label fw-semibold small">Department</label>
+                                        <select id="department" name="department" class="form-select bg-light border-0 shadow-sm" required>
+                                            <option value="Pharmacy" selected>Pharmacy</option>
+                                        </select>
+                                    </div>
 
-                            <label for="department">Department:</label>
-                            <select id="department" name="department" required>
-                                <option value="Pharmacy">Pharmacy</option>
-                            </select>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Pharmacist Type to Replace</label>
+                                        <select name="position" class="form-select bg-light border-0 shadow-sm" required>
+                                            <option value="" disabled selected>--- Select Pharmacist Type ---</option>
+                                            <option value="Clinical Pharmacist">Clinical Pharmacist</option>
+                                            <option value="Hospital Pharmacist">Hospital Pharmacist</option>
+                                            <option value="Compounding Pharmacist">Compounding Pharmacist</option>
+                                            <option value="Dispensing Pharmacist">Dispensing Pharmacist</option>
+                                        </select>
+                                    </div>
 
-                            <!-- Specialist Dropdown -->
-                            <label>Pharmacist Type to Replace</label>
-                            <select name="position" required>
-                                <option value="">--- Select Pharmacist Type ---</option>
-                                <option value="Clinical Pharmacist">Clinical Pharmacist</option>
-                                <option value="Hospital Pharmacist">Hospital Pharmacist</option>
-                                <option value="Compounding Pharmacist">Compounding Pharmacist</option>
-                                <option value="Dispensing Pharmacist">Dispensing Pharmacist</option>
-                            </select>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold small">Leaving Employee Name</label>
+                                            <input type="text" name="leaving_employee_name" class="form-control bg-light border-0 shadow-sm" placeholder="e.g. John Doe">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-semibold small">Leaving Employee ID</label>
+                                            <input type="text" name="leaving_employee_id" class="form-control bg-light border-0 shadow-sm" placeholder="e.g. EMP-1234">
+                                        </div>
+                                    </div>
 
-                            <label>Leaving Employee Name</label>
-                            <input type="text" name="leaving_employee_name">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold small">Reason for Leaving</label>
+                                        <textarea name="reason_for_leaving" class="form-control bg-light border-0 shadow-sm" rows="3" placeholder="Provide a brief explanation..."></textarea>
+                                    </div>
 
-                            <label>Leaving Employee ID</label>
-                            <input type="text" name="leaving_employee_id">
+                                    <div class="mb-4">
+                                        <label class="form-label fw-semibold small">Requested By</label>
+                                        <input type="text" name="requested_by" class="form-control bg-light border-0 shadow-sm" placeholder="Your Name" required>
+                                    </div>
 
-                            <label>Reason for Leaving</label>
-                            <textarea name="reason_for_leaving"></textarea>
-
-                            <label>Requested By</label>
-                            <input type="text" name="requested_by" required>
-
-                            <button type="submit">Submit Request</button>
-                        </form>
+                                    <div class="d-grid mt-2">
+                                        <button type="submit" class="btn btn-primary py-2 fw-bold" style="background: linear-gradient(135deg, #6366f1, #4f46e5); border: none; border-radius: 8px;">
+                                            Submit Request <i class="fa-solid fa-paper-plane ms-1"></i>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -882,6 +1039,7 @@ for ($i = 1; $i <= 12; $i++) {
         function openModal(id) {
             document.getElementById(id).style.display = "flex";
         }
+
         function closeModal(id) {
             document.getElementById(id).style.display = "none";
         }
@@ -890,10 +1048,9 @@ for ($i = 1; $i <= 12; $i++) {
             const modals = ['laboratoryModal'];
             modals.forEach(id => {
                 const modal = document.getElementById(id);
-                if(event.target == modal) closeModal(id);
+                if (event.target == modal) closeModal(id);
             });
         }
-
     </script>
     <script src="assets/Bootstrap/all.min.js"></script>
     <script src="assets/Bootstrap/bootstrap.bundle.min.js"></script>

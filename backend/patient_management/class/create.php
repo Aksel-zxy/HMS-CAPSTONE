@@ -55,8 +55,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Insert into previous medical records
         $stmt = $conn->prepare("
-            INSERT INTO p_previous_medical_records (patient_id, condition_name, diagnosis_date, notes)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO p_previous_medical_records (patient_id, condition_name, diagnosis_date, notes, image_blob)
+            VALUES (?, ?, ?, ?, ?)
         ");
         if (!$stmt) {
             throw new Exception("Prepare failed for p_previous_medical_records: " . $conn->error);
@@ -65,8 +65,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $condition_name = $_POST['condition_name'] ?? '';
         $diagnosis_date = !empty($_POST['diagnosis_date']) ? $_POST['diagnosis_date'] : null;
         $notes = $_POST['notes'] ?? '';
+        $image_blob = null;
 
-        $stmt->bind_param("isss", $patient_id, $condition_name, $diagnosis_date, $notes);
+        if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $image_blob = file_get_contents($_FILES['image']['tmp_name']);
+        }
+
+        // Bind parameters (b = blob placeholder)
+        $stmt->bind_param("isssb", 
+            $patient_id, 
+            $condition_name, 
+            $diagnosis_date, 
+            $notes, 
+            $null  // blob placeholder
+        );
+
+        // Send the blob if it exists
+        if ($image_blob !== null) {
+            $stmt->send_long_data(4, $image_blob); // index 4 = fifth parameter (0-based)
+        }
+
         if (!$stmt->execute()) {
             throw new Exception("Execute failed for p_previous_medical_records: " . $stmt->error);
         }
@@ -74,14 +92,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->close();
         $conn->commit();
 
+        // Log action
         $user_id = $_SESSION['user_id'] ?? null;
         if ($user_id) {
-        logAction($conn, $user_id, 'ADD_PATIENT', $patient_id);
+            logAction($conn, $user_id, 'ADD_PATIENT', $patient_id);
         }
+
         header("Location: ../registered.php?success=1");
         exit();
 
-        } catch (Exception $e) {
+    } catch (Exception $e) {
         $conn->rollback();
 
         if (isset($_SESSION['user_id'])) {
@@ -89,10 +109,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         error_log("Patient creation failed: " . $e->getMessage());
-        echo "<pre style='color:red; font-weight:bold;'>Patient creation failed:" . htmlspecialchars($e->getMessage()) . "</pre>";
+        echo "<pre style='color:red; font-weight:bold;'>Patient creation failed: " . htmlspecialchars($e->getMessage()) . "</pre>";
         exit();
-        }
-
+    }
 }
 ob_end_flush();
 ?>

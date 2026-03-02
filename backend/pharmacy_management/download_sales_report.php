@@ -17,7 +17,7 @@ $sales = new Sales($conn);
 $period = $_GET['period'] ?? 'all';
 
 // Fetch summary data
-$totalSales      = $sales->getTotalSales($period);
+$totalSales      = $sales->getTotalCashSales($period);
 $totalOrders     = $sales->getTotalOrders($period);
 $categoryDataRaw = $sales->getRevenueByCategory($period);
 $topProducts     = $sales->getTopProducts($period);

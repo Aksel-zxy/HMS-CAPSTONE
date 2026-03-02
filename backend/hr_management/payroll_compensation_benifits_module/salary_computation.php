@@ -24,101 +24,87 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 $salary = new Salary($conn);
 $employees = $salary->getEmployees();
 
-$salaryResult = null;
-if (isset($_SESSION['computed_salary'])) {
-    $salaryResult = $_SESSION['computed_salary'];
-}
+// SESSION MESSAGE
+$message = $_SESSION['message'] ?? null;
+unset($_SESSION['message']);
+
+// SALARY RESULT
+$salaryResult = $_SESSION['computed_salary'] ?? null;
 
 // COMPUTE SALARY
 if (isset($_POST['compute_salary'])) {
-
     $employee_id = (int)$_POST['employee_id'];
     $pay_period  = $_POST['pay_period'];
     $period_type = $_POST['period_type'];
 
-    $salaryResult = $salary->computeEmployeeSalary(
+    // Compute salary
+    $computed = $salary->computeEmployeeSalary($employee_id, $pay_period, $period_type);
+
+    if (!$computed) {
+        $_SESSION['message'] = "No compensation data found for this employee.";
+        header("Location: salary_computation.php");
+        exit;
+    }
+
+    // Attach full name and profession for UI
+    $emp_row = array_filter($employees, fn($e) => $e['employee_id'] == $employee_id);
+    $emp_row = reset($emp_row);
+    $computed['full_name']  = $emp_row['full_name'] ?? 'N/A';
+    $computed['profession'] = $emp_row['profession'] ?? 'N/A';
+
+    // Check existing payroll
+    $existingPayroll = $salary->checkExistingPayroll(
         $employee_id,
-        $pay_period,
-        $period_type
+        $computed['pay_period_start'],
+        $computed['pay_period_end']
     );
 
-    if ($salaryResult) {
+    if ($existingPayroll) {
+        // Fill missing info for UI
+        $existingPayroll['full_name']  = $emp_row['full_name'] ?? 'N/A';
+        $existingPayroll['profession'] = $emp_row['profession'] ?? 'N/A';
 
-        // Attach employee name (UI ONLY)
-        foreach ($employees as $emp) {
-            if ($emp['employee_id'] == $employee_id) {
-                $salaryResult['full_name'] = $emp['full_name'];
-                break;
-            }
-        }
+        // Compute daily rate from basic_pay / total duty days (fallback: compute from attendance)
+        $stmt = $conn->prepare("
+            SELECT COUNT(*) as total_duty_days
+            FROM hr_daily_attendance
+            WHERE employee_id = ? AND attendance_date BETWEEN ? AND ? AND duty_status = 'On Duty'
+        ");
+        $stmt->bind_param("iss", $employee_id, $existingPayroll['pay_period_start'], $existingPayroll['pay_period_end']);
+        $stmt->execute();
+        $total_duty_days_full = (int)$stmt->get_result()->fetch_assoc()['total_duty_days'];
+        $stmt->close();
 
-        // 🚨 CHECK IF ALREADY EXISTS (prevent duplicate)
-        $existingPayroll = $salary->checkExistingPayroll(
-            $employee_id,
-            $salaryResult['pay_period_start'],
-            $salaryResult['pay_period_end']
-        );
+        $existingPayroll['daily_rate'] = $total_duty_days_full > 0 
+            ? $existingPayroll['basic_pay'] / $total_duty_days_full 
+            : 0;
 
-        if ($existingPayroll) {
-
-            $_SESSION['computed_salary'] = $existingPayroll;
-            $_SESSION['message'] = "Payroll already exists for this period.";
-
+        $_SESSION['computed_salary'] = $existingPayroll;
+        $_SESSION['message'] = "Payroll already exists for this period (Status: " . $existingPayroll['status'] . ").";
+    } else {
+        // Auto save as Pending
+        $payrollId = $salary->savePayroll($computed, 'Pending');
+        if ($payrollId) {
+            $computed['payroll_id'] = $payrollId;
+            $computed['status'] = 'Pending';
+            $_SESSION['computed_salary'] = $computed;
+            $_SESSION['message'] = "Payroll computed and saved as Pending.";
         } else {
-
-            // ✅ AUTO SAVE AS PENDING
-            $payrollId = $salary->savePayroll($salaryResult, 'Pending');
-
-            if ($payrollId) {
-
-                $salaryResult['payroll_id'] = $payrollId;
-                $salaryResult['status'] = 'Pending';
-                $_SESSION['computed_salary'] = $salaryResult;
-                $_SESSION['message'] = "Payroll computed and saved as Pending.";
-
-            } else {
-                $_SESSION['message'] = "Failed to save payroll.";
-            }
+            $_SESSION['message'] = "Failed to save payroll.";
         }
-
-        header("Location: salary_computation.php");
-        exit;
-
-    } else {
-        echo "<script>alert('No compensation data found for this employee.');</script>";
-    }
-}
-
-//  SAVE PAYROLL
-if (isset($_POST['save_payroll'])) {
-
-    if (!isset($_SESSION['computed_salary']['payroll_id'])) {
-        $_SESSION['message'] = "No payroll record found.";
-        header("Location: salary_computation.php");
-        exit;
-    }
-
-    $payroll_id = $_SESSION['computed_salary']['payroll_id'];
-
-    if ($salary->markAsPaid($payroll_id)) {
-
-        $_SESSION['computed_salary']['status'] = 'Paid';
-        $_SESSION['message'] = "Payroll marked as Paid successfully!";
-
-    } else {
-        $_SESSION['message'] = "Failed to update payroll status.";
     }
 
     header("Location: salary_computation.php");
     exit;
 }
 
-if (!empty($_SESSION['message'])) {
-    echo "<script>alert('" . $_SESSION['message'] . "');</script>";
-    unset($_SESSION['message']);
+// CLEAR PAYROLL SESSION IF NEEDED
+if (isset($_POST['clear_salary'])) {
+    unset($_SESSION['computed_salary']);
+    header("Location: salary_computation.php");
+    exit;
 }
 ?>
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -254,10 +240,10 @@ if (!empty($_SESSION['message'])) {
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -314,63 +300,99 @@ if (!empty($_SESSION['message'])) {
             </div>
             <!-- START CODING HERE -->
             <div class="card">
-                <h3> Salary Computation (Per Employee) </h3>
+                <h3>Salary Computation (Per Employee)</h3>
+
+                <!-- DISPLAY SESSION MESSAGE -->
+                <?php if ($message): ?>
+                    <div class="alert alert-info">
+                        <?= htmlspecialchars($message); ?>
+                        <button class="close-btn" onclick="this.parentElement.style.display='none';">&times;</button>
+                    </div>
+                <?php endif; ?>
 
                 <form method="POST">
-                    <div class="form-grid">
-                        <div>
-                            <label>Employee</label>
-                            <select name="employee_id" id="employee_id" required>
-                                <option value="">----- Select Employee -----</option>
-                                <?php foreach ($employees as $emp): ?>
-                                    <option value="<?php echo $emp['employee_id']; ?>">
-                                        <?php echo htmlspecialchars($emp['full_name'] ?? ''); ?> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (Employee ID: <?php echo $emp['employee_id']; ?>)
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                    <div class="form-grid" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items:end;">
+
+                        <!-- Column 1: Employee Info -->
+                        <div style="display:grid; gap:0.5rem;">
+                            <!-- Employee Select -->
+                            <div>
+                                <label for="employee_id">Employee</label>
+                                <select name="employee_id" id="employee_id" required>
+                                    <option value="">----- Select Employee -----</option>
+                                    <?php foreach ($employees as $emp): ?>
+                                        <option 
+                                            value="<?= $emp['employee_id']; ?>" 
+                                            data-profession="<?= htmlspecialchars($emp['profession'] ?? ''); ?>"
+                                            data-role="<?= htmlspecialchars($emp['role'] ?? ''); ?>"
+                                            <?= ($salaryResult['employee_id'] ?? '') == $emp['employee_id'] ? 'selected' : '' ?>
+                                        >
+                                            <?= htmlspecialchars($emp['full_name'] ?? ''); ?> (ID: <?= $emp['employee_id']; ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <!-- Profession Display -->
+                            <div>
+                                <label>Profession</label>
+                                <input type="text" id="profession_display" readonly value="<?= htmlspecialchars($salaryResult['profession'] ?? ''); ?>">
+                            </div>
+
+                            <!-- Role Display -->
+                            <div>
+                                <label>Role</label>
+                                <input type="text" id="role_display" readonly value="<?= htmlspecialchars($salaryResult['role'] ?? ''); ?>">
+                            </div>
                         </div>
 
-                        <div>
-                            <label>Pay Period</label>
-                            <input type="month" name="pay_period" id="pay_period" value="<?= $_POST['pay_period'] ?? date('Y-m'); ?>" required>
+                        <!-- Column 2: Pay Info + Buttons -->
+                        <div style="display:grid; gap:0.5rem;">
+                            <!-- Pay Period -->
+                            <div>
+                                <label>Pay Period</label>
+                                <input type="month" name="pay_period" value="<?= $_POST['pay_period'] ?? date('Y-m'); ?>" required>
+                            </div>
+
+                            <!-- Period Type -->
+                            <div>
+                                <label>Period Type</label>
+                                <select name="period_type">
+                                    <option value="full" <?= (($_POST['period_type'] ?? '') == 'full') ? 'selected' : '' ?>>Full Month</option>
+                                    <option value="first" <?= (($_POST['period_type'] ?? '') == 'first') ? 'selected' : '' ?>>1st Half</option>
+                                    <option value="second" <?= (($_POST['period_type'] ?? '') == 'second') ? 'selected' : '' ?>>2nd Half</option>
+                                </select>
+                            </div>
+
+                            <!-- Buttons -->
+                            <div style="display:flex; gap:0.5rem;">
+                                <button type="submit" name="compute_salary" class="btn btn-primary" style="flex:1;">Compute Salary</button>
+                                <button type="submit" name="clear_salary" class="btn btn-secondary" style="flex:1;">Clear</button>
+                            </div>
                         </div>
 
-                        <div>
-                            <label>Period Type</label>
-                            <select name="period_type">
-                                <option value="full" <?= (isset($_POST['period_type']) && $_POST['period_type']=='full') ? 'selected' : '' ?>>Full Month</option>
-                                <option value="first" <?= (isset($_POST['period_type']) && $_POST['period_type']=='first') ? 'selected' : '' ?>>1st Half</option>
-                                <option value="second" <?= (isset($_POST['period_type']) && $_POST['period_type']=='second') ? 'selected' : '' ?>>2nd Half</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <button type="submit" name="compute_salary" class="haha">Compute Salary</button>
-                        </div>
                     </div>
                 </form>
 
-                <!-- RESULT -->
+                <!-- SALARY RESULT -->
                 <?php if ($salaryResult): ?>
                     <div class="salary-box">
-
                         <div class="salary-header">
-                            Salary Breakdown
+                            Salary Breakdown (Status: <?= htmlspecialchars($salaryResult['status'] ?? 'N/A'); ?>)
                         </div>
 
+                        <!-- Earnings -->
                         <div class="salary-body">
                             <table class="salary-table">
                                 <tr>
                                     <th>Employee</th>
                                     <td><?= htmlspecialchars($salaryResult['full_name'] ?? 'N/A'); ?></td>
+
                                 </tr>
                                 <tr>
                                     <th>Pay Period</th>
-                                    <td>
-                                        <?= htmlspecialchars($salaryResult['pay_period_start'] ?? 'N/A'); ?>
-                                        to
-                                        <?= htmlspecialchars($salaryResult['pay_period_end'] ?? 'N/A'); ?>
-                                    </td>
+                                    <td><?= htmlspecialchars($salaryResult['pay_period_start'] ?? 'N/A'); ?> 
+                                        to <?= htmlspecialchars($salaryResult['pay_period_end'] ?? 'N/A'); ?></td>
                                 </tr>
                                 <tr>
                                     <th>Profession</th>
@@ -414,6 +436,8 @@ if (!empty($_SESSION['message'])) {
                                 </tr>
                             </table>
                         </div>
+
+                        <!-- Deductions -->
                         <div class="salary-body">
                             <table class="salary-table">
                                 <tr>
@@ -446,6 +470,8 @@ if (!empty($_SESSION['message'])) {
                                 </tr>
                             </table>
                         </div>
+
+                        <!-- Net Pay -->
                         <div class="salary-body">
                             <table class="salary-table">
                                 <tr class="net-pay">
@@ -453,18 +479,17 @@ if (!empty($_SESSION['message'])) {
                                     <td><?= number_format($salaryResult['net_pay'] ?? 0, 2); ?></td>
                                 </tr>
                             </table>
-
-                            <br />
-
-                            <center>
-                                <button type="button" id="savePayrollBtn" class="hahaha">
-                                    Save to Payroll
-                                </button>
-                            </center>
                         </div>
+
+                        <!-- Save Payroll Button -->
+                        <?php if (($salaryResult['status'] ?? '') !== 'Paid'): ?>
+                            <center>
+                                <button type="button" id="savePayrollBtn" class="hahaha">Save to Payroll</button>
+                            </center>
+                        <?php endif; ?>
+
                     </div>
                 <?php endif; ?>
-
             </div>
             <!-- END CODING HERE -->
         </div>
@@ -477,34 +502,36 @@ if (!empty($_SESSION['message'])) {
     <!----- End of Footer Content ----->
 
     <script>
-
-        window.addEventListener("load", function(){
-            setTimeout(function(){
-                document.getElementById("loading-screen").style.display = "none";
+        window.addEventListener("load", () => {
+            setTimeout(() => {
+                document.getElementById("loading-screen")?.style.setProperty("display", "none");
             }, 2000);
         });
 
-        const toggler = document.querySelector(".toggler-btn");
-        toggler.addEventListener("click", function() {
-            document.querySelector("#sidebar").classList.toggle("collapsed");
+        // Sidebar toggle
+        document.querySelector(".toggler-btn")?.addEventListener("click", () => {
+            document.querySelector("#sidebar")?.classList.toggle("collapsed");
         });
 
+        // Fetch attendance function
         function fetchAttendance(employeeId, payPeriod) {
+            if (!employeeId || !payPeriod) return;
+
             fetch(`get_attendance.php?employee_id=${employeeId}&pay_period=${payPeriod}`)
                 .then(res => res.json())
                 .then(data => {
-                    if(data.error) {
+                    if (data.error) {
                         alert(data.error);
                     } else {
-                        // Fill table or form
-                        console.log(data);
+                        // Fill table or form with returned data
+                        console.log("Attendance Data:", data);
                     }
                 })
-                .catch(err => console.error(err));
+                .catch(err => console.error("Attendance fetch error:", err));
         }
 
-        document.getElementById('savePayrollBtn').addEventListener('click', function() {
-
+        // Save Payroll button
+        document.getElementById('savePayrollBtn')?.addEventListener('click', function() {
             const payrollId = <?= json_encode($salaryResult['payroll_id'] ?? null) ?>;
 
             if (!payrollId) {
@@ -512,8 +539,9 @@ if (!empty($_SESSION['message'])) {
                 return;
             }
 
-            this.disabled = true;
-            this.innerText = 'Saving...';
+            const btn = this;
+            btn.disabled = true;
+            btn.innerText = 'Saving...';
 
             fetch('save_payroll.php', {
                 method: 'POST',
@@ -523,15 +551,10 @@ if (!empty($_SESSION['message'])) {
                     payroll_id: payrollId
                 })
             })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error("Network response was not OK");
-                }
-                return response.text(); // safer than direct json()
-            })
-            .then(text => {
+            .then(async res => {
+                if (!res.ok) throw new Error("Network response was not OK");
+                const text = await res.text();
 
-                // Try parsing JSON safely
                 let data;
                 try {
                     data = JSON.parse(text);
@@ -542,33 +565,44 @@ if (!empty($_SESSION['message'])) {
 
                 if (data.success) {
                     alert('Payroll saved! Status updated to Paid.');
-
-                    // Safest approach → reload page
                     location.reload();
-
                 } else {
                     alert('Error: ' + (data.message || 'Unknown error'));
                 }
             })
-            .catch(error => {
-                console.error("Fetch error:", error);
+            .catch(err => {
+                console.error("Fetch error:", err);
                 alert('An error occurred while processing the request.');
             })
             .finally(() => {
-                this.disabled = false;
-                this.innerText = 'Save to Payroll';
+                btn.disabled = false;
+                btn.innerText = 'Save to Payroll';
             });
-
         });
 
-        // Example: when employee or period changes
-        document.getElementById('employee_select').addEventListener('change', function() {
-            const empId = this.value;
-            const period = document.getElementById('pay_period').value;
-            fetchAttendance(empId, period);
+        // Fetch attendance when employee or period changes
+        const employeeSelect = document.getElementById('employee_id');
+        const professionInput = document.getElementById('profession_display');
+        const roleInput = document.getElementById('role_display');
+
+        employeeSelect.addEventListener('change', () => {
+            const selectedOption = employeeSelect.selectedOptions[0];
+            professionInput.value = selectedOption.dataset.profession || '';
+            roleInput.value = selectedOption.dataset.role || '';
         });
 
-    </script>
+        // Trigger change on page load if an employee is pre-selected
+        if(employeeSelect.value) employeeSelect.dispatchEvent(new Event('change'));
+
+        // Debounce helper
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+    </script>    
     <script src="../assets/Bootstrap/all.min.js"></script>
     <script src="../assets/Bootstrap/bootstrap.bundle.min.js"></script>
     <script src="../assets/Bootstrap/fontawesome.min.js"></script>

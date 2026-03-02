@@ -25,7 +25,11 @@ if (!$user) {
     die("User not found.");
 }
 
-$leave_result = $report->fetchAll();
+$month  = $_GET['month'] ?? null;
+$year   = $_GET['year'] ?? null;
+$search = $_GET['search'] ?? '';
+
+$leave_result = $report->fetchAll($month, $year, $search);
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 ?>
@@ -224,22 +228,72 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                 </div>
             </div>
             <!-- START CODING HERE -->
-            <br />
-            <br />
-            <center>
-                <a href="leave_approve_history.php" class="hahaha">Approved Leaves</a> 
-                <a href="leave_reject_history.php" class="hahaha">Rejected Leaves</a>
-            </center>
-            <br />
-            <br />
-
             <div class="summary">
                 <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Leave Reports — Summary by Employee</p>
+
+                <!-- Filter + Search -->
+                <form method="GET" class="leave-nav-inline" style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 20px; max-width: 1100px; margin-left: auto; margin-right: auto; flex-wrap: wrap;">
+
+                    <div style="display: flex; align-items: center; gap: 20px;">
+
+                        <!-- Month Picker -->
+                        <label for="month">Month:</label>
+                        <select name="month" id="month" style="padding:5px 10px; font-size:14px;">
+                            <option value="">--- All ---</option>
+                            <?php
+                            for ($m=1; $m<=12; $m++) {
+                                $selected = (isset($_GET['month']) && $_GET['month'] == $m) ? 'selected' : '';
+                                echo "<option value='$m' $selected>".date('F', mktime(0,0,0,$m,1))."</option>";
+                            }
+                            ?>
+                        </select>
+
+                        <!-- Year Picker -->
+                        <label for="year">Year:</label>
+                        <select name="year" id="year" style="padding:5px 10px; font-size:14px;">
+                            <?php
+                            $currentYear = date('Y');
+                            for ($y = $currentYear - 5; $y <= $currentYear + 1; $y++) {
+                                $selected = '';
+                                if (isset($_GET['year'])) {
+                                    $selected = ($_GET['year'] == $y) ? 'selected' : '';
+                                } else {
+                                    $selected = ($y == 2026) ? 'selected' : '';
+                                }
+                                echo "<option value='$y' $selected>$y</option>";
+                            }
+                            ?>
+                        </select>
+
+                        <!-- Filter Button -->
+                        <button type="submit" name="filter_btn" class="nav-btn">
+                            📅 Filter
+                        </button>
+
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 5px;">
+
+                        <!-- Search Input -->
+                        <input type="text" name="search" placeholder="Search Employee ID/Name..." value="<?= $_GET['search'] ?? '' ?>" style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; width: 250px;">
+
+                        <!-- Search Button -->
+                        <button type="submit" name="search_btn" class="nav-btn">
+                            🔍 Search
+                        </button>
+
+                    </div>
+
+                </form>
+
+                <br />
+
                 <table id="ReportsTable">
                     <thead>
                         <tr>
                             <th>Employee ID</th>
-                            <th>Full Name</th>
+                            <th>Employee Name</th>
+                            <th>Profession</th>
                             <th>Leave Type</th>
                             <th>Start Date</th>
                             <th>End Date</th>
@@ -258,6 +312,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                 <tr>
                                     <td><?= htmlspecialchars($row['employee_id']) ?></td>
                                     <td><?= htmlspecialchars($row['full_name']) ?></td>
+                                    <td><?= htmlspecialchars($row['profession']) ?></td>
                                     <td><?= htmlspecialchars($row['leave_type']) ?></td>
                                     <td><?= htmlspecialchars($row['leave_start_date']) ?></td>
                                     <td><?= htmlspecialchars($row['leave_end_date']) ?></td>
@@ -326,7 +381,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             const rows = table.querySelectorAll("tbody tr");
             const pagination = document.getElementById("pagination");
 
-            let rowsPerPage = 10;
+            let rowsPerPage = 50;
             let currentPage = 1;
             let totalPages = Math.ceil(rows.length / rowsPerPage);
 

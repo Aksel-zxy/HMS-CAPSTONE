@@ -1,30 +1,39 @@
 <?php
+session_start();
 include '../../SQL/config.php';
 include 'class/dashb.php';
 include 'class/logs.php';
 
+/* ================= LOGIN CHECK ================= */
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+/* ================= DASHBOARD DATA ================= */
 $callerObj = new Dashboard($conn);
-$beds= $callerObj->getAvailableBedsCount($conn);
-$appointments = $callerObj->getAppointmentsCount($conn);
-$outpatients = $callerObj->getOutpatientsCount($conn);
-$inpatients = $callerObj->getInpatientsCount($conn);
-$registered = $callerObj->getRegisteredPatientsCount($conn);
+
+$beds = $callerObj->getBedsStatus($conn);
+$appointments  = $callerObj->getAppointmentsCount($conn);
+$outpatients   = $callerObj->getOutpatientsCount($conn);
+$inpatients    = $callerObj->getInpatientsCount($conn);
+$registered    = $callerObj->getRegisteredPatientsCount($conn);
 $totalPatients = $callerObj->getTotalPatients($conn);
+$AvgStay       = $callerObj->getMonthlyAvgStay($conn);
+$occupancyRate   = $callerObj->getBedOccupancyRate($conn);
+$dailyPatients   = $callerObj->getDailyPatientsCount($conn);
+$growthRate        = $callerObj->getGrowthRate($conn);
 
 
+// Extract values into separate variables
+$totalBeds = $beds['total'];
+$availableBeds = $beds['available'];
+$occupiedBeds = $beds['occupied'];
 
-
-if (!isset($_SESSION['patient']) || $_SESSION['patient'] !== true) {
-header('Location: login.php'); // Redirect to login if not logged in
-exit();
-}
-
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-echo "User ID is not set in session.";
-exit();
-}
-
-$query = "SELECT * FROM users WHERE user_id = ?";
+// Calculate occupancy percentage safely
+$occupancyPercent = ($totalBeds > 0) ? ($occupiedBeds / $totalBeds) * 100 : 0;
+/* ================= GET USER ================= */
+$query = "SELECT fname, lname FROM users WHERE user_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $_SESSION['user_id']);
 $stmt->execute();
@@ -32,14 +41,13 @@ $result = $stmt->get_result();
 $user = $result->fetch_assoc();
 
 if (!$user) {
-echo "No user found.";
-exit();
+    echo "No user found.";
+    exit();
 }
 
 logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
-
-
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -209,9 +217,12 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
 
             <!-- START CODING HERE -->
             <div class="container-fluid mt-4">
-                <div class="container text-black allign-items-center rounded welcome my-4">
-                    <span class="username ml-4 me-4 fs-4 justify-content-end">Hello,
-                        <?php echo $user['fname']; ?> <?php echo $user['lname']; ?>! Here's today's Hospital overview
+                <div class="container bg-light p-3 rounded shadow-sm my-4">
+                    <span class="fs-4">
+                        Hello,
+                        <?php echo htmlspecialchars($user['fname']); ?>
+                        <?php echo htmlspecialchars($user['lname']); ?>!
+                        Here's today's Hospital overview
                     </span>
                 </div>
 
@@ -223,7 +234,6 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
                             <p class="card-text fs-4"><?php echo $inpatients; ?></p>
                         </div>
                     </div>
-
 
                     <div class="card text-center shadow-sm">
                         <div class="card-body">
@@ -241,234 +251,301 @@ logAction($conn, $_SESSION['user_id'], 'VIEW_DASHBOARD');
 
                     <div class="card text-center shadow-sm">
                         <div class="card-body">
-                            <h6 class="card-title">Available Beds</h6>
-                            <p class="card-text fs-4"><?php echo $beds; ?></p>
-                        </div>
-                    </div>
-
-                     <div class="card text-center shadow-sm">
-                        <div class="card-body">
-                            <h6 class="card-title">Today's Appointments<</h6>
+                            <h6 class="card-title">Today's Appointments</h6>
                             <p class="card-text fs-4"><?php echo $appointments; ?></p>
                         </div>
                     </div>
 
-                    
-                </div>
-
-            </div>
-
-            <div class="container-fluid mt-4">
-                <div class="d-flex flex-ROW gap-3">
-                    <!-- Flex column wrapper -->
-                    <div class="card w-100">
-                        <div class="card-body justify-content-center">
-                            <div class="d-flex gap-3 mb-3 align-items-end">
-                                <div class="flex-grow-1">
-                                    <label for="typeSelect" class="form-label">Data Type</label>
-                                    <select id="typeSelect" class="form-select">
-                                        <option value="inpatient">Inpatient</option>
-                                        <option value="outpatient">Outpatient</option>
-                                        <option value="appointments">Appointments</option>
-                                        <option value="total">Total Patients</option>
-                                    </select>
-                                </div>
-
-                                <div class="flex-grow-1">
-                                    <label for="rangeSelect" class="form-label">Time Range</label>
-                                    <select id="rangeSelect" class="form-select">
-                                        <option value="monthly">Monthly</option>
-                                        <option value="weekly">Weekly</option>
-                                    </select>
+                    <div class="card text-center shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title">Beds Status</h6>
+                            <p class="card-text fs-6 mb-2">
+                                Occupied: <?php echo $occupiedBeds; ?> / <?php echo $totalBeds; ?>
+                            </p>
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar bg-danger" role="progressbar"
+                                    style="width: <?php echo $occupancyPercent; ?>%;"
+                                    aria-valuenow="<?php echo $occupancyPercent; ?>" aria-valuemin="0"
+                                    aria-valuemax="100">
+                                    <?php echo round($occupancyPercent); ?>%
                                 </div>
                             </div>
 
-
-
-                            <!-- Chart below -->
-                            <div style="flex: 1; min-height: 400px;">
-                                <canvas id="monthlyReportChart"></canvas>
-                            </div>
                         </div>
                     </div>
 
-                   <div class="col-12 col-lg-3">
-    <div class="card h-100">
-        <div class="card-body">
-            <h5 class="card-title text-center pb-3">Quick Actions</h5>
+                </div>
 
-            <!-- Search -->
-            <div class="position-relative mb-3">
-                <input type="text" id="patientSearch" class="form-control"
-                    placeholder="Search patient...">
-                <div id="searchResults"
-                    class="list-group w-100 position-absolute"
-                    style="z-index:1000;"></div>
-            </div>
+                <div class="container-fluid mt-4">
+                    <div class="d-flex flex-ROW gap-3">
+                        <!-- Flex column wrapper -->
+                        <div class="card w-100">
+                            <div class="card-body d-flex flex-column justify-content-center width: 100%;">
+                                <div class="card mb-3 w-100 shadow-sm h-50">
+                                    <div class="card-body py-3 px-3 h-auto">
+                                        <h6 class="mb-3 fw-semibold">
+                                            Overview Analysis (<span id="overviewRange">Monthly</span>)
+                                        </h6>
 
-            <!-- Buttons -->
-            <div class="d-grid gap-3">
+                                        <div class="row text-center g-2">
 
-                <button type="button"
-                    class="btn btn-primary btn-lg w-100 rounded-3"
-                    data-bs-toggle="modal"
-                    data-bs-target="#addPatientModal">
-                    Add Patient
-                </button>
+                                            <!-- Overview -->
+                                            <div class="col-md-4">
+                                                <div class="border rounded p-2 h-100 bg-light">
+                                                    <small class="text-muted d-block">Bed Occupancy rate</small>
+                                                    <h5 class="fw-bold mb-0" id="overviewTotal">
+                                                        <?php echo $occupancyRate; ?>%</h5>
+                                                </div>
+                                            </div>
 
-                <button type="button"
-                    class="btn btn-primary btn-lg w-100 rounded-3"
-                    data-bs-toggle="modal"
-                    data-bs-target="#moveModal">
-                    Move Patient
-                </button>
+                                            <!-- Discharges -->
+                                            <div class="col-md-4">
+                                                <div class="border rounded p-2 h-100 bg-light">
+                                                    <small class="text-muted d-block">Discharges</small>
+                                                    <h5 class="fw-bold text-success mb-0" id="totalDischarges">
+                                                        <?php echo $outpatients; ?></h5>
+                                                </div>
+                                            </div>
 
-                <button type="button"
-                    class="btn btn-primary btn-lg w-100 rounded-3"
-                    data-bs-toggle="modal"
-                    data-bs-target="#appointmentModal">
-                    Add Appointment
-                </button>
+                                            <!-- Average Length of Stay -->
+                                            <div class="col-md-4">
+                                                <div class="border rounded p-2 h-100 bg-light">
+                                                    <small class="text-muted d-block">Avg. Length of Stay</small>
+                                                    <h5 class="fw-bold text-primary mb-0" id="avgStay">
+                                                        <?php echo $AvgStay; ?> days</h5>
+                                                </div>
+                                            </div>
 
-            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Filters -->
+                                <div class="d-flex gap-3 mb-3 align-items-end flex-wrap">
+                                    <div class="flex-grow-1 min-w-150px">
+                                        <label for="typeSelect" class="form-label">Data Type</label>
+                                        <select id="typeSelect" class="form-select">
+                                            <option value="inpatient">Inpatient</option>
+                                            <option value="outpatient">Outpatient</option>
+                                            <option value="appointments">Appointments</option>
+                                            <option value="total">Total Patients</option>
+                                        </select>
+                                    </div>
 
-            <?php include 'icreate.php'; ?>
-            <?php include 'move.php'; ?>
-            <?php include 'pcreate.php'; ?>
+                                    <div class="flex-grow-1 min-w-150px">
+                                        <label for="rangeSelect" class="form-label">Time Range</label>
+                                        <select id="rangeSelect" class="form-select">
+                                            <option value="monthly">Monthly</option>
+                                            <option value="weekly">Weekly</option>
+                                        </select>
+                                    </div>
+                                </div>
 
-        </div>
-    </div>
-</div>
+                                <!-- Chart Container -->
+                                <div class="position-relative "
+                                    style="min-height: 300px; max-height: 450px; width: 100%;">
+                                    <!-- Optional loader -->
+                                    <div id="chartLoader"
+                                        class="position-absolute top-50 start-50 translate-middle d-none">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+
+                                    <canvas id="monthlyReportChart" class="w-100 h-100"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-lg-2">
+                            <div class="row g-3">
+
+                                <!-- Quick Actions (left) -->
+                                <div class="col-12 col-lg-2 d-flex flex-column gap-3">
+
+                                    <!-- Quick Actions Card (Top) -->
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h5 class="card-title text-center pb-3">Quick Actions</h5>
+
+                                            <!-- Search -->
+                                            <div class="position-relative mb-3">
+                                                <input type="text" id="patientSearch" class="form-control"
+                                                    placeholder="Search patient...">
+                                                <div id="searchResults" class="list-group w-100 position-absolute"
+                                                    style="z-index:1000;"></div>
+                                            </div>
+
+                                            <!-- Buttons -->
+                                            <div class="d-grid gap-2">
+                                                <button type="button" class="btn btn-primary btn-sm w-100 rounded-3"
+                                                    data-bs-toggle="modal" data-bs-target="#addPatientModal">
+                                                    Add Patient
+                                                </button>
+
+                                                <button type="button" class="btn btn-primary btn-sm w-100 rounded-3"
+                                                    data-bs-toggle="modal" data-bs-target="#moveModal">
+                                                    Move Patient
+                                                </button>
+
+                                                <button type="button" class="btn btn-primary btn-sm w-100 rounded-3"
+                                                    data-bs-toggle="modal" data-bs-target="#appointmentModal">
+                                                    Add Appointment
+                                                </button>
+                                            </div>
+
+                                            <?php include 'icreate.php'; ?>
+                                            <?php include 'move.php'; ?>
+                                            <?php include 'pcreate.php'; ?>
+                                        </div>
+                                    </div>
+
+                                    <!-- Empty Card (Bottom) -->
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="col text-center g-3">
+
+                                                <!-- Average Length of Stay -->
+                                                <div class="col-12 mb-3">
+                                                    <div class="border rounded p-3 h-100 bg-light w-100">
+                                                        <small class="text-muted d-block"><strong>Growth
+                                                                rate</strong></small>
+                                                        <h5 class="fw-bold text-primary mb-0">
+                                                            <?php echo $growthRate; ?>%
+                                                        </h5>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Bed Occupancy -->
+                                                <div class="col-12">
+                                                    <div class="border rounded p-3 h-100 bg-light w-100">
+                                                        <small class="text-muted d-block"><strong>Daily
+                                                                Patient</strong></small>
+                                                        <h5 class="fw-bold text-success mb-0">
+                                                            <?php echo $dailyPatients; ?>
+                                                        </h5>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+            <!-- END CODING HERE -->
         </div>
-
-
-
-
-
-        <!-- END CODING HERE -->
-    </div>
-    <!----- End of Main Content ----->
+        <!----- End of Main Content ----->
     </div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 
     <script>
+    // SIDEBAR TOGGLER
     const toggler = document.querySelector(".toggler-btn");
-    toggler.addEventListener("click", function() {
+    toggler.addEventListener("click", () => {
         document.querySelector("#sidebar").classList.toggle("collapsed");
     });
 
+    const types = ['inpatient', 'outpatient', 'appointments', 'total'];
+
+    const typeNames = {
+        inpatient: 'Inpatients',
+        outpatient: 'Outpatients',
+        appointments: 'Appointments',
+        total: 'Total Patients'
+    };
+
+    const colors = {
+        inpatient: '#3b82f6',
+        outpatient: '#10b981',
+        appointments: '#f59e0b',
+        total: '#8b5cf6'
+    };
+
+    // Initialize chart
     const ctx = document.getElementById('monthlyReportChart').getContext('2d');
 
     const chart = new Chart(ctx, {
-        type: 'line',
+        type: 'bar',
         data: {
-            labels: [], // will be updated dynamically
-            datasets: [{
-                label: '',
-                data: [],
-                tension: 0.3,
-                borderWidth: 2,
-                pointRadius: 4
-            }]
+            labels: [],
+            datasets: []
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
         }
     });
 
-    function loadChartData(type, range) {
-        fetch(`class/dashboard_chart.php?type=${type}&range=${range}`)
-            .then(res => res.json())
-            .then(data => {
-                chart.data.datasets[0].data = data;
+    async function loadChartData() {
+        const selectedType = document.getElementById('typeSelect').value;
+        const range = document.getElementById('rangeSelect').value;
 
-                if (range === 'weekly') {
-                    const labels = [];
-                    for (let i = 6; i >= 0; i--) {
-                        const d = new Date();
-                        d.setDate(d.getDate() - i);
-                        labels.push(d.toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric'
-                        }));
-                    }
-                    chart.data.labels = labels;
-                } else {
-                    chart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct',
-                        'Nov', 'Dec'
-                    ];
-                }
+        const labels = range === 'weekly' ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] : ['Jan', 'Feb',
+            'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        ];
 
-                chart.data.datasets[0].label =
-                    `${document.querySelector(`#typeSelect option[value="${type}"]`).text} (${range})`;
+        let datasets = [];
 
-                chart.update();
-            })
-            .catch(err => console.error('Chart fetch error:', err));
+        for (const type of types) {
+            const response = await fetch(`class/dashboard_chart.php?type=${type}&range=${range}`);
+            const data = await response.json();
+
+            datasets.push({
+                type: type === selectedType ? 'bar' : 'line',
+                label: typeNames[type],
+                data: data,
+                backgroundColor: type === selectedType ?
+                    colors[type] + '99' : 'transparent',
+                borderColor: colors[type],
+                borderWidth: 2,
+                tension: 0.4,
+                pointRadius: type === selectedType ? 0 : 4,
+                fill: false,
+                order: type === selectedType ? 2 : 1
+            });
+        }
+
+        chart.data.labels = labels;
+        chart.data.datasets = datasets;
+        chart.update();
+
     }
 
-    // INITIAL LOAD
-    loadChartData('inpatient', 'monthly');
+    // Initial load
+    loadChartData();
 
-    // Event listeners
-    document.getElementById('typeSelect').addEventListener('change', () => {
-        const type = document.getElementById('typeSelect').value;
-        const range = document.getElementById('rangeSelect').value;
-        loadChartData(type, range);
-    });
+    // On filter change
+    document.getElementById('typeSelect').addEventListener('change', loadChartData);
+    document.getElementById('rangeSelect').addEventListener('change', loadChartData);
 
-    document.getElementById('rangeSelect').addEventListener('change', () => {
-        const type = document.getElementById('typeSelect').value;
-        const range = document.getElementById('rangeSelect').value;
-        loadChartData(type, range);
-    });
+    // INPUT EVENT WITH DEBOUNCE
+    searchInput.addEventListener('input', debounce(function() {
+        searchPatients(this.value.trim());
+    }, 300));
 
-
-
-
-    // Search Patient
-    const searchInput = document.getElementById('patientSearch');
-    const resultsDiv = document.getElementById('searchResults');
-
-    searchInput.addEventListener('input', function() {
-        const query = this.value.trim();
-
-        if (query.length === 0) {
-            resultsDiv.innerHTML = '';
-            return;
-        }
-
-        fetch('class/search_patient.php?q=' + encodeURIComponent(query))
-            .then(response => response.json())
-            .then(data => {
-                resultsDiv.innerHTML = '';
-
-                if (data.length > 0) {
-                    data.forEach(patient => {
-                        const item = document.createElement('a');
-                        item.href = `iview.php?patient_id=${patient.id}`;
-                        item.classList.add('list-group-item', 'list-group-item-action');
-                        item.textContent = patient.name;
-                        resultsDiv.appendChild(item);
-                    });
-                } else {
-                    const noItem = document.createElement('div');
-                    noItem.classList.add('list-group-item', 'text-muted');
-                    noItem.textContent = 'No results found';
-                    resultsDiv.appendChild(noItem);
-                }
-            })
-            .catch(err => {
-                console.error('Error fetching patients:', err);
-            });
-    });
-
-    // Hide results when clicking outside
-    document.addEventListener('click', function(e) {
+    // HIDE RESULTS WHEN CLICKING OUTSIDE
+    document.addEventListener('click', (e) => {
         if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
             resultsDiv.innerHTML = '';
         }

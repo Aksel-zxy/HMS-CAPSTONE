@@ -7,23 +7,67 @@ class AttendanceRecord {
     }
 
     // Get records by date
-    public function getDailyRecords($date) {
-        $stmt = $this->conn->prepare("
+    public function getDailyRecords($date, $search = null) {
+
+        $sql = "
             SELECT 
-                employee_id,
-                attendance_date,
-                time_in,
-                time_out,
-                working_hours,
-                late_minutes,
-                undertime_minutes,
-                overtime_minutes,
-                status
-            FROM hr_daily_attendance
-            WHERE attendance_date = ?
-            ORDER BY employee_id ASC
-        ");
-        $stmt->bind_param("s", $date);
+                a.employee_id,
+                CONCAT(
+                    e.first_name, ' ',
+                    IFNULL(e.middle_name, ''), ' ',
+                    e.last_name, ' ',
+                    IFNULL(e.suffix_name, '')
+                ) AS full_name,
+                e.role,
+                e.profession,
+                a.attendance_date,
+                a.time_in,
+                a.time_out,
+                a.working_hours,
+                a.late_minutes,
+                a.undertime_minutes,
+                a.overtime_minutes,
+                a.status
+            FROM hr_daily_attendance a
+            INNER JOIN hr_employees e 
+                ON a.employee_id = e.employee_id
+            WHERE a.attendance_date = ?
+        ";
+
+        if (!empty($search)) {
+            $sql .= " AND (
+                a.employee_id LIKE ? OR
+                a.status LIKE ? OR
+                CONCAT(
+                    e.first_name, ' ',
+                    IFNULL(e.middle_name, ''), ' ',
+                    e.last_name, ' ',
+                    IFNULL(e.suffix_name, '')
+                ) LIKE ? OR
+                e.role LIKE ? OR
+                e.profession LIKE ?
+            )";
+        }
+
+        $sql .= " ORDER BY a.employee_id ASC";
+
+        $stmt = $this->conn->prepare($sql);
+
+        if (!empty($search)) {
+            $searchParam = "%{$search}%";
+            $stmt->bind_param(
+                "ssssss",
+                $date,
+                $searchParam,
+                $searchParam,
+                $searchParam,
+                $searchParam,
+                $searchParam
+            );
+        } else {
+            $stmt->bind_param("s", $date);
+        }
+
         $stmt->execute();
         return $stmt->get_result();
     }

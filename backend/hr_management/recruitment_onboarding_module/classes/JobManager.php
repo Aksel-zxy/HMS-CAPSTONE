@@ -13,6 +13,7 @@ class JobManager {
             $title = trim($data['title']);
             $job_position = trim($data['job_position']);
             $job_description = trim($data['job_description']);
+            $job_qualification = trim($data['job_qualification']);
             $specialization = trim($data['specialization']);
             $date_post = date("Y-m-d H:i:s");
 
@@ -24,10 +25,10 @@ class JobManager {
             }
 
             $stmt = $this->conn->prepare("
-                INSERT INTO hr_job (profession, title, job_position, job_description, specialization, date_post, image)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO hr_job (profession, title, job_position, job_description, job_qualification, specialization, date_post, image)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->bind_param("sssssss", $profession, $title, $job_position, $job_description, $specialization, $date_post, $imageData);
+            $stmt->bind_param("ssssssss", $profession, $title, $job_position, $job_description, $job_qualification, $specialization, $date_post, $imageData);
 
             if ($stmt->execute()) {
                 return true;

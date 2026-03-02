@@ -27,7 +27,8 @@ if (!$user) {
 
 $currentYear = date('Y');
 
-$leaveCredits = $leaveCreditModel->getAllLeaveCredits($currentYear);
+$search = $_GET['search'] ?? '';
+$leaveCredits = $leaveCreditModel->getAllLeaveCredits($currentYear, $search);
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 ?>
@@ -228,11 +229,24 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             <!-- START CODING HERE -->
             <div class="summary">
                 <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Leave Credits per Employees</p>
-
+                
                 <center>
-                    <button class="hahaha" onclick="openForm()">Add Leave Credits</button>
+                    <button class="nav-btn" onclick="openForm()">Add Leave Credits</button>
                 </center>
 
+                <form method="GET" class="leave-nav-inline" style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 20px; max-width: 1100px; margin-left: auto; margin-right: auto; flex-wrap: wrap;">
+                    
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="text" name="search" id="leaveSearch" placeholder="Search Employee ID/Name..." value="<?= $_GET['search'] ?? '' ?>" style="padding: 8px 12px; width: 250px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;">
+
+                        <button type="submit" name="search_btn" class="navv-btn">
+                            🔍 Search
+                        </button>
+                    </div>
+
+                </form>
+
+                <br />
 
                 <!-- Pop-Up Form -->
                 <div id="popupForm" class="popup-form">
@@ -261,7 +275,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                                         ($emp['suffix_name'] ?? ''));
                                     ?>
                                         <option value="<?= $emp['employee_id'] ?>" data-gender="<?= $emp['gender'] ?>">
-                                            <?= htmlspecialchars($fullName) ?> &nbsp;&nbsp;&nbsp; (<?= htmlspecialchars($emp['employee_id']) ?>) &nbsp;&nbsp;&nbsp; (<?= htmlspecialchars($emp['profession']) ?>)
+                                            <?= htmlspecialchars($fullName) ?> &nbsp;&nbsp;&nbsp; (ID: <?= htmlspecialchars($emp['employee_id']) ?>) &nbsp;&nbsp;&nbsp; (<?= htmlspecialchars($emp['profession']) ?>)
                                         </option>
                                     <?php endwhile; ?>
                                 </select>
@@ -316,8 +330,9 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                     <thead>
                         <tr>
                             <th>Employee ID</th>
-                            <th>Full Name</th>
+                            <th>Employee Name</th>
                             <th>Profession</th>
+                            <th>Role</th>
                             <th>Leave Type</th>
                             <th>Allocated Days</th>
                             <th>Used Days</th>
@@ -342,6 +357,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                                             <td rowspan="<?= $rowCount ?>"><?= $rec['employee_id'] ?></td>
                                             <td rowspan="<?= $rowCount ?>"><?= htmlspecialchars($rec['full_name']) ?></td>
                                             <td rowspan="<?= $rowCount ?>"><?= htmlspecialchars($rec['profession']) ?></td>
+                                            <td rowspan="<?= $rowCount ?>"><?= htmlspecialchars($rec['role']) ?></td>
                                         <?php $firstRow = false; endif; ?>
 
                                         <td><?= htmlspecialchars($rec['leave_type'] ?? '') ?></td>
@@ -426,7 +442,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             const rows = table.querySelectorAll("tbody tr");
             const pagination = document.getElementById("pagination");
 
-            let rowsPerPage = 25;
+            let rowsPerPage = 50;
             let currentPage = 1;
             let totalPages = Math.ceil(rows.length / rowsPerPage);
 

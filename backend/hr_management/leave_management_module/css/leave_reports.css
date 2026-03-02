@@ -63,6 +63,42 @@
     box-shadow: 10px 10px 10px rgba(0, 0, 0, 1);
 }
 
+.leave-nav-inline {
+    display: flex;
+    justify-content: center; 
+    align-items: center;    
+    gap: 15px;            
+    margin-bottom: 30px;
+    flex-wrap: wrap;   
+}
+
+.leave-nav-inline label {
+    font-weight: 500;
+    margin-right: 5px;
+}
+
+.leave-nav-inline input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.leave-nav-inline .nav-btn {
+    background-color: #0047ab;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.leave-nav-inline .nav-btn:hover {
+    background-color: #0096c7;
+    transition: background-color 0.3s;
+}
+
 /* ---------- Table Style ---------- */
 .summary {
     position: relative;

@@ -28,6 +28,11 @@ $totalNurses     = $employee->countByProfession('Nurse');
 $totalPharma     = $employee->countByProfession('Pharmacist');
 $totalAccountant = $employee->countByProfession('Accountant');
 $totalLab        = $employee->countByProfession('Laboratorist');
+$totalLab        = $employee->countByProfession('Laboratorist');
+$totalITSupport  = $employee->countByProfession('IT Support');
+$totalJanitor    = $employee->countByProfession('Janitor');
+$totalSecurityGuard = $employee->countByProfession('Security Guard');
+$totalElectricalTech = $employee->countByProfession('Electrical Technician');
 
 // Get all employees for dropdown
 $employees = $dashboard->getAllEmployees();
@@ -177,10 +182,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="payroll_compensation_benifits_module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -237,54 +242,96 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             </div>
             <!-- START CODING HERE -->
             <!-- ----- Card-List of Employees ----- -->
-            <div class="row">
-                <h5 class="row-title">Number of Active Employees per Profession</h5>
-                <div class="card">
-                    <a href="recruitment_onboarding_module/list_of_doctors.php">
-                        <div class="card-body">
-                            <h5 class="card-title">Doctor</h5>
-                            <p class="card-text"><strong><?php echo $totalDoctors; ?></strong> active doctors.</p>
-                        </div>
-                    </a>
-                </div>
+            <h5 class="row1-title">Number of Active Employees per Profession</h5>
 
-                <div class="card">
-                    <a href="recruitment_onboarding_module/list_of_nurses.php">
-                        <div class="card-body">
-                            <h5 class="card-title">Nurse</h5>
-                            <p class="card-text"><strong><?php echo $totalNurses; ?></strong> active nurses.</p>
-                        </div>
-                    </a>
-                </div>
+            <div class="HAHAHA">
+                <h5 class="row1-title">Medical Personnel</h5>
 
-                <div class="card">
-                    <a href="recruitment_onboarding_module/list_of_pharmacists.php">
-                        <div class="card-body">
-                            <h5 class="card-title">Pharmacist</h5>
-                            <p class="card-text"><strong><?php echo $totalPharma; ?></strong> active pharmacist.</p>
-                        </div>
-                    </a>
-                </div>
+                <div class="row1">
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_doctors.php">
+                            <div class="card-body">
+                                <h5 class="card-title">Doctor</h5>
+                                <p class="card-text"><strong><?php echo $totalDoctors; ?></strong> active doctors.</p>
+                            </div>
+                        </a>
+                    </div>
 
-                <div class="card">
-                    <a href="recruitment_onboarding_module/list_of_accountants.php">
-                        <div class="card-body">
-                            <h5 class="card-title">Accountant</h5>
-                            <p class="card-text"><strong><?php echo $totalAccountant; ?></strong> active accountant.</p>
-                        </div>
-                    </a>
-                </div>
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_nurses.php">
+                            <div class="card-body">
+                                <h5 class="card-title">Nurse</h5>
+                                <p class="card-text"><strong><?php echo $totalNurses; ?></strong> active nurses.</p>
+                            </div>
+                        </a>
+                    </div>
 
-                <div class="card">
-                    <a href="recruitment_onboarding_module/list_of_laboratorist.php">
-                        <div class="card-body">
-                            <h5 class="card-title">Laboratorist</h5>
-                            <p class="card-text"><strong><?php echo $totalLab; ?></strong> active laboratorist.</p>
-                        </div>
-                    </a>
-                </div>
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_pharmacists.php">
+                            <div class="card-body">
+                                <h5 class="card-title">Pharmacist</h5>
+                                <p class="card-text"><strong><?php echo $totalPharma; ?></strong> active pharmacist.</p>
+                            </div>
+                        </a>
+                    </div>
 
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_laboratorist.php">
+                            <div class="card-body">
+                                <h5 class="card-title">Medical Technologist</h5>
+                                <p class="card-text"><strong><?php echo $totalLab; ?></strong> active medical technologist.</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
             </div>
+            <div class="HAHAHA">
+                <h5 class="row1-title">Non-Medical Personnel</h5>
+
+                <div class="row2">
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_accountants.php">
+                            <div class="card-body">
+                                <h5 class="card-title">Accountant</h5>
+                                <p class="card-text"><strong><?php echo $totalAccountant; ?></strong> active accountant.</p>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_it_support.php">
+                            <div class="card-body">
+                                <h5 class="card-title">IT Personnel</h5>
+                                <p class="card-text"><strong><?php echo $totalITSupport; ?></strong> active IT personnel.</p>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_janitors.php">
+                            <div class="card-body">
+                                <h5 class="card-title">Janitor</h5>
+                                <p class="card-text"><strong><?php echo $totalJanitor; ?></strong> active janitor.</p>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_security_guards.php">
+                            <div class="card-body">
+                                <h5 class="card-title">Security Guard</h5>
+                                <p class="card-text"><strong><?php echo $totalSecurityGuard; ?></strong> active security guard.</p>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="card">
+                        <a href="recruitment_onboarding_module/list_of_electrical_technicians.php">
+                            <div class="card-body">
+                                <h5 class="card-title">Electrical Technician</h5>
+                                <p class="card-text"><strong><?php echo $totalElectricalTech; ?></strong> active electrical technician.</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
 
             <div class="dashboard-attendance-container">
                 <!-- ----- Attendance Summary Per Day ----- -->
@@ -456,7 +503,8 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
         window.addEventListener("load", function () {
             setTimeout(() => {
                 document.getElementById("loading-screen").style.display = "none";
-                document.body.classList.add("show-cards");
+                document.querySelector('.row1').classList.add('show-cards');
+                document.querySelector('.row2').classList.add('show-cards');
 
                 // ----- STAGGER RENDER CHARTS -----
                 setTimeout(renderPendingLeaveChart, 200);   // Pending Leave

@@ -7,13 +7,14 @@ class PayrollReports {
     }
 
     /**
-     * Get all payrolls marked as 'Paid', optionally filtered by date range
+     * Get all payrolls marked as 'Paid', optionally filtered by date range and search
      *
      * @param string $start Start date (YYYY-MM-DD)
      * @param string $end End date (YYYY-MM-DD)
+     * @param string $search Search term (Employee ID, Name, Role, Profession, Department)
      * @return array
      */
-    public function getPayrolls($start = '', $end = '') {
+    public function getPayrolls($start = '', $end = '', $search = '') {
         $sql = "
             SELECT 
                 p.payroll_id,
@@ -25,47 +26,53 @@ class PayrollReports {
                     COALESCE(e.suffix_name, '')
                 )) AS employee_name,
                 e.profession,
+                e.role,
                 e.department,
                 p.pay_period_start,
                 p.pay_period_end,
-                p.days_worked,
-                p.overtime_hours,
-                p.basic_pay,
-                p.overtime_pay,
-                p.allowances,
-                p.bonuses,
-                p.thirteenth_month,
-                p.undertime_deduction,
-                p.sss_deduction,
-                p.philhealth_deduction,
-                p.pagibig_deduction,
-                p.absence_deduction,
                 p.gross_pay,
                 p.total_deductions,
                 p.net_pay,
-                p.disbursement_method,
                 p.date_generated
             FROM hr_payroll p
             JOIN hr_employees e ON p.employee_id = e.employee_id
             WHERE p.status = 'Paid'
         ";
 
-        $params = [];
-        $types = "";
-
+        // -------------------- DATE FILTER --------------------
         if (!empty($start) && !empty($end)) {
             $sql .= " AND p.pay_period_start >= ? AND p.pay_period_end <= ?";
-            $params[] = $start;
-            $params[] = $end;
-            $types .= "ss";
+        }
+
+        // -------------------- SEARCH FILTER --------------------
+        if (!empty($search)) {
+            $sql .= " AND (
+                        e.employee_id LIKE ? OR
+                        TRIM(CONCAT(
+                            COALESCE(e.first_name, ''), ' ',
+                            COALESCE(e.middle_name, ''), ' ',
+                            COALESCE(e.last_name, ''), ' ',
+                            COALESCE(e.suffix_name, '')
+                        )) LIKE ? OR
+                        e.role LIKE ? OR
+                        e.profession LIKE ? OR
+                        e.department LIKE ?
+                    )";
         }
 
         $sql .= " ORDER BY p.date_generated DESC";
 
         $stmt = $this->conn->prepare($sql);
 
-        if (!empty($params)) {
-            $stmt->bind_param($types, ...$params);
+        // -------------------- BIND PARAMETERS --------------------
+        if (!empty($start) && !empty($end) && !empty($search)) {
+            $searchParam = "%{$search}%";
+            $stmt->bind_param("sssssss", $start, $end, $searchParam, $searchParam, $searchParam, $searchParam, $searchParam);
+        } elseif (!empty($start) && !empty($end)) {
+            $stmt->bind_param("ss", $start, $end);
+        } elseif (!empty($search)) {
+            $searchParam = "%{$search}%";
+            $stmt->bind_param("sssss", $searchParam, $searchParam, $searchParam, $searchParam, $searchParam);
         }
 
         $stmt->execute();
@@ -73,7 +80,6 @@ class PayrollReports {
 
         $payrolls = [];
         while ($row = $result->fetch_assoc()) {
-            // Ensure numeric fields are safe
             $row['gross_pay'] = (float) ($row['gross_pay'] ?? 0);
             $row['total_deductions'] = (float) ($row['total_deductions'] ?? 0);
             $row['net_pay'] = (float) ($row['net_pay'] ?? 0);
@@ -86,9 +92,6 @@ class PayrollReports {
 
     /**
      * Get payroll summary totals
-     *
-     * @param array $payrolls Array of payroll rows
-     * @return array ['total_gross' => , 'total_deductions' => , 'total_net' => ]
      */
     public function getSummaryTotals($payrolls) {
         $totalGross = $totalDeductions = $totalNet = 0;
@@ -108,9 +111,6 @@ class PayrollReports {
 
     /**
      * Format totals for display
-     *
-     * @param float $amount
-     * @return string
      */
     public function formatCurrency($amount) {
         return number_format($amount, 2);

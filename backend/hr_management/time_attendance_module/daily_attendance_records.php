@@ -32,7 +32,10 @@ $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
 $prev_day = date('Y-m-d', strtotime($date . ' -1 day'));
 $next_day = date('Y-m-d', strtotime($date . ' +1 day'));
 
-$result = $attendanceRecords->getDailyRecords($date);
+$date = $_GET['date'] ?? date('Y-m-d');
+$search = $_GET['search'] ?? '';
+
+$result = $attendanceRecords->getDailyRecords($date, $search);
 
 ?>
 
@@ -170,10 +173,10 @@ $result = $attendanceRecords->getDailyRecords($date);
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../payroll_compensation_benifits_module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -232,37 +235,44 @@ $result = $attendanceRecords->getDailyRecords($date);
             <div class="attendance">
                 <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Daily Attendance Records (<?php echo $date; ?>)</p>
 
-                <!-- Navigation -->
-                <form method="GET" class="attendance-nav" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 900px; margin-left: auto; margin-right: auto;">
-                    
+                <!-- Navigation + Search -->
+                <form method="GET" class="attendance-nav" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 1100px; margin-left: auto; margin-right: auto; flex-wrap: wrap;">
+
                     <!-- Previous Day Button -->
-                    <button type="submit" class="nav-btn" 
-                        onclick="document.getElementById('form-date').value='<?= $prev_day; ?>'">
+                    <button type="submit" class="nav-btn" onclick="document.getElementById('form-date').value='<?= $prev_day; ?>'">
                         ⬅ Previous Day
                     </button>
 
-                    <!-- Hidden input to store the selected date -->
+                    <!-- Hidden input to store selected date -->
                     <input type="hidden" name="date" id="form-date" value="<?= $date; ?>">
 
                     <!-- Calendar Date Picker -->
-                    <input type="date" class="date-picker" value="<?= $date; ?>" 
-                        onchange="document.getElementById('form-date').value=this.value; this.form.submit();"
-                        style="padding: 5px 10px; font-size: 16px;">
+                    <input type="date" class="date-picker" value="<?= $date; ?>" onchange="document.getElementById('form-date').value=this.value; this.form.submit();" style="padding: 5px 10px; font-size: 16px;">
 
                     <!-- Next Day Button -->
-                    <button type="submit" class="nav-btn" 
-                        onclick="document.getElementById('form-date').value='<?= $next_day; ?>'">
+                    <button type="submit" class="nav-btn" onclick="document.getElementById('form-date').value='<?= $next_day; ?>'">
                         Next Day ➡
                     </button>
+                    
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="text" name="search" id="attendanceSearch" placeholder="Search Employee ID/Name..." value="<?= $_GET['search'] ?? '' ?>" style="padding: 8px 12px; width: 250px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;">
 
+                        <button type="submit" name="search_btn" class="nav-btn">
+                            🔍 Search
+                        </button>
+                    </div>
+                
                 </form>
+
                 <br />
 
                 <table id="AttendanceTable">
                     <thead>
                         <tr>
                             <th>Employee ID</th>
-                            <th>Date</th>
+                            <th>Employee Name</th>
+                            <th>Profession</th>
+                            <th>Role</th>
                             <th>Time In</th>
                             <th>Time Out</th>
                             <th>Hours Worked</th>
@@ -281,7 +291,9 @@ $result = $attendanceRecords->getDailyRecords($date);
                                 ?>
                                 <tr>
                                     <td><?= $row['employee_id'] ?? '-' ?></td>
-                                    <td><?= $row['attendance_date'] ?? '-' ?></td>
+                                    <td><?= $row['full_name'] ?? '-' ?></td>
+                                    <td><?= $row['profession'] ?? '-' ?></td>
+                                    <td><?= $row['role'] ?? '-' ?></td>
                                     <td><?= $row['time_in'] ?? '-' ?></td>
                                     <td><?= $row['time_out'] ?? '-' ?></td>
                                     <td><?= $row['working_hours'] ?? '0' ?></td>
@@ -294,7 +306,7 @@ $result = $attendanceRecords->getDailyRecords($date);
                                 </tr>
                             <?php endwhile; ?>
                         <?php else: ?>
-                            <tr><td colspan="10">No attendance records for this date.</td></tr>
+                            <tr><td colspan="11">No attendance records for this date.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -331,7 +343,7 @@ $result = $attendanceRecords->getDailyRecords($date);
             const rows = table.querySelectorAll("tbody tr");
             const pagination = document.getElementById("pagination");
 
-            let rowsPerPage = 10;
+            let rowsPerPage = 20;
             let currentPage = 1;
             let totalPages = Math.ceil(rows.length / rowsPerPage);
 

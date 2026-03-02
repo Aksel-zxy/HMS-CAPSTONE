@@ -22,8 +22,12 @@ class CompensationBenefits {
                         ' ',
                         COALESCE(suffix_name, '')
                     )
-                ) AS full_name
+                ) AS full_name,
+                profession,
+                role
             FROM hr_employees
+            WHERE status = 'Active'
+            AND profession IN ('Doctor','Nurse','Pharmacist','Laboratorist','Accountant')
             ORDER BY employee_id ASC
         ");
 

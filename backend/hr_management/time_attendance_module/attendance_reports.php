@@ -27,8 +27,9 @@ if (!$user) {
 
 $start_date = $_GET['start_date'] ?? date('Y-m-01');
 $end_date   = $_GET['end_date'] ?? date('Y-m-t');   
+$search = $_GET['search'] ?? '';
 
-$result = $attendanceReport->getAttendanceSummary($start_date, $end_date);
+$result = $attendanceReport->getAttendanceSummary($start_date, $end_date, $search);
 $pendingCount = $leaveNotif->getPendingLeaveCount();
 
 ?>
@@ -167,10 +168,10 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../payroll_compensation_benifits_module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -227,24 +228,42 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             </div>
             <!-- START CODING HERE -->
             <div class="attendance">
-                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: black;">Attendance Reports</p>
+                <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Attendance Reports</p>
 
 
-                <form method="GET" class="attendance-nav-inline">
-                    <label for="start_date">Start Date:</label>
-                    <input type="date" id="start_date" name="start_date" value="<?= $start_date ?>">
+                <form method="GET" class="attendance-nav-inline" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; max-width: 1100px; margin-left: auto; margin-right: auto; flex-wrap: wrap;">
 
-                    <label for="end_date">End Date:</label>
-                    <input type="date" id="end_date" name="end_date" value="<?= $end_date ?>">
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <label for="start_date">Start Date:</label>
+                        <input type="date" id="start_date" name="start_date" value="<?= $start_date ?>">
 
-                    <button type="submit">Filter</button>
+                        <label for="end_date">End Date:</label>
+                        <input type="date" id="end_date" name="end_date" value="<?= $end_date ?>">
+
+                        <button type="submit"  class="nav-btn">
+                            📅 Filter
+                        </button>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="text" name="search" id="attendanceSearch" placeholder="Search Employee ID/Name..." value="<?= $_GET['search'] ?? '' ?>" style="padding: 8px 12px; width: 250px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;">
+
+                        <button type="submit" name="search_btn" class="nav-btn">
+                            🔍 Search
+                        </button>
+                    </div>
+
                 </form>
+
+                <br />
 
                 <table id="AttendanceTable">
                     <thead>
                         <tr>
                             <th>Employee ID</th>
-                            <th>Name</th>
+                            <th>Employee Name</th>
+                            <th>Profession</th>
+                            <th>Role</th>
                             <th>Days Present</th>
                             <th>Days Absent</th>
                             <th>Days On Leave</th>
@@ -259,6 +278,8 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
                         <tr>
                             <td><?= $row['employee_id'] ?></td>
                             <td><?= htmlspecialchars($row['full_name']) ?></td>
+                            <td><?= $row['profession'] ?></td>
+                            <td><?= $row['role'] ?></td>
                             <td><?= $row['days_present'] ?></td>
                             <td><?= $row['days_absent'] ?></td>
                             <td><?= $row['days_on_leave'] ?></td>
@@ -303,7 +324,7 @@ $pendingCount = $leaveNotif->getPendingLeaveCount();
             const rows = table.querySelectorAll("tbody tr");
             const pagination = document.getElementById("pagination");
 
-            let rowsPerPage = 10;
+            let rowsPerPage = 20;
             let currentPage = 1;
             let totalPages = Math.ceil(rows.length / rowsPerPage);
 

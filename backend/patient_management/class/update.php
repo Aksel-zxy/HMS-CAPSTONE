@@ -55,27 +55,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$updateResult) {
             throw new Exception("Failed to update patient information.");
         }
+// Handle image upload
+$image_blob = null;
+$imageUploaded = false;
 
-        // Update medical history if provided
-        if (!empty($_POST['condition_name']) || !empty($_POST['diagnosis_date']) || !empty($_POST['notes'])) {
-            $stmt = $conn->prepare("
-                UPDATE p_previous_medical_records 
-                SET condition_name = ?, diagnosis_date = ?, notes = ? 
-                WHERE patient_id = ?
-            ");
-            $stmt->bind_param(
-                "sssi",
-                $_POST['condition_name'],
-                $_POST['diagnosis_date'],
-                $_POST['notes'],
-                $patient_id
-            );
+if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
 
-            if (!$stmt->execute()) {
-                throw new Exception("Medical history update failed: " . $stmt->error);
-            }
-            $stmt->close();
+    $allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    $maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!in_array($_FILES['image']['type'], $allowedTypes)) {
+        throw new Exception("Invalid image type.");
+    }
+
+    if ($_FILES['image']['size'] > $maxSize) {
+        throw new Exception("Image too large.");
+    }
+
+    $image_blob = file_get_contents($_FILES['image']['tmp_name']);
+    $imageUploaded = true;
+}
+
+// Update medical history if provided
+if (!empty($_POST['condition_name']) || 
+    !empty($_POST['diagnosis_date']) || 
+    !empty($_POST['notes']) || 
+    $imageUploaded) {
+
+    if ($imageUploaded) {
+
+        $stmt = $conn->prepare("
+            UPDATE p_previous_medical_records 
+            SET condition_name = ?, 
+                diagnosis_date = ?, 
+                notes = ?, 
+                image_blob = ?
+            WHERE patient_id = ?
+        ");
+
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
         }
+
+        $condition_name = $_POST['condition_name'] ?? '';
+        $diagnosis_date = $_POST['diagnosis_date'] ?? null;
+        $notes = $_POST['notes'] ?? '';
+        $null = NULL; // placeholder for blob
+
+        $stmt->bind_param(
+            "sssbi",
+            $condition_name,
+            $diagnosis_date,
+            $notes,
+            $null,
+            $patient_id
+        );
+
+        // Send binary data (image is parameter index 3)
+        $stmt->send_long_data(3, $image_blob);
+
+    } else {
+
+        $stmt = $conn->prepare("
+            UPDATE p_previous_medical_records 
+            SET condition_name = ?, 
+                diagnosis_date = ?, 
+                notes = ?
+            WHERE patient_id = ?
+        ");
+
+        if (!$stmt) {
+            throw new Exception("Prepare failed: " . $conn->error);
+        }
+
+        $condition_name = $_POST['condition_name'] ?? '';
+        $diagnosis_date = $_POST['diagnosis_date'] ?? null;
+        $notes = $_POST['notes'] ?? '';
+
+        $stmt->bind_param(
+            "sssi",
+            $condition_name,
+            $diagnosis_date,
+            $notes,
+            $patient_id
+        );
+    }
+
+    if (!$stmt->execute()) {
+        throw new Exception("Medical history update failed: " . $stmt->error);
+    }
+
+    $stmt->close();
+}
 
         // Commit if everything is successful
         $conn->commit();

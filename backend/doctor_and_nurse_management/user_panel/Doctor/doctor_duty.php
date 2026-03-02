@@ -121,7 +121,8 @@ class Duty
         $sql = "
         SELECT 
             d.*,
-            CONCAT(pat.fname, ' ', pat.lname) AS patient_name,
+            COALESCE(CONCAT(p1.fname, ' ', p1.lname), CONCAT(p2.fname, ' ', p2.lname)) AS patient_name,
+            COALESCE(p1.patient_id, p2.patient_id) AS resolved_pat_id,
             r.resultID,
             r.result AS lab_result,
             r.status AS lab_status,
@@ -129,9 +130,10 @@ class Duty
             r.received_by AS lab_received_by,
             r.scheduleID
         FROM duty_assignments d
-        INNER JOIN p_appointments a ON d.appointment_id = a.appointment_id
-        INNER JOIN patientinfo pat ON a.patient_id = pat.patient_id
-        LEFT JOIN dl_results r ON r.patientID = pat.patient_id
+        LEFT JOIN p_appointments a ON d.appointment_id = a.appointment_id
+        LEFT JOIN patientinfo p1 ON a.patient_id = p1.patient_id
+        LEFT JOIN patientinfo p2 ON d.patient_id = p2.patient_id
+        LEFT JOIN dl_results r ON r.patientID = COALESCE(p1.patient_id, p2.patient_id)
         WHERE d.status != 'Completed'
         ";
 
@@ -516,6 +518,13 @@ class DoctorDutyController
     }
 }
 
+$admittedPatients = mysqli_query($conn, "
+    SELECT patient_id, fname, mname, lname 
+    FROM patientinfo 
+    WHERE admission_type != 'Registered Patient'
+    ORDER BY lname ASC
+");
+
 $controller = new DoctorDutyController($conn);
 $user = $controller->authenticate();
 $controller->handleActions();
@@ -654,12 +663,12 @@ if (class_exists('Prescription')) {
                     <span style="font-size: 18px;">Performance and Evaluation</span>
                 </a>
             </li>
-             <li class="sidebar-item">
+            <li class="sidebar-item">
                 <a href="leave_request.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" class="bi bi-person-walking" viewBox="0 0 16 16">
-                        <path d="M9.5 1.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0M6.44 3.752A.75.75 0 0 1 7 3.5h1.445c.742 0 1.32.643 1.243 1.38l-.43 4.083a1.8 1.8 0 0 1-.088.395l-.318.906.213.242a.8.8 0 0 1 .114.175l2 4.25a.75.75 0 1 1-1.357.638l-1.956-4.154-1.68-1.921A.75.75 0 0 1 6 8.96l.138-2.613-.435.489-.464 2.786a.75.75 0 1 1-1.48-.246l.5-3a.75.75 0 0 1 .18-.375l2-2.25Z"/>
-                        <path d="M6.25 11.745v-1.418l1.204 1.375.261.524a.8.8 0 0 1-.12.231l-2.5 3.25a.75.75 0 1 1-1.19-.914zm4.22-4.215-.494-.494.205-1.843.006-.067 1.124 1.124h1.44a.75.75 0 0 1 0 1.5H11a.75.75 0 0 1-.531-.22Z"/>
+                        <path d="M9.5 1.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0M6.44 3.752A.75.75 0 0 1 7 3.5h1.445c.742 0 1.32.643 1.243 1.38l-.43 4.083a1.8 1.8 0 0 1-.088.395l-.318.906.213.242a.8.8 0 0 1 .114.175l2 4.25a.75.75 0 1 1-1.357.638l-1.956-4.154-1.68-1.921A.75.75 0 0 1 6 8.96l.138-2.613-.435.489-.464 2.786a.75.75 0 1 1-1.48-.246l.5-3a.75.75 0 0 1 .18-.375l2-2.25Z" />
+                        <path d="M6.25 11.745v-1.418l1.204 1.375.261.524a.8.8 0 0 1-.12.231l-2.5 3.25a.75.75 0 1 1-1.19-.914zm4.22-4.215-.494-.494.205-1.843.006-.067 1.124 1.124h1.44a.75.75 0 0 1 0 1.5H11a.75.75 0 0 1-.531-.22Z" />
                     </svg>
                     <span style="font-size: 18px;">Leave Request</span>
                 </a>
@@ -668,7 +677,7 @@ if (class_exists('Prescription')) {
                 <a href="payslip_viewing.php" class="sidebar-link" data-bs-toggle="#" data-bs-target="#"
                     aria-expanded="false" aria-controls="auth">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" class="bi bi-file-earmark-text-fill" viewBox="0 0 16 16">
-                        <path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1M4.5 9a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1zM4 10.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 0 1z"/>
+                        <path d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1M4.5 9a.5.5 0 0 1 0-1h7a.5.5 0 0 1 0 1zM4 10.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 0 1h-7a.5.5 0 0 1-.5-.5m.5 2.5a.5.5 0 0 1 0-1h4a.5.5 0 0 1 0 1z" />
                     </svg>
                     <span style="font-size: 18px;">Payslip Viewing</span>
                 </a>
@@ -990,17 +999,40 @@ if (class_exists('Prescription')) {
                                             <?php
                                             // Show nurse assistant full name using OOP
                                             $nurseName = '';
-                                            if (!empty($duty['nurse_assistant'])) {
+                                            date_default_timezone_set('Asia/Manila');
+                                            $currentHour = (int)date('G'); // 0-23
+                                            $activeNurseId = null;
+
+                                            // Determine active shift based on time rules.
+                                            // Shift 1: 08:00 AM – 04:00 PM (8 -> 15)
+                                            // Shift 2: 04:00 PM – 12:00 AM (16 -> 23)
+                                            // Shift 3: 12:00 AM – 08:00 AM (0 -> 7)
+                                            if (!empty($duty['shift1_nurse_id']) || !empty($duty['shift2_nurse_id']) || !empty($duty['shift3_nurse_id'])) {
+                                                if ($currentHour >= 8 && $currentHour < 16) {
+                                                    $activeNurseId = $duty['shift1_nurse_id'] ?? null;
+                                                } elseif ($currentHour >= 16) {
+                                                    $activeNurseId = $duty['shift2_nurse_id'] ?? null;
+                                                } else {
+                                                    $activeNurseId = $duty['shift3_nurse_id'] ?? null;
+                                                }
+                                            }
+
+                                            // Fallback to legacy field if not a 3-shift setup or shift nurse is missing
+                                            if (empty($activeNurseId) && !empty($duty['nurse_assistant'])) {
+                                                $activeNurseId = $duty['nurse_assistant'];
+                                            }
+
+                                            if (!empty($activeNurseId)) {
                                                 // Use the controller's getAllNurses() to map ID to full name
                                                 foreach ($nurses as $nurse) {
-                                                    if ($nurse['employee_id'] == $duty['nurse_assistant']) {
+                                                    if ($nurse['employee_id'] == $activeNurseId) {
                                                         $nurseName = htmlspecialchars($nurse['full_name']);
                                                         break;
                                                     }
                                                 }
                                             }
                                             ?>
-                                            <td><?= $nurseName ?: '<span class="text-muted">N/A</span>'; ?></td>
+                                            <td><?= $nurseName ? $nurseName . '<br><small class="text-info fw-bold">Active Shift</small>' : '<span class="text-muted">N/A</span>'; ?></td>
                                             <td><?= htmlspecialchars($duty['procedure']); ?></td>
                                             <td>
                                                 <button class="btn btn-info btn-sm" data-bs-toggle="modal"
@@ -1048,10 +1080,15 @@ if (class_exists('Prescription')) {
                                             </td>
                                             <td><?= htmlspecialchars($duty['status']); ?></td>
                                             <td>
+                                                <a href="patient_notes.php?patient_id=<?= urlencode($duty['resolved_pat_id'] ?? $duty['patient_id']); ?>"
+                                                    class="btn btn-primary btn-sm mb-1"
+                                                    title="View or Add Patient Medical Notes">
+                                                    <i class="fas fa-notes-medical"></i> Patient Notes
+                                                </a><br>
                                                 <a href="doctor_duty.php?complete_duty_id=<?= urlencode($duty['duty_id']); ?>"
-                                                    class="btn btn-success btn-sm"
+                                                    class="btn btn-success btn-sm mt-1"
                                                     onclick="return confirm('Mark this duty as completed?');">
-                                                    Mark as Completed
+                                                    <i class="fas fa-check"></i> Complete
                                                 </a>
                                             </td>
                                         </tr>
@@ -1086,11 +1123,21 @@ if (class_exists('Prescription')) {
                             <!-- Header Section -->
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h2></h2>
-                                <div>
-                                    <!-- Button trigger modal -->
-                                    <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                                <div class="d-flex gap-2">
+                                    <!-- Add Normal Prescription -->
+                                    <button type="button"
+                                        class="btn btn-primary"
+                                        data-bs-toggle="modal"
                                         data-bs-target="#prescriptionModal">
                                         Add Prescription
+                                    </button>
+
+                                    <!-- Add Scheduled Prescription -->
+                                    <button type="button"
+                                        class="btn btn-success"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#schedulePrescriptionModal">
+                                        Schedule Prescription
                                     </button>
                                 </div>
                             </div>
@@ -1099,6 +1146,120 @@ if (class_exists('Prescription')) {
 
                             <!-- Modal -->
                             <!-- Prescription Modal -->
+                            <!-- Schedule Prescription Modal -->
+                            <div class="modal fade" id="schedulePrescriptionModal" tabindex="-1">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Schedule Medication</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+
+                                        <form action="schedule_prescription_process.php" method="POST">
+                                            <div class="modal-body">
+
+                                                <div class="row">
+                                                    <div class="col-md-6 mb-3">
+                                                        <label>Select Patient</label>
+                                                        <select name="patient_id" class="form-control" required>
+                                                            <option value="">-- Select Admitted Patient --</option>
+
+                                                            <?php while ($row = mysqli_fetch_assoc($admittedPatients)) { ?>
+                                                                <option value="<?= $row['patient_id']; ?>">
+                                                                    <?= $row['lname']; ?>,
+                                                                    <?= $row['fname']; ?>
+                                                                    <?= $row['mname']; ?>
+                                                                </option>
+                                                            <?php } ?>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-6 mb-3">
+                                                        <label>Medication</label>
+                                                        <select name="med_id" id="medicationSelect" class="form-control" required>
+                                                            <option value="">-- Select Medication --</option>
+                                                            <?php foreach ($medicines as $med) { ?>
+                                                                <option
+                                                                    value="<?= $med['med_id']; ?>"
+                                                                    data-dosage="<?= $med['dosage']; ?>">
+                                                                    <?= $med['generic_name']; ?>
+                                                                    <?php if (!empty($med['brand_name'])) { ?>
+                                                                        (<?= $med['brand_name']; ?>)
+                                                                    <?php } ?>
+                                                                </option>
+                                                            <?php } ?>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="col-md-6 mb-3">
+                                                        <label>Dosage</label>
+                                                        <input type="text"
+                                                            name="dosage"
+                                                            id="dosageInput"
+                                                            class="form-control"
+                                                            required>
+                                                    </div>
+
+                                                    <div class="col-md-6 mb-3">
+                                                        <label>Route</label>
+                                                        <select name="route" class="form-control">
+                                                            <option>Oral</option>
+                                                            <option>IV</option>
+                                                            <option>IM</option>
+                                                            <option>Subcutaneous</option>
+                                                        </select>
+                                                    </div>
+
+                                                    <div class="col-md-6 mb-3">
+                                                        <label for="frequency">Frequency</label>
+                                                        <div class="input-group">
+                                                            <select class="form-select" id="frequencySelect" name="frequency" required>
+                                                                <option value="" disabled selected>Select frequency</option>
+                                                                <option value="1x a day">1x a day</option>
+                                                                <option value="2x a day">2x a day</option>
+                                                                <option value="3x a day">3x a day</option>
+                                                                <option value="Every 6 hours">Every 6 hours</option>
+                                                                <option value="Every 8 hours">Every 8 hours</option>
+                                                                <option value="Every 12 hours">Every 12 hours</option>
+                                                                <option value="Other">Other / Custom</option>
+                                                            </select>
+                                                            <input type="text" class="form-control d-none" id="frequencyCustom" placeholder="Enter custom frequency">
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-md-6 mb-3">
+                                                        <label>Duration (Days)</label>
+                                                        <input type="number" name="duration_days"
+                                                            class="form-control" required>
+                                                    </div>
+
+                                                    <div class="col-md-6 mb-3">
+                                                        <label>Start Date</label>
+                                                        <input type="datetime-local"
+                                                            name="start_date"
+                                                            class="form-control" required>
+                                                    </div>
+
+                                                    <div class="col-12 mb-3">
+                                                        <label>Special Instructions</label>
+                                                        <textarea name="special_instructions"
+                                                            class="form-control"></textarea>
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+
+                                            <div class="modal-footer">
+                                                <button type="submit" class="btn btn-success">
+                                                    Save Schedule
+                                                </button>
+                                            </div>
+                                        </form>
+
+                                    </div>
+                                </div>
+                            </div>
                             <div class="modal fade" id="prescriptionModal" tabindex="-1"
                                 aria-labelledby="prescriptionModalLabel" aria-hidden="true">
                                 <div class="modal-dialog modal-lg">
@@ -1361,6 +1522,40 @@ if (class_exists('Prescription')) {
                             "<p class='text-danger'>⚠️ Error loading results.</p>";
                     });
             });
+        });
+    </script>
+    <script>
+        // Show custom input if 'Other' is selected
+        const freqSelect = document.getElementById('frequencySelect');
+        const freqCustom = document.getElementById('frequencyCustom');
+
+        freqSelect.addEventListener('change', function() {
+            if (this.value === 'Other') {
+                freqCustom.classList.remove('d-none');
+                freqCustom.required = true;
+                freqCustom.focus();
+            } else {
+                freqCustom.classList.add('d-none');
+                freqCustom.required = false;
+                freqCustom.value = '';
+            }
+        });
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+
+            let medSelect = document.getElementById('medicationSelect');
+
+            if (medSelect) {
+                medSelect.addEventListener('change', function() {
+
+                    let selectedOption = this.options[this.selectedIndex];
+                    let dosage = selectedOption.getAttribute('data-dosage');
+
+                    document.getElementById('dosageInput').value = dosage ? dosage : '';
+                });
+            }
+
         });
     </script>
     <script src="../../assets/Bootstrap/all.min.js"></script>

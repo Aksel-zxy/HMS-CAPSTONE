@@ -83,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <!-- ----- Serach Bar ----- -->
             <div class="search-bar">
                 <form method="GET" action="list_of_doctors.php">
-                    <input type="text" name="search" placeholder="Search by Employee ID..." value="<?= htmlspecialchars($search); ?>">
+                    <input type="text" name="search" placeholder="Search Employee ID/Name.." value="<?= htmlspecialchars($search); ?>">
                         <select name="status">
                             <option value="">All Status</option>
                             <option value="Active" <?= ($status === 'Active') ? 'selected' : ''; ?>>Active</option>
@@ -110,8 +110,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <th>#</th>
                         <th>Employee ID</th>
                         <th>License Number</th>
-                        <th>Full Name</th>
-                        <th>Department</th> 
+                        <th>Employee Name</th>
+                        <th>Department</th>
+                        <th>Role</th>
                         <th>Specialization</th> 
                         <th>Status</th>
                         <th>Actions</th>
@@ -138,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             ?>
                         </td>
                         <td><?= htmlspecialchars($row['department'] ?? '') ?></td>
-
+                        <td><?= htmlspecialchars($row['role'] ?? '') ?></td>
                         <td><?= htmlspecialchars($row['specialization'] ?? '') ?></td>
                         <td>
                             <?php
@@ -478,6 +479,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>Transcription of Records:</label>
                     <input type="file" name="tor" accept=".pdf,.jpg,.jpeg,.png">
 
+                    <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>NBI Clearance / Police Clearance:</label>
+                    <input type="file" name="nbi_clearance" accept=".pdf,.jpg,.jpeg,.png">
+
                     <label><span style="color: red;font-weight: bold;font-size: 15px;">*</span>2x2 Formal Picture:</label>
                     <input type="file" name="id_picture" accept=".pdf,.jpg,.jpeg,.png">
 
@@ -500,7 +504,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const rows = table.querySelectorAll("tbody tr");
             const pagination = document.getElementById("pagination");
 
-            let rowsPerPage = 10;
+            let rowsPerPage = 50;
             let currentPage = 1;
             let totalPages = Math.ceil(rows.length / rowsPerPage);
 

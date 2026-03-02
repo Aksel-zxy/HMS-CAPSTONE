@@ -31,6 +31,10 @@ $totalNurses     = $employee->countByProfession('Nurse');
 $totalPharma     = $employee->countByProfession('Pharmacist');
 $totalAccountant = $employee->countByProfession('Accountant');
 $totalLab        = $employee->countByProfession('Laboratorist');
+$totalITSupport  = $employee->countByProfession('IT Support');
+$totalJanitor    = $employee->countByProfession('Janitor');
+$totalSecurityGuard = $employee->countByProfession('Security Guard');
+$totalElectricalTech = $employee->countByProfession('Electrical Technician');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['applicant_id'], $_POST['status'])) {
     $applicantId = (int) $_POST['applicant_id'];
@@ -187,10 +191,10 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
 
                 <ul id="geraldddd" class="sidebar-dropdown list-unstyled collapse" data-bs-parent="#sidebar">
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
+                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
                     </li>
                     <li class="sidebar-item">
-                        <a href="../payroll_compensation_benifits_module/compensation_benifits.php" class="sidebar-link">Compensation & Benifits</a>
+                        <a href="../payroll_compensation_benifits_module/salary_computation.php" class="sidebar-link">Salary Computation</a>
                     </li>
                     <li class="sidebar-item">
                         <a href="../payroll_compensation_benifits_module/payroll_reports.php" class="sidebar-link">Payroll Reports</a>
@@ -297,6 +301,8 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
             
             <!-- ----- Card-List of Employees ----- -->
             <p style="text-align: center; font-size: 35px; font-weight: bold; padding-bottom: 20px; color: #0047ab;">Registration of Applicant</p>
+            
+            <p style="text-align: center; font-size: 25px; font-weight: bold; color: #0047ab;">List of Medical Personnel</p>
 
             <div class="row1">
                 <div class="card">
@@ -314,9 +320,7 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
                         <a href="list_of_nurses.php" class="list">List Of Nurses...</a>
                     </div>
                 </div>
-            </div>
 
-            <div class="row2">
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Pharmacist</h5>
@@ -327,21 +331,58 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
 
                 <div class="card">
                     <div class="card-body">
+                        <h5 class="card-title">Medical Technologists</h5>
+                        <p class="card-text">There are currently <strong><?php echo $totalLab; ?></strong> active medical technologists registered.</p>
+                        <a href="list_of_laboratorist.php" class="list">List Of Medical Technologists...</a>
+                    </div>
+                </div>
+
+            </div>
+
+            <br />
+            <br />
+
+            <p style="text-align: center; font-size: 25px; font-weight: bold; color: #0047ab;">List of Non-Medical Personnel</p>
+
+            <div class="row2">
+                <div class="card">
+                    <div class="card-body">
                         <h5 class="card-title">Accountant</h5>
                         <p class="card-text">There are currently <strong><?php echo $totalAccountant; ?></strong> active accountant registered.</p>
                         <a href="list_of_accountants.php" class="list">List Of Accountant...</a>
                     </div>
                 </div>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">IT Support</h5>
+                        <p class="card-text">There are currently <strong><?php echo $totalITSupport; ?></strong> active IT support registered.</p>
+                        <a href="list_of_it_support.php" class="list">List Of IT Support...</a>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Janitor</h5>
+                        <p class="card-text">There are currently <strong><?php echo $totalJanitor; ?></strong> active janitor registered.</p>
+                        <a href="list_of_janitors.php" class="list">List Of Janitor...</a>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Security Guard</h5>
+                        <p class="card-text">There are currently <strong><?php echo $totalSecurityGuard; ?></strong> active security guard registered.</p>
+                        <a href="list_of_security_guards.php" class="list">List Of Security Guard...</a>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Electrical Technician</h5>
+                        <p class="card-text">There are currently <strong><?php echo $totalElectricalTech; ?></strong> active electrical technician registered.</p>
+                        <a href="list_of_electrical_technicians.php" class="list">List Of Electrical Technician...</a>
+                    </div>
+                </div>
             </div>
 
             <div class="row3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Laboratorist</h5>
-                        <p class="card-text">There are currently <strong><?php echo $totalLab; ?></strong> active laboratorist registered.</p>
-                        <a href="list_of_laboratorist.php" class="list">List Of Laboratorist...</a>
-                    </div>
-                </div>
             </div>
             <!-- END CODING HERE -->
 
@@ -359,7 +400,6 @@ $hiredApplicants = $applicantObj->getReadyForRegistration();
         window.addEventListener("load", function(){
             setTimeout(function(){
                 document.getElementById("loading-screen").style.display = "none";
-                document.body.classList.add("show-cards");
             }, 2000);
         });
 
