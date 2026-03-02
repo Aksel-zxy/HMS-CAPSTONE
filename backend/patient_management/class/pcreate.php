@@ -98,14 +98,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if ($success && !empty($data['bed_id'])) {
 
+    // 1️⃣ Update bed status
     $updateBed = $conn->prepare("
         UPDATE p_beds 
         SET status = 'occupied' 
         WHERE bed_id = ?
     ");
-
     $updateBed->bind_param("i", $data['bed_id']);
     $updateBed->execute();
+
+    // 2️⃣ Insert into p_bed_assignment
+    $assignBed = $conn->prepare("
+        INSERT INTO p_bed_assignments 
+        (patient_id, bed_id, assigned_date)
+        VALUES (?, ?, NOW())
+    ");
+
+    $assignBed->bind_param(
+        "ii",
+        $data['patient_id'],
+        $data['bed_id']
+    );
+
+    $assignBed->execute();
 }
     // ✅ 4️⃣ LOG AFTER SUCCESSFUL INSERT
     if ($success) {

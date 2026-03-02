@@ -147,6 +147,22 @@ $admission = new PatientAdmission($conn);
     </div>
 </div>
 <script>
+    
+document.getElementById('patient_search').addEventListener('input', function() {
+    const input = this.value;
+    const options = document.getElementById('patientsList').options;
+    const hiddenId = document.getElementById('patient_id');
+
+    hiddenId.value = ''; // reset first
+
+    for (let i = 0; i < options.length; i++) {
+        if (options[i].value === input) {
+            hiddenId.value = options[i].getAttribute('data-id');
+            break;
+        }
+    }
+});
+
 document.getElementById('doctor').addEventListener('change', function() {
     const doctorId = this.value;
     const panel = document.getElementById('doctor-schedule-panel');
